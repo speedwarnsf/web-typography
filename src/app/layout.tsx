@@ -50,6 +50,7 @@ const spectral = Spectral({ subsets: ["latin"], variable: "--font-spectral", wei
 export const metadata: Metadata = {
   title: "Web Typography -- A Resource for Designers",
   description: "Typographic rules, font pairings, and practical tips for beautiful web text.",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

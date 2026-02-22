@@ -72,7 +72,7 @@ function AnimationCard({
   category,
   when,
   whenNot,
-  demo,
+  Demo,
   cssCode,
   reactCode,
 }: {
@@ -80,17 +80,26 @@ function AnimationCard({
   category: string;
   when: string;
   whenNot: string;
-  demo: React.ReactNode;
+  Demo: React.ComponentType;
   cssCode: string;
   reactCode: string;
 }) {
   const [tab, setTab] = useState<"css" | "react">("css");
+  const [replayKey, setReplayKey] = useState(0);
   return (
     <div className="border border-neutral-800 bg-neutral-950/50" style={{ borderRadius: 0 }}>
       <div className="p-6 sm:p-8 border-b border-neutral-800">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-1">
-          {category}
-        </p>
+        <div className="flex items-start justify-between mb-1">
+          <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+            {category}
+          </p>
+          <button
+            onClick={() => setReplayKey(k => k + 1)}
+            className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] transition-colors border border-neutral-800 px-2 py-1 hover:border-[#B8963E]"
+          >
+            Replay
+          </button>
+        </div>
         <h3
           className="text-2xl font-bold tracking-tight mb-4"
           style={{ fontFamily: "var(--font-playfair)" }}
@@ -100,7 +109,7 @@ function AnimationCard({
 
         {/* Live demo */}
         <div className="p-6 bg-[#0a0a0a] border border-neutral-800 mb-6 min-h-[120px] flex items-center overflow-hidden">
-          {demo}
+          <Demo key={replayKey} />
         </div>
 
         {/* Taste guidance */}
@@ -1137,7 +1146,7 @@ export default function AnimationsPage() {
               category="Entrance"
               when="Hero headlines, section titles on landing pages. Draws the eye naturally."
               whenNot="Body paragraphs or UI text. Staggering long content feels slow and annoying."
-              demo={<FadeUpStaggerDemo />}
+              Demo={FadeUpStaggerDemo}
               cssCode={snippets.fadeUpStagger.css}
               reactCode={snippets.fadeUpStagger.react}
             />
@@ -1146,7 +1155,7 @@ export default function AnimationsPage() {
               category="Entrance"
               when="Short, impactful phrases -- brand names, taglines, pull quotes."
               whenNot="Anything longer than 30 characters. Per-letter animation on a paragraph is torture."
-              demo={<CharacterRevealDemo />}
+              Demo={CharacterRevealDemo}
               cssCode={snippets.characterReveal.css}
               reactCode={snippets.characterReveal.react}
             />
@@ -1155,7 +1164,7 @@ export default function AnimationsPage() {
               category="Entrance"
               when="Multi-line quotes, testimonials, step-by-step instructions."
               whenNot="Dense body copy. The clip-path wipe implies sequence -- don't use it where order does not matter."
-              demo={<LineRevealDemo />}
+              Demo={LineRevealDemo}
               cssCode={snippets.lineReveal.css}
               reactCode={snippets.lineReveal.react}
             />
@@ -1164,7 +1173,7 @@ export default function AnimationsPage() {
               category="Entrance"
               when="Terminal aesthetics, code-themed sites, command-line interfaces."
               whenNot="Serif or editorial contexts. The monospace cursor breaks the typographic voice."
-              demo={<TypewriterDemo />}
+              Demo={TypewriterDemo}
               cssCode={snippets.typewriter.css}
               reactCode={snippets.typewriter.react}
             />
@@ -1191,7 +1200,7 @@ export default function AnimationsPage() {
               category="Emphasis"
               when="Navigation links, interactive labels, variable-font-powered interfaces."
               whenNot="Static text or fonts without weight axis. Without a variable font, the jump is harsh."
-              demo={<WeightShiftDemo />}
+              Demo={WeightShiftDemo}
               cssCode={snippets.weightShift.css}
               reactCode={snippets.weightShift.react}
             />
@@ -1200,7 +1209,7 @@ export default function AnimationsPage() {
               category="Emphasis"
               when="Navigation links, call-to-action text, inline links in editorial content."
               whenNot="Every link on the page. If everything draws, nothing stands out."
-              demo={<UnderlineDrawDemo />}
+              Demo={UnderlineDrawDemo}
               cssCode={snippets.underlineDraw.css}
               reactCode={snippets.underlineDraw.react}
             />
@@ -1209,7 +1218,7 @@ export default function AnimationsPage() {
               category="Emphasis"
               when="Key phrases in articles, feature highlights, marketing copy."
               whenNot="Headings (too heavy) or body text (too distracting for continuous reading)."
-              demo={<HighlightSweepDemo />}
+              Demo={HighlightSweepDemo}
               cssCode={snippets.highlightSweep.css}
               reactCode={snippets.highlightSweep.react}
             />
@@ -1218,7 +1227,7 @@ export default function AnimationsPage() {
               category="Emphasis"
               when="Uppercase labels, navigation items, short headings."
               whenNot="Lowercase body text. Expanding letter spacing on lowercase makes it harder to read."
-              demo={<LetterSpacingDemo />}
+              Demo={LetterSpacingDemo}
               cssCode={snippets.letterSpacing.css}
               reactCode={snippets.letterSpacing.react}
             />
@@ -1245,7 +1254,7 @@ export default function AnimationsPage() {
               category="Transition"
               when="Hero text, dramatic reveals, content that loads progressively."
               whenNot="Repeated elements or lists. The blur effect loses impact when overused."
-              demo={<BlurToSharpDemo />}
+              Demo={BlurToSharpDemo}
               cssCode={snippets.blurToSharp.css}
               reactCode={snippets.blurToSharp.react}
             />
@@ -1254,7 +1263,7 @@ export default function AnimationsPage() {
               category="Transition"
               when="Data visualization headings, scroll-storytelling, mood-driven pages."
               whenNot="Accessibility-critical text. Changing color on scroll can confuse screen readers and break contrast ratios."
-              demo={<ColorShiftDemo />}
+              Demo={ColorShiftDemo}
               cssCode={snippets.colorShift.css}
               reactCode={snippets.colorShift.react}
             />
@@ -1263,7 +1272,7 @@ export default function AnimationsPage() {
               category="Transition"
               when="Section transitions, dramatic reveals, short impactful phrases."
               whenNot="Long sentences. The splitting effect becomes chaotic with too many words."
-              demo={<SplitRejoinDemo />}
+              Demo={SplitRejoinDemo}
               cssCode={snippets.splitRejoin.css}
               reactCode={snippets.splitRejoin.react}
             />
@@ -1290,7 +1299,7 @@ export default function AnimationsPage() {
               category="Scrolling"
               when="Landing pages, editorial long-reads, section headers with supporting body text."
               whenNot="Mobile-first designs. Parallax effects can feel janky on touch devices."
-              demo={<ParallaxDemo />}
+              Demo={ParallaxDemo}
               cssCode={snippets.parallax.css}
               reactCode={snippets.parallax.react}
             />
@@ -1299,7 +1308,7 @@ export default function AnimationsPage() {
               category="Scrolling"
               when="Storytelling, long-form narratives, manifesto-style content."
               whenNot="Content users need to scan quickly. Forced sequential reading frustrates skimmers."
-              demo={<ProgressiveRevealDemo />}
+              Demo={ProgressiveRevealDemo}
               cssCode={snippets.progressiveReveal.css}
               reactCode={snippets.progressiveReveal.react}
             />
@@ -1308,7 +1317,7 @@ export default function AnimationsPage() {
               category="Scrolling"
               when="Hero headings, dramatic single-word titles, section transitions."
               whenNot="Body text or anything meant to be read. Scaling distorts readability."
-              demo={<ScaleOnScrollDemo />}
+              Demo={ScaleOnScrollDemo}
               cssCode={snippets.scaleOnScroll.css}
               reactCode={snippets.scaleOnScroll.react}
             />
