@@ -236,25 +236,25 @@ export default function Home() {
                   {rule.description}
                 </p>
 
-                <div className="grid sm:grid-cols-2 gap-6 mb-6">
-                  <div className="p-5 bg-neutral-900 border border-neutral-800">
-                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-500 mb-4">
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="p-4 border border-red-900/40 bg-red-950/20">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 mb-3">
                       Before
                     </p>
                     <p
-                      className="text-[15px] leading-[1.75] text-neutral-300"
+                      className="text-[13px] leading-[1.7] text-neutral-400"
                       style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
                       data-no-typeset
                     >
                       {rule.beforeLines.join("\n")}
                     </p>
                   </div>
-                  <div className="p-5 bg-neutral-900 border border-neutral-800">
-                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-500 mb-4">
+                  <div className="p-4 border border-emerald-900/40 bg-emerald-950/20">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 mb-3">
                       After
                     </p>
                     <p
-                      className="text-[15px] leading-[1.75] text-neutral-300"
+                      className="text-[13px] leading-[1.7] text-neutral-300"
                       style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
                       data-no-typeset
                     >
