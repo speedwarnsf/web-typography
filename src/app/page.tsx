@@ -242,8 +242,8 @@ export default function Home() {
                       Before
                     </p>
                     <p
-                      className="text-[13px] leading-[1.7] text-neutral-400"
-                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
+                      className="text-[12px] leading-[1.65] text-neutral-400"
+                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre" }}
                       data-no-typeset
                     >
                       {rule.beforeLines.join("\n")}
@@ -254,8 +254,8 @@ export default function Home() {
                       After
                     </p>
                     <p
-                      className="text-[13px] leading-[1.7] text-neutral-300"
-                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
+                      className="text-[12px] leading-[1.65] text-neutral-300"
+                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre" }}
                       data-no-typeset
                     >
                       {rule.afterLines.join("\n")}
