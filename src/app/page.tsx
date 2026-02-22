@@ -267,6 +267,7 @@ export default function Home() {
         <div className="mt-12 flex gap-8 text-xs font-mono uppercase tracking-widest text-neutral-600">
           <a href="#rules" className="hover:text-[#B8963E] transition-colors">Rules</a>
           <a href="#pairings" className="hover:text-[#B8963E] transition-colors">Pairings</a>
+          <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
           <a href="#tips" className="hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="#utility" className="hover:text-[#B8963E] transition-colors">Utility</a>
         </div>

@@ -23,6 +23,7 @@ import {
   Spectral,
 } from "next/font/google";
 import "./globals.css";
+import GlobalTypeset from "@/components/GlobalTypeset";
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans", display: "swap" });
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${fontVars} antialiased bg-[#0a0a0a] text-neutral-200`}>
         {children}
+        <GlobalTypeset />
       </body>
     </html>
   );
