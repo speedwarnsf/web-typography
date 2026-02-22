@@ -268,6 +268,7 @@ export default function Home() {
           <a href="#rules" className="hover:text-[#B8963E] transition-colors">Rules</a>
           <a href="#pairings" className="hover:text-[#B8963E] transition-colors">Pairings</a>
           <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
+          <a href="/animations" className="hover:text-[#B8963E] transition-colors">Animations</a>
           <a href="#tips" className="hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="#utility" className="hover:text-[#B8963E] transition-colors">Utility</a>
         </div>
