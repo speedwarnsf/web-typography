@@ -348,8 +348,114 @@ h1, h2, h3 {
 <body>
   <h1>${headingText}</h1>
   <p>${rawText}</p>
+  <script>
+  // typeset.js — include this for automatic typographic refinement
+  // Get the full script at web-typography.vercel.app/pairing-cards
+  </script>
 </body>
 </html>`;
+
+  const typesetJS = `/**
+ * typeset.js — Typographic refinement for the web
+ * Prevents orphans, binds short words, protects sentence boundaries.
+ * From web-typography.vercel.app
+ *
+ * Usage:
+ *   typesetText(string) — returns string with non-breaking spaces
+ *   typeset(element)    — processes all text nodes in a DOM element
+ *   typesetAll(selector) — processes all matching elements
+ *
+ * Drop-in: add typesetAll('p, h1, h2, h3, h4, li') on DOMContentLoaded
+ */
+
+const NBSP = '\\u00A0';
+
+function isSentenceEnd(word) {
+  return /[.!?]$/.test(word) || /[.!?]["'\\u201D\\u2019]$/.test(word);
+}
+
+function typesetText(text) {
+  if (!text || text.length < 10) return text;
+  const words = text.split(/\\s+/).filter(Boolean);
+  if (words.length < 3) return text;
+  const result = [];
+  const shortWords = ['a','an','the','to','in','on','of','is','it','or','at','by','if','no','so','up','as','we','my','do','be'];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const prevWord = i > 0 ? words[i - 1] : null;
+    const nextWord = i < words.length - 1 ? words[i + 1] : null;
+
+    // Rule 1: No orphans — last two words always bound
+    if (i === words.length - 2) {
+      result.push(word + NBSP + words[i + 1]);
+      break;
+    }
+
+    // Rule 2: Sentence-start protection
+    if (prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
+      if (word.length <= 6) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
+    }
+
+    // Rule 3: Sentence-end protection (short punctuated words)
+    if (/[.!?,;:]$/.test(word) && word.length <= 7 && result.length > 0) {
+      const last = result.pop();
+      result.push(last + NBSP + word);
+      continue;
+    }
+
+    // Rule 3b: Bind with next short punctuated word
+    if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
+      result.push(word + NBSP + words[i + 1]);
+      i++;
+      continue;
+    }
+
+    // Rule 4: Short word binding (prepositions, articles)
+    // Binds to BOTH previous and next word
+    if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
+      if (result.length > 0) {
+        const prev = result.pop();
+        result.push(prev + NBSP + word + NBSP + words[i + 1]);
+      } else {
+        result.push(word + NBSP + words[i + 1]);
+      }
+      i++;
+      continue;
+    }
+
+    result.push(word);
+  }
+  return result.join(' ');
+}
+
+function typeset(element) {
+  if (!element) return;
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+  const nodes = [];
+  let node;
+  while ((node = walker.nextNode())) nodes.push(node);
+  for (const textNode of nodes) {
+    const original = textNode.textContent;
+    if (!original || original.trim().length < 10) continue;
+    const leading = original.match(/^\\s*/)?.[0] || '';
+    const trailing = original.match(/\\s*$/)?.[0] || '';
+    textNode.textContent = leading + typesetText(original.trim()) + trailing;
+  }
+}
+
+function typesetAll(selector) {
+  document.querySelectorAll(selector).forEach(typeset);
+}
+
+// Auto-run on page load
+document.addEventListener('DOMContentLoaded', function() {
+  typesetAll('p, h1, h2, h3, h4, li, blockquote, figcaption');
+});`;
 
   const [showCode, setShowCode] = useState(false);
   const [copiedField, setCopiedField] = useState("");
@@ -649,10 +755,30 @@ h1, h2, h3 {
                       </pre>
                     </div>
 
+                    {/* Typeset.js */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">Typeset.js -- rag control + word binding</p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(typesetJS);
+                            setCopiedField("js");
+                            setTimeout(() => setCopiedField(""), 2000);
+                          }}
+                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                        >
+                          {copiedField === "js" ? "Copied" : "Copy JS"}
+                        </button>
+                      </div>
+                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {typesetJS}
+                      </pre>
+                    </div>
+
                     {/* Share Code */}
                     <button
                       onClick={async () => {
-                        const codeBundle = `/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}`;
+                        const codeBundle = `/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}\n\n/* === TYPESET.JS === */\n${typesetJS}`;
                         if (navigator.share) {
                           try {
                             const file = new File([codeBundle], `type-specimen-${heading.replace(/\s+/g, "-")}-${body.replace(/\s+/g, "-")}.txt`, { type: "text/plain" });
@@ -665,7 +791,7 @@ h1, h2, h3 {
                             }
                           } catch {}
                         }
-                        await navigator.clipboard.writeText(`/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}`);
+                        await navigator.clipboard.writeText(`/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}\n\n/* === TYPESET.JS === */\n${typesetJS}`);
                         setCopiedField("all");
                         setTimeout(() => setCopiedField(""), 2000);
                       }}
