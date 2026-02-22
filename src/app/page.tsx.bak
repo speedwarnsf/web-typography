@@ -14,34 +14,13 @@ const typesetFullCode = (() => {
   }
 })();
 
-// Each rule uses explicit line arrays with markup segments.
-// Lines are rendered with <br/> for device-independent display.
-// Segments can be plain strings or { text, mark } objects for highlighting.
-type Seg = string | { text: string; mark: "bad" | "good" };
-type Rule = {
-  name: string;
-  description: string;
-  beforeLines: Seg[];
-  afterLines: Seg[];
-  code: string;
-};
-
-const rules: Rule[] = [
+const rules = [
   {
     name: "No Orphans",
     description:
       "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
-    beforeLines: [
-      "Good typography is invisible.",
-      "Great typography speaks",
-      "without ever being",
-      { text: "noticed.", mark: "bad" },
-    ],
-    afterLines: [
-      "Good typography is invisible.",
-      "Great typography speaks",
-      { text: "without ever being noticed.", mark: "good" },
-    ],
+    before: "Good typography is invisible. Great typography speaks without ever being noticed.",
+    after: "Good typography is invisible. Great typography speaks without ever being\u00A0noticed.",
     code: `export function preventOrphans(text: string): string {
   const lastSpaceIndex = text.lastIndexOf(" ");
   if (lastSpaceIndex === -1) return text;
@@ -54,18 +33,8 @@ const rules: Rule[] = [
     name: "Sentence-Start Protection",
     description:
       "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
-    beforeLines: [
-      "The type was set well.",
-      { text: "She", mark: "bad" },
-      "noticed it immediately and",
-      "appreciated the quiet craft.",
-    ],
-    afterLines: [
-      "The type was set well.",
-      { text: "She noticed", mark: "good" },
-      "it immediately and",
-      "appreciated the quiet craft.",
-    ],
+    before: "The type was set well. She noticed it immediately and appreciated the quiet craft behind it.",
+    after: "The type was set well. She\u00A0noticed it immediately and appreciated the quiet craft behind\u00A0it.",
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
 }`,
@@ -73,17 +42,9 @@ const rules: Rule[] = [
   {
     name: "Sentence-End Protection",
     description:
-      "Prevent short words (1\u20133 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
-    beforeLines: [
-      "Every decision you make",
-      "adds",
-      { text: "to", mark: "bad" },
-      { text: "it.", mark: "bad" },
-    ],
-    afterLines: [
-      "Every decision you make",
-      { text: "adds to it.", mark: "good" },
-    ],
+      "Prevent short words (1-3 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
+    before: "The details are what separate good work from great. Every decision you make adds to it.",
+    after: "The details are what separate good work from great. Every decision you make adds to\u00A0it.",
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
 }`,
@@ -92,19 +53,8 @@ const rules: Rule[] = [
     name: "Rag Smoothing",
     description:
       "Detects words that would push a line past the target length and binds them to the previous word, pulling them to the next line. Creates a smoother right edge without justification.",
-    beforeLines: [
-      "Every choice you make in",
-      { text: "typography", mark: "bad" },
-      "either helps the reader or",
-      "gets",
-      { text: "in their way.", mark: "bad" },
-    ],
-    afterLines: [
-      { text: "Every choice you make", mark: "good" },
-      { text: "in typography either helps", mark: "good" },
-      { text: "the reader or gets", mark: "good" },
-      { text: "in their way.", mark: "good" },
-    ],
+    before: "Every choice you make in typography either helps the reader or gets in their way.",
+    after: "Every choice you make in\u00A0typography either helps the reader or gets in\u00A0their\u00A0way.",
     code: `export function smoothRag(text: string, targetLineLength = 65): string {
   const words = text.split(" ");
   let currentLength = 0;
@@ -130,21 +80,9 @@ const rules: Rule[] = [
   {
     name: "Short Word Binding",
     description:
-      "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to neighboring words. Prevents these small words from sitting alone at a line break.",
-    beforeLines: [
-      "She walked",
-      { text: "to", mark: "bad" },
-      "the store and stood",
-      { text: "in", mark: "bad" },
-      "the rain for",
-      { text: "a", mark: "bad" },
-      "while.",
-    ],
-    afterLines: [
-      { text: "She walked to the", mark: "good" },
-      { text: "store and stood in the", mark: "good" },
-      { text: "rain for a while.", mark: "good" },
-    ],
+      "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to the following word with a non-breaking space. Prevents these small words from ending a line alone.",
+    before: "She walked to the store and stood in the rain for a while.",
+    after: "She walked to\u00A0the store and stood in\u00A0the rain for a\u00A0while.",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or|is|it|as|if|so|no|do|up|we|he|me|my|be|am)\\s/gi,
@@ -374,51 +312,29 @@ export default function Home() {
                 </p>
 
                 <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  <div className="p-5 bg-red-950/30 border border-red-900/50">
-                    <p className="text-xs font-mono uppercase tracking-widest text-red-400/60 mb-4">
+                  <div className="p-4 bg-neutral-900 border border-neutral-800">
+                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       Before
                     </p>
-                    <div
-                      className="text-[16px] leading-[2] text-red-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[16px] leading-[1.65] text-red-300"
+                      style={{ fontFamily: "var(--font-source-sans)", width: 240 }}
                       data-no-typeset
                     >
-                      {rule.beforeLines.map((seg, i) => (
-                        <span key={i}>
-                          {i > 0 && <br />}
-                          {typeof seg === "string" ? seg : (
-                            <span style={{
-                              background: "rgba(239,68,68,0.25)",
-                              borderBottom: "2px solid #ef4444",
-                              padding: "1px 4px",
-                            }}>{seg.text}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                      {rule.before}
+                    </p>
                   </div>
-                  <div className="p-5 bg-emerald-950/30 border border-emerald-900/50">
-                    <p className="text-xs font-mono uppercase tracking-widest text-emerald-400/60 mb-4">
+                  <div className="p-4 bg-neutral-900 border border-neutral-800">
+                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       After
                     </p>
-                    <div
-                      className="text-[16px] leading-[2] text-emerald-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[16px] leading-[1.65] text-emerald-300"
+                      style={{ fontFamily: "var(--font-source-sans)", width: 240 }}
                       data-no-typeset
                     >
-                      {rule.afterLines.map((seg, i) => (
-                        <span key={i}>
-                          {i > 0 && <br />}
-                          {typeof seg === "string" ? seg : (
-                            <span style={{
-                              background: "rgba(34,197,94,0.2)",
-                              borderBottom: "2px solid #22c55e",
-                              padding: "1px 4px",
-                            }}>{seg.text}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                      {rule.after}
+                    </p>
                   </div>
                 </div>
               </div>
