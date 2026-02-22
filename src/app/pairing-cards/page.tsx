@@ -241,7 +241,8 @@ function PairingCardBuilder() {
         </p>
       </div>
       <div style="font-family: monospace; font-size: 10px; color: #${fg}44; margin-top: auto; padding-top: 24px; letter-spacing: 0.1em; text-transform: uppercase;">
-        ${heading} ${hSize}px / ${body} ${bSize}px / Leading ${leading} -- web-typography.vercel.app
+        ${heading} ${hSize}px / ${body} ${bSize}px / Leading ${leading}<br/>
+        <span style="font-size: 9px;">fonts.google.com -- web-typography.vercel.app</span>
       </div>
     `;
 
@@ -262,18 +263,22 @@ function PairingCardBuilder() {
     setGenerating(true);
     setGeneratedImages([]);
     try {
-      const [mobile, desktop] = await Promise.all([
+      const [mobile, square] = await Promise.all([
         generatePNG(390, 844, "mobile"),
-        generatePNG(1440, 900, "desktop"),
+        generatePNG(1080, 1080, "square"),
       ]);
       setGeneratedImages([
         { label: "Mobile", dataUrl: mobile, width: 390, height: 844 },
-        { label: "Desktop", dataUrl: desktop, width: 1440, height: 900 },
+        { label: "Square", dataUrl: square, width: 1080, height: 1080 },
       ]);
     } finally {
       setGenerating(false);
     }
   };
+
+  const googleFontsUrl = (font: string) =>
+    `https://fonts.google.com/specimen/${encodeURIComponent(font.replace(/\s+/g, "+"))}`;
+
 
   const downloadImage = (dataUrl: string, label: string) => {
     const link = document.createElement("a");
@@ -333,6 +338,26 @@ function PairingCardBuilder() {
         <aside className="w-full lg:w-80 lg:min-w-[320px] border-r border-neutral-800 p-6 space-y-5 lg:min-h-[calc(100vh-80px)] lg:sticky lg:top-0 lg:overflow-y-auto">
           <FontSearch label="Heading Font" value={heading} onChange={setHeading} />
           <FontSearch label="Body Font" value={body} onChange={setBody} />
+
+          <div className="flex gap-3 text-[10px] font-mono uppercase tracking-widest">
+            <a
+              href={googleFontsUrl(heading)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-500 hover:text-[#B8963E] transition-colors underline underline-offset-2"
+            >
+              {heading} source
+            </a>
+            <span className="text-neutral-700">/</span>
+            <a
+              href={googleFontsUrl(body)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-500 hover:text-[#B8963E] transition-colors underline underline-offset-2"
+            >
+              {body} source
+            </a>
+          </div>
 
           <div className="border-t border-neutral-800 pt-5">
             <Slider label="Heading Size" value={hSize} onChange={setHSize} min={16} max={120} step={1} unit="px" />
