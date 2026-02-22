@@ -191,6 +191,8 @@ function PairingCardBuilder() {
   const [colW, setColW] = useState(Number(searchParams.get("colW")) || 65);
   const [bg, setBg] = useState(searchParams.get("bg") || "0a0a0a");
   const [fg, setFg] = useState(searchParams.get("fg") || "e0e0e0");
+  const [hColor, setHColor] = useState(searchParams.get("hc") || "");
+  const [bColor, setBColor] = useState(searchParams.get("bc") || "");
   const [useCustomText, setUseCustomText] = useState(false);
   const [customText, setCustomText] = useState("");
   const [headingText, setHeadingText] = useState("The Art of Typography");
@@ -208,9 +210,11 @@ function PairingCardBuilder() {
       hSize: String(hSize), bSize: String(bSize),
       leading: String(leading), colW: String(colW),
       bg, fg,
+      ...(hColor ? { hc: hColor } : {}),
+      ...(bColor ? { bc: bColor } : {}),
     });
     router.replace(`?${params.toString()}`, { scroll: false });
-  }, [heading, body, hSize, bSize, leading, colW, bg, fg, router]);
+  }, [heading, body, hSize, bSize, leading, colW, bg, fg, hColor, bColor, router]);
 
   useEffect(() => { updateURL(); }, [updateURL]);
 
@@ -233,10 +237,10 @@ function PairingCardBuilder() {
 
     container.innerHTML = `
       <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: ${colW}ch;">
-        <h1 style="font-family: '${heading}', serif; font-size: ${hSize * (width > 500 ? 1 : 0.7)}px; line-height: 1.15; margin: 0 0 ${width > 500 ? 32 : 20}px 0; font-weight: 700;">
+        <h1 style="font-family: '${heading}', serif; font-size: ${hSize * (width > 500 ? 1 : 0.7)}px; line-height: 1.15; margin: 0 0 ${width > 500 ? 32 : 20}px 0; font-weight: 700; color: #${hColor || fg};">
           ${typesetText(headingText)}
         </h1>
-        <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0;">
+        <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0; color: #${bColor || fg};">
           ${displayText}
         </p>
       </div>
@@ -368,7 +372,22 @@ function PairingCardBuilder() {
 
           <div className="border-t border-neutral-800 pt-5 space-y-4">
             <ColorInput label="Background" value={bg} onChange={setBg} />
-            <ColorInput label="Type Color" value={fg} onChange={setFg} />
+            <ColorInput label="Heading Color" value={hColor || fg} onChange={setHColor} />
+            <ColorInput label="Body Color" value={bColor || fg} onChange={setBColor} />
+            <div>
+              <button
+                type="button"
+                onClick={() => { setHColor(""); setBColor(""); }}
+                className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] transition-colors"
+              >
+                Reset to unified color
+              </button>
+              {(!hColor && !bColor) && (
+                <div className="mt-1">
+                  <ColorInput label="Base Type Color" value={fg} onChange={setFg} />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="border-t border-neutral-800 pt-5">
@@ -435,6 +454,7 @@ function PairingCardBuilder() {
                 lineHeight: 1.15,
                 fontWeight: 700,
                 margin: "0 0 0.5em 0",
+                color: hColor ? `#${hColor}` : undefined,
               }}
             >
               {typesetText(headingText)}
@@ -445,6 +465,7 @@ function PairingCardBuilder() {
                 fontSize: `${bSize}px`,
                 lineHeight: leading,
                 margin: 0,
+                color: bColor ? `#${bColor}` : undefined,
               }}
             >
               {displayText}
