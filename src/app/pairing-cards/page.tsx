@@ -195,6 +195,8 @@ function PairingCardBuilder() {
   const [headingText, setHeadingText] = useState("The Art of Typography");
 
   const specimenRef = useRef<HTMLDivElement>(null);
+  const [generatedImages, setGeneratedImages] = useState<{label: string; dataUrl: string; width: number; height: number}[]>([]);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => { loadGoogleFont(heading); }, [heading]);
   useEffect(() => { loadGoogleFont(body); }, [body]);
@@ -213,7 +215,7 @@ function PairingCardBuilder() {
 
   const displayText = useCustomText && customText ? customText : LOREM;
 
-  const exportPNG = async (width: number, height: number, label: string) => {
+  const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");
 
     const container = document.createElement("div");
@@ -242,23 +244,60 @@ function PairingCardBuilder() {
     `;
 
     document.body.appendChild(container);
-
     await new Promise((r) => setTimeout(r, 500));
 
     const canvas = await html2canvas(container, {
-      width,
-      height,
-      scale: 2,
+      width, height, scale: 2,
       backgroundColor: `#${bg}`,
       useCORS: true,
     });
 
     document.body.removeChild(container);
+    return canvas.toDataURL("image/png");
+  };
 
+  const generateBoth = async () => {
+    setGenerating(true);
+    setGeneratedImages([]);
+    try {
+      const [mobile, desktop] = await Promise.all([
+        generatePNG(390, 844, "mobile"),
+        generatePNG(1440, 900, "desktop"),
+      ]);
+      setGeneratedImages([
+        { label: "Mobile", dataUrl: mobile, width: 390, height: 844 },
+        { label: "Desktop", dataUrl: desktop, width: 1440, height: 900 },
+      ]);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const downloadImage = (dataUrl: string, label: string) => {
     const link = document.createElement("a");
-    link.download = `type-specimen-${label}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = `type-specimen-${label.toLowerCase()}-${heading.replace(/\s+/g, "-")}-${body.replace(/\s+/g, "-")}.png`;
+    link.href = dataUrl;
     link.click();
+  };
+
+  const shareImage = async (dataUrl: string, label: string) => {
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `type-specimen-${label.toLowerCase()}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `${heading} + ${body} Type Specimen`,
+          text: `Font pairing: ${heading} / ${body} -- ${hSize}px / ${bSize}px / Leading ${leading}`,
+          files: [file],
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Link copied to clipboard");
+      }
+    } catch (e) {
+      // User cancelled share or not supported
+    }
   };
 
   return (
@@ -277,20 +316,13 @@ function PairingCardBuilder() {
               Font Pairing Cards
             </h1>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => exportPNG(390, 844, "mobile")}
-              className="border border-neutral-700 px-4 py-2 text-xs font-mono uppercase tracking-widest text-neutral-300 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
-            >
-              Export Mobile
-            </button>
-            <button
-              onClick={() => exportPNG(1440, 900, "desktop")}
-              className="border border-[#B8963E] bg-[#B8963E]/10 px-4 py-2 text-xs font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors"
-            >
-              Export Desktop
-            </button>
-          </div>
+          <button
+            onClick={generateBoth}
+            disabled={generating}
+            className="border border-[#B8963E] bg-[#B8963E]/10 px-6 py-2 text-xs font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors disabled:opacity-50"
+          >
+            {generating ? "Generating..." : "Generate Cards"}
+          </button>
         </div>
       </header>
 
@@ -356,8 +388,9 @@ function PairingCardBuilder() {
           </div>
         </aside>
 
-        {/* Preview */}
-        <div className="flex-1 p-6 lg:p-12 flex items-start justify-center min-h-[calc(100vh-80px)]">
+        {/* Preview + Generated Images */}
+        <div className="flex-1 p-6 lg:p-12 flex flex-col items-center min-h-[calc(100vh-80px)] gap-12">
+          {/* Live Preview */}
           <div
             ref={specimenRef}
             className="w-full border border-neutral-800 transition-colors duration-200"
@@ -401,6 +434,47 @@ function PairingCardBuilder() {
               </p>
             </div>
           </div>
+
+          {/* Generated Image Cards */}
+          {generatedImages.length > 0 && (
+            <div className="w-full max-w-4xl space-y-10">
+              <div className="border-t border-neutral-800 pt-6">
+                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-6">
+                  Generated Cards -- hold to save to photos
+                </p>
+              </div>
+              {generatedImages.map((img) => (
+                <div key={img.label} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-400">
+                      {img.label} ({img.width} x {img.height})
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => downloadImage(img.dataUrl, img.label)}
+                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={() => shareImage(img.dataUrl, img.label)}
+                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                      >
+                        Share
+                      </button>
+                    </div>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.dataUrl}
+                    alt={`${img.label} type specimen: ${heading} + ${body}`}
+                    className="w-full border border-neutral-800"
+                    style={{ imageRendering: "auto" }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </main>
