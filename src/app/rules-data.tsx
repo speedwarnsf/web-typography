@@ -24,8 +24,9 @@ export const rules: Rule[] = [
     afterLines: [
       "We opened the new",
       "location on March",
-      "15th and the response",
-      "was overwhelming.",
+      "15th and the",
+      "response was",
+      "overwhelming.",
     ],
     code: `export function preventOrphans(text: string): string {
   const i = text.lastIndexOf(" ");
@@ -80,18 +81,20 @@ export const rules: Rule[] = [
     description:
       "Without rag control, line lengths vary wildly \u2014 one line fills the column, the next has two words. Smoothing creates even line lengths for a cleaner right edge.",
     beforeLines: [
-      "The building was designed by a",
+      "It was designed by a",
       "firm",
-      "from Portland that specialized",
-      "in",
-      "sustainable architecture.",
-    ],
-    afterLines: [
-      "The building was",
-      "designed by a firm",
       "from Portland that",
       "specialized in",
-      "sustainable architecture.",
+      "sustainable",
+      "architecture.",
+    ],
+    afterLines: [
+      "It was designed",
+      "by a firm from",
+      "Portland that",
+      "specialized in",
+      "sustainable",
+      "architecture.",
     ],
     code: `export function smoothRag(text: string, target = 65): string {
   const words = text.split(" ");
