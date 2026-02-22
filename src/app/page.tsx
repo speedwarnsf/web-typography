@@ -236,29 +236,29 @@ export default function Home() {
                   {rule.description}
                 </p>
 
-                <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  <div className="p-5 bg-red-950/30 border border-red-900/50">
-                    <p className="text-xs font-mono uppercase tracking-widest text-red-400/60 mb-4">
+                <div className="grid sm:grid-cols-2 gap-6 mb-6">
+                  <div className="p-5 bg-neutral-900 border border-neutral-800">
+                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-500 mb-4">
                       Before
                     </p>
                     <p
-                      className="text-[15px] leading-[1.8] text-red-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)", maxWidth: 220 }}
+                      className="text-[15px] leading-[1.75] text-neutral-300"
+                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
                       data-no-typeset
                     >
-                      {rule.before}
+                      {rule.beforeLines.join("\n")}
                     </p>
                   </div>
-                  <div className="p-5 bg-emerald-950/30 border border-emerald-900/50">
-                    <p className="text-xs font-mono uppercase tracking-widest text-emerald-400/60 mb-4">
+                  <div className="p-5 bg-neutral-900 border border-neutral-800">
+                    <p className="text-xs font-mono uppercase tracking-widest text-neutral-500 mb-4">
                       After
                     </p>
                     <p
-                      className="text-[15px] leading-[1.8] text-emerald-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)", maxWidth: 220 }}
+                      className="text-[15px] leading-[1.75] text-neutral-300"
+                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre-line" }}
                       data-no-typeset
                     >
-                      {rule.after}
+                      {rule.afterLines.join("\n")}
                     </p>
                   </div>
                 </div>
