@@ -283,6 +283,77 @@ function PairingCardBuilder() {
   const googleFontsUrl = (font: string) =>
     `https://fonts.google.com/specimen/${encodeURIComponent(font.replace(/\s+/g, "+"))}`;
 
+  const generatedCSS = `/* Font Pairing: ${heading} + ${body} */
+/* Google Fonts import */
+@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(heading)}:wght@400;700&family=${encodeURIComponent(body)}:wght@400;600&display=swap');
+
+:root {
+  --heading-font: '${heading}', serif;
+  --body-font: '${body}', sans-serif;
+  --heading-size: ${hSize}px;
+  --body-size: ${bSize}px;
+  --leading: ${leading};
+  --col-width: ${colW}ch;
+  --bg: #${bg};
+  --heading-color: #${hColor || fg};
+  --body-color: #${bColor || fg};
+}
+
+body {
+  background: var(--bg);
+  font-family: var(--body-font);
+  font-size: var(--body-size);
+  line-height: var(--leading);
+  color: var(--body-color);
+  max-width: var(--col-width);
+}
+
+h1, h2, h3 {
+  font-family: var(--heading-font);
+  font-size: var(--heading-size);
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--heading-color);
+}`;
+
+  const generatedHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${heading} + ${body} Type Specimen</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(heading)}:wght@400;700&family=${encodeURIComponent(body)}:wght@400;600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      padding: clamp(24px, 4vw, 80px);
+      background: #${bg};
+      font-family: '${body}', sans-serif;
+      font-size: ${bSize}px;
+      line-height: ${leading};
+      color: #${bColor || fg};
+      max-width: ${colW}ch;
+    }
+    h1 {
+      font-family: '${heading}', serif;
+      font-size: ${hSize}px;
+      line-height: 1.15;
+      font-weight: 700;
+      color: #${hColor || fg};
+      margin: 0 0 0.5em;
+    }
+    p { margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>${headingText}</h1>
+  <p>${rawText}</p>
+</body>
+</html>`;
+
+  const [showCode, setShowCode] = useState(false);
+  const [copiedField, setCopiedField] = useState("");
+
 
   const downloadImage = (dataUrl: string, label: string) => {
     const link = document.createElement("a");
@@ -521,6 +592,90 @@ function PairingCardBuilder() {
                   />
                 </div>
               ))}
+
+              {/* Code Export */}
+              <div className="border-t border-neutral-800 pt-6 mt-10">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-500">
+                    Code Export
+                  </p>
+                  <button
+                    onClick={() => setShowCode(!showCode)}
+                    className="font-mono text-[10px] uppercase tracking-widest text-[#B8963E] hover:underline"
+                  >
+                    {showCode ? "Hide Code" : "Show Code"}
+                  </button>
+                </div>
+
+                {showCode && (
+                  <div className="space-y-6">
+                    {/* CSS */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">CSS</p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedCSS);
+                            setCopiedField("css");
+                            setTimeout(() => setCopiedField(""), 2000);
+                          }}
+                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                        >
+                          {copiedField === "css" ? "Copied" : "Copy CSS"}
+                        </button>
+                      </div>
+                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap">
+                        {generatedCSS}
+                      </pre>
+                    </div>
+
+                    {/* HTML */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">HTML</p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedHTML);
+                            setCopiedField("html");
+                            setTimeout(() => setCopiedField(""), 2000);
+                          }}
+                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                        >
+                          {copiedField === "html" ? "Copied" : "Copy HTML"}
+                        </button>
+                      </div>
+                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap">
+                        {generatedHTML}
+                      </pre>
+                    </div>
+
+                    {/* Share Code */}
+                    <button
+                      onClick={async () => {
+                        const codeBundle = `/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}`;
+                        if (navigator.share) {
+                          try {
+                            const file = new File([codeBundle], `type-specimen-${heading.replace(/\s+/g, "-")}-${body.replace(/\s+/g, "-")}.txt`, { type: "text/plain" });
+                            if (navigator.canShare({ files: [file] })) {
+                              await navigator.share({
+                                title: `${heading} + ${body} Type Specimen Code`,
+                                files: [file],
+                              });
+                              return;
+                            }
+                          } catch {}
+                        }
+                        await navigator.clipboard.writeText(`/* === CSS === */\n${generatedCSS}\n\n/* === HTML === */\n${generatedHTML}`);
+                        setCopiedField("all");
+                        setTimeout(() => setCopiedField(""), 2000);
+                      }}
+                      className="w-full border border-[#B8963E] bg-[#B8963E]/10 px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors"
+                    >
+                      {copiedField === "all" ? "Copied to clipboard" : "Share All Code"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
