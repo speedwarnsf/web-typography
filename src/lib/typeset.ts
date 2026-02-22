@@ -85,7 +85,14 @@ export function typesetText(text: string): string {
     const shortWords = ['a', 'an', 'the', 'to', 'in', 'on', 'of', 'is', 'it', 'or', 'at', 'by', 'if', 'no', 'so', 'up', 'as', 'we', 'my', 'do', 'be'];
     // Only bind if the word has NO trailing punctuation (skip "of," "in," etc. in lists)
     if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
-      result.push(word + NBSP + words[i + 1]);
+      // Bind to BOTH previous and next word — prevents "of" from being at a line break
+      // e.g. "center of gravity" becomes "center\u00A0of\u00A0gravity"
+      if (result.length > 0) {
+        const prev = result.pop()!;
+        result.push(prev + NBSP + word + NBSP + words[i + 1]);
+      } else {
+        result.push(word + NBSP + words[i + 1]);
+      }
       i++;
       continue;
     }

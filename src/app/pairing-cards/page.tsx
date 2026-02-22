@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
+import { typesetText } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -213,7 +214,8 @@ function PairingCardBuilder() {
 
   useEffect(() => { updateURL(); }, [updateURL]);
 
-  const displayText = useCustomText && customText ? customText : LOREM;
+  const rawText = useCustomText && customText ? customText : LOREM;
+  const displayText = typesetText(rawText);
 
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");
@@ -232,7 +234,7 @@ function PairingCardBuilder() {
     container.innerHTML = `
       <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: ${colW}ch;">
         <h1 style="font-family: '${heading}', serif; font-size: ${hSize * (width > 500 ? 1 : 0.7)}px; line-height: 1.15; margin: 0 0 ${width > 500 ? 32 : 20}px 0; font-weight: 700;">
-          ${headingText}
+          ${typesetText(headingText)}
         </h1>
         <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0;">
           ${displayText}
@@ -410,7 +412,7 @@ function PairingCardBuilder() {
                 margin: "0 0 0.5em 0",
               }}
             >
-              {headingText}
+              {typesetText(headingText)}
             </h2>
             <p
               style={{
