@@ -32,15 +32,16 @@ const rules: Rule[] = [
     description:
       "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
     beforeLines: [
-      "Good typography is invisible.",
-      "Great typography speaks",
-      "without ever being",
-      { text: "noticed.", mark: "bad" },
+      "The campaign launched across",
+      "fourteen cities with record",
+      "breaking media coverage and",
+      { text: "attendance.", mark: "bad" },
     ],
     afterLines: [
-      "Good typography is invisible.",
-      "Great typography speaks",
-      { text: "without ever being noticed.", mark: "good" },
+      "The campaign launched across",
+      "fourteen cities with record",
+      { text: "breaking media coverage", mark: "good" },
+      { text: "and attendance.", mark: "good" },
     ],
     code: `export function preventOrphans(text: string): string {
   const lastSpaceIndex = text.lastIndexOf(" ");
@@ -55,16 +56,20 @@ const rules: Rule[] = [
     description:
       "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
     beforeLines: [
-      "The type was set well.",
-      { text: "She", mark: "bad" },
-      "noticed it immediately and",
-      "appreciated the quiet craft.",
+      "The results exceeded targets.",
+      { text: "We", mark: "bad" },
+      "expanded into three new",
+      "markets by September.",
+      { text: "It", mark: "bad" },
+      "changed everything.",
     ],
     afterLines: [
-      "The type was set well.",
-      { text: "She noticed", mark: "good" },
-      "it immediately and",
-      "appreciated the quiet craft.",
+      "The results exceeded targets.",
+      { text: "We expanded", mark: "good" },
+      "into three new markets",
+      "by September.",
+      { text: "It changed", mark: "good" },
+      "everything.",
     ],
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
@@ -75,14 +80,20 @@ const rules: Rule[] = [
     description:
       "Prevent short words (1\u20133 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
     beforeLines: [
-      "Every decision you make",
-      "adds",
-      { text: "to", mark: "bad" },
+      "The whole team contributed",
+      "to",
       { text: "it.", mark: "bad" },
+      "Nobody could believe what",
+      "we had built from nothing",
+      { text: "at", mark: "bad" },
+      { text: "all.", mark: "bad" },
     ],
     afterLines: [
-      "Every decision you make",
-      { text: "adds to it.", mark: "good" },
+      "The whole team contributed",
+      { text: "to it.", mark: "good" },
+      "Nobody could believe what",
+      "we had built from",
+      { text: "nothing at all.", mark: "good" },
     ],
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
@@ -91,19 +102,19 @@ const rules: Rule[] = [
   {
     name: "Rag Smoothing",
     description:
-      "Detects words that would push a line past the target length and binds them to the previous word, pulling them to the next line. Creates a smoother right edge without justification.",
+      "Evens out line lengths to create a smoother right edge. Without it, lines alternate between long and short, creating a jagged, amateurish rag.",
     beforeLines: [
-      "Every choice you make in",
-      { text: "typography", mark: "bad" },
-      "either helps the reader or",
-      "gets",
-      { text: "in their way.", mark: "bad" },
+      { text: "She studied visual communication design at", mark: "bad" },
+      { text: "NSCAD.", mark: "bad" },
+      { text: "Her thesis explored how rhetorical tropes shape", mark: "bad" },
+      { text: "meaning.", mark: "bad" },
     ],
     afterLines: [
-      { text: "Every choice you make", mark: "good" },
-      { text: "in typography either helps", mark: "good" },
-      { text: "the reader or gets", mark: "good" },
-      { text: "in their way.", mark: "good" },
+      { text: "She studied visual", mark: "good" },
+      { text: "communication design", mark: "good" },
+      { text: "at NSCAD. Her thesis", mark: "good" },
+      { text: "explored how rhetorical", mark: "good" },
+      { text: "tropes shape meaning.", mark: "good" },
     ],
     code: `export function smoothRag(text: string, targetLineLength = 65): string {
   const words = text.split(" ");
@@ -132,18 +143,22 @@ const rules: Rule[] = [
     description:
       "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to neighboring words. Prevents these small words from sitting alone at a line break.",
     beforeLines: [
-      "She walked",
-      { text: "to", mark: "bad" },
-      "the store and stood",
-      { text: "in", mark: "bad" },
-      "the rain for",
+      "He drove through the center",
+      { text: "of", mark: "bad" },
+      "the city and turned onto",
       { text: "a", mark: "bad" },
-      "while.",
+      "narrow street that led",
+      { text: "to", mark: "bad" },
+      { text: "the", mark: "bad" },
+      "waterfront.",
     ],
     afterLines: [
-      { text: "She walked to the", mark: "good" },
-      { text: "store and stood in the", mark: "good" },
-      { text: "rain for a while.", mark: "good" },
+      "He drove through",
+      { text: "the center of the city", mark: "good" },
+      "and turned onto",
+      { text: "a narrow street", mark: "good" },
+      { text: "that led to the", mark: "good" },
+      "waterfront.",
     ],
     code: `export function bindShortWords(text: string): string {
   return text.replace(
