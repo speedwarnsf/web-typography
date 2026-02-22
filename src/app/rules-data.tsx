@@ -118,18 +118,17 @@ export const rules: Rule[] = [
       "Prepositions and articles like \"of\" \"in\" \"a\" and \"the\" look wrong sitting alone at the end of a line. Typeset binds them to the next word so they always travel together.",
     beforeLines: [
       "She walked through",
-      "the doors of",
-      "the gallery and stood",
-      "there for a long time",
-      "looking at the art.",
+      "the center of",
+      "town and stopped at",
+      "the old bookshop on",
+      "the corner.",
     ],
     afterLines: [
       "She walked through",
-      "the doors of the",
-      "gallery and stood",
-      "there for a long",
-      "time looking at",
-      "the art.",
+      "the center of town",
+      "and stopped at the",
+      "old bookshop on",
+      "the corner.",
     ],
     code: `export function bindShortWords(text: string): string {
   return text.replace(
