@@ -1,3 +1,4 @@
+import { rules } from "./rules-data";
 import CodeBlock from "@/components/CodeBlock";
 import CopyButton from "@/components/CopyButton";
 import { readFileSync } from "fs";
@@ -14,160 +15,7 @@ const typesetFullCode = (() => {
   }
 })();
 
-// Each rule uses explicit line arrays with markup segments.
-// Lines are rendered with <br/> for device-independent display.
-// Segments can be plain strings or { text, mark } objects for highlighting.
-type Seg = string | { text: string; mark: "bad" | "good" };
-type Rule = {
-  name: string;
-  description: string;
-  beforeLines: Seg[];
-  afterLines: Seg[];
-  code: string;
-};
 
-const rules: Rule[] = [
-  {
-    name: "No Orphans",
-    description:
-      "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
-    beforeLines: [
-      "The campaign launched across",
-      "fourteen cities with record",
-      "breaking media coverage and",
-      { text: "attendance.", mark: "bad" },
-    ],
-    afterLines: [
-      "The campaign launched across",
-      "fourteen cities with record",
-      { text: "breaking media coverage", mark: "good" },
-      { text: "and attendance.", mark: "good" },
-    ],
-    code: `export function preventOrphans(text: string): string {
-  const lastSpaceIndex = text.lastIndexOf(" ");
-  if (lastSpaceIndex === -1) return text;
-  return (
-    text.slice(0, lastSpaceIndex) + "\\u00A0" + text.slice(lastSpaceIndex + 1)
-  );
-}`,
-  },
-  {
-    name: "Sentence-Start Protection",
-    description:
-      "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
-    beforeLines: [
-      "The results exceeded targets.",
-      { text: "We", mark: "bad" },
-      "expanded into three new",
-      "markets by September.",
-      { text: "It", mark: "bad" },
-      "changed everything.",
-    ],
-    afterLines: [
-      "The results exceeded targets.",
-      { text: "We expanded", mark: "good" },
-      "into three new markets",
-      "by September.",
-      { text: "It changed", mark: "good" },
-      "everything.",
-    ],
-    code: `export function protectSentenceStart(text: string): string {
-  return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
-}`,
-  },
-  {
-    name: "Sentence-End Protection",
-    description:
-      "Prevent short words (1\u20133 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
-    beforeLines: [
-      "The whole team contributed",
-      "to",
-      { text: "it.", mark: "bad" },
-      "Nobody could believe what",
-      "we had built from nothing",
-      { text: "at", mark: "bad" },
-      { text: "all.", mark: "bad" },
-    ],
-    afterLines: [
-      "The whole team contributed",
-      { text: "to it.", mark: "good" },
-      "Nobody could believe what",
-      "we had built from",
-      { text: "nothing at all.", mark: "good" },
-    ],
-    code: `export function protectSentenceEnd(text: string): string {
-  return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
-}`,
-  },
-  {
-    name: "Rag Smoothing",
-    description:
-      "Evens out line lengths to create a smoother right edge. Without it, lines alternate between long and short, creating a jagged, amateurish rag.",
-    beforeLines: [
-      { text: "She studied visual communication design at", mark: "bad" },
-      { text: "NSCAD.", mark: "bad" },
-      { text: "Her thesis explored how rhetorical tropes shape", mark: "bad" },
-      { text: "meaning.", mark: "bad" },
-    ],
-    afterLines: [
-      { text: "She studied visual", mark: "good" },
-      { text: "communication design", mark: "good" },
-      { text: "at NSCAD. Her thesis", mark: "good" },
-      { text: "explored how rhetorical", mark: "good" },
-      { text: "tropes shape meaning.", mark: "good" },
-    ],
-    code: `export function smoothRag(text: string, targetLineLength = 65): string {
-  const words = text.split(" ");
-  let currentLength = 0;
-  const result: string[] = [];
-
-  for (const word of words) {
-    if (currentLength > 0 && currentLength + word.length + 1 > targetLineLength) {
-      result.push("\\u00A0" + word);
-      currentLength = word.length;
-    } else {
-      if (currentLength > 0) {
-        result.push(" " + word);
-        currentLength += word.length + 1;
-      } else {
-        result.push(word);
-        currentLength = word.length;
-      }
-    }
-  }
-  return result.join("");
-}`,
-  },
-  {
-    name: "Short Word Binding",
-    description:
-      "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to neighboring words. Prevents these small words from sitting alone at a line break.",
-    beforeLines: [
-      "He drove through the center",
-      { text: "of", mark: "bad" },
-      "the city and turned onto",
-      { text: "a", mark: "bad" },
-      "narrow street that led",
-      { text: "to", mark: "bad" },
-      { text: "the", mark: "bad" },
-      "waterfront.",
-    ],
-    afterLines: [
-      "He drove through",
-      { text: "the center of the city", mark: "good" },
-      "and turned onto",
-      { text: "a narrow street", mark: "good" },
-      { text: "that led to the", mark: "good" },
-      "waterfront.",
-    ],
-    code: `export function bindShortWords(text: string): string {
-  return text.replace(
-    /\\s(a|an|the|in|on|at|to|by|of|or|is|it|as|if|so|no|do|up|we|he|me|my|be|am)\\s/gi,
-    (match, word) => \` \${word}\\u00A0\`
-  );
-}`,
-  },
-];
 
 const fontPairings = [
   {
@@ -393,47 +241,25 @@ export default function Home() {
                     <p className="text-xs font-mono uppercase tracking-widest text-red-400/60 mb-4">
                       Before
                     </p>
-                    <div
-                      className="text-[16px] leading-[2] text-red-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[15px] leading-[1.8] text-red-200/80"
+                      style={{ fontFamily: "var(--font-source-sans)", maxWidth: 220 }}
                       data-no-typeset
                     >
-                      {rule.beforeLines.map((seg, i) => (
-                        <span key={i}>
-                          {i > 0 && <br />}
-                          {typeof seg === "string" ? seg : (
-                            <span style={{
-                              background: "rgba(239,68,68,0.25)",
-                              borderBottom: "2px solid #ef4444",
-                              padding: "1px 4px",
-                            }}>{seg.text}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                      {rule.before}
+                    </p>
                   </div>
                   <div className="p-5 bg-emerald-950/30 border border-emerald-900/50">
                     <p className="text-xs font-mono uppercase tracking-widest text-emerald-400/60 mb-4">
                       After
                     </p>
-                    <div
-                      className="text-[16px] leading-[2] text-emerald-200/80"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[15px] leading-[1.8] text-emerald-200/80"
+                      style={{ fontFamily: "var(--font-source-sans)", maxWidth: 220 }}
                       data-no-typeset
                     >
-                      {rule.afterLines.map((seg, i) => (
-                        <span key={i}>
-                          {i > 0 && <br />}
-                          {typeof seg === "string" ? seg : (
-                            <span style={{
-                              background: "rgba(34,197,94,0.2)",
-                              borderBottom: "2px solid #22c55e",
-                              padding: "1px 4px",
-                            }}>{seg.text}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                      {rule.after}
+                    </p>
                   </div>
                 </div>
               </div>
