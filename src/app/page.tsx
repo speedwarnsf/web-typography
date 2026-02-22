@@ -19,8 +19,8 @@ const rules = [
     name: "No Orphans",
     description:
       "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
-    beforeLines: ["Good typography is invisible.", "Great typography speaks", "without ever being", { text: "noticed.", highlight: true }],
-    afterLines: ["Good typography is invisible.", "Great typography speaks", "without ever", { text: "being noticed.", highlight: true }],
+    before: "Good typography is invisible. Great typography speaks without ever being noticed.",
+    after: "Good typography is invisible. Great typography speaks without ever being\u00A0noticed.",
     code: `export function preventOrphans(text: string): string {
   const lastSpaceIndex = text.lastIndexOf(" ");
   if (lastSpaceIndex === -1) return text;
@@ -33,8 +33,8 @@ const rules = [
     name: "Sentence-Start Protection",
     description:
       "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
-    beforeLines: ["The type was set well.", { text: "She", highlight: true }, "noticed it immediately."],
-    afterLines: ["The type was set well.", { text: "She noticed", highlight: true }, "it immediately."],
+    before: "The type was set well. She noticed it immediately and appreciated the quiet craft behind it.",
+    after: "The type was set well. She\u00A0noticed it immediately and appreciated the quiet craft behind\u00A0it.",
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
 }`,
@@ -43,8 +43,8 @@ const rules = [
     name: "Sentence-End Protection",
     description:
       "Prevent short words (1-3 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
-    beforeLines: ["The details are what separate", "good work from great. Every", "decision you make adds to", { text: "it.", highlight: true }],
-    afterLines: ["The details are what separate", "good work from great. Every", "decision you make", { text: "adds to it.", highlight: true }],
+    before: "The details are what separate good work from great. Every decision you make adds to it.",
+    after: "The details are what separate good work from great. Every decision you make adds to\u00A0it.",
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
 }`,
@@ -53,8 +53,8 @@ const rules = [
     name: "Rag Smoothing",
     description:
       "Detects words that would push a line past the target length and binds them to the previous word, pulling them to the next line. Creates a smoother right edge without justification.",
-    beforeLines: [{ text: "Every choice you make in", highlight: true }, "typography either helps the", { text: "reader or gets in their", highlight: true }, "way."],
-    afterLines: ["Every choice you make", "in typography either helps", "the reader or gets", "in their way."],
+    before: "Every choice you make in typography either helps the reader or gets in their way.",
+    after: "Every choice you make in\u00A0typography either helps the reader or gets in\u00A0their\u00A0way.",
     code: `export function smoothRag(text: string, targetLineLength = 65): string {
   const words = text.split(" ");
   let currentLength = 0;
@@ -81,8 +81,8 @@ const rules = [
     name: "Short Word Binding",
     description:
       "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to the following word with a non-breaking space. Prevents these small words from ending a line alone.",
-    beforeLines: [{ text: "She walked to", highlight: true }, "the store and stood in", "the rain for a while."],
-    afterLines: [{ text: "She walked to the store", highlight: true }, "and stood in the rain", "for a while."],
+    before: "She walked to the store and stood in the rain for a while.",
+    after: "She walked to\u00A0the store and stood in\u00A0the rain for a\u00A0while.",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or|is|it|as|if|so|no|do|up|we|he|me|my|be|am)\\s/gi,
@@ -316,47 +316,25 @@ export default function Home() {
                     <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       Before
                     </p>
-                    <div
-                      className="text-[15px] leading-[1.7] text-red-300/70"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[16px] leading-[1.65] text-red-300"
+                      style={{ fontFamily: "var(--font-source-sans)", width: 240 }}
                       data-no-typeset
                     >
-                      {rule.beforeLines.map((line: any, i: number) => {
-                        const text = typeof line === "string" ? line : line.text;
-                        const hl = typeof line !== "string" && line.highlight;
-                        return (
-                          <span key={i}>
-                            {hl ? (
-                              <span className="text-red-300 bg-red-500/20 px-1">{text}</span>
-                            ) : text}
-                            {i < rule.beforeLines.length - 1 && <br />}
-                          </span>
-                        );
-                      })}
-                    </div>
+                      {rule.before}
+                    </p>
                   </div>
                   <div className="p-4 bg-neutral-900 border border-neutral-800">
                     <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       After
                     </p>
-                    <div
-                      className="text-[15px] leading-[1.7] text-emerald-300/70"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
+                    <p
+                      className="text-[16px] leading-[1.65] text-emerald-300"
+                      style={{ fontFamily: "var(--font-source-sans)", width: 240 }}
                       data-no-typeset
                     >
-                      {rule.afterLines.map((line: any, i: number) => {
-                        const text = typeof line === "string" ? line : line.text;
-                        const hl = typeof line !== "string" && line.highlight;
-                        return (
-                          <span key={i}>
-                            {hl ? (
-                              <span className="text-emerald-300 bg-emerald-500/20 px-1">{text}</span>
-                            ) : text}
-                            {i < rule.afterLines.length - 1 && <br />}
-                          </span>
-                        );
-                      })}
-                    </div>
+                      {rule.after}
+                    </p>
                   </div>
                 </div>
               </div>
