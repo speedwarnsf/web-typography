@@ -323,7 +323,7 @@ export default function Home() {
                     <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-2">
                       After
                     </p>
-                    <p className="text-sm font-mono text-emerald-400/70 whitespace-pre-wrap">
+                    <p className="text-sm font-mono text-emerald-400/70 whitespace-pre-wrap" data-no-typeset>
                       {rule.after}
                     </p>
                   </div>
