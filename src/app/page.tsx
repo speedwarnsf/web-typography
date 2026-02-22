@@ -19,8 +19,8 @@ const rules = [
     name: "No Orphans",
     description:
       "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
-    before: "...into an experience\nworth\nhaving.",
-    after: "...into an experience\nworth\u00A0having.",
+    before: "Good typography is invisible.\nGreat typography speaks\nwithout ever being\nnoticed.",
+    after: "Good typography is invisible.\nGreat typography speaks\nwithout ever\nbeing\u00A0noticed.",
     code: `export function preventOrphans(text: string): string {
   const lastSpaceIndex = text.lastIndexOf(" ");
   if (lastSpaceIndex === -1) return text;
@@ -33,8 +33,8 @@ const rules = [
     name: "Sentence-Start Protection",
     description:
       "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
-    before: "The sky darkened.\nShe\nran inside quickly.",
-    after: "The sky darkened.\nShe\u00A0ran inside quickly.",
+    before: "The type was set well.\nShe\nnoticed it immediately.",
+    after: "The type was set well.\nShe\u00A0noticed it immediately.",
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
 }`,
@@ -43,8 +43,8 @@ const rules = [
     name: "Sentence-End Protection",
     description:
       "Prevent short words (1-3 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
-    before: 'He said it was fine\nto\ngo.',
-    after: 'He said it was fine\nto\u00A0go.',
+    before: 'The details are what\nseparate good work from\ngreat. Every decision adds\nto\nit.',
+    after: 'The details are what\nseparate good work from\ngreat. Every decision\nadds\u00A0to\u00A0it.',
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
 }`,
@@ -53,8 +53,8 @@ const rules = [
     name: "Rag Smoothing",
     description:
       "Detects words that would push a line past the target length and binds them to the previous word, pulling them to the next line. Creates a smoother right edge without justification.",
-    before: "Design is how it works and\nhow it\nlooks matters too.",
-    after: "Design is how it works\nand how it looks\nmatters too.",
+    before: "Every choice you make in\ntypography either\nhelps the reader or gets in\ntheir way.",
+    after: "Every choice you make\nin typography either\nhelps the reader or\ngets in their way.",
     code: `export function smoothRag(text: string, targetLineLength = 65): string {
   const words = text.split(" ");
   let currentLength = 0;
@@ -81,8 +81,8 @@ const rules = [
     name: "Short Word Binding",
     description:
       "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to the following word with a non-breaking space. Prevents these small words from ending a line alone.",
-    before: "She walked to\nthe store in\nthe rain.",
-    after: "She walked to\u00A0the\nstore in\u00A0the rain.",
+    before: "She walked to\nthe store and stood in\nthe rain for a while.",
+    after: "She walked to\u00A0the store\nand stood in\u00A0the rain\nfor a while.",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or|is|it|as|if|so|no|do|up|we|he|me|my|be|am)\\s/gi,
