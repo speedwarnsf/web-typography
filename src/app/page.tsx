@@ -19,8 +19,10 @@ const rules = [
     name: "No Orphans",
     description:
       "Replace the last space in a paragraph with a non-breaking space, ensuring the final line always contains at least two words. Prevents lonely words dangling on their own line.",
-    beforeLines: ["Good typography is invisible.", "Great typography speaks", "without ever being", { text: "noticed.", highlight: true }],
-    afterLines: ["Good typography is invisible.", "Great typography speaks", "without ever", { text: "being noticed.", highlight: true }],
+    beforeBars: [90, 85, 75, { w: 20, hl: true }],
+    afterBars: [90, 85, { w: 55, hl: true }],
+    beforeLabel: "Single word on last line",
+    afterLabel: "Last two words bound together",
     code: `export function preventOrphans(text: string): string {
   const lastSpaceIndex = text.lastIndexOf(" ");
   if (lastSpaceIndex === -1) return text;
@@ -33,8 +35,10 @@ const rules = [
     name: "Sentence-Start Protection",
     description:
       "Bind the first two words after a sentence boundary so a line never begins with just one word from the new sentence. Keeps the reading flow unbroken.",
-    beforeLines: ["The type was set well.", { text: "She", highlight: true }, "noticed it immediately."],
-    afterLines: ["The type was set well.", { text: "She noticed", highlight: true }, "it immediately."],
+    beforeBars: [80, 70, { w: 15, hl: true }, 85],
+    afterBars: [80, 70, { w: 50, hl: true }, 55],
+    beforeLabel: "New sentence starts alone",
+    afterLabel: "First two words bound",
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
 }`,
@@ -43,8 +47,10 @@ const rules = [
     name: "Sentence-End Protection",
     description:
       "Prevent short words (1-3 characters) from sitting alone at the end of a sentence. Binds them to the preceding word with a non-breaking space.",
-    beforeLines: ["The details are what separate", "good work from great. Every", "decision you make adds to", { text: "it.", highlight: true }],
-    afterLines: ["The details are what separate", "good work from great. Every", "decision you make", { text: "adds to it.", highlight: true }],
+    beforeBars: [90, 88, 82, { w: 10, hl: true }],
+    afterBars: [90, 88, { w: 60, hl: true }],
+    beforeLabel: "Short word dangles alone",
+    afterLabel: "Bound to preceding word",
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
 }`,
@@ -53,8 +59,10 @@ const rules = [
     name: "Rag Smoothing",
     description:
       "Detects words that would push a line past the target length and binds them to the previous word, pulling them to the next line. Creates a smoother right edge without justification.",
-    beforeLines: [{ text: "Every choice you make in", highlight: true }, "typography either helps the", { text: "reader or gets in their", highlight: true }, "way."],
-    afterLines: ["Every choice you make", "in typography either helps", "the reader or gets", "in their way."],
+    beforeBars: [{ w: 95, hl: true }, 60, { w: 92, hl: true }, 30],
+    afterBars: [75, 78, 72, 70],
+    beforeLabel: "Jagged right edge",
+    afterLabel: "Smooth, even rag",
     code: `export function smoothRag(text: string, targetLineLength = 65): string {
   const words = text.split(" ");
   let currentLength = 0;
@@ -81,8 +89,10 @@ const rules = [
     name: "Short Word Binding",
     description:
       "Common prepositions, articles, and conjunctions (a, an, the, in, on, at, to, by, of, etc.) are bound to the following word with a non-breaking space. Prevents these small words from ending a line alone.",
-    beforeLines: [{ text: "She walked to", highlight: true }, "the store and stood in", "the rain for a while."],
-    afterLines: [{ text: "She walked to the store", highlight: true }, "and stood in the rain", "for a while."],
+    beforeBars: [55, { w: 15, hl: true }, 80, 70],
+    afterBars: [55, { w: 60, hl: true }, 65, 55],
+    beforeLabel: "'to' stranded at line end",
+    afterLabel: "'to the' bound together",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or|is|it|as|if|so|no|do|up|we|he|me|my|be|am)\\s/gi,
@@ -316,47 +326,43 @@ export default function Home() {
                     <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       Before
                     </p>
-                    <div
-                      className="text-[15px] leading-[1.7] text-red-400/40"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
-                      data-no-typeset
-                    >
-                      {rule.beforeLines.map((line: any, i: number) => {
-                        const text = typeof line === "string" ? line : line.text;
-                        const hl = typeof line !== "string" && line.highlight;
+                    <div className="space-y-1.5 mb-3">
+                      {rule.beforeBars.map((bar: any, i: number) => {
+                        const w = typeof bar === "number" ? bar : bar.w;
+                        const hl = typeof bar !== "number" && bar.hl;
                         return (
-                          <span key={i}>
-                            {hl ? (
-                              <span className="text-red-400 bg-red-400/10 px-0.5">{text}</span>
-                            ) : text}
-                            {i < rule.beforeLines.length - 1 && <br />}
-                          </span>
+                          <div
+                            key={i}
+                            className={hl ? "bg-red-400/80" : "bg-neutral-700/50"}
+                            style={{ width: `${w}%`, height: 6 }}
+                          />
                         );
                       })}
                     </div>
+                    <p className="text-xs text-red-400/60 font-mono" data-no-typeset>
+                      {rule.beforeLabel}
+                    </p>
                   </div>
                   <div className="p-4 bg-neutral-900 border border-neutral-800">
                     <p className="text-xs font-mono uppercase tracking-widest text-neutral-600 mb-3">
                       After
                     </p>
-                    <div
-                      className="text-[15px] leading-[1.7] text-emerald-400/40"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
-                      data-no-typeset
-                    >
-                      {rule.afterLines.map((line: any, i: number) => {
-                        const text = typeof line === "string" ? line : line.text;
-                        const hl = typeof line !== "string" && line.highlight;
+                    <div className="space-y-1.5 mb-3">
+                      {rule.afterBars.map((bar: any, i: number) => {
+                        const w = typeof bar === "number" ? bar : bar.w;
+                        const hl = typeof bar !== "number" && bar.hl;
                         return (
-                          <span key={i}>
-                            {hl ? (
-                              <span className="text-emerald-400 bg-emerald-400/10 px-0.5">{text}</span>
-                            ) : text}
-                            {i < rule.afterLines.length - 1 && <br />}
-                          </span>
+                          <div
+                            key={i}
+                            className={hl ? "bg-emerald-400/80" : "bg-neutral-700/50"}
+                            style={{ width: `${w}%`, height: 6 }}
+                          />
                         );
                       })}
                     </div>
+                    <p className="text-xs text-emerald-400/60 font-mono" data-no-typeset>
+                      {rule.afterLabel}
+                    </p>
                   </div>
                 </div>
               </div>
