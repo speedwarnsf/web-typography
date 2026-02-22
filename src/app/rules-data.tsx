@@ -81,10 +81,10 @@ export const rules: Rule[] = [
     description:
       "Without rag control, line lengths vary wildly \u2014 one line fills the column, the next has two words. Smoothing creates even line lengths for a cleaner right edge.",
     beforeLines: [
-      "It was designed by a",
-      "firm",
-      "from Portland that",
-      "specialized in",
+      "It was designed by",
+      "a",
+      "firm from Portland",
+      "that specialized in",
       "sustainable",
       "architecture.",
     ],
