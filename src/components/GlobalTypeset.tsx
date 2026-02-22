@@ -10,7 +10,7 @@ import { typesetAll } from '@/lib/typeset';
 export default function GlobalTypeset() {
   useEffect(() => {
     // Run after initial render + ScrollReveal animations
-    const run = () => typesetAll('p, h1, h2, h3, h4, li, blockquote, figcaption');
+    const run = () => typesetAll('p:not([data-no-typeset]), h1:not([data-no-typeset]), h2:not([data-no-typeset]), h3:not([data-no-typeset]), h4:not([data-no-typeset]), li:not([data-no-typeset]), blockquote:not([data-no-typeset]), figcaption:not([data-no-typeset])');
 
     // Initial pass
     run();
