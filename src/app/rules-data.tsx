@@ -119,17 +119,17 @@ export const rules: Rule[] = [
     beforeLines: [
       "She walked through",
       "the doors of",
-      "the gallery and",
-      "stopped in",
-      "front of",
-      "a painting.",
+      "the gallery and stood",
+      "there for a long time",
+      "looking at the art.",
     ],
     afterLines: [
       "She walked through",
-      "the doors",
-      "of the gallery and",
-      "stopped in front",
-      "of a painting.",
+      "the doors of the",
+      "gallery and stood",
+      "there for a long",
+      "time looking at",
+      "the art.",
     ],
     code: `export function bindShortWords(text: string): string {
   return text.replace(
