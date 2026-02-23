@@ -106,12 +106,20 @@ async function render() {
           return `<span style="display:block">${l.text}</span>`;
         }
         const gap = target - l.width;
-        const ws = gap / spaces;
-        // Only expand short lines, never tighten. Cap at 3px to stay subtle.
-        if (ws <= 0.3 || ws > 3.0) {
+        if (gap <= 1) {
+          // Line already meets or exceeds target — don't tighten
           return `<span style="display:block">${l.text}</span>`;
         }
-        return `<span style="display:block;word-spacing:${ws.toFixed(2)}px">${l.text}</span>`;
+        // Split the gap: 60% word-spacing, 40% letter-spacing
+        const chars = l.text.length;
+        const wsGap = gap * 0.6;
+        const lsGap = gap * 0.4;
+        const ws = wsGap / spaces;
+        const ls = lsGap / chars;
+        // Cap word-spacing at 4px, letter-spacing at 0.8px
+        const wsActual = Math.min(ws, 4.0);
+        const lsActual = Math.min(ls, 0.8);
+        return `<span style="display:block;word-spacing:${wsActual.toFixed(2)}px;letter-spacing:${lsActual.toFixed(2)}px">${l.text}</span>`;
       });
 
       // Render "after" with a subtle guide line showing the target right edge
