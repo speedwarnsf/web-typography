@@ -28,9 +28,9 @@ const rules = [
   },
   {
     id: 'rag',
-    width: 360,
-    before: 'It was a collaboration between the university and several local nonprofits focused on housing.',
-    after: 'It was a collaboration between the university and several local nonprofits focused on\u00A0housing.',
+    width: 500,
+    before: 'The morning light through the kitchen window caught the steam rising from her coffee. She sat at the counter rereading the letter for the third time, still not sure what to make of it. Outside, the neighbor was walking his dog past the same fire hydrant.',
+    after: 'The morning light through the kitchen window caught\u00A0the\u00A0steam rising from her coffee. She sat at the counter\u00A0rereading\u00A0the letter for the third time, still not sure what to make\u00A0of\u00A0it. Outside, the neighbor was walking his dog past the\u00A0same\u00A0fire\u00A0hydrant.',
   },
   {
     id: 'short-words',
