@@ -28,9 +28,9 @@ const rules = [
   },
   {
     id: 'rag',
-    width: 500,
+    width: 420,
     before: 'The morning light through the kitchen window caught the steam rising from her coffee. She sat at the counter rereading the letter for the third time, still not sure what to make of it. Outside, the neighbor was walking his dog past the same fire hydrant.',
-    after: 'The morning light through the kitchen window caught\u00A0the\u00A0steam rising from her coffee. She sat at the counter\u00A0rereading\u00A0the letter for the third time, still not sure what to make\u00A0of\u00A0it. Outside, the neighbor was walking his dog past the\u00A0same\u00A0fire\u00A0hydrant.',
+    ragSmooth: true, // special handling: per-line word-spacing adjustment
   },
   {
     id: 'short-words',
@@ -46,6 +46,78 @@ async function render() {
   const page = await ctx.newPage();
 
   for (const rule of rules) {
+    if (rule.ragSmooth) {
+      // Special rag smoothing: render before normally, then after with per-line word-spacing
+      const text = rule.before;
+
+      // Render "before" (raw ragged text)
+      await page.setContent(`
+        <html><body style="background:transparent;margin:0;padding:0">
+          <div id="d" style="width:${rule.width}px;${STYLE}">${text}</div>
+        </body></html>
+      `);
+      await page.waitForTimeout(300);
+      let el = await page.$('#d');
+      let buf = await el.screenshot({ omitBackground: true });
+      writeFileSync(join(OUT, `${rule.id}-before.png`), buf);
+      console.log(`  ${join(OUT, `${rule.id}-before.png`)}`);
+
+      // Detect line breaks and measure each line's pixel width
+      const lineData = await page.evaluate(() => {
+        const div = document.getElementById('d');
+        const tn = div.firstChild;
+        const range = document.createRange();
+        let lastY = -1, lineStart = 0, lineText = '';
+        const lines = [];
+        for (let i = 0; i < tn.textContent.length; i++) {
+          range.setStart(tn, i); range.setEnd(tn, i + 1);
+          const rect = range.getBoundingClientRect();
+          if (lastY !== -1 && Math.abs(rect.top - lastY) > 5) {
+            range.setStart(tn, lineStart); range.setEnd(tn, i);
+            lines.push({ text: lineText.trim(), width: range.getBoundingClientRect().width });
+            lineStart = i; lineText = '';
+          }
+          lineText += tn.textContent[i];
+          lastY = rect.top;
+        }
+        if (lineText) {
+          range.setStart(tn, lineStart); range.setEnd(tn, tn.textContent.length);
+          lines.push({ text: lineText.trim(), width: range.getBoundingClientRect().width });
+        }
+        return { lines, containerWidth: div.getBoundingClientRect().width };
+      });
+
+      // Build "after" HTML: each line as a span with adjusted word-spacing
+      // Target ~92% of container width for a smooth right edge
+      const target = lineData.containerWidth * 0.93;
+      const spanLines = lineData.lines.map((l, i) => {
+        const spaces = (l.text.match(/ /g) || []).length;
+        const isLast = i === lineData.lines.length - 1;
+        if (isLast || spaces === 0) {
+          return `<span style="display:block">${l.text}</span>`;
+        }
+        const gap = target - l.width;
+        const ws = gap / spaces;
+        // Only adjust if needed (gap > 2px) and don't tighten too much
+        if (Math.abs(ws) < 0.3) {
+          return `<span style="display:block">${l.text}</span>`;
+        }
+        return `<span style="display:block;word-spacing:${ws.toFixed(2)}px">${l.text}</span>`;
+      });
+
+      await page.setContent(`
+        <html><body style="background:transparent;margin:0;padding:0">
+          <div style="width:${rule.width}px;${STYLE}">${spanLines.join('')}</div>
+        </body></html>
+      `);
+      await page.waitForTimeout(300);
+      el = await page.$('div');
+      buf = await el.screenshot({ omitBackground: true });
+      writeFileSync(join(OUT, `${rule.id}-after.png`), buf);
+      console.log(`  ${join(OUT, `${rule.id}-after.png`)}`);
+      continue;
+    }
+
     for (const side of ['before', 'after']) {
       const text = rule[side];
       // Transparent background — no grey block

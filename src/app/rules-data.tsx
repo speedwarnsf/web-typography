@@ -39,21 +39,18 @@ export const rules: Rule[] = [
     name: "Rag Smoothing",
     id: "rag",
     description:
-      "Without rag control, line lengths vary wildly \u2014 one line fills the column, the next has two words. Smoothing creates even line lengths for a cleaner right edge.",
-    code: `export function smoothRag(text: string, target = 65): string {
-  const words = text.split(" ");
-  let len = 0;
-  const out: string[] = [];
-  for (const w of words) {
-    if (len > 0 && len + w.length + 1 > target) {
-      out.push("\\u00A0" + w);
-      len = w.length;
-    } else {
-      out.push((len > 0 ? " " : "") + w);
-      len += w.length + (len > 0 ? 1 : 0);
-    }
-  }
-  return out.join("");
+      "Without rag control, line lengths vary wildly \u2014 one line barely reaches half the column while the next fills it completely. Smoothing adjusts word-spacing line by line, gently extending short lines and tightening long ones to create a cleaner right edge.",
+    code: `export function smoothRag(el: HTMLElement): void {
+  const target = el.offsetWidth * 0.93;
+  const lines = getLines(el); // detect line breaks via Range API
+  lines.forEach((line, i) => {
+    if (i === lines.length - 1) return; // leave last line alone
+    const gap = target - line.width;
+    const spaces = (line.text.match(/ /g) || []).length;
+    if (!spaces) return;
+    const ws = gap / spaces; // px per word space
+    wrapLine(line, \`word-spacing: \${ws.toFixed(2)}px\`);
+  });
 }`,
   },
   {
