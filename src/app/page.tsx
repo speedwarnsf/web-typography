@@ -236,12 +236,12 @@ export default function Home() {
                   {rule.description}
                 </p>
 
-                <div className="space-y-3 mb-6">
+                <div className="space-y-4 mb-8">
                   <div className="border border-red-900/40 bg-red-950/10 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 px-4 pt-3 pb-2">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 px-6 pt-5 pb-1">
                       Default
                     </p>
-                    <div className="px-4 pb-4">
+                    <div className="px-6 py-6">
                       <img
                         src={`/examples/${rule.id}-before.png`}
                         alt="Default browser rendering"
@@ -251,10 +251,10 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="border border-emerald-900/40 bg-emerald-950/10 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 px-4 pt-3 pb-2">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 px-6 pt-5 pb-1">
                       With typeset
                     </p>
-                    <div className="px-4 pb-4">
+                    <div className="px-6 py-6">
                       <img
                         src={`/examples/${rule.id}-after.png`}
                         alt="With typeset applied"
