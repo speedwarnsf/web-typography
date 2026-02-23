@@ -236,28 +236,32 @@ export default function Home() {
                   {rule.description}
                 </p>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="border border-neutral-800 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 px-3 pt-3 pb-2">
+                <div className="space-y-3 mb-6">
+                  <div className="border border-red-900/40 bg-red-950/10 overflow-hidden">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 px-4 pt-3 pb-2">
                       Default
                     </p>
-                    <img
-                      src={`/examples/${rule.id}-before.png`}
-                      alt="Before typeset"
-                      className="w-full"
-                      style={{ borderRadius: 0 }}
-                    />
+                    <div className="px-4 pb-4">
+                      <img
+                        src={`/examples/${rule.id}-before.png`}
+                        alt="Default browser rendering"
+                        className="w-full"
+                        style={{ borderRadius: 0 }}
+                      />
+                    </div>
                   </div>
-                  <div className="border border-neutral-800 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#B8963E] px-3 pt-3 pb-2">
+                  <div className="border border-emerald-900/40 bg-emerald-950/10 overflow-hidden">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 px-4 pt-3 pb-2">
                       With typeset
                     </p>
-                    <img
-                      src={`/examples/${rule.id}-after.png`}
-                      alt="After typeset"
-                      className="w-full"
-                      style={{ borderRadius: 0 }}
-                    />
+                    <div className="px-4 pb-4">
+                      <img
+                        src={`/examples/${rule.id}-after.png`}
+                        alt="With typeset applied"
+                        className="w-full"
+                        style={{ borderRadius: 0 }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
