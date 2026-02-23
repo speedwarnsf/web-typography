@@ -7,7 +7,6 @@ mkdirSync(OUT, { recursive: true });
 
 const STYLE = `font-family: Georgia, 'Times New Roman', serif; font-size: 18px; line-height: 1.65; color: #d4d4d4;`;
 
-// Each rule uses text + width that naturally creates the problem
 const rules = [
   {
     id: 'orphans',
@@ -30,14 +29,14 @@ const rules = [
   {
     id: 'rag',
     width: 360,
-    before: 'The building was designed by a small firm from Portland that specialized in sustainable architecture using reclaimed materials from the region.',
-    after: 'The building was designed by a small firm from Portland that specialized in\u00A0sustainable architecture using reclaimed materials from the\u00A0region.',
+    before: 'It was a collaboration between the university and several local nonprofits focused on housing.',
+    after: 'It was a collaboration between the university and several local nonprofits focused on\u00A0housing.',
   },
   {
     id: 'short-words',
     width: 360,
-    before: 'She walked through the center of town and stopped at the old bookshop on the corner to look at the shelves near the back of the store.',
-    after: 'She walked through the center of\u00A0town and stopped at\u00A0the old bookshop on\u00A0the corner to\u00A0look at\u00A0the shelves near the back of\u00A0the store.',
+    before: 'The foundation was built on the principles of transparency and the belief that every member of the community deserves a voice.',
+    after: 'The foundation was built on\u00A0the principles of\u00A0transparency and the belief that every member of\u00A0the community deserves a\u00A0voice.',
   },
 ];
 
@@ -49,14 +48,15 @@ async function render() {
   for (const rule of rules) {
     for (const side of ['before', 'after']) {
       const text = rule[side];
+      // Transparent background — no grey block
       await page.setContent(`
-        <html><body style="background:#171717;margin:0;padding:24px">
+        <html><body style="background:transparent;margin:0;padding:0">
           <div style="width:${rule.width}px;${STYLE}">${text}</div>
         </body></html>
       `);
       await page.waitForTimeout(300);
       const el = await page.$('div');
-      const buf = await el.screenshot();
+      const buf = await el.screenshot({ omitBackground: true });
       const path = join(OUT, `${rule.id}-${side}.png`);
       writeFileSync(path, buf);
       console.log(`  ${path}`);
