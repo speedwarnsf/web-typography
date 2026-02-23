@@ -237,29 +237,27 @@ export default function Home() {
                 </p>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="p-4 border border-red-900/40 bg-red-950/20">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 mb-3">
-                      Before
+                  <div className="border border-neutral-800 overflow-hidden">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 px-3 pt-3 pb-2">
+                      Default
                     </p>
-                    <p
-                      className="text-[13px] leading-[1.6] text-neutral-400"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
-                      data-no-typeset
-                    >
-                      {rule.before}
-                    </p>
+                    <img
+                      src={`/examples/${rule.id}-before.png`}
+                      alt="Before typeset"
+                      className="w-full"
+                      style={{ borderRadius: 0 }}
+                    />
                   </div>
-                  <div className="p-4 border border-emerald-900/40 bg-emerald-950/20">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 mb-3">
-                      After
+                  <div className="border border-neutral-800 overflow-hidden">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#B8963E] px-3 pt-3 pb-2">
+                      With typeset
                     </p>
-                    <p
-                      className="text-[13px] leading-[1.6] text-neutral-300"
-                      style={{ fontFamily: "var(--font-source-sans)" }}
-                      data-no-typeset
-                    >
-                      {rule.after}
-                    </p>
+                    <img
+                      src={`/examples/${rule.id}-after.png`}
+                      alt="After typeset"
+                      className="w-full"
+                      style={{ borderRadius: 0 }}
+                    />
                   </div>
                 </div>
               </div>
