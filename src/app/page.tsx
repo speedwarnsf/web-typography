@@ -242,11 +242,11 @@ export default function Home() {
                       Before
                     </p>
                     <p
-                      className="text-[12px] leading-[1.65] text-neutral-400"
-                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre" }}
+                      className="text-[13px] leading-[1.6] text-neutral-400"
+                      style={{ fontFamily: "var(--font-source-sans)" }}
                       data-no-typeset
                     >
-                      {rule.beforeLines.join("\n")}
+                      {rule.before}
                     </p>
                   </div>
                   <div className="p-4 border border-emerald-900/40 bg-emerald-950/20">
@@ -254,11 +254,11 @@ export default function Home() {
                       After
                     </p>
                     <p
-                      className="text-[12px] leading-[1.65] text-neutral-300"
-                      style={{ fontFamily: "var(--font-source-sans)", whiteSpace: "pre" }}
+                      className="text-[13px] leading-[1.6] text-neutral-300"
+                      style={{ fontFamily: "var(--font-source-sans)" }}
                       data-no-typeset
                     >
-                      {rule.afterLines.join("\n")}
+                      {rule.after}
                     </p>
                   </div>
                 </div>
