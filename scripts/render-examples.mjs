@@ -28,8 +28,8 @@ const rules = [
   },
   {
     id: 'rag',
-    width: 420,
-    before: 'The morning light through the kitchen window caught the steam rising from her coffee. She sat at the counter rereading the letter for the third time, still not sure what to make of it. Outside, the neighbor was walking his dog past the same fire hydrant.',
+    width: 380,
+    before: 'He arrived early and found a seat by the window overlooking the courtyard. The tables around him filled up slowly. A waiter brought coffee without being asked. Outside, two children chased a cat across the cobblestones while their parents watched from a doorway.',
     ragSmooth: true, // special handling: per-line word-spacing adjustment
   },
   {
@@ -88,26 +88,40 @@ async function render() {
       });
 
       // Build "after" HTML: each line as a span with adjusted word-spacing
-      // Target ~92% of container width for a smooth right edge
-      const target = lineData.containerWidth * 0.93;
-      const spanLines = lineData.lines.map((l, i) => {
+      // First: merge orphaned last line (short single word) into previous line
+      let lines = [...lineData.lines];
+      const lastLine = lines[lines.length - 1];
+      if (lastLine && lastLine.text.split(' ').length <= 2 && lines.length > 1) {
+        const prev = lines[lines.length - 2];
+        lines[lines.length - 2] = { text: prev.text + ' ' + lastLine.text, width: prev.width + lastLine.width };
+        lines.pop();
+      }
+
+      // Target ~95% of container width — smooth rag, not justification
+      const target = lineData.containerWidth * 0.95;
+      const spanLines = lines.map((l, i) => {
         const spaces = (l.text.match(/ /g) || []).length;
-        const isLast = i === lineData.lines.length - 1;
+        const isLast = i === lines.length - 1;
         if (isLast || spaces === 0) {
           return `<span style="display:block">${l.text}</span>`;
         }
         const gap = target - l.width;
         const ws = gap / spaces;
-        // Only adjust if needed (gap > 2px) and don't tighten too much
-        if (Math.abs(ws) < 0.3) {
+        // Only expand short lines, never tighten. Cap at 3px to stay subtle.
+        if (ws <= 0.3 || ws > 3.0) {
           return `<span style="display:block">${l.text}</span>`;
         }
         return `<span style="display:block;word-spacing:${ws.toFixed(2)}px">${l.text}</span>`;
       });
 
+      // Render "after" with a subtle guide line showing the target right edge
+      const guidePos = Math.round(target);
       await page.setContent(`
-        <html><body style="background:transparent;margin:0;padding:0">
-          <div style="width:${rule.width}px;${STYLE}">${spanLines.join('')}</div>
+        <html><body style="background:transparent;margin:0;padding:0;position:relative">
+          <div style="width:${rule.width}px;${STYLE};position:relative">
+            ${spanLines.join('')}
+            <div style="position:absolute;top:0;bottom:0;left:${guidePos}px;width:1px;background:rgba(184,150,62,0.25)"></div>
+          </div>
         </body></html>
       `);
       await page.waitForTimeout(300);
@@ -115,6 +129,21 @@ async function render() {
       buf = await el.screenshot({ omitBackground: true });
       writeFileSync(join(OUT, `${rule.id}-after.png`), buf);
       console.log(`  ${join(OUT, `${rule.id}-after.png`)}`);
+
+      // Also add guide line to "before" for comparison
+      await page.setContent(`
+        <html><body style="background:transparent;margin:0;padding:0">
+          <div style="width:${rule.width}px;${STYLE};position:relative">
+            ${text}
+            <div style="position:absolute;top:0;bottom:0;left:${guidePos}px;width:1px;background:rgba(184,150,62,0.25)"></div>
+          </div>
+        </body></html>
+      `);
+      await page.waitForTimeout(300);
+      el = await page.$('#d') || await page.$('div');
+      buf = await el.screenshot({ omitBackground: true });
+      writeFileSync(join(OUT, `${rule.id}-before.png`), buf);
+      console.log(`  ${join(OUT, `${rule.id}-before.png`)} (with guide)`);
       continue;
     }
 
