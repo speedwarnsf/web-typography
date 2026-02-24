@@ -17,102 +17,159 @@ const typesetFullCode = (() => {
 
 
 
-const fontPairings = [
+const GOOGLE_FONTS_URL =
+  "https://fonts.googleapis.com/css2?" +
+  [
+    "family=Montserrat:wght@400;700",
+    "family=Lora:wght@400;700",
+    "family=Plus+Jakarta+Sans:wght@400;700",
+    "family=Inter:wght@400;700",
+    "family=Inter+Tight:wght@400;700",
+    "family=Poppins:wght@400;700",
+    "family=Raleway:wght@400;700",
+    "family=Roboto:wght@400;700",
+    "family=Roboto+Slab:wght@400;700",
+    "family=Roboto+Mono:wght@400;700",
+    "family=Open+Sans:wght@400;700",
+    "family=Open+Sans+Condensed:wght@300;700",
+    "family=Fira+Sans:wght@400;700",
+    "family=Outfit:wght@400;700",
+    "family=Lexend:wght@400;700",
+    "family=DM+Sans:wght@400;700",
+    "family=Lato:wght@400;700",
+    "family=EB+Garamond:wght@400;700",
+    "family=Playfair+Display:wght@400;700",
+    "family=Source+Sans+3:wght@400;700",
+    "family=DM+Serif+Display:wght@400",
+    "family=Nunito:wght@400;700",
+    "family=Instrument+Serif:wght@400",
+    "family=Lancelot",
+    "family=La+Belle+Aurore",
+    "family=Cinzel:wght@400;700",
+    "family=Quattrocento:wght@400;700",
+    "family=Cormorant+Garamond:wght@400;700",
+    "family=Fraunces:wght@400;700",
+    "family=Alice",
+    "family=Great+Vibes",
+    "family=Merriweather:wght@400;700",
+    "family=Bebas+Neue",
+    "family=Space+Grotesk:wght@400;700",
+    "family=JetBrains+Mono:wght@400;700",
+    "family=Oswald:wght@400;700",
+    "family=League+Spartan:wght@400;700",
+    "family=Libre+Baskerville:wght@400;700",
+    "family=Orbitron:wght@400;700",
+    "family=UnifrakturCook:wght@700",
+    "family=Podkova:wght@400;700",
+    "family=Bungee",
+    "family=Bricolage+Grotesque:wght@400;700",
+    "family=Pacifico",
+    "family=Quicksand:wght@400;700",
+    "family=Fredoka:wght@400;700",
+    "family=Margarine",
+    "family=Inspiration",
+    "family=Sacramento",
+    "family=Yellowtail",
+    "family=Coustard:wght@400;900",
+    "family=Fredericka+the+Great",
+    "family=Arapey:wght@400",
+    "family=Homemade+Apple",
+    "family=Borel",
+    "family=Bodoni+Moda:wght@400;700",
+    "family=Agbalumo",
+    "family=Amatic+SC:wght@400;700",
+    "family=Beth+Ellen",
+    "family=Briem+Hand:wght@400;700",
+    "family=Cedarville+Cursive",
+  ].join("&") +
+  "&display=swap";
+
+type FontPairing = {
+  heading: string;
+  body: string;
+  headingFamily: string;
+  bodyFamily: string;
+  description: string;
+  css: string;
+};
+
+type PairingCategory = {
+  name: string;
+  pairings: FontPairing[];
+};
+
+function p(heading: string, hFam: string, body: string, bFam: string, description: string): FontPairing {
+  return {
+    heading,
+    body,
+    headingFamily: `'${heading}', ${hFam}`,
+    bodyFamily: `'${body}', ${bFam}`,
+    description,
+    css: `font-family: '${heading}', ${hFam}; /* Headings */\nfont-family: '${body}', ${bFam}; /* Body */`,
+  };
+}
+
+const pairingCategories: PairingCategory[] = [
   {
-    heading: "Playfair Display",
-    body: "Source Sans Pro",
-    headingVar: "var(--font-playfair)",
-    bodyVar: "var(--font-source-sans)",
-    vibe: "Editorial",
-    css: `font-family: 'Playfair Display', serif; /* Headings */\nfont-family: 'Source Sans 3', sans-serif; /* Body */`,
+    name: "Clean, Modern & Minimalist",
+    pairings: [
+      p("Montserrat", "sans-serif", "Lora", "serif", "Clean, confident sans-serif heading balanced by warmth of elegant serif"),
+      p("Plus Jakarta Sans", "sans-serif", "Inter", "sans-serif", "Geometric perfection meets global scalability"),
+      p("Poppins", "sans-serif", "Inter", "sans-serif", "Upbeat friendly energy balanced with serious contemporary undertone"),
+      p("Roboto", "sans-serif", "Raleway", "sans-serif", "Structured mechanical feel softened by airy elongated strokes"),
+      p("Open Sans", "sans-serif", "Open Sans Condensed", "sans-serif", "Signature contrast within same typeface family"),
+      p("Fira Sans", "sans-serif", "Montserrat", "sans-serif", "Harmonious balance of modernity and elegance"),
+      p("Outfit", "sans-serif", "Lexend", "sans-serif", "Highly legible pairing focused on accessibility and cognitive load reduction"),
+      p("Montserrat", "sans-serif", "DM Sans", "sans-serif", "High-impact agency aesthetic balancing visual strength with organic flow"),
+      p("Lato", "sans-serif", "EB Garamond", "serif", "Simple modern sans-serif matched with soft classic serif"),
+      p("Roboto", "sans-serif", "Roboto Slab", "serif", "Matching family pairing sharing rhythm and spacing"),
+      p("Raleway", "sans-serif", "Open Sans", "sans-serif", "Refined style headers with high usability body text"),
+    ],
   },
   {
-    heading: "Inter",
-    body: "Lora",
-    headingVar: "var(--font-inter)",
-    bodyVar: "var(--font-lora)",
-    vibe: "Modern Editorial",
-    css: `font-family: 'Inter', sans-serif; /* Headings */\nfont-family: 'Lora', serif; /* Body */`,
+    name: "Elegant, Sophisticated & Editorial",
+    pairings: [
+      p("Playfair Display", "serif", "Source Sans 3", "sans-serif", "High-contrast classic serif with minimal sans-serif body"),
+      p("DM Serif Display", "serif", "Nunito", "sans-serif", "Romantic sophistication balanced by ultra-clean readability"),
+      p("Instrument Serif", "serif", "Inter Tight", "sans-serif", "Silent luxury aesthetic with Apple-inspired minimalism"),
+      p("Lancelot", "serif", "La Belle Aurore", "cursive", "Elegant serifs merged with delicate graceful script"),
+      p("Playfair Display", "serif", "Lora", "serif", "18th-century styling with organic strokes for upscale brands"),
+      p("Cinzel", "serif", "Quattrocento", "serif", "Classic Roman typography with strong vertical lines"),
+      p("Cormorant Garamond", "serif", "Nunito", "sans-serif", "High-end organic serif with gentle rounded sans-serif"),
+      p("Fraunces", "serif", "DM Sans", "sans-serif", "Soft serifs with warm tones for boutique lifestyle"),
+      p("Playfair Display", "serif", "Alice", "serif", "Bold serif authority with whimsical character"),
+      p("Great Vibes", "cursive", "Merriweather", "serif", "Delicate romantic script loops anchored by balanced readable serifs"),
+    ],
   },
   {
-    heading: "Space Grotesk",
-    body: "Crimson Pro",
-    headingVar: "var(--font-space-grotesk)",
-    bodyVar: "var(--font-crimson-pro)",
-    vibe: "Tech Meets Classic",
-    css: `font-family: 'Space Grotesk', sans-serif; /* Headings */\nfont-family: 'Crimson Pro', serif; /* Body */`,
+    name: "Bold, Edgy & High-Impact",
+    pairings: [
+      p("Bebas Neue", "sans-serif", "Roboto Mono", "monospace", "Aggressive sans-serif synergizing with engineered monospace"),
+      p("Space Grotesk", "sans-serif", "JetBrains Mono", "monospace", "Radical innovation for developer ecosystems"),
+      p("Oswald", "sans-serif", "Courier New", "monospace", "Hard-hitting verticality with vintage attitude"),
+      p("League Spartan", "sans-serif", "Libre Baskerville", "serif", "Strong structured geometric heading with elegantly curved serifs"),
+      p("Bebas Neue", "sans-serif", "Poppins", "sans-serif", "Dominant urgency evened out by smooth circular proportions"),
+      p("Orbitron", "sans-serif", "Roboto", "sans-serif", "Mechanical space-age aesthetic softened by user-friendly letterforms"),
+      p("UnifrakturCook", "serif", "Podkova", "serif", "Bold blackletter authority with ultra-cool modern look"),
+      p("Bungee", "sans-serif", "Bricolage Grotesque", "sans-serif", "Energetic display personality grounded by versatile sans-serif"),
+    ],
   },
   {
-    heading: "DM Serif Display",
-    body: "DM Sans",
-    headingVar: "var(--font-dm-serif)",
-    bodyVar: "var(--font-dm-sans)",
-    vibe: "Google's Own",
-    css: `font-family: 'DM Serif Display', serif; /* Headings */\nfont-family: 'DM Sans', sans-serif; /* Body */`,
-  },
-  {
-    heading: "Cormorant Garamond",
-    body: "Fira Sans",
-    headingVar: "var(--font-cormorant)",
-    bodyVar: "var(--font-fira-sans)",
-    vibe: "Luxury",
-    css: `font-family: 'Cormorant Garamond', serif; /* Headings */\nfont-family: 'Fira Sans', sans-serif; /* Body */`,
-  },
-  {
-    heading: "Sora",
-    body: "Merriweather",
-    headingVar: "var(--font-sora)",
-    bodyVar: "var(--font-merriweather)",
-    vibe: "Startup Meets Tradition",
-    css: `font-family: 'Sora', sans-serif; /* Headings */\nfont-family: 'Merriweather', serif; /* Body */`,
-  },
-  {
-    heading: "Libre Baskerville",
-    body: "Nunito Sans",
-    headingVar: "var(--font-libre-baskerville)",
-    bodyVar: "var(--font-nunito-sans)",
-    vibe: "Literary",
-    css: `font-family: 'Libre Baskerville', serif; /* Headings */\nfont-family: 'Nunito Sans', sans-serif; /* Body */`,
-  },
-  {
-    heading: "Oswald",
-    body: "EB Garamond",
-    headingVar: "var(--font-oswald)",
-    bodyVar: "var(--font-eb-garamond)",
-    vibe: "Bold Contrast",
-    css: `font-family: 'Oswald', sans-serif; /* Headings */\nfont-family: 'EB Garamond', serif; /* Body */`,
-  },
-  {
-    heading: "Raleway",
-    body: "Bitter",
-    headingVar: "var(--font-raleway)",
-    bodyVar: "var(--font-bitter)",
-    vibe: "Clean and Warm",
-    css: `font-family: 'Raleway', sans-serif; /* Headings */\nfont-family: 'Bitter', serif; /* Body */`,
-  },
-  {
-    heading: "Work Sans",
-    body: "Spectral",
-    headingVar: "var(--font-work-sans)",
-    bodyVar: "var(--font-spectral)",
-    vibe: "Functional Elegance",
-    css: `font-family: 'Work Sans', sans-serif; /* Headings */\nfont-family: 'Spectral', serif; /* Body */`,
-  },
-  {
-    heading: "EB Garamond",
-    body: "Inter",
-    headingVar: "var(--font-eb-garamond)",
-    bodyVar: "var(--font-inter)",
-    vibe: "Old World, New Clarity",
-    css: `font-family: 'EB Garamond', serif; /* Headings */\nfont-family: 'Inter', sans-serif; /* Body */`,
-  },
-  {
-    heading: "Spectral",
-    body: "DM Sans",
-    headingVar: "var(--font-spectral)",
-    bodyVar: "var(--font-dm-sans)",
-    vibe: "Refined and Quiet",
-    css: `font-family: 'Spectral', serif; /* Headings */\nfont-family: 'DM Sans', sans-serif; /* Body */`,
+    name: "Playful, Friendly & Creative",
+    pairings: [
+      p("Pacifico", "cursive", "Quicksand", "sans-serif", "Flamboyant brush font with rounded quirky sans-serif"),
+      p("Fredoka", "sans-serif", "Nunito", "sans-serif", "Oversized rounded letters with youthful exuberance"),
+      p("Margarine", "cursive", "Inspiration", "cursive", "Cheerful expressive headers with elegant fluid cursive"),
+      p("Poppins", "sans-serif", "Merriweather", "serif", "Rounded approachable sans-serif with traditional serif hierarchy"),
+      p("Sacramento", "cursive", "Playfair Display", "serif", "Unique elegant calligraphy with classic refined serif"),
+      p("Yellowtail", "cursive", "Open Sans", "sans-serif", "Playful fat-brush display font with highly readable typeface"),
+      p("Coustard", "serif", "Fredericka the Great", "serif", "Dependable clean slab serif with hand-drawn quirky twist"),
+      p("Arapey", "serif", "Homemade Apple", "cursive", "Classic serif charm with approachable organic casual script"),
+      p("Borel", "cursive", "Bodoni Moda", "serif", "Playful handcrafted header anchored by sleek sharp serif"),
+      p("Agbalumo", "sans-serif", "Amatic SC", "cursive", "Thick expressive letterforms with tall narrow handwritten textures"),
+      p("Beth Ellen", "cursive", "Libre Baskerville", "serif", "Casual ink-drawn rhythm paired with timeless precision"),
+      p("Briem Hand", "cursive", "Cedarville Cursive", "cursive", "Confident human strokes with flowing emotional cursive"),
+    ],
   },
 ];
 
@@ -168,8 +225,13 @@ const tips = [
 ];
 
 export default function Home() {
+  const totalPairings = pairingCategories.reduce((n, c) => n + c.pairings.length, 0);
+
   return (
     <main className="min-h-screen">
+      {/* Google Fonts for all 36 pairings */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
       <section className="flex flex-col items-center justify-center min-h-[85vh] px-6 text-center border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
@@ -280,52 +342,62 @@ export default function Home() {
           </p>
           <h2
             className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            style={{ fontFamily: "'Playfair Display', serif" }}
           >
             Curated Combinations
           </h2>
-          <p className="text-neutral-400 max-w-2xl mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
-            {fontPairings.length} handpicked font pairings, all loaded from Google Fonts.
+          <p className="text-neutral-400 max-w-2xl mb-16 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+            {totalPairings} handpicked font pairings, all loaded from Google Fonts.
             Each pair is shown with a live preview. Copy the CSS to use them in
             your project.
           </p>
 
-          <div className="grid gap-8">
-            {fontPairings.map((pair) => (
-              <div
-                key={`${pair.heading}-${pair.body}`}
-                className="border border-neutral-800 bg-neutral-950/50"
-                style={{ borderRadius: 0 }}
-              >
-                <div className="p-6 sm:p-8">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
-                    <div>
-                      <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
-                        {pair.vibe}
-                      </p>
-                      <p className="text-sm text-neutral-400 mt-1">
-                        {pair.heading} + {pair.body}
+          {pairingCategories.map((category) => (
+            <div key={category.name} className="mb-16 last:mb-0">
+              <h3 className="font-mono text-sm uppercase tracking-[0.25em] text-[#B8963E] border-b border-neutral-800 pb-4 mb-8">
+                {category.name}
+              </h3>
+              <div className="grid gap-8">
+                {category.pairings.map((pair) => (
+                  <div
+                    key={`${pair.heading}-${pair.body}`}
+                    className="border border-neutral-800 bg-neutral-950/50"
+                    style={{ borderRadius: 0 }}
+                  >
+                    <div className="p-6 sm:p-8">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-600">
+                            {category.name}
+                          </p>
+                          <p className="text-sm text-neutral-300 mt-1">
+                            {pair.heading} + {pair.body}
+                          </p>
+                          <p className="text-xs text-neutral-500 mt-1 italic">
+                            {pair.description}
+                          </p>
+                        </div>
+                        <CopyButton text={pair.css} />
+                      </div>
+
+                      <h4
+                        className="text-3xl sm:text-4xl font-bold tracking-tight mb-4"
+                        style={{ fontFamily: pair.headingFamily }}
+                      >
+                        The Art of Type
+                      </h4>
+                      <p
+                        className="text-base text-neutral-400 leading-relaxed max-w-2xl"
+                        style={{ fontFamily: pair.bodyFamily }}
+                      >
+                        {SAMPLE_TEXT}
                       </p>
                     </div>
-                    <CopyButton text={pair.css} />
                   </div>
-
-                  <h3
-                    className="text-3xl sm:text-4xl font-bold tracking-tight mb-4"
-                    style={{ fontFamily: pair.headingVar }}
-                  >
-                    The Art of Visual Hierarchy
-                  </h3>
-                  <p
-                    className="text-base text-neutral-400 leading-relaxed max-w-2xl"
-                    style={{ fontFamily: pair.bodyVar }}
-                  >
-                    {SAMPLE_TEXT}
-                  </p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </section>
 

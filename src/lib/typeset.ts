@@ -23,16 +23,83 @@ const NBSP = '\u00A0'; // non-breaking space
 const HAIR = '\u200A'; // hair space (invisible, used as marker)
 
 /**
+ * Options for typesetText
+ */
+export interface TypesetOptions {
+  mode?: 'body' | 'heading';
+}
+
+/**
  * Detect sentence boundaries
  */
 const isSentenceEnd = (word: string) =>
   /[.!?]$/.test(word) || /[.!?]["'\u201D\u2019]$/.test(word);
 
 /**
+ * Heading mode: semantic-aware line breaks.
+ * Prioritizes meaning over orphan prevention.
+ * Binds at punctuation boundaries, keeps phrases together.
+ */
+function typesetHeadingText(text: string): string {
+  if (!text || text.length < 5) return text;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 3) return text;
+
+  const ARTICLES = new Set(['a', 'an', 'the']);
+  const PREPS = new Set(['to', 'in', 'on', 'of', 'at', 'by', 'for', 'with', 'from']);
+
+  const result: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const nextWord = i < words.length - 1 ? words[i + 1] : null;
+
+    // Never let an article sit alone at end of line — bind to next word
+    if (ARTICLES.has(word.toLowerCase()) && nextWord) {
+      result.push(word + NBSP + words[i + 1]);
+      i++;
+      continue;
+    }
+
+    // Never let a short preposition sit alone at end of line
+    if (PREPS.has(word.toLowerCase()) && nextWord) {
+      result.push(word + NBSP + words[i + 1]);
+      i++;
+      continue;
+    }
+
+    result.push(word);
+  }
+
+  return result.join(' ');
+}
+
+/**
  * Insert non-breaking spaces to enforce typographic rules.
  * Works by analyzing word groups and binding words that must stay together.
+ *
+ * @param text The text to process
+ * @param options Optional: { mode: 'body' | 'heading' }. Default: 'body'.
  */
-export function typesetText(text: string): string {
+export function typesetText(text: string, options?: TypesetOptions): string {
+  const mode = options?.mode ?? 'body';
+  if (mode === 'heading') {
+    return typesetHeadingText(text);
+  }
+  return typesetBodyText(text);
+}
+
+/**
+ * Convenience export for heading mode.
+ */
+export function typesetHeading(text: string): string {
+  return typesetText(text, { mode: 'heading' });
+}
+
+/**
+ * Body mode: full typographic rules with orphan prevention,
+ * short-word binding, sentence protection.
+ */
+function typesetBodyText(text: string): string {
   if (!text || text.length < 10) return text;
 
   const words = text.split(/\s+/).filter(Boolean);
@@ -158,6 +225,84 @@ export function useTypeset(ref: React.RefObject<HTMLElement | null>, deps: any[]
   if (ref.current) {
     run();
   }
+}
+
+/**
+ * smoothRag — adjust letter-spacing per line to smooth the right rag edge.
+ * Attach to an element; returns a cleanup function.
+ * Uses ResizeObserver so it re-runs on resize.
+ */
+export function smoothRag(element: HTMLElement): () => void {
+  const MAX_LS = 0.35; // max letter-spacing in px
+  const THRESHOLD = 5;  // min gap in px before adjusting
+  const GAP_RATIO = 0.75; // close 75% of the gap
+
+  function apply() {
+    // Reset any previous adjustments
+    element.style.letterSpacing = '';
+
+    const text = element.textContent || '';
+    if (!text.trim()) return;
+
+    // Measure natural line widths using Range API
+    const range = document.createRange();
+    const textNode = element.firstChild;
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
+
+    const chars = text.length;
+    const lines: { start: number; end: number; width: number }[] = [];
+    let lineStart = 0;
+    let lastTop = -1;
+
+    for (let i = 0; i <= chars; i++) {
+      range.setStart(textNode, Math.min(i, chars));
+      range.setEnd(textNode, Math.min(i + 1, chars));
+      const rect = range.getBoundingClientRect();
+      if (rect.top !== lastTop && i > 0) {
+        // New line detected
+        range.setStart(textNode, lineStart);
+        range.setEnd(textNode, i);
+        const lineRect = range.getBoundingClientRect();
+        lines.push({ start: lineStart, end: i, width: lineRect.width });
+        lineStart = i;
+      }
+      lastTop = rect.top;
+    }
+    // Last line
+    if (lineStart < chars) {
+      range.setStart(textNode, lineStart);
+      range.setEnd(textNode, chars);
+      const lineRect = range.getBoundingClientRect();
+      lines.push({ start: lineStart, end: chars, width: lineRect.width });
+    }
+
+    if (lines.length < 2) return;
+
+    // Find the longest non-last line as the target
+    const target = Math.max(...lines.slice(0, -1).map(l => l.width));
+
+    // For now, apply uniform letter-spacing based on average gap
+    // (per-line adjustment requires wrapping each line in a span, which is more invasive)
+    const gaps = lines.slice(0, -1).map(l => target - l.width).filter(g => g > THRESHOLD);
+    if (gaps.length === 0) return;
+
+    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const avgChars = lines.slice(0, -1).reduce((a, l) => a + (l.end - l.start), 0) / (lines.length - 1);
+    const ls = Math.min(MAX_LS, (avgGap * GAP_RATIO) / avgChars);
+
+    if (ls > 0.02) {
+      element.style.letterSpacing = `${ls.toFixed(3)}px`;
+    }
+  }
+
+  apply();
+
+  const observer = new ResizeObserver(() => {
+    requestAnimationFrame(apply);
+  });
+  observer.observe(element);
+
+  return () => observer.disconnect();
 }
 
 export default typeset;

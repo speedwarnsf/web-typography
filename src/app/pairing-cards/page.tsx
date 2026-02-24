@@ -195,7 +195,7 @@ function PairingCardBuilder() {
   const [bColor, setBColor] = useState(searchParams.get("bc") || "");
   const [useCustomText, setUseCustomText] = useState(false);
   const [customText, setCustomText] = useState("");
-  const [headingText, setHeadingText] = useState("The Art of Typography");
+  const [headingText, setHeadingText] = useState("The Art of Type");
 
   const specimenRef = useRef<HTMLDivElement>(null);
   const [generatedImages, setGeneratedImages] = useState<{label: string; dataUrl: string; width: number; height: number}[]>([]);
