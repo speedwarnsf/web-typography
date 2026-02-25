@@ -97,8 +97,10 @@ async function render() {
         lines.pop();
       }
 
-      // Target ~95% of container width — smooth rag, not justification
-      const target = lineData.containerWidth * 0.95;
+      // Subtle smoothing — nudge short lines slightly closer to longest line
+      // NOT justification. The rag should still be visible, just gentler.
+      const maxLineWidth = Math.max(...lines.map(l => l.width));
+      const target = maxLineWidth * 0.97; // aim for ~97% of the longest line
       const spanLines = lines.map((l, i) => {
         const spaces = (l.text.match(/ /g) || []).length;
         const isLast = i === lines.length - 1;
@@ -106,20 +108,22 @@ async function render() {
           return `<span style="display:block">${l.text}</span>`;
         }
         const gap = target - l.width;
-        if (gap <= 1) {
-          // Line already meets or exceeds target — don't tighten
+        if (gap <= 2) {
+          // Line is already close enough — leave it alone
           return `<span style="display:block">${l.text}</span>`;
         }
-        // Split the gap: 60% word-spacing, 40% letter-spacing
+        // Very subtle: only letter-spacing, capped at 0.35px
         const chars = l.text.length;
-        const wsGap = gap * 0.6;
-        const lsGap = gap * 0.4;
-        const ws = wsGap / spaces;
-        const ls = lsGap / chars;
-        // Cap word-spacing at 4px, letter-spacing at 0.8px
-        const wsActual = Math.min(ws, 4.0);
-        const lsActual = Math.min(ls, 0.8);
-        return `<span style="display:block;word-spacing:${wsActual.toFixed(2)}px;letter-spacing:${lsActual.toFixed(2)}px">${l.text}</span>`;
+        const ls = Math.min(gap / chars, 0.35);
+        // If even max letter-spacing can't bridge most of the gap, also add tiny word-spacing
+        const lsTotal = ls * chars;
+        const remaining = gap - lsTotal;
+        const ws = remaining > 1 && spaces > 0 ? Math.min(remaining / spaces, 1.2) : 0;
+        const parts = [];
+        if (ws > 0.05) parts.push(`word-spacing:${ws.toFixed(2)}px`);
+        if (ls > 0.02) parts.push(`letter-spacing:${ls.toFixed(2)}px`);
+        if (parts.length === 0) return `<span style="display:block">${l.text}</span>`;
+        return `<span style="display:block;${parts.join(';')}">${l.text}</span>`;
       });
 
       // Render "after" with a subtle guide line showing the target right edge
