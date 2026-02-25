@@ -244,8 +244,9 @@ export default function Home() {
           Web<br />Typography
         </h1>
         <p
+          data-no-typeset
           className="max-w-xl text-lg text-neutral-400 leading-relaxed"
-          style={{ fontFamily: "var(--font-source-sans)" }}
+          style={{ fontFamily: "var(--font-source-sans)", textWrap: "balance" }}
         >
           Typography is the foundation of great design. It shapes how we read,
           how we feel, and how we understand. This is a practical guide to
