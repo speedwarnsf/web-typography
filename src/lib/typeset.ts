@@ -147,19 +147,13 @@ function typesetBodyText(text: string): string {
       continue;
     }
 
-    // Rule: Bind prepositions/articles with the next word
+    // Rule: Bind prepositions/articles FORWARD only to the next word
     // (prevents dangling "a", "to", "in", "of", "the", "is", "it", etc.)
+    // FORWARD ONLY — binding backward creates massive unbreakable chains
+    // e.g. "Copy the CSS to use" would become one giant &nbsp; block
     const shortWords = ['a', 'an', 'the', 'to', 'in', 'on', 'of', 'is', 'it', 'or', 'at', 'by', 'if', 'no', 'so', 'up', 'as', 'we', 'my', 'do', 'be'];
-    // Only bind if the word has NO trailing punctuation (skip "of," "in," etc. in lists)
     if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
-      // Bind to BOTH previous and next word — prevents "of" from being at a line break
-      // e.g. "center of gravity" becomes "center\u00A0of\u00A0gravity"
-      if (result.length > 0) {
-        const prev = result.pop()!;
-        result.push(prev + NBSP + word + NBSP + words[i + 1]);
-      } else {
-        result.push(word + NBSP + words[i + 1]);
-      }
+      result.push(word + NBSP + words[i + 1]);
       i++;
       continue;
     }
