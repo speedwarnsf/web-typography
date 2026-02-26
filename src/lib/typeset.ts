@@ -240,6 +240,109 @@ export function smoothRag(element: HTMLElement): () => void {
   const originalHTML = element.innerHTML;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /**
+   * Light smooth mode — for narrow containers (<400px).
+   * Detects WHERE the browser broke the lines (via Range API),
+   * then applies per-line word-spacing to even out the right edge.
+   * Does NOT change line breaks — only adjusts spacing within each line.
+   */
+  function applyLightSmooth(el: HTMLElement, width: number) {
+    // Detect existing browser line breaks using Range API
+    const text = el.textContent || '';
+    if (!text.trim() || text.length < 40) return;
+
+    // Get all text nodes
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    const textNodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) textNodes.push(node as Text);
+    if (textNodes.length === 0) return;
+
+    // Detect lines by checking Y position of each character range
+    const lines: { text: string; width: number; startY: number }[] = [];
+    let currentLine = '';
+    let currentY = -1;
+    let lineStartOffset = 0;
+    let lineStartNode: Text | null = null;
+
+    const range = document.createRange();
+
+    for (const tNode of textNodes) {
+      const str = tNode.textContent || '';
+      for (let ci = 0; ci < str.length; ci++) {
+        range.setStart(tNode, ci);
+        range.setEnd(tNode, ci + 1);
+        const rect = range.getBoundingClientRect();
+        const y = Math.round(rect.top);
+
+        if (currentY === -1) {
+          currentY = y;
+          lineStartNode = tNode;
+          lineStartOffset = ci;
+        }
+
+        if (Math.abs(y - currentY) > 3 && currentLine.length > 0) {
+          // New line detected — measure the previous line's width
+          const lineRange = document.createRange();
+          lineRange.setStart(lineStartNode!, lineStartOffset);
+          // End at previous char
+          range.setStart(tNode, ci);
+          range.setEnd(tNode, ci);
+          // Use the accumulated text
+          const trimmed = currentLine.trimEnd();
+          if (trimmed.length > 0) {
+            // Measure actual rendered width of this line
+            const tempRange = document.createRange();
+            tempRange.setStart(lineStartNode!, lineStartOffset);
+            tempRange.setEnd(tNode, ci);
+            const lineRect = tempRange.getBoundingClientRect();
+            lines.push({ text: trimmed, width: lineRect.width, startY: currentY });
+          }
+          currentLine = str[ci];
+          currentY = y;
+          lineStartNode = tNode;
+          lineStartOffset = ci;
+        } else {
+          currentLine += str[ci];
+        }
+      }
+    }
+    // Last line
+    if (currentLine.trim().length > 0) {
+      const trimmed = currentLine.trim();
+      // Approximate last line width
+      lines.push({ text: trimmed, width: trimmed.length * (width / 40), startY: currentY });
+    }
+
+    if (lines.length < 2) return;
+
+    // Calculate target width (90th percentile of non-last lines)
+    const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
+    const target = nonLastWidths[Math.min(nonLastWidths.length - 1, Math.floor(nonLastWidths.length * 0.9))];
+
+    // Build HTML: wrap each line in a span with adjusted word-spacing
+    const MAX_WS = 1.5; // More conservative for narrow containers
+    const htmlParts: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isLast = i === lines.length - 1;
+      const spaces = (line.text.match(/ /g) || []).length;
+      const gap = target - line.width;
+
+      if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
+        const ws = Math.max(-MAX_WS, Math.min(MAX_WS, (gap * 0.6) / spaces));
+        if (Math.abs(ws) > 0.05) {
+          htmlParts.push(`<span style="word-spacing:${ws.toFixed(2)}px">${line.text}</span>`);
+          continue;
+        }
+      }
+      htmlParts.push(line.text);
+    }
+
+    el.innerHTML = htmlParts.join('<br>');
+  }
+
   function apply() {
     // Reset
     element.innerHTML = originalHTML;
@@ -252,9 +355,13 @@ export function smoothRag(element: HTMLElement): () => void {
       - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     if (containerWidth <= 0) return;
 
-    // Skip narrow containers — Knuth-Plass needs enough width to make good decisions.
-    // Below ~400px (e.g. mobile cards), browser's text-wrap: pretty does better.
-    if (containerWidth < 400) return;
+    const isNarrow = containerWidth < 400;
+
+    // Narrow containers: light mode — accept browser breaks, just smooth word-spacing
+    if (isNarrow) {
+      applyLightSmooth(element, containerWidth);
+      return;
+    }
 
     // Create a hidden measurement span inside the element (inherits all styles)
     const measurer = document.createElement('span');

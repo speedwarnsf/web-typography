@@ -391,7 +391,6 @@ export default function Home() {
                       </h4>
                       <p
                         className="text-base text-neutral-400 leading-relaxed max-w-2xl"
-                        data-no-smooth
                         style={{ fontFamily: pair.bodyFamily }}
                       >
                         {SAMPLE_TEXT}
