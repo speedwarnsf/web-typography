@@ -252,6 +252,10 @@ export function smoothRag(element: HTMLElement): () => void {
       - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     if (containerWidth <= 0) return;
 
+    // Skip narrow containers — Knuth-Plass needs enough width to make good decisions.
+    // Below ~400px (e.g. mobile cards), browser's text-wrap: pretty does better.
+    if (containerWidth < 400) return;
+
     // Create a hidden measurement span inside the element (inherits all styles)
     const measurer = document.createElement('span');
     measurer.style.cssText =
@@ -267,7 +271,9 @@ export function smoothRag(element: HTMLElement): () => void {
 
     const spaceWidth = measureWord('\u00A0'); // non-breaking space = true space width
 
-    const words = text.split(/\s+/).filter(Boolean);
+    // Split on regular spaces ONLY — preserve \u00A0 (nbsp) bindings from typesetText
+    // so "typography\u00A0is\u00A0invisible." stays as one atomic unit
+    const words = text.split(/ +/).filter(Boolean);
     if (words.length < 3) { element.removeChild(measurer); return; }
 
     // Measure all words (measurer must still be in DOM for getBoundingClientRect)

@@ -426,17 +426,17 @@ export default function Home() {
             {tips.map((tip) => (
               <div
                 key={tip.title}
-                className="border border-neutral-800 bg-neutral-950/50"
+                className="border border-neutral-800 bg-neutral-950/50 min-w-0 overflow-hidden"
                 style={{ borderRadius: 0 }}
               >
-                <div className="p-6 border-b border-neutral-800">
+                <div className="p-6 border-b border-neutral-800 min-w-0">
                   <h3
                     className="text-xl font-bold tracking-tight mb-3"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {tip.title}
                   </h3>
-                  <p className="text-sm text-neutral-400 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
+                  <p className="text-sm text-neutral-400 leading-relaxed break-words" style={{ fontFamily: "var(--font-source-sans)" }}>
                     {tip.content}
                   </p>
                 </div>
