@@ -665,7 +665,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </h2>
             <p
               ref={bodyParaRef}
-              data-no-smooth
               style={{
                 fontFamily: `'${body}', sans-serif`,
                 fontSize: `${bSize}px`,
