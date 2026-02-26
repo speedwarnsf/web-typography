@@ -228,81 +228,200 @@ export function useTypeset(ref: React.RefObject<HTMLElement | null>, deps: any[]
 }
 
 /**
- * smoothRag — adjust letter-spacing per line to smooth the right rag edge.
- * Attach to an element; returns a cleanup function.
- * Uses ResizeObserver so it re-runs on resize.
+ * smoothRag v4 — DOM-measured Knuth-Plass optimal line breaking.
+ *
+ * Uses actual DOM measurement (not canvas) for pixel-accurate word widths,
+ * then applies Knuth-Plass dynamic programming to find globally optimal
+ * break points that minimize rag variance.
+ *
+ * Two passes:
+ *   1. Measure each word's rendered width using a hidden span in the same
+ *      font context as the target element
+ *   2. Run Knuth-Plass to find optimal breaks, insert <br> tags
+ *   3. Apply subtle per-line word-spacing to polish
+ *
+ * Returns a cleanup function. Re-runs on resize via ResizeObserver.
  */
 export function smoothRag(element: HTMLElement): () => void {
-  const MAX_LS = 0.35; // max letter-spacing in px
-  const THRESHOLD = 5;  // min gap in px before adjusting
-  const GAP_RATIO = 0.75; // close 75% of the gap
+  const originalHTML = element.innerHTML;
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   function apply() {
-    // Reset any previous adjustments
-    element.style.letterSpacing = '';
+    // Reset
+    element.innerHTML = originalHTML;
 
     const text = element.textContent || '';
-    if (!text.trim()) return;
+    if (!text.trim() || text.length < 40) return;
 
-    // Measure natural line widths using Range API
-    const range = document.createRange();
-    const textNode = element.firstChild;
-    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
+    const cs = getComputedStyle(element);
+    const containerWidth = element.clientWidth
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    if (containerWidth <= 0) return;
 
-    const chars = text.length;
-    const lines: { start: number; end: number; width: number }[] = [];
-    let lineStart = 0;
-    let lastTop = -1;
+    // Create a hidden measurement span inside the element (inherits all styles)
+    const measurer = document.createElement('span');
+    measurer.style.cssText =
+      'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
+      'font:inherit;letter-spacing:inherit;word-spacing:inherit;';
+    element.style.position = element.style.position || 'relative';
+    element.appendChild(measurer);
 
-    for (let i = 0; i <= chars; i++) {
-      range.setStart(textNode, Math.min(i, chars));
-      range.setEnd(textNode, Math.min(i + 1, chars));
-      const rect = range.getBoundingClientRect();
-      if (rect.top !== lastTop && i > 0) {
-        // New line detected
-        range.setStart(textNode, lineStart);
-        range.setEnd(textNode, i);
-        const lineRect = range.getBoundingClientRect();
-        lines.push({ start: lineStart, end: i, width: lineRect.width });
-        lineStart = i;
-      }
-      lastTop = rect.top;
-    }
-    // Last line
-    if (lineStart < chars) {
-      range.setStart(textNode, lineStart);
-      range.setEnd(textNode, chars);
-      const lineRect = range.getBoundingClientRect();
-      lines.push({ start: lineStart, end: chars, width: lineRect.width });
+    const measureWord = (w: string): number => {
+      measurer.textContent = w;
+      return measurer.getBoundingClientRect().width;
+    };
+
+    const spaceWidth = measureWord('\u00A0'); // non-breaking space = true space width
+
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length < 3) { element.removeChild(measurer); return; }
+
+    // Measure all words (measurer must still be in DOM for getBoundingClientRect)
+    const wordWidths = words.map(w => measureWord(w));
+    element.removeChild(measurer);
+
+    // Run Knuth-Plass to find optimal breakpoints
+    const lineBreaks = knuthPlass(wordWidths, spaceWidth, containerWidth);
+
+    if (lineBreaks.length < 2) return;
+
+    // Build lines
+    const lines: { words: string[]; width: number }[] = [];
+    for (let i = 0; i < lineBreaks.length - 1; i++) {
+      const start = lineBreaks[i];
+      const end = lineBreaks[i + 1];
+      const lineWords = words.slice(start, end);
+      const w = lineWords.reduce((sum, word, j) => {
+        return sum + wordWidths[start + j] + (j < lineWords.length - 1 ? spaceWidth : 0);
+      }, 0);
+      lines.push({ words: lineWords, width: w });
     }
 
     if (lines.length < 2) return;
 
-    // Find the longest non-last line as the target
-    const target = Math.max(...lines.slice(0, -1).map(l => l.width));
+    // Compute target (90th percentile of non-last line widths)
+    const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
+    const p90 = nonLastWidths[Math.min(nonLastWidths.length - 1, Math.floor(nonLastWidths.length * 0.9))];
 
-    // For now, apply uniform letter-spacing based on average gap
-    // (per-line adjustment requires wrapping each line in a span, which is more invasive)
-    const gaps = lines.slice(0, -1).map(l => target - l.width).filter(g => g > THRESHOLD);
-    if (gaps.length === 0) return;
+    // Build HTML with per-line word-spacing
+    const MAX_WS = 2.0;
+    const htmlParts: string[] = [];
 
-    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-    const avgChars = lines.slice(0, -1).reduce((a, l) => a + (l.end - l.start), 0) / (lines.length - 1);
-    const ls = Math.min(MAX_LS, (avgGap * GAP_RATIO) / avgChars);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineText = line.words.join(' ');
+      const isLast = i === lines.length - 1;
+      const spaces = line.words.length - 1;
+      const gap = p90 - line.width;
 
-    if (ls > 0.02) {
-      element.style.letterSpacing = `${ls.toFixed(3)}px`;
+      if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
+        const ws = Math.max(-MAX_WS, Math.min(MAX_WS, (gap * 0.65) / spaces));
+        if (Math.abs(ws) > 0.05) {
+          htmlParts.push(`<span style="word-spacing:${ws.toFixed(2)}px">${lineText}</span>`);
+          continue;
+        }
+      }
+      htmlParts.push(lineText);
     }
+
+    element.innerHTML = htmlParts.join('<br>');
+  }
+
+  /**
+   * Knuth-Plass line breaking for ragged-right.
+   * Returns array of word indices where each line starts.
+   */
+  function knuthPlass(
+    wordWidths: number[],
+    spaceWidth: number,
+    lineWidth: number,
+  ): number[] {
+    const n = wordWidths.length;
+    const INF = 1e10;
+
+    // dp[i] = minimum cost to break words[0..i-1], with line ending after word i-1
+    const dp: number[] = new Array(n + 1).fill(INF);
+    const from: number[] = new Array(n + 1).fill(-1);
+    const lineWidthAt: number[] = new Array(n + 1).fill(0);
+    dp[0] = 0;
+
+    for (let j = 1; j <= n; j++) {
+      // Try starting a line from word i to word j-1
+      let w = 0;
+      for (let i = j; i >= 1; i--) {
+        // Width of words[i-1..j-1] with spaces between
+        w += wordWidths[i - 1] + (i < j ? spaceWidth : 0);
+
+        // Too wide? Stop looking further back
+        if (w > lineWidth * 1.05 && i < j) break;
+
+        if (dp[i - 1] >= INF) continue;
+
+        // Compute badness
+        const slack = lineWidth - w;
+        const ratio = slack / lineWidth;
+        const isLastLine = j === n;
+
+        let badness: number;
+        if (slack < -lineWidth * 0.03) {
+          // Line is too long (beyond 3% tolerance)
+          badness = Math.pow(Math.abs(ratio), 2) * 1000;
+        } else if (isLastLine) {
+          // Last line: very lenient — only penalize if very short
+          badness = ratio > 0.5 ? Math.pow(ratio - 0.5, 2) * 20 : 0;
+        } else {
+          // Normal line: penalize deviation from ~85% fill
+          const ideal = lineWidth * 0.85;
+          const dev = Math.abs(w - ideal) / lineWidth;
+          badness = Math.pow(dev, 2) * 100;
+
+          // Extra penalty for very short lines (<65% fill)
+          if (w < lineWidth * 0.65) {
+            badness += Math.pow((lineWidth * 0.65 - w) / lineWidth, 2) * 200;
+          }
+        }
+
+        // Adjacent-line variance penalty
+        if (i > 1 && lineWidthAt[i - 1] > 0) {
+          const prevWidth = lineWidthAt[i - 1];
+          const diff = Math.abs(w - prevWidth) / lineWidth;
+          badness += Math.pow(diff, 2) * 30;
+        }
+
+        const cost = dp[i - 1] + badness;
+        if (cost < dp[j]) {
+          dp[j] = cost;
+          from[j] = i - 1;
+          lineWidthAt[j] = w;
+        }
+      }
+    }
+
+    // Trace back
+    const breaks: number[] = [];
+    let cur = n;
+    while (cur > 0) {
+      breaks.unshift(from[cur]);
+      cur = from[cur];
+    }
+    breaks.push(n);
+
+    return breaks;
   }
 
   apply();
 
   const observer = new ResizeObserver(() => {
-    requestAnimationFrame(apply);
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => requestAnimationFrame(apply), 150);
   });
   observer.observe(element);
 
-  return () => observer.disconnect();
+  return () => {
+    observer.disconnect();
+    if (resizeTimer) clearTimeout(resizeTimer);
+    element.innerHTML = originalHTML;
+  };
 }
 
 export default typeset;

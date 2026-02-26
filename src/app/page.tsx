@@ -1,6 +1,7 @@
 import { rules } from "./rules-data";
 import CodeBlock from "@/components/CodeBlock";
 import CopyButton from "@/components/CopyButton";
+import AnimatedHeroHeading from "@/components/AnimatedHeroHeading";
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -81,6 +82,7 @@ const GOOGLE_FONTS_URL =
     "family=Beth+Ellen",
     "family=Briem+Hand:wght@400;700",
     "family=Cedarville+Cursive",
+    "family=Roboto+Flex:opsz,slnt,wdth,wght,GRAD,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC@8..144,-10..0,25..151,100..1000,-200..150,323..603,25..135,649..854,-305..-98,560..788,416..570,528..760",
   ].join("&") +
   "&display=swap";
 
@@ -233,30 +235,30 @@ export default function Home() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
-      <section className="flex flex-col items-center justify-center min-h-[85vh] px-6 text-center border-b border-neutral-800">
+      <section className="flex flex-col items-center justify-center lg:justify-start lg:pt-[12vh] min-h-[85vh] px-6 text-center border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
           A resource for designers and developers
         </p>
-        <h1
-          className="text-6xl sm:text-8xl md:text-9xl font-bold tracking-tight leading-[0.9] mb-8"
-          style={{ fontFamily: "var(--font-playfair)" }}
-        >
-          Web<br />Typography
-        </h1>
+        <AnimatedHeroHeading />
         <p
           data-no-typeset
-          className="max-w-xl text-lg text-neutral-400 leading-relaxed"
+          className="max-w-xl text-lg text-neutral-400 leading-relaxed mt-6 lg:mt-16"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "balance" }}
         >
-          Typography is the foundation of great design. It shapes how we read,
-          how we feel, and how we understand. This is a practical guide to
-          getting it right on the web.
+          Typography is the foundation of great&nbsp;design.
+          <br />
+          It shapes how we read, how we feel, and how we&nbsp;understand.
+          <br />
+          This is a practical guide to getting it right on the&nbsp;web.
         </p>
-        <div className="mt-12 flex gap-8 text-xs font-mono uppercase tracking-widest text-neutral-600">
+        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs lg:text-[15.3px] font-mono uppercase tracking-widest text-neutral-600 lg:max-w-5xl lg:w-full lg:justify-evenly lg:gap-x-0 lg:px-6">
           <a href="#rules" className="hover:text-[#B8963E] transition-colors">Rules</a>
           <a href="#pairings" className="hover:text-[#B8963E] transition-colors">Pairings</a>
           <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
           <a href="/animations" className="hover:text-[#B8963E] transition-colors">Animations</a>
+          <a href="/clamp" className="hover:text-[#B8963E] transition-colors">Clamp</a>
+          <a href="/font-inspector" className="hover:text-[#B8963E] transition-colors">Inspector</a>
+          <a href="/variable-fonts" className="hover:text-[#B8963E] transition-colors">Variable</a>
           <a href="#tips" className="hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="#utility" className="hover:text-[#B8963E] transition-colors">Utility</a>
         </div>
@@ -295,7 +297,7 @@ export default function Home() {
                     {rule.name}
                   </h3>
                 </div>
-                <p className="text-neutral-400 leading-relaxed mb-6" style={{ fontFamily: "var(--font-source-sans)" }}>
+                <p className="text-neutral-400 leading-relaxed mb-6 max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" as never }}>
                   {rule.description}
                 </p>
 

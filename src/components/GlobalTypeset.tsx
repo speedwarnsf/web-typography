@@ -1,15 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
-import { typesetAll, typesetHeading } from '@/lib/typeset';
+import { typesetAll, typesetHeading, smoothRag } from '@/lib/typeset';
 
 /**
  * GlobalTypeset — applies typographic rules to all text on the page.
- * Body text (p, li, etc.) uses body mode (orphan prevention, short-word binding).
- * Headings (h1-h4) use heading mode (semantic phrase preservation).
+ * 
+ * Phase 1: typesetAll + typesetHeading (orphan prevention, short-word binding)
+ * Phase 2: smoothRag on eligible paragraphs (Knuth-Plass optimal line breaking)
+ * 
+ * smoothRag runs ONCE after all typeset passes complete. It is NOT re-triggered
+ * by MutationObserver to prevent infinite DOM mutation loops.
  */
 export default function GlobalTypeset() {
   useEffect(() => {
+    let mutationPaused = false;
+    const ragCleanups: Array<() => void> = [];
+
     const runBody = () => typesetAll('p:not([data-no-typeset]), li:not([data-no-typeset]), blockquote:not([data-no-typeset]), figcaption:not([data-no-typeset])');
 
     const runHeadings = () => {
@@ -31,30 +38,61 @@ export default function GlobalTypeset() {
       });
     };
 
-    const run = () => {
+    const runSmooth = () => {
+      // Clean up previous
+      ragCleanups.forEach(fn => { try { fn(); } catch {} });
+      ragCleanups.length = 0;
+
+      // Pause mutation observer — smoothRag modifies innerHTML
+      mutationPaused = true;
+
+      const paragraphs = document.querySelectorAll<HTMLElement>(
+        'p:not([data-no-typeset]):not([data-no-smooth])'
+      );
+      paragraphs.forEach((p) => {
+        try {
+          const text = p.textContent || '';
+          if (text.length < 80) return;
+          if (p.closest('[data-no-smooth], pre, code, .demo, [role="tabpanel"]')) return;
+          const cleanup = smoothRag(p);
+          ragCleanups.push(cleanup);
+        } catch {
+          // silently skip
+        }
+      });
+
+      // Resume observer after DOM settles
+      requestAnimationFrame(() => { mutationPaused = false; });
+    };
+
+    const runTypeset = () => {
       runBody();
       runHeadings();
     };
 
-    // Initial pass
-    run();
+    // Phase 1: typeset passes
+    runTypeset();
 
-    // Re-run after ScrollReveal animations might have loaded content
+    // smoothRag disabled — was rewriting DOM and making type look bad.
+    // Relying on text-wrap: pretty in globals.css instead.
+
+    // Re-run typeset for late-loading content
     const timers = [
-      setTimeout(run, 500),
-      setTimeout(run, 1500),
-      setTimeout(run, 3000),
+      setTimeout(runTypeset, 500),
+      setTimeout(runTypeset, 1500),
     ];
 
-    // Observer for dynamically added content
+    // Observer for dynamically added content — only runs typeset, not smoothRag
     const observer = new MutationObserver(() => {
-      requestAnimationFrame(run);
+      if (mutationPaused) return;
+      requestAnimationFrame(runTypeset);
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       timers.forEach(clearTimeout);
       observer.disconnect();
+      ragCleanups.forEach(fn => { try { fn(); } catch {} });
     };
   }, []);
 

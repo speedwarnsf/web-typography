@@ -24,8 +24,8 @@ export default function CodeBlock({
           <CopyButton text={code} />
         </div>
       )}
-      <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
-        <code className="font-mono text-neutral-300">{code}</code>
+      <pre className="p-3 sm:p-4 overflow-x-auto text-xs sm:text-sm leading-relaxed">
+        <code className="font-mono text-neutral-300 break-all">{code}</code>
       </pre>
     </div>
   );

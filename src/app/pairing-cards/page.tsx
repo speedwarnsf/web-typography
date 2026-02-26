@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { typesetText } from "@/lib/typeset";
+import { typesetText, smoothRag } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -198,6 +198,7 @@ function PairingCardBuilder() {
   const [headingText, setHeadingText] = useState("The Art of Type");
 
   const specimenRef = useRef<HTMLDivElement>(null);
+  const bodyParaRef = useRef<HTMLParagraphElement>(null);
   const [generatedImages, setGeneratedImages] = useState<{label: string; dataUrl: string; width: number; height: number}[]>([]);
   const [generating, setGenerating] = useState(false);
 
@@ -221,6 +222,10 @@ function PairingCardBuilder() {
   const rawText = useCustomText && customText ? customText : LOREM;
   const displayText = typesetText(rawText);
 
+  // smoothRag disabled on builder — text-wrap: pretty handles it
+  // The builder preview is user-configurable (font/size/width), so
+  // algorithmic re-breaking can conflict with user intent.
+
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");
 
@@ -240,8 +245,8 @@ function PairingCardBuilder() {
         <h1 style="font-family: '${heading}', serif; font-size: ${hSize * (width > 500 ? 1 : 0.7)}px; line-height: 1.15; margin: 0 0 ${width > 500 ? 32 : 20}px 0; font-weight: 700; color: #${hColor || fg};">
           ${typesetText(headingText)}
         </h1>
-        <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0; color: #${bColor || fg};">
-          ${displayText}
+        <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0; color: #${bColor || fg}; text-wrap: pretty;">
+          ${rawText}
         </p>
       </div>
       <div style="font-family: monospace; font-size: 10px; color: #${fg}44; margin-top: auto; padding-top: 24px; letter-spacing: 0.1em; text-transform: uppercase;">
@@ -251,7 +256,15 @@ function PairingCardBuilder() {
     `;
 
     document.body.appendChild(container);
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Apply smoothRag to even out the right edge
+    const bodyP = container.querySelector("p");
+    let cleanupRag: (() => void) | undefined;
+    if (bodyP) {
+      cleanupRag = smoothRag(bodyP as HTMLElement);
+    }
+    await new Promise((r) => setTimeout(r, 200));
 
     const canvas = await html2canvas(container, {
       width, height, scale: 2,
@@ -259,6 +272,7 @@ function PairingCardBuilder() {
       useCORS: true,
     });
 
+    if (cleanupRag) cleanupRag();
     document.body.removeChild(container);
     return canvas.toDataURL("image/png");
   };
@@ -308,6 +322,13 @@ body {
   max-width: var(--col-width);
 }
 
+p {
+  text-wrap: pretty;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
+}
+
 h1, h2, h3 {
   font-family: var(--heading-font);
   font-size: var(--heading-size);
@@ -342,7 +363,13 @@ h1, h2, h3 {
       color: #${hColor || fg};
       margin: 0 0 0.5em;
     }
-    p { margin: 0; }
+    p {
+      margin: 0;
+      text-wrap: pretty;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      overflow-wrap: break-word;
+    }
   </style>
 </head>
 <body>
@@ -637,15 +664,22 @@ document.addEventListener('DOMContentLoaded', function() {
               {typesetText(headingText)}
             </h2>
             <p
+              ref={bodyParaRef}
+              data-no-smooth
               style={{
                 fontFamily: `'${body}', sans-serif`,
                 fontSize: `${bSize}px`,
                 lineHeight: leading,
                 margin: 0,
                 color: bColor ? `#${bColor}` : undefined,
+                textWrap: "pretty" as never,
+                hyphens: "none",
+                overflowWrap: "break-word",
+                wordBreak: "normal",
+                maxWidth: "100%",
               }}
             >
-              {displayText}
+              {rawText}
             </p>
             <div
               className="mt-8 pt-4 border-t"
