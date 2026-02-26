@@ -73,13 +73,15 @@ export default function GlobalTypeset() {
     // Phase 1: typeset passes
     runTypeset();
 
-    // smoothRag disabled — was rewriting DOM and making type look bad.
-    // Relying on text-wrap: pretty in globals.css instead.
-
-    // Re-run typeset for late-loading content
+    // Phase 2: smoothRag after initial typeset settles
+    // Runs once with MutationObserver paused to prevent infinite loop
     const timers = [
       setTimeout(runTypeset, 500),
-      setTimeout(runTypeset, 1500),
+      setTimeout(() => {
+        runTypeset();
+        // Run smoothRag after final typeset pass
+        requestAnimationFrame(runSmooth);
+      }, 1500),
     ];
 
     // Observer for dynamically added content — only runs typeset, not smoothRag
