@@ -21,6 +21,10 @@ import {
   Bitter,
   Work_Sans,
   Spectral,
+  Bebas_Neue,
+  Roboto,
+  Poppins,
+  Montserrat,
 } from "next/font/google";
 import "./globals.css";
 import GlobalTypeset from "@/components/GlobalTypeset";
@@ -47,6 +51,10 @@ const raleway = Raleway({ subsets: ["latin"], variable: "--font-raleway", displa
 const bitter = Bitter({ subsets: ["latin"], variable: "--font-bitter", display: "swap" });
 const workSans = Work_Sans({ subsets: ["latin"], variable: "--font-work-sans", display: "swap" });
 const spectral = Spectral({ subsets: ["latin"], variable: "--font-spectral", weight: ["400", "600"], display: "swap" });
+const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: "400", variable: "--font-bebas-neue", display: "swap" });
+const roboto = Roboto({ subsets: ["latin"], variable: "--font-roboto", weight: ["400", "700"], display: "swap" });
+const poppins = Poppins({ subsets: ["latin"], variable: "--font-poppins", weight: ["400", "600"], display: "swap" });
+const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Web Typography -- A Resource for Designers",
@@ -59,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     playfair, sourceSans, jetbrains, inter, lora, spaceGrotesk, crimsonPro,
     dmSerif, dmSans, cormorant, firaSans, sora, merriweather, libreBaskerville,
     nunitoSans, oswald, ebGaramond, raleway, bitter, workSans, spectral,
+    bebasNeue, roboto, poppins, montserrat,
   ].map((f) => f.variable).join(" ");
 
   return (
