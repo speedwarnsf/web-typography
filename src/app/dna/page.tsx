@@ -73,14 +73,43 @@ interface ExtractedDNA {
 
 export default function DNAPage() {
   const [htmlInput, setHtmlInput] = useState('')
+  const [urlInput, setUrlInput] = useState('')
+  const [inputMode, setInputMode] = useState<'url' | 'html'>('url')
   const [extractedDNA, setExtractedDNA] = useState<ExtractedDNA | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
+  const [fetchError, setFetchError] = useState('')
 
   const loadSample = () => {
     setHtmlInput(SAMPLE_HTML)
   }
 
-  const extractDNA = () => {
+  const extractDNA = async () => {
+    setFetchError('')
+    if (inputMode === 'url') {
+      const url = urlInput.trim()
+      if (!url) return
+      setIsExtracting(true)
+      try {
+        const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`
+        const res = await fetch(`/api/fetch-url?url=${encodeURIComponent(normalizedUrl)}`)
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || `Failed to fetch (${res.status})`)
+        }
+        const { html } = await res.json()
+        setIsExtracting(false)
+        runExtraction(html)
+      } catch (err: any) {
+        setFetchError(err.message || 'Failed to fetch URL')
+        setIsExtracting(false)
+      }
+    } else {
+      if (!htmlInput.trim()) return
+      runExtraction(htmlInput)
+    }
+  }
+
+  const runExtraction = (html: string) => {
     setIsExtracting(true)
 
     // Create hidden iframe
@@ -91,7 +120,7 @@ export default function DNAPage() {
     iframe.style.height = '800px'
     document.body.appendChild(iframe)
 
-    iframe.srcdoc = htmlInput
+    iframe.srcdoc = html
 
     iframe.onload = () => {
       try {
@@ -455,33 +484,84 @@ export default function DNAPage() {
         </div>
 
         {/* Input Section */}
-        <div className="border border-neutral-800 bg-neutral-950/50 p-8 mb-8">
-          <label className="block font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
-            HTML + CSS Input
-          </label>
-          <p className="text-neutral-400 text-sm mb-4">
-            View source on any page, copy the HTML (including &lt;style&gt; tags or inline styles), and paste it here
-          </p>
-          <textarea
-            value={htmlInput}
-            onChange={(e) => setHtmlInput(e.target.value)}
-            placeholder="Paste your HTML here..."
-            className="w-full h-64 bg-black border border-neutral-800 text-neutral-200 p-4 font-mono text-sm resize-none focus:outline-none focus:border-[#B8963E] mb-4"
-          />
-          <div className="flex gap-4">
+        <div className="mb-8 space-y-4">
+          {/* Mode toggle */}
+          <div className="flex gap-0 border border-neutral-800 w-fit">
             <button
-              onClick={extractDNA}
-              disabled={!htmlInput || isExtracting}
-              className="px-6 py-3 bg-[#B8963E] text-black font-mono text-xs uppercase tracking-[0.3em] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#d4ab4a] transition-colors"
+              onClick={() => setInputMode('url')}
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors border-r border-neutral-800 ${
+                inputMode === 'url'
+                  ? 'bg-[#B8963E]/10 text-[#B8963E]'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
             >
-              {isExtracting ? 'Extracting...' : 'Extract DNA'}
+              Website URL
             </button>
             <button
-              onClick={loadSample}
-              className="px-6 py-3 border border-neutral-800 text-neutral-200 font-mono text-xs uppercase tracking-[0.3em] hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+              onClick={() => setInputMode('html')}
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+                inputMode === 'html'
+                  ? 'bg-[#B8963E]/10 text-[#B8963E]'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
             >
-              Load Sample
+              Paste HTML
             </button>
+          </div>
+
+          <div className="border border-neutral-800 bg-neutral-950/50 p-8">
+            {inputMode === 'url' ? (
+              <>
+                <label className="block font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
+                  Website Address
+                </label>
+                <input
+                  type="text"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && extractDNA()}
+                  placeholder="apple.com"
+                  className="w-full bg-black border border-neutral-800 text-neutral-200 p-4 font-mono text-sm focus:outline-none focus:border-[#B8963E] mb-4"
+                />
+              </>
+            ) : (
+              <>
+                <label className="block font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
+                  HTML + CSS Input
+                </label>
+                <p className="text-neutral-400 text-sm mb-4">
+                  View source on any page, copy the HTML (including &lt;style&gt; tags or inline styles), and paste it here
+                </p>
+                <textarea
+                  value={htmlInput}
+                  onChange={(e) => setHtmlInput(e.target.value)}
+                  placeholder="Paste your HTML here..."
+                  className="w-full h-64 bg-black border border-neutral-800 text-neutral-200 p-4 font-mono text-sm resize-none focus:outline-none focus:border-[#B8963E] mb-4"
+                />
+              </>
+            )}
+
+            {fetchError && (
+              <p className="text-red-400 text-sm font-mono mb-4">{fetchError}</p>
+            )}
+
+            <div className="flex gap-4">
+              <button
+                onClick={extractDNA}
+                disabled={(inputMode === 'url' ? !urlInput.trim() : !htmlInput.trim()) || isExtracting}
+                className="px-6 py-3 bg-[#B8963E] text-black font-mono text-xs uppercase tracking-[0.3em] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#d4ab4a] transition-colors"
+              >
+                {isExtracting ? 'Fetching & Extracting...' : 'Extract DNA'}
+              </button>
+              {inputMode === 'html' && (
+                <button
+                  onClick={loadSample}
+                  className="px-6 py-3 border border-neutral-800 text-neutral-200 font-mono text-xs uppercase tracking-[0.3em] hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                >
+                  Load Sample
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
