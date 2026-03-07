@@ -79,16 +79,16 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
 export default function PerfectParagraph() {
   const [text, setText] = useState(DEFAULT_TEXT);
   const [toggles, setToggles] = useState<Record<string, boolean>>({
-    orphan: false,
-    shortWord: false,
-    sentenceStart: false,
-    sentenceEnd: false,
+    orphan: true,
+    shortWord: true,
+    sentenceStart: true,
+    sentenceEnd: true,
     ragSmoothing: false,
-    lineHeight: false,
-    measure: false,
+    lineHeight: true,
+    measure: true,
     hangingPunct: false,
     fontFeatures: false,
-    textWrap: false,
+    textWrap: true,
   });
 
   const typesetRef = useRef<HTMLParagraphElement>(null);

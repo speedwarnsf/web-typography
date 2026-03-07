@@ -415,7 +415,7 @@ export default function ReadingLab() {
                     lineHeight: settings.lineHeight,
                     maxWidth: `${settings.lineLength}ch`,
                     letterSpacing: `${settings.letterSpacing}em`,
-                    wordSpacing: `${settings.wordSpacing}em`,
+                    wordSpacing: `${(settings.wordSpacing - 1).toFixed(2)}em`,
                     fontWeight: settings.fontWeight,
                   }}
                   className="font-source-sans"
