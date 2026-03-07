@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import CopyButton from "@/components/CopyButton";
+import { typesetText, smoothRag } from "@/lib/typeset";
 
 export default function GoPage() {
   const scriptTag = '<script src="https://typeset.us/go.js"></script>';
@@ -9,7 +10,17 @@ export default function GoPage() {
 
   const beforeText = "This is a sample paragraph that demonstrates what text looks like without professional typesetting. Notice how the last word might sit alone on a line, creating an orphan. Short words like a, an, the are not bound to the following word, and there are other issues.";
 
-  const afterText = "This is a sample paragraph that demonstrates what text looks like with professional typesetting. Notice how the last two words are bound together, preventing orphans. Short words like a, an, the are properly bound to\u00A0the following word, and sentence breaks are\u00A0handled elegantly.";
+  const afterText = "This is a sample paragraph that demonstrates what text looks like with professional typesetting. Notice how the last two words are bound together, preventing orphans. Short words like a, an, the are properly bound to the following word, and sentence breaks are handled elegantly.";
+
+  const afterRef = useRef<HTMLParagraphElement>(null);
+
+  // Apply real typesetText + smoothRag to the "after" paragraph
+  useEffect(() => {
+    if (!afterRef.current) return;
+    afterRef.current.textContent = typesetText(afterText);
+    const cleanup = smoothRag(afterRef.current);
+    return cleanup;
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
@@ -74,9 +85,10 @@ export default function GoPage() {
               With go.js
             </h3>
             <p
+              ref={afterRef}
               className="font-[family-name:var(--font-source-sans)] text-neutral-200 leading-relaxed"
               style={{
-                textWrap: 'pretty',
+                textWrap: 'pretty' as any,
                 hangingPunctuation: 'first last',
                 fontFeatureSettings: '"liga" 1, "calt" 1, "kern" 1'
               }}
