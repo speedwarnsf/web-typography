@@ -17,22 +17,31 @@ export default function AboutPage() {
         >
           About
         </p>
-        <h1
-          className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6"
-          style={{
-            fontFamily: "var(--font-playfair)",
-            lineHeight: 1.1,
-            textWrap: "balance",
-          }}
-        >
-          Dustin York
-        </h1>
-        <p
-          className="text-xl text-neutral-400"
-          style={{ fontFamily: "var(--font-source-sans)" }}
-        >
-          Communication Designer
-        </p>
+        <div className="flex items-center gap-5">
+          <img
+            src="/dustin-york.jpg"
+            srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
+            alt="Dustin York"
+            className="w-16 h-16 rounded-full object-cover shrink-0"
+          />
+          <div>
+            <h1
+              className="text-2xl sm:text-3xl font-bold tracking-tight"
+              style={{
+                fontFamily: "var(--font-playfair)",
+                lineHeight: 1.2,
+              }}
+            >
+              Dustin York, <span className="font-normal">BDes</span>
+            </h1>
+            <p
+              className="text-lg text-neutral-400 mt-1"
+              style={{ fontFamily: "var(--font-source-sans)" }}
+            >
+              Communication Designer
+            </p>
+          </div>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -64,14 +73,15 @@ export default function AboutPage() {
               The Foundation
             </h2>
             <p className="leading-[1.8] mb-6">
-              Dustin York studied Communication Design at the Nova Scotia
-              College of Art and Design (NSCAD), where he was mentored by Peter
-              Brooks and studied under Hanno Ehses. His thesis work explored
-              rhetorical tropes in visual communication — the idea that design
-              choices carry persuasive meaning beyond their literal function.
-              Typography, he discovered, is where rhetoric becomes invisible.
-              The right typeface does not announce itself. It simply makes the
-              message more true.
+              Dustin York studied Communication Design (Honors) at the Nova
+              Scotia College of Art and Design (NSCAD), where he was mentored
+              by Peter Brooks and studied under Hanno Ehses. The program
+              centered on rhetoric and the use of its tropes in visual
+              communication — the idea that design choices carry persuasive
+              meaning beyond their literal function. His thesis applied these
+              principles to typography on the web. The right typeface does not
+              announce itself — but the rhetorical choices behind it are
+              deliberate, discoverable, and worth understanding.
             </p>
 
             <h2

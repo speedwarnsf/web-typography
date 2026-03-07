@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { typesetText, smoothRagSpans } from "@/lib/typeset";
 
 interface TypographySettings {
   fontSize: number;
@@ -112,7 +113,71 @@ export default function ReadingLab() {
     setCharsPerLine(settings.lineLength);
   }, [settings.lineLength]);
 
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [ragSmoothed, setRagSmoothed] = useState(false);
+
+  // Debounced rag smoothing — 1s after settings stop changing
+  useEffect(() => {
+    setRagSmoothed(false);
+    const timer = setTimeout(() => setRagSmoothed(true), 1000);
+    return () => clearTimeout(timer);
+  }, [settings, previewDark]);
+
+  // Apply rag smoothing from the library after debounce
+  useEffect(() => {
+    if (!ragSmoothed || !previewRef.current) return;
+
+    const cleanups: (() => void)[] = [];
+    const paragraphs = previewRef.current.querySelectorAll<HTMLElement>('p');
+    paragraphs.forEach((p) => {
+      cleanups.push(smoothRagSpans(p));
+    });
+
+    return () => cleanups.forEach((fn) => fn());
+  }, [ragSmoothed]);
+
   const comfortScore = calculateComfortScore();
+
+  // Build non-default CSS properties only
+  const cssProps: string[] = [];
+  if (settings.fontSize !== 16) cssProps.push(`  font-size: ${settings.fontSize}px;`);
+  cssProps.push(`  line-height: ${settings.lineHeight};`);
+  cssProps.push(`  max-width: ${settings.lineLength}ch;`);
+  if (settings.letterSpacing !== 0) cssProps.push(`  letter-spacing: ${settings.letterSpacing}em;`);
+  if (settings.wordSpacing !== 1) cssProps.push(`  word-spacing: ${(settings.wordSpacing - 1).toFixed(2)}em;`);
+  if (settings.fontWeight !== 400) cssProps.push(`  font-weight: ${settings.fontWeight};`);
+  if (settings.paragraphSpacing !== 0) cssProps.push(`  margin-bottom: ${settings.paragraphSpacing}rem;`);
+  cssProps.push(`  text-wrap: pretty;`);
+
+  const generatedCSS = `.readable-text {\n${cssProps.join('\n')}\n}${
+    settings.paragraphSpacing !== 0
+      ? `\n\n.readable-text p {\n  margin-bottom: ${settings.paragraphSpacing}rem;\n}\n\n.readable-text p:last-child {\n  margin-bottom: 0;\n}`
+      : ''
+  }`;
+
+  // Build JS snippet showing which typeset rules apply at this measure
+  const m = settings.lineLength;
+  const activeRules: string[] = [];
+  if (m >= 35) activeRules.push('orphan prevention');
+  if (m >= 45) activeRules.push('sentence protection');
+  if (m >= 55) activeRules.push('short-word binding');
+
+  const generatedJS = `import { typesetText, smoothRag } from 'typeset';
+
+// At ${settings.lineLength}ch measure, active rules:
+// ${activeRules.length > 0 ? activeRules.join(', ') : 'none (measure too narrow for binding rules)'}
+
+const element = document.querySelector('.readable-text');
+
+// Step 1: Apply text-level rules (non-breaking spaces)
+element.innerHTML = typesetText(element.textContent, {
+  measure: ${settings.lineLength}
+});
+
+// Step 2: Smooth the rag (per-line word-spacing)
+const cleanup = smoothRag(element);
+
+// To undo: cleanup();`;
 
   const previewText = [
     "Typography is the craft of endowing human language with a durable visual form, and thus with an independent existence. Its heartwood is calligraphy—the dance, on a smaller page, of the living, speaking hand—and its roots reach into living soil, though its branches may be hung with dead conventions.",
@@ -410,6 +475,7 @@ export default function ReadingLab() {
                 }`}
               >
                 <div
+                  ref={previewRef}
                   style={{
                     fontSize: `${settings.fontSize}px`,
                     lineHeight: settings.lineHeight,
@@ -417,29 +483,79 @@ export default function ReadingLab() {
                     letterSpacing: `${settings.letterSpacing}em`,
                     wordSpacing: `${(settings.wordSpacing - 1).toFixed(2)}em`,
                     fontWeight: settings.fontWeight,
+                    textWrap: 'pretty' as any,
                   }}
                   className="font-source-sans"
                 >
-                  {previewText.map((paragraph, index) => (
-                    <p
-                      key={index}
-                      style={{
-                        marginBottom:
-                          index < previewText.length - 1
-                            ? `${settings.paragraphSpacing}rem`
-                            : 0,
-                      }}
-                      className="text-wrap-balance"
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
+                  {previewText.map((paragraph, index) => {
+                    // Split into words, render each as a span for rag measurement
+                    const processed = typesetText(paragraph, { measure: settings.lineLength });
+                    const words = processed.split(/[ \u00A0]+/).filter(Boolean);
+                    return (
+                      <p
+                        key={index}
+                        style={{
+                          marginBottom:
+                            index < previewText.length - 1
+                              ? `${settings.paragraphSpacing}rem`
+                              : 0,
+                        }}
+                      >
+                        {words.map((word, wi) => (
+                          <React.Fragment key={wi}>
+                            {wi > 0 && ' '}
+                            <span data-w={wi}>{word}</span>
+                          </React.Fragment>
+                        ))}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="mt-4 text-xs text-neutral-500 font-mono">
                 Characters per line: ~{charsPerLine}
               </div>
+            </div>
+
+            {/* Generated Code */}
+            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
+                  Generated CSS
+                </h2>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedCSS);
+                  }}
+                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors"
+                >
+                  Copy CSS
+                </button>
+              </div>
+              <pre className="text-sm font-mono text-neutral-300 bg-neutral-900 p-6 overflow-x-auto whitespace-pre leading-relaxed">
+                {generatedCSS}
+              </pre>
+            </div>
+
+            {/* Generated JS (typeset rules) */}
+            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
+                  Typeset.js Rules
+                </h2>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedJS);
+                  }}
+                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors"
+                >
+                  Copy JS
+                </button>
+              </div>
+              <pre className="text-sm font-mono text-neutral-300 bg-neutral-900 p-6 overflow-x-auto whitespace-pre leading-relaxed">
+                {generatedJS}
+              </pre>
             </div>
           </div>
         </div>

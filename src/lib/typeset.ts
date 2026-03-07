@@ -27,6 +27,8 @@ const HAIR = '\u200A'; // hair space (invisible, used as marker)
  */
 export interface TypesetOptions {
   mode?: 'body' | 'heading';
+  /** Line length in characters — at narrow measures (<50ch), only orphan prevention runs */
+  measure?: number;
 }
 
 /**
@@ -85,7 +87,7 @@ export function typesetText(text: string, options?: TypesetOptions): string {
   if (mode === 'heading') {
     return typesetHeadingText(text);
   }
-  return typesetBodyText(text);
+  return typesetBodyText(text, options?.measure);
 }
 
 /**
@@ -99,11 +101,19 @@ export function typesetHeading(text: string): string {
  * Body mode: full typographic rules with orphan prevention,
  * short-word binding, sentence protection.
  */
-function typesetBodyText(text: string): string {
+function typesetBodyText(text: string, measure?: number): string {
   if (!text || text.length < 10) return text;
 
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 3) return text;
+
+  // At narrow measures, non-breaking bindings create oversized atoms
+  // that force bad breaks. Scale back: only orphan prevention below 45ch,
+  // add sentence protection at 45-55ch, full rules above 55ch.
+  const m = measure ?? 65;
+  const doOrphans = m >= 35;             // skip even orphan binding at very narrow measures
+  const doSentenceProtection = m >= 45;  // medium+ measures
+  const doShortWordBinding = m >= 55;    // wide measures only
 
   const result: string[] = [];
 
@@ -113,49 +123,46 @@ function typesetBodyText(text: string): string {
     const nextWord = i < words.length - 1 ? words[i + 1] : null;
 
     // Rule 1: Last two words always bound together (no orphans)
-    if (i === words.length - 2) {
+    if (doOrphans && i === words.length - 2) {
       result.push(word + NBSP + words[i + 1]);
       break;
     }
 
     // Rule 2: If previous word ends a sentence, bind this word with the next
-    // (don't let a sentence start be alone at end of a line)
-    // Catches: "stage. Tempo sets" → "stage. Tempo\u00A0sets"
-    if (prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
+    if (doSentenceProtection && prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
       if (word.length <= 6) {
         result.push(word + NBSP + words[i + 1]);
-        i++; // skip next word, already consumed
+        i++;
         continue;
       }
     }
 
-    // Rule 3: If this word ends a sentence/clause and it's short (1-5 chars),
-    // bind it with the previous word so it doesn't dangle alone
-    // Catches: "out." "out," "go." "it," "way" before punctuated words, etc.
-    const hasTrailingPunct = /[.!?,;:]$/.test(word);
-    if (hasTrailingPunct && word.length <= 7 && result.length > 0) {
-      const last = result.pop()!;
-      result.push(last + NBSP + word);
-      continue;
-    }
+    // Rule 3: If this word ends a sentence/clause and it's short,
+    // bind it with the previous word
+    if (doSentenceProtection) {
+      const hasTrailingPunct = /[.!?,;:]$/.test(word);
+      if (hasTrailingPunct && word.length <= 7 && result.length > 0) {
+        const last = result.pop()!;
+        result.push(last + NBSP + word);
+        continue;
+      }
 
-    // Rule 3b: If the NEXT word has trailing punctuation and is short,
-    // bind this word + next together (e.g. "way out," stays together)
-    if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
-      result.push(word + NBSP + words[i + 1]);
-      i++;
-      continue;
+      // Rule 3b: If the NEXT word has trailing punctuation and is short
+      if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
     }
 
     // Rule: Bind prepositions/articles FORWARD only to the next word
-    // (prevents dangling "a", "to", "in", "of", "the", "is", "it", etc.)
-    // FORWARD ONLY — binding backward creates massive unbreakable chains
-    // e.g. "Copy the CSS to use" would become one giant &nbsp; block
-    const shortWords = ['a', 'an', 'the', 'to', 'in', 'on', 'of', 'is', 'it', 'or', 'at', 'by', 'if', 'no', 'so', 'up', 'as', 'we', 'my', 'do', 'be'];
-    if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
-      result.push(word + NBSP + words[i + 1]);
-      i++;
-      continue;
+    if (doShortWordBinding) {
+      const shortWords = ['a', 'an', 'the', 'to', 'in', 'on', 'of', 'is', 'it', 'or', 'at', 'by', 'if', 'no', 'so', 'up', 'as', 'we', 'my', 'do', 'be'];
+      if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
     }
 
     result.push(word);
@@ -236,108 +243,108 @@ export function useTypeset(ref: React.RefObject<HTMLElement | null>, deps: any[]
  *
  * Returns a cleanup function. Re-runs on resize via ResizeObserver.
  */
-export function smoothRag(element: HTMLElement): () => void {
+export interface SmoothRagOptions {
+  /** If true, only adjust word-spacing on existing browser lines — never rewrite breaks */
+  preserveBreaks?: boolean;
+}
+
+export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () => void {
   const originalHTML = element.innerHTML;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
-   * Light smooth mode — for narrow containers (<400px).
-   * Detects WHERE the browser broke the lines (via Range API),
-   * then applies per-line word-spacing to even out the right edge.
-   * Does NOT change line breaks — only adjusts spacing within each line.
+   * Light smooth mode — word-based line detection.
+   * Wraps each word in a <span>, detects lines via offsetTop,
+   * then applies per-line word-spacing. Never loses characters.
    */
-  function applyLightSmooth(el: HTMLElement, width: number) {
-    // Detect existing browser line breaks using Range API
+  function applyLightSmooth(el: HTMLElement, containerWidth: number) {
     const text = el.textContent || '';
     if (!text.trim() || text.length < 40) return;
 
-    // Get all text nodes
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    const textNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = walker.nextNode())) textNodes.push(node as Text);
-    if (textNodes.length === 0) return;
+    // Get baseline word-spacing so we add our delta on top
+    const baseWS = parseFloat(getComputedStyle(el).wordSpacing) || 0;
 
-    // Detect lines by checking Y position of each character range
-    const lines: { text: string; width: number; startY: number }[] = [];
-    let currentLine = '';
-    let currentY = -1;
-    let lineStartOffset = 0;
-    let lineStartNode: Text | null = null;
+    // Split on any whitespace (regular + nbsp), preserving word content
+    const words = text.split(/[\s\u00A0]+/).filter(Boolean);
+    if (words.length < 4) return;
 
-    const range = document.createRange();
+    // Phase 1: Wrap each word in a span to detect line positions
+    el.innerHTML = words
+      .map((w, i) => `<span data-w="${i}">${w}</span>`)
+      .join(' ');
 
-    for (const tNode of textNodes) {
-      const str = tNode.textContent || '';
-      for (let ci = 0; ci < str.length; ci++) {
-        range.setStart(tNode, ci);
-        range.setEnd(tNode, ci + 1);
-        const rect = range.getBoundingClientRect();
-        const y = Math.round(rect.top);
+    // Phase 2: Group words into lines by their vertical position
+    const wordSpans = el.querySelectorAll<HTMLElement>('span[data-w]');
+    const lines: { wordIndices: number[]; width: number }[] = [];
+    let currentLineTop = -1;
+    let currentLine: number[] = [];
 
-        if (currentY === -1) {
-          currentY = y;
-          lineStartNode = tNode;
-          lineStartOffset = ci;
+    wordSpans.forEach((span, idx) => {
+      const top = Math.round(span.getBoundingClientRect().top);
+      if (currentLineTop === -1) {
+        currentLineTop = top;
+        currentLine = [idx];
+      } else if (Math.abs(top - currentLineTop) > 3) {
+        // New line — finalize previous
+        if (currentLine.length > 0) {
+          const firstSpan = wordSpans[currentLine[0]];
+          const lastSpan = wordSpans[currentLine[currentLine.length - 1]];
+          const lineWidth = lastSpan.getBoundingClientRect().right - firstSpan.getBoundingClientRect().left;
+          lines.push({ wordIndices: currentLine, width: lineWidth });
         }
-
-        if (Math.abs(y - currentY) > 3 && currentLine.length > 0) {
-          // New line detected — measure the previous line's width
-          const lineRange = document.createRange();
-          lineRange.setStart(lineStartNode!, lineStartOffset);
-          // End at previous char
-          range.setStart(tNode, ci);
-          range.setEnd(tNode, ci);
-          // Use the accumulated text
-          const trimmed = currentLine.trimEnd();
-          if (trimmed.length > 0) {
-            // Measure actual rendered width of this line
-            const tempRange = document.createRange();
-            tempRange.setStart(lineStartNode!, lineStartOffset);
-            tempRange.setEnd(tNode, ci);
-            const lineRect = tempRange.getBoundingClientRect();
-            lines.push({ text: trimmed, width: lineRect.width, startY: currentY });
-          }
-          currentLine = str[ci];
-          currentY = y;
-          lineStartNode = tNode;
-          lineStartOffset = ci;
-        } else {
-          currentLine += str[ci];
-        }
+        currentLineTop = top;
+        currentLine = [idx];
+      } else {
+        currentLine.push(idx);
       }
-    }
+    });
     // Last line
-    if (currentLine.trim().length > 0) {
-      const trimmed = currentLine.trim();
-      // Approximate last line width
-      lines.push({ text: trimmed, width: trimmed.length * (width / 40), startY: currentY });
+    if (currentLine.length > 0) {
+      const firstSpan = wordSpans[currentLine[0]];
+      const lastSpan = wordSpans[currentLine[currentLine.length - 1]];
+      const lineWidth = lastSpan.getBoundingClientRect().right - firstSpan.getBoundingClientRect().left;
+      lines.push({ wordIndices: currentLine, width: lineWidth });
     }
 
-    if (lines.length < 2) return;
+    if (lines.length < 2) {
+      // Not enough lines to smooth — restore plain text
+      el.innerHTML = words.join(' ');
+      return;
+    }
 
-    // Calculate target width (90th percentile of non-last lines)
+    // Phase 3: Compute target (median of non-last line widths)
     const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
-    const target = nonLastWidths[Math.min(nonLastWidths.length - 1, Math.floor(nonLastWidths.length * 0.9))];
+    const midIdx = Math.floor(nonLastWidths.length / 2);
+    const target = nonLastWidths.length % 2 === 0
+      ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
+      : nonLastWidths[midIdx];
 
-    // Build HTML: wrap each line in a span with adjusted word-spacing
-    const MAX_WS = 1.5; // More conservative for narrow containers
+    // Phase 4: Build HTML with per-line word-spacing
+    const isNarrow = containerWidth < 350;
+    const MAX_EXPAND = isNarrow ? 1.5 : 2.5;
+    const MAX_TIGHTEN = isNarrow ? 0.75 : 1.5;
     const htmlParts: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const isLast = i === lines.length - 1;
-      const spaces = (line.text.match(/ /g) || []).length;
+      const lineWords = line.wordIndices.map(idx => words[idx]);
+      const lineText = lineWords.join(' ');
+      const spaces = lineWords.length - 1;
       const gap = target - line.width;
 
       if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
-        const ws = Math.max(-MAX_WS, Math.min(MAX_WS, (gap * 0.6) / spaces));
-        if (Math.abs(ws) > 0.05) {
-          htmlParts.push(`<span style="word-spacing:${ws.toFixed(2)}px">${line.text}</span>`);
+        const rawDelta = gap / spaces;
+        const wsDelta = rawDelta > 0
+          ? Math.min(MAX_EXPAND, rawDelta * 0.8)
+          : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
+        if (Math.abs(wsDelta) > 0.05) {
+          const finalWS = baseWS + wsDelta;
+          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
-      htmlParts.push(line.text);
+      htmlParts.push(lineText);
     }
 
     el.innerHTML = htmlParts.join('<br>');
@@ -357,8 +364,13 @@ export function smoothRag(element: HTMLElement): () => void {
 
     const isNarrow = containerWidth < 400;
 
-    // Narrow containers: light mode — accept browser breaks, just smooth word-spacing
-    if (isNarrow) {
+    // Very narrow containers (<250px): rag smoothing does more harm than good.
+    // Let the browser handle it entirely.
+    if (containerWidth < 250) return;
+
+    // Light mode: accept browser breaks, just smooth word-spacing per line.
+    // Used for narrow containers OR when preserveBreaks is requested.
+    if (isNarrow || options?.preserveBreaks) {
       applyLightSmooth(element, containerWidth);
       return;
     }
@@ -377,6 +389,9 @@ export function smoothRag(element: HTMLElement): () => void {
     };
 
     const spaceWidth = measureWord('\u00A0'); // non-breaking space = true space width
+
+    // Get baseline word-spacing so per-line deltas add on top, not replace
+    const baseWS = parseFloat(cs.wordSpacing) || 0;
 
     // Split on regular spaces ONLY — preserve \u00A0 (nbsp) bindings from typesetText
     // so "typography\u00A0is\u00A0invisible." stays as one atomic unit
@@ -406,25 +421,35 @@ export function smoothRag(element: HTMLElement): () => void {
 
     if (lines.length < 2) return;
 
-    // Compute target (90th percentile of non-last line widths)
+    // Compute target: median of non-last line widths
     const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
-    const p90 = nonLastWidths[Math.min(nonLastWidths.length - 1, Math.floor(nonLastWidths.length * 0.9))];
+    const midIdx = Math.floor(nonLastWidths.length / 2);
+    const target = nonLastWidths.length % 2 === 0
+      ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
+      : nonLastWidths[midIdx];
 
-    // Build HTML with per-line word-spacing
-    const MAX_WS = 2.0;
+    // Build HTML with per-line word-spacing (delta added to user's base)
+    // Asymmetric: more expansion room than tightening
+    const MAX_EXPAND = 2.5;
+    const MAX_TIGHTEN = 1.5;
     const htmlParts: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const lineText = line.words.join(' ');
+      // Normalize nbsp → regular space so CSS word-spacing applies
+      const lineText = line.words.join(' ').replace(/\u00A0/g, ' ');
       const isLast = i === lines.length - 1;
       const spaces = line.words.length - 1;
-      const gap = p90 - line.width;
+      const gap = target - line.width;
 
       if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
-        const ws = Math.max(-MAX_WS, Math.min(MAX_WS, (gap * 0.65) / spaces));
-        if (Math.abs(ws) > 0.05) {
-          htmlParts.push(`<span style="word-spacing:${ws.toFixed(2)}px">${lineText}</span>`);
+        const rawDelta = gap / spaces;
+        const wsDelta = rawDelta > 0
+          ? Math.min(MAX_EXPAND, rawDelta * 0.8)
+          : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
+        if (Math.abs(wsDelta) > 0.05) {
+          const finalWS = baseWS + wsDelta;
+          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
@@ -528,6 +553,104 @@ export function smoothRag(element: HTMLElement): () => void {
     observer.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
     element.innerHTML = originalHTML;
+  };
+}
+
+/**
+ * smoothRagSpans — Non-destructive rag smoothing for word-wrapped content.
+ *
+ * Expects the container to hold words wrapped in <span data-w> elements
+ * (with regular spaces between them in the DOM). Measures where the browser
+ * placed each word, groups them into lines, and applies per-line word-spacing
+ * adjustments to even out the right edge.
+ *
+ * Never rewrites innerHTML — only reads positions and sets inline styles.
+ * Returns a cleanup function that removes the applied styles.
+ *
+ * Usage:
+ *   // Render words as spans (React, vanilla JS, whatever)
+ *   container.innerHTML = words.map((w, i) =>
+ *     `<span data-w="${i}">${w}</span>`
+ *   ).join(' ');
+ *
+ *   // Smooth the rag
+ *   const cleanup = smoothRagSpans(container);
+ *
+ *   // Later, to reset:
+ *   cleanup();
+ */
+export function smoothRagSpans(container: HTMLElement): () => void {
+  const wordSpans = container.querySelectorAll<HTMLElement>('span[data-w]');
+  if (wordSpans.length < 4) return () => {};
+
+  const containerWidth = container.clientWidth;
+  if (containerWidth < 250) return () => {};
+
+  // Group spans into lines by vertical position
+  const lines: HTMLElement[][] = [];
+  let currentTop = -1;
+  let currentLine: HTMLElement[] = [];
+
+  wordSpans.forEach((span) => {
+    const top = Math.round(span.getBoundingClientRect().top);
+    if (currentTop === -1) {
+      currentTop = top;
+      currentLine = [span];
+    } else if (Math.abs(top - currentTop) > 3) {
+      if (currentLine.length > 0) lines.push(currentLine);
+      currentTop = top;
+      currentLine = [span];
+    } else {
+      currentLine.push(span);
+    }
+  });
+  if (currentLine.length > 0) lines.push(currentLine);
+
+  if (lines.length < 2) return () => {};
+
+  // Measure each line's width (first span left → last span right)
+  const lineWidths = lines.map((line) => {
+    const first = line[0].getBoundingClientRect();
+    const last = line[line.length - 1].getBoundingClientRect();
+    return last.right - first.left;
+  });
+
+  // Target: median of non-last line widths
+  const nonLast = lineWidths.slice(0, -1).sort((a, b) => a - b);
+  const mid = Math.floor(nonLast.length / 2);
+  const target = nonLast.length % 2 === 0
+    ? (nonLast[mid - 1] + nonLast[mid]) / 2
+    : nonLast[mid];
+
+  // Asymmetric limits: short lines get more expansion room
+  const isNarrow = containerWidth < 350;
+  const MAX_EXPAND = isNarrow ? 1.5 : 2.5;   // px per word gap
+  const MAX_TIGHTEN = isNarrow ? 0.75 : 1.5;
+
+  const styledSpans: HTMLElement[] = [];
+
+  lines.forEach((line, i) => {
+    const isLast = i === lines.length - 1;
+    const spaces = line.length - 1;
+    const gap = target - lineWidths[i];
+
+    if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
+      const rawDelta = gap / spaces;
+      const wsDelta = rawDelta > 0
+        ? Math.min(MAX_EXPAND, rawDelta * 0.8)    // expand short lines
+        : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);  // tighten long lines
+      if (Math.abs(wsDelta) > 0.05) {
+        line.forEach((span) => {
+          span.style.wordSpacing = `${wsDelta.toFixed(2)}px`;
+          styledSpans.push(span);
+        });
+      }
+    }
+  });
+
+  // Cleanup: remove word-spacing from all spans we touched
+  return () => {
+    styledSpans.forEach((span) => { span.style.wordSpacing = ''; });
   };
 }
 
