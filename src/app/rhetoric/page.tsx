@@ -966,7 +966,7 @@ export default function RhetoricPage() {
 
       <footer className="border-t border-neutral-800 py-12 text-center">
         <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
-          Built for social good by Better World Advertising
+          typeset.us
         </p>
       </footer>
     </main>
