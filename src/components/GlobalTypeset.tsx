@@ -70,26 +70,28 @@ export default function GlobalTypeset() {
       runHeadings();
     };
 
-    // Phase 1: typeset passes
-    runTypeset();
-
-    // Phase 2: smoothRag after initial typeset settles
-    // Runs once with MutationObserver paused to prevent infinite loop
+    // Delay Phase 1 to avoid hydration mismatch — React must finish
+    // reconciling the DOM before we mutate text nodes.
     const timers = [
-      setTimeout(runTypeset, 500),
+      setTimeout(runTypeset, 100),
+      setTimeout(runTypeset, 600),
       setTimeout(() => {
         runTypeset();
         // Run smoothRag after final typeset pass
         requestAnimationFrame(runSmooth);
-      }, 1500),
+      }, 1600),
     ];
 
     // Observer for dynamically added content — only runs typeset, not smoothRag
+    // Starts paused until after initial hydration window
+    mutationPaused = true;
     const observer = new MutationObserver(() => {
       if (mutationPaused) return;
       requestAnimationFrame(runTypeset);
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    // Enable observer after hydration settles
+    setTimeout(() => { mutationPaused = false; }, 200);
 
     return () => {
       timers.forEach(clearTimeout);
