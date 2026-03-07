@@ -8,16 +8,16 @@ import { sections, metaPages, getPageInfo, type SiteSection, type PageInfo } fro
 export default function LocationBadge() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const badgeRef = useRef<HTMLDivElement>(null);
   const pageInfo = getPageInfo(pathname);
 
-  // Set expanded section to current section when opening
+  // Reset all sections to expanded when menu opens
   useEffect(() => {
-    if (isOpen && pageInfo) {
-      setExpandedSection(pageInfo.section.id);
+    if (isOpen) {
+      setCollapsedSections(new Set());
     }
-  }, [isOpen, pageInfo]);
+  }, [isOpen]);
 
   // Close on click outside
   useEffect(() => {
@@ -87,10 +87,15 @@ export default function LocationBadge() {
               key={section.id}
               section={section}
               currentSlug={pathname}
-              isExpanded={expandedSection === section.id}
-              onToggle={() =>
-                setExpandedSection(expandedSection === section.id ? null : section.id)
-              }
+              isExpanded={!collapsedSections.has(section.id)}
+              onToggle={() => {
+                setCollapsedSections((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(section.id)) next.delete(section.id);
+                  else next.add(section.id);
+                  return next;
+                });
+              }}
             />
           ))}
 
