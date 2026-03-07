@@ -544,19 +544,45 @@ p, li, blockquote {
 /* ── Component ── */
 export default function TypographicAudit() {
   const [input, setInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [inputMode, setInputMode] = useState<"html" | "url">("url");
   const [result, setResult] = useState<AuditResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [fetchError, setFetchError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleAnalyze = () => {
-    if (!input.trim()) return;
-    setAnalyzing(true);
-    // Small delay for UI feedback
-    setTimeout(() => {
-      const auditResult = performAudit(input);
-      setResult(auditResult);
-      setAnalyzing(false);
-    }, 300);
+  const handleAnalyze = async () => {
+    setFetchError("");
+
+    if (inputMode === "url") {
+      const url = urlInput.trim();
+      if (!url) return;
+      setAnalyzing(true);
+      try {
+        const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+        const res = await fetch(`/api/fetch-url?url=${encodeURIComponent(normalizedUrl)}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Failed to fetch (${res.status})`);
+        }
+        const { html } = await res.json();
+        const auditResult = performAudit(html);
+        setResult(auditResult);
+      } catch (err: any) {
+        setFetchError(err.message || "Failed to fetch URL");
+        setResult(null);
+      } finally {
+        setAnalyzing(false);
+      }
+    } else {
+      if (!input.trim()) return;
+      setAnalyzing(true);
+      setTimeout(() => {
+        const auditResult = performAudit(input);
+        setResult(auditResult);
+        setAnalyzing(false);
+      }, 300);
+    }
   };
 
   const loadSample = () => {
@@ -629,35 +655,86 @@ export default function TypographicAudit() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Input Section */}
         <section className="space-y-4">
-          <div className="border border-neutral-800 bg-neutral-950/50">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
-              <span className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500">
-                HTML or Text Input
-              </span>
-              <button
-                onClick={loadSample}
-                className="text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
-              >
-                Load Example
-              </button>
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Paste your HTML markup or plain text here..."
-              className="w-full bg-transparent text-neutral-200 p-4 sm:p-6 font-mono text-xs sm:text-sm resize-none outline-none min-h-[240px]"
-              style={{ fontFamily: "var(--font-mono)" }}
-            />
+          {/* Mode toggle */}
+          <div className="flex gap-0 border border-neutral-800 w-fit">
+            <button
+              onClick={() => setInputMode("url")}
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+                inputMode === "url"
+                  ? "bg-[#B8963E]/10 text-[#B8963E] border-r border-neutral-800"
+                  : "text-neutral-500 hover:text-neutral-300 border-r border-neutral-800"
+              }`}
+            >
+              Website URL
+            </button>
+            <button
+              onClick={() => setInputMode("html")}
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+                inputMode === "html"
+                  ? "bg-[#B8963E]/10 text-[#B8963E]"
+                  : "text-neutral-500 hover:text-neutral-300"
+              }`}
+            >
+              Paste HTML
+            </button>
           </div>
+
+          <div className="border border-neutral-800 bg-neutral-950/50">
+            {inputMode === "url" ? (
+              <>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
+                  <span className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500">
+                    Website Address
+                  </span>
+                </div>
+                <div className="p-4 sm:p-6">
+                  <input
+                    type="text"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                    placeholder="apple.com"
+                    className="w-full bg-transparent text-neutral-200 font-mono text-sm sm:text-base outline-none placeholder:text-neutral-600"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
+                  <span className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500">
+                    HTML or Text Input
+                  </span>
+                  <button
+                    onClick={loadSample}
+                    className="text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+                  >
+                    Load Example
+                  </button>
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Paste your HTML markup or plain text here..."
+                  className="w-full bg-transparent text-neutral-200 p-4 sm:p-6 font-mono text-xs sm:text-sm resize-none outline-none min-h-[240px]"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                />
+              </>
+            )}
+          </div>
+
+          {fetchError && (
+            <p className="text-red-400 text-sm font-mono">{fetchError}</p>
+          )}
 
           <div className="flex gap-3">
             <button
               onClick={handleAnalyze}
-              disabled={!input.trim() || analyzing}
+              disabled={(inputMode === "url" ? !urlInput.trim() : !input.trim()) || analyzing}
               className="flex-1 px-6 py-3 border border-[#B8963E] text-[#B8963E] font-mono text-sm uppercase tracking-wider hover:bg-[#B8963E] hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {analyzing ? "Analyzing..." : "Analyze"}
+              {analyzing ? "Fetching & Analyzing..." : "Analyze"}
             </button>
           </div>
         </section>
