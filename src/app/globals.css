@@ -18,6 +18,8 @@ html, body {
 body {
   background: var(--bg);
   color: var(--fg);
+  /* Space for the fixed location badge */
+  padding-top: 52px;
 }
 
 h1, h2, h3, h4 {

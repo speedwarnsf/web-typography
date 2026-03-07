@@ -251,14 +251,9 @@ export default function Home() {
           <br />
           This is a practical guide to getting it right on the&nbsp;web.
         </p>
-        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs lg:text-[15.3px] font-mono uppercase tracking-widest text-neutral-600 lg:max-w-5xl lg:w-full lg:justify-evenly lg:gap-x-0 lg:px-6">
+        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
           <a href="#rules" className="hover:text-[#B8963E] transition-colors">Rules</a>
           <a href="#pairings" className="hover:text-[#B8963E] transition-colors">Pairings</a>
-          <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
-          <a href="/animations" className="hover:text-[#B8963E] transition-colors">Animations</a>
-          <a href="/clamp" className="hover:text-[#B8963E] transition-colors">Clamp</a>
-          <a href="/font-inspector" className="hover:text-[#B8963E] transition-colors">Inspector</a>
-          <a href="/variable-fonts" className="hover:text-[#B8963E] transition-colors">Variable</a>
           <a href="#tips" className="hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="#utility" className="hover:text-[#B8963E] transition-colors">Utility</a>
         </div>
