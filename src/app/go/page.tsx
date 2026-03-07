@@ -74,7 +74,7 @@ export default function GoPage() {
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-4">
               Without go.js
             </h3>
-            <p className="font-[family-name:var(--font-source-sans)] text-neutral-400 leading-relaxed">
+            <p className="font-[family-name:var(--font-source-sans)] text-neutral-400 leading-relaxed" data-no-typeset data-no-smooth>
               {beforeText}
             </p>
           </div>
