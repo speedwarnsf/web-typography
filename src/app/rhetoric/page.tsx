@@ -673,7 +673,7 @@ export default function RhetoricPage() {
                 {[
                   { value: "trust", label: "Establish trust and credibility" },
                   { value: "emotion", label: "Evoke emotion and connection" },
-                  { value: "clarity", label: "Communicate clearly and logically" },
+                  { value: "clarity", label: "Communicate clearly and\u00A0logically" },
                 ].map((option) => (
                   <button
                     key={option.value}
@@ -681,7 +681,7 @@ export default function RhetoricPage() {
                       setWizardAnswers({ ...wizardAnswers, goal: option.value });
                       setWizardStep(1);
                     }}
-                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all"
+                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all" style={{ textWrap: "balance" } as React.CSSProperties}
                   >
                     <span style={{ fontFamily: "var(--font-source-sans)" }}>
                       {option.label}
@@ -715,7 +715,7 @@ export default function RhetoricPage() {
                       setWizardAnswers({ ...wizardAnswers, context: option.value });
                       setWizardStep(2);
                     }}
-                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all"
+                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all" style={{ textWrap: "balance" } as React.CSSProperties}
                   >
                     <span style={{ fontFamily: "var(--font-source-sans)" }}>
                       {option.label}
@@ -753,7 +753,7 @@ export default function RhetoricPage() {
                       setWizardAnswers({ ...wizardAnswers, tone: option.value });
                       setWizardStep(3);
                     }}
-                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all"
+                    className="w-full text-left p-4 border border-neutral-800 hover:border-[#B8963E] bg-neutral-900/50 hover:bg-neutral-900 transition-all" style={{ textWrap: "balance" } as React.CSSProperties}
                   >
                     <span style={{ fontFamily: "var(--font-source-sans)" }}>
                       {option.label}
