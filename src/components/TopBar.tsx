@@ -11,10 +11,9 @@ export default function TopBar() {
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50"
-      style={{ height: 'var(--topbar-h, 52px)' }}
     >
       {/* Solid bar */}
-      <div className="relative h-full flex items-center justify-between bg-[#0a0a0a]">
+      <div className="relative flex items-center justify-between bg-[#0a0a0a]" style={{ height: 'var(--topbar-h, 52px)' }}>
         <LocationBadge />
         <SearchTrigger />
       </div>
