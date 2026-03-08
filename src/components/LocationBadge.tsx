@@ -74,7 +74,7 @@ export default function LocationBadge() {
 
       {/* Expanded dropdown */}
       <div
-        className={`absolute top-full left-0 w-[320px] max-h-[calc(100vh-80px)] overflow-y-auto bg-[#0a0a0a] border border-neutral-800 shadow-2xl shadow-black/50 transition-all duration-200 origin-top-left ${
+        className={`absolute top-full left-0 w-[calc(100vw-2rem)] sm:w-[320px] max-h-[calc(100vh-80px)] overflow-y-auto bg-[#0a0a0a] border border-neutral-800 shadow-2xl shadow-black/50 transition-all duration-200 origin-top-left ${
           isOpen
             ? 'opacity-100 scale-100 translate-y-0'
             : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'

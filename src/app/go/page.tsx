@@ -25,7 +25,7 @@ export default function GoPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
       {/* Hero */}
-      <section className="max-w-4xl mx-auto px-6 pt-24 pb-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16">
         <div className="mb-8">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
             Universal Typeset
@@ -61,7 +61,7 @@ export default function GoPage() {
       </section>
 
       {/* Before & After */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <div className="mb-8">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
             Before & After
@@ -100,7 +100,7 @@ export default function GoPage() {
       </section>
 
       {/* What it does */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <div className="mb-8">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
             What it does
@@ -151,7 +151,7 @@ export default function GoPage() {
       </section>
 
       {/* Configuration */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <div className="mb-8">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
             Configuration
@@ -198,7 +198,7 @@ export default function GoPage() {
       </section>
 
       {/* API */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <div className="mb-8">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
             JavaScript API
@@ -245,7 +245,7 @@ export default function GoPage() {
       </section>
 
       {/* Footer */}
-      <footer className="max-w-4xl mx-auto px-6 py-16 border-t border-neutral-800">
+      <footer className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-t border-neutral-800">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <a

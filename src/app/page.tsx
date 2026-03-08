@@ -235,14 +235,14 @@ export default function Home() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
-      <section className="flex flex-col items-center justify-center lg:justify-start lg:pt-[12vh] min-h-[85vh] px-6 text-center border-b border-neutral-800">
+      <section className="flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
           A resource for designers and developers
         </p>
         <AnimatedHeroHeading />
         <p
           data-no-typeset
-          className="max-w-xl text-lg text-neutral-400 leading-relaxed mt-6 lg:mt-16"
+          className="max-w-xl text-base sm:text-lg text-neutral-400 leading-relaxed mt-6 lg:mt-16"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "balance" }}
         >
           Typography is the foundation of great&nbsp;design.
@@ -260,17 +260,17 @@ export default function Home() {
       </section>
 
       {/* ── Typographic Rules ── */}
-      <section id="rules" className="max-w-5xl mx-auto px-6 py-24">
+      <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           01 -- Typographic Rules
         </p>
         <h2
-          className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
+          className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
           style={{ fontFamily: "var(--font-playfair)" }}
         >
           Clean Text, Automatically
         </h2>
-        <p className="text-neutral-400 max-w-2xl mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
+        <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
           Five rules that transform raw text into professionally typeset copy.
           Each function uses non-breaking spaces to control line breaks without
           altering content.
@@ -283,16 +283,16 @@ export default function Home() {
               className="border border-neutral-800 bg-neutral-950/50"
               style={{ borderRadius: 0 }}
             >
-              <div className="p-6 sm:p-8 border-b border-neutral-800">
+              <div className="p-4 sm:p-6 lg:p-8 border-b border-neutral-800">
                 <div className="flex items-start justify-between mb-4">
                   <h3
-                    className="text-2xl font-bold tracking-tight"
+                    className="text-xl sm:text-2xl font-bold tracking-tight"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {rule.name}
                   </h3>
                 </div>
-                <p className="text-neutral-400 leading-relaxed mb-6 max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" as never }}>
+                <p className="text-sm sm:text-base text-neutral-400 leading-relaxed mb-6 max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" as never }}>
                   {rule.description}
                 </p>
 
@@ -334,17 +334,17 @@ export default function Home() {
 
       {/* ── Font Pairings ── */}
       <section id="pairings" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             02 -- Font Pairings
           </p>
           <h2
-            className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
             style={{ fontFamily: "'Playfair Display', serif" }}
           >
             Curated Combinations
           </h2>
-          <p className="text-neutral-400 max-w-2xl mb-16 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
             {totalPairings} handpicked font pairings, all loaded from Google Fonts.
             Each pair is shown with a live preview. Copy the CSS to use them in
             your project.
@@ -362,7 +362,7 @@ export default function Home() {
                     className="border border-neutral-800 bg-neutral-950/50"
                     style={{ borderRadius: 0 }}
                   >
-                    <div className="p-6 sm:p-8">
+                    <div className="p-4 sm:p-6 lg:p-8">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
                         <div>
                           <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-600">
@@ -379,13 +379,13 @@ export default function Home() {
                       </div>
 
                       <h4
-                        className="text-3xl sm:text-4xl font-bold tracking-tight mb-4"
+                        className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4"
                         style={{ fontFamily: pair.headingFamily }}
                       >
                         The Art of Type
                       </h4>
                       <p
-                        className="text-base text-neutral-400 leading-relaxed max-w-2xl"
+                        className="text-sm sm:text-base text-neutral-400 leading-relaxed max-w-2xl"
                         style={{ fontFamily: pair.bodyFamily }}
                       >
                         {SAMPLE_TEXT}
@@ -401,17 +401,17 @@ export default function Home() {
 
       {/* ── Typography Tips ── */}
       <section id="tips" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             03 -- Typography Tips
           </p>
           <h2
-            className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             The Details That Matter
           </h2>
-          <p className="text-neutral-400 max-w-2xl mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
             Practical CSS techniques for better reading experiences. Each tip is
             something you can apply to your next project today.
           </p>
@@ -423,9 +423,9 @@ export default function Home() {
                 className="border border-neutral-800 bg-neutral-950/50 min-w-0 overflow-hidden"
                 style={{ borderRadius: 0 }}
               >
-                <div className="p-6 border-b border-neutral-800 min-w-0">
+                <div className="p-4 sm:p-6 border-b border-neutral-800 min-w-0">
                   <h3
-                    className="text-xl font-bold tracking-tight mb-3"
+                    className="text-lg sm:text-xl font-bold tracking-tight mb-3"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {tip.title}
@@ -443,17 +443,17 @@ export default function Home() {
 
       {/* ── Full Utility ── */}
       <section id="utility" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             04 -- The Utility
           </p>
           <h2
-            className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             typeset.ts
           </h2>
-          <p className="text-neutral-400 max-w-2xl mb-8 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
             Drop this single file into any TypeScript project. Call{" "}
             <code className="font-mono text-[#B8963E]">typeset(text)</code> to
             apply all five rules at once, or use individual functions for

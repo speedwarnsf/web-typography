@@ -264,12 +264,12 @@ export default function RhetoricPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-neutral-200">
-      <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           10 -- Rhetorical Type
         </p>
         <h1
-          className="text-5xl sm:text-6xl font-bold tracking-tight mb-6"
+          className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}
         >
           Typography as Rhetoric
@@ -285,7 +285,7 @@ export default function RhetoricPage() {
         </p>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <h2
           className="text-3xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}
@@ -448,7 +448,7 @@ export default function RhetoricPage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <h2
           className="text-3xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}
@@ -543,7 +543,7 @@ export default function RhetoricPage() {
       </section>
 
       {comparisonFonts.length > 0 && (
-        <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
           <div className="flex items-center justify-between mb-6">
             <h2
               className="text-3xl font-bold tracking-tight"
@@ -645,7 +645,7 @@ export default function RhetoricPage() {
         </section>
       )}
 
-      <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <h2
           className="text-3xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}
@@ -846,7 +846,7 @@ export default function RhetoricPage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16 border-b border-neutral-800">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <h2
           className="text-3xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}
@@ -932,7 +932,7 @@ export default function RhetoricPage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h2
           className="text-3xl font-bold tracking-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)" }}

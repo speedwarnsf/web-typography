@@ -518,14 +518,14 @@ document.addEventListener('DOMContentLoaded', function() {
   return (
     <main className="min-h-screen" style={{ background: "#0a0a0a" }}>
       {/* Header */}
-      <header className="border-b border-neutral-800 px-6 py-6">
+      <header className="border-b border-neutral-800 px-4 sm:px-6 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <a href="/" className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 hover:text-[#B8963E] transition-colors">
               Web Typography
             </a>
             <h1
-              className="text-2xl font-bold tracking-tight mt-1"
+              className="text-xl sm:text-2xl font-bold tracking-tight mt-1"
               style={{ fontFamily: "'Playfair Display', serif" }}
             >
               Font Pairing Cards
@@ -534,7 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <button
             onClick={generateBoth}
             disabled={generating}
-            className="border border-[#B8963E] bg-[#B8963E]/10 px-6 py-2 text-xs font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors disabled:opacity-50"
+            className="border border-[#B8963E] bg-[#B8963E]/10 px-4 sm:px-6 py-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors disabled:opacity-50"
           >
             {generating ? "Generating..." : "Generate Cards"}
           </button>
@@ -543,7 +543,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row">
         {/* Controls */}
-        <aside className="w-full lg:w-80 lg:min-w-[320px] border-r border-neutral-800 p-6 space-y-5 lg:min-h-[calc(100vh-80px)] lg:sticky lg:top-0 lg:overflow-y-auto">
+        <aside className="w-full lg:w-80 lg:min-w-[320px] border-b lg:border-b-0 lg:border-r border-neutral-800 p-4 sm:p-6 space-y-5 lg:min-h-[calc(100vh-80px)] lg:sticky lg:top-0 lg:overflow-y-auto">
           <FontSearch label="Heading Font" value={heading} onChange={setHeading} />
           <FontSearch label="Body Font" value={body} onChange={setBody} />
 
@@ -639,7 +639,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </aside>
 
         {/* Preview + Generated Images */}
-        <div className="flex-1 p-6 lg:p-12 flex flex-col items-center min-h-[calc(100vh-80px)] gap-12">
+        <div className="flex-1 p-4 sm:p-6 lg:p-12 flex flex-col items-center min-h-[calc(100vh-80px)] gap-8 sm:gap-12">
           {/* Live Preview */}
           <div
             ref={specimenRef}
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <h2
               style={{
                 fontFamily: `'${heading}', serif`,
-                fontSize: `${hSize}px`,
+                fontSize: `clamp(${Math.max(hSize * 0.6, 24)}px, ${hSize * 0.8}px, ${hSize}px)`,
                 lineHeight: 1.15,
                 fontWeight: 700,
                 margin: "0 0 0.5em 0",
@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
               ref={bodyParaRef}
               style={{
                 fontFamily: `'${body}', sans-serif`,
-                fontSize: `${bSize}px`,
+                fontSize: `clamp(${Math.max(bSize * 0.8, 14)}px, ${bSize * 0.9}px, ${bSize}px)`,
                 lineHeight: leading,
                 margin: 0,
                 color: bColor ? `#${bColor}` : undefined,

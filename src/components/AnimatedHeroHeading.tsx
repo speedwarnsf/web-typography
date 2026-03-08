@@ -13,7 +13,6 @@ const FONTS = [
 ];
 const WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 const VARIANTS = ["normal", "small-caps", "all-small-caps", "unicase"];
-// User-configured palette: mostly white with gold + red accent
 const COLORS = [
   "#B8963E", "#ff3333", "#ffffff", "#ffffff", "#ffffff", "#ffffff",
   "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff",
@@ -35,7 +34,7 @@ type LetterStyle = {
 const RESOLVED: LetterStyle = {
   fontFamily: "var(--font-playfair)",
   fontWeight: 700,
-  fontSize: 1, // 1 = multiplier of base size
+  fontSize: 1,
   rotate: 0,
   skewX: 0,
   scaleX: 1,
@@ -48,8 +47,8 @@ const RESOLVED: LetterStyle = {
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-const REGULARITY = 0.73; // 73% — subtle chaos
-const TICK_MS = 200;     // glacial speed
+const REGULARITY = 0.73;
+const TICK_MS = 200;
 
 function randomStyle(devOverride?: number): LetterStyle {
   const dev = devOverride !== undefined ? devOverride : (1 - REGULARITY);
@@ -57,12 +56,13 @@ function randomStyle(devOverride?: number): LetterStyle {
   return {
     fontFamily: dev > 0.2 ? pick(FONTS) : RESOLVED.fontFamily,
     fontWeight: dev > 0.1 ? pick(WEIGHTS) : RESOLVED.fontWeight,
-    fontSize: lerp(1, 0.3 + Math.random() * 1.4, dev),
-    rotate: lerp(0, (Math.random() - 0.5) * 60, dev),
-    skewX: lerp(0, (Math.random() - 0.5) * 30, dev),
-    scaleX: lerp(1, 0.5 + Math.random() * 1.5, dev),
+    // Clamp fontSize to prevent overflow on mobile
+    fontSize: Math.max(0.5, Math.min(1.3, lerp(1, 0.3 + Math.random() * 1.4, dev))),
+    rotate: lerp(0, (Math.random() - 0.5) * 40, dev), // Reduced from 60
+    skewX: lerp(0, (Math.random() - 0.5) * 20, dev),  // Reduced from 30
+    scaleX: Math.max(0.6, Math.min(1.4, lerp(1, 0.5 + Math.random() * 1.5, dev))), // Clamped
     color: dev > 0.05 ? pick(COLORS) : RESOLVED.color,
-    letterSpacing: lerp(0, (Math.random() - 0.5) * 8, dev),
+    letterSpacing: lerp(0, (Math.random() - 0.5) * 4, dev), // Reduced from 8
     fontStyle: dev > 0.3 && Math.random() > 0.6 ? "italic" : "normal",
     fontVariantCaps: dev > 0.4 ? pick(VARIANTS) : "normal",
   };
@@ -73,14 +73,12 @@ export default function AnimatedHeroHeading() {
   const [phase, setPhase] = useState<"chaos" | "resolving" | "hold">("hold");
   const [tick, setTick] = useState(0);
 
-  // Cycle: hold 2s → chaos 3s → resolve over 2s → hold 2s → repeat
   useEffect(() => {
     let t = 0;
     const iv = setInterval(() => {
       t++;
       setTick(t);
 
-      // At 200ms tick: hold 15 ticks (3s), chaos 25 ticks (5s), resolve 15 ticks (3s)
       const cycleLength = 55;
       const pos = t % cycleLength;
 
@@ -100,13 +98,10 @@ export default function AnimatedHeroHeading() {
     const pos = tick % cycleLength;
 
     if (pos < 15) {
-      // Hold
       return LETTERS.map(() => RESOLVED);
     } else if (pos < 40) {
-      // Chaos at configured regularity (73% = subtle)
       return LETTERS.map(() => randomStyle());
     } else {
-      // Resolving: each letter converges
       const resolveProgress = (pos - 40) / (cycleLength - 40);
       return LETTERS.map((_, i) => {
         const letterPhase = ((i * 3 + 2) % LETTERS.length) / LETTERS.length;
@@ -123,18 +118,36 @@ export default function AnimatedHeroHeading() {
 
   return (
     <h1
-      className="text-5xl sm:text-8xl md:text-9xl font-bold tracking-tight leading-[0.9] mb-8"
-      style={{ minHeight: "1.1em" }}
+      className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.9] mb-8"
+      style={{
+        minHeight: "1.1em",
+        /* Contain the chaos animation — prevent horizontal overflow */
+        overflow: "hidden",
+        /* Don't let touch events on the animation interfere with scrolling */
+        touchAction: "pan-y",
+        /* Prevent accidental text selection of invisible spacer letters */
+        WebkitUserSelect: "none",
+        userSelect: "none",
+      }}
       aria-label="Web Typography"
     >
       <span style={{ fontFamily: "var(--font-playfair)", color: "#ffffff" }}>Web</span>
       <br />
-      <span style={{ display: "inline-flex", alignItems: "baseline", whiteSpace: "nowrap" }}>
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "baseline",
+          whiteSpace: "nowrap",
+          /* Extra safety: clip any letters that escape bounds */
+          overflow: "hidden",
+          /* Promote to GPU layer for smoother animation */
+          willChange: "contents",
+        }}
+      >
         {LETTERS.map((letter, i) => {
           const s = states[i] || RESOLVED;
           const isResolved = phase === "hold";
           return (
-            /* Outer: fixed size based on resolved font, never changes layout */
             <span
               key={i}
               style={{
@@ -146,11 +159,10 @@ export default function AnimatedHeroHeading() {
                 lineHeight: 1,
                 position: "relative",
                 letterSpacing: "0px",
+                overflow: "hidden",
               }}
             >
-              {/* Invisible resolved letter holds the space */}
               {letter}
-              {/* Visible chaos letter rendered on top */}
               <span
                 style={{
                   position: "absolute",
@@ -169,6 +181,7 @@ export default function AnimatedHeroHeading() {
                     : "all 0.06s linear",
                   lineHeight: 1,
                   whiteSpace: "nowrap",
+                  pointerEvents: "none",
                 }}
                 aria-hidden="true"
               >

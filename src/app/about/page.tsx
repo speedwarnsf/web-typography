@@ -10,7 +10,7 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-neutral-200">
       {/* Header */}
-      <header className="max-w-4xl mx-auto px-6 pt-24 pb-16 border-b border-neutral-800">
+      <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16 border-b border-neutral-800">
         <p
           className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-8"
           style={{ borderRadius: 0 }}
@@ -45,7 +45,7 @@ export default function AboutPage() {
       </header>
 
       {/* Main Content */}
-      <article className="max-w-4xl mx-auto px-6 py-16">
+      <article className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <div
           className="prose prose-invert max-w-none"
           style={{

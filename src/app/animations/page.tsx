@@ -2796,7 +2796,7 @@ function FontClash({ text = "${textVal}" }) {
     <PaletteContext.Provider value={{ colors }}>
     <ChaosContext.Provider value={chaosControls}>
       <section id="experimental" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             05 -- Experimental
           </p>
@@ -2875,7 +2875,7 @@ export default function AnimationsPage() {
     <main className="min-h-screen">
       {/* ── Header ── */}
       <header className="border-b border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <a
             href="/"
             className="text-lg font-bold tracking-tight"
@@ -2892,7 +2892,7 @@ export default function AnimationsPage() {
       </header>
 
       {/* ── Hero ── */}
-      <section className="max-w-5xl mx-auto px-6 py-24">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           Typography Animations
         </p>
@@ -2920,7 +2920,7 @@ export default function AnimationsPage() {
 
       {/* ── Entrances ── */}
       <section id="entrances" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             01 -- Entrances
           </p>
@@ -2974,7 +2974,7 @@ export default function AnimationsPage() {
 
       {/* ── Emphasis ── */}
       <section id="emphasis" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             02 -- Emphasis
           </p>
@@ -3028,7 +3028,7 @@ export default function AnimationsPage() {
 
       {/* ── Transitions ── */}
       <section id="transitions" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             03 -- Transitions
           </p>
@@ -3073,7 +3073,7 @@ export default function AnimationsPage() {
 
       {/* ── Scrolling ── */}
       <section id="scrolling" className="border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             04 -- Scrolling
           </p>

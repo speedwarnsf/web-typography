@@ -191,7 +191,7 @@ export default function PerfectParagraph() {
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             05 -- The Perfect Paragraph
           </p>
-          <h1 className="text-5xl font-serif mb-4" style={{ fontFamily: 'var(--font-playfair)' }}>
+          <h1 className="text-3xl sm:text-5xl font-serif mb-4" style={{ fontFamily: 'var(--font-playfair)' }}>
             The Perfect Paragraph
           </h1>
           <p className="text-neutral-400 text-lg max-w-3xl">

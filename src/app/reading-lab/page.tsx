@@ -188,7 +188,7 @@ const cleanup = smoothRag(element);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
-      <div className="max-w-[1600px] mx-auto px-6 py-16">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-10 sm:py-16">
         {/* Header */}
         <div className="mb-12">
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
