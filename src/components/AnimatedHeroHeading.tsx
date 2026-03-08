@@ -48,7 +48,7 @@ const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 const REGULARITY = 0.73;
-const TICK_MS = 200;
+const TICK_MS = 140;
 
 function randomStyle(devOverride?: number): LetterStyle {
   const dev = devOverride !== undefined ? devOverride : (1 - REGULARITY);
@@ -119,9 +119,10 @@ export default function AnimatedHeroHeading() {
   return (
     <h1
       data-no-typeset
-      className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.9] mb-8"
+      className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.95] mb-8"
       style={{
         minHeight: "1.1em",
+        paddingBottom: "0.15em",
         /* Contain the chaos animation — prevent horizontal overflow */
         overflow: "hidden",
         /* Don't let touch events on the animation interfere with scrolling */
