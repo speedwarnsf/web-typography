@@ -107,13 +107,21 @@ function typesetBodyText(text: string, measure?: number): string {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 3) return text;
 
-  // At narrow measures, non-breaking bindings create oversized atoms
-  // that force bad breaks. Scale back: only orphan prevention below 45ch,
-  // add sentence protection at 45-55ch, full rules above 55ch.
+  // Tiered binding based on actual column width.
+  // Tiny words (1-2 chars) are safe to bind at ANY width — they never
+  // cause overflow. Sentence protection works at medium widths. The full
+  // set of prepositions/articles only binds at wide measures where the
+  // extra atoms won't force near-justified lines.
   const m = measure ?? 65;
-  const doOrphans = m >= 35;             // skip even orphan binding at very narrow measures
-  const doSentenceProtection = m >= 45;  // medium+ measures
-  const doShortWordBinding = m >= 55;    // wide measures only
+  const doOrphans = m >= 30;                     // always, except absurdly narrow
+  const doTinyWordBinding = m >= 25;             // 1-2 char words: always safe
+  const doSentenceProtection = m >= 35;          // sentence start/end: most measures
+  const doMediumWordBinding = m >= 45;           // 3-char words (the, to, etc.)
+  const doFullShortWordBinding = m >= 55;        // full list: wide measures only
+
+  // Build word lists by size tier
+  const tinyWords = new Set(['a', 'i', 'an', 'as', 'at', 'be', 'by', 'do', 'go', 'if', 'in', 'is', 'it', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we']);
+  const mediumWords = new Set(['the', 'and', 'but', 'for', 'nor', 'not', 'yet', 'its', 'our', 'has', 'was', 'are', 'can']);
 
   const result: string[] = [];
 
@@ -129,8 +137,12 @@ function typesetBodyText(text: string, measure?: number): string {
     }
 
     // Rule 2: If previous word ends a sentence, bind this word with the next
+    // "invisible. Great" → "invisible. Great\u00A0typography"
     if (doSentenceProtection && prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
-      if (word.length <= 6) {
+      // At narrow measures, only bind short sentence-start words (≤5 chars)
+      // to avoid creating oversized atoms. At wider measures, up to 6.
+      const maxLen = m >= 45 ? 6 : 5;
+      if (word.length <= maxLen) {
         result.push(word + NBSP + words[i + 1]);
         i++;
         continue;
@@ -155,10 +167,21 @@ function typesetBodyText(text: string, measure?: number): string {
       }
     }
 
-    // Rule: Bind prepositions/articles FORWARD only to the next word
-    if (doShortWordBinding) {
-      const shortWords = ['a', 'an', 'the', 'to', 'in', 'on', 'of', 'is', 'it', 'or', 'at', 'by', 'if', 'no', 'so', 'up', 'as', 'we', 'my', 'do', 'be'];
-      if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
+    // Tiered short-word binding: tiny words first, then medium, then full
+    const lc = word.toLowerCase();
+    if (nextWord && !/[,;:.!?]$/.test(word)) {
+      if (doTinyWordBinding && tinyWords.has(lc)) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
+      if (doMediumWordBinding && mediumWords.has(lc)) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
+      if (doFullShortWordBinding && lc.length <= 2) {
+        // Catch any remaining 1-2 char words not in the sets above
         result.push(word + NBSP + words[i + 1]);
         i++;
         continue;
