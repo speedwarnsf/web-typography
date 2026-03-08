@@ -179,49 +179,49 @@ const tips = [
   {
     title: "Line Height",
     content:
-      "Body text reads best at 1.5 to 1.7 line-height. Headings can be tighter -- 1.1 to 1.3. Never leave line-height at the browser default of 1.2 for body copy.",
+      "Body text reads best at 1.5\u00A0to\u00A01.7. Headings can sit tighter\u00A0\u2014 around 1.1\u00A0to\u00A01.3. Never leave body copy at the browser default\u00A0of\u00A01.2.",
     code: `body { line-height: 1.6; }\nh1, h2, h3 { line-height: 1.15; }`,
   },
   {
     title: "Measure (Line Length)",
     content:
-      "The ideal line length for reading comfort is 45 to 75 characters. Too wide and the eye loses its place; too narrow and the rhythm breaks with constant returns.",
+      "The ideal line length is 45\u00A0to\u00A075 characters. Too wide and the eye loses its place; too narrow and the rhythm breaks with constant\u00A0returns.",
     code: `p { max-width: 65ch; }`,
   },
   {
     title: "Vertical Rhythm",
     content:
-      "Establish a base unit (e.g. 1.5rem) and derive all spacing from it. Margins, padding, and line-heights that share a common denominator create visual harmony.",
+      "Pick a base unit\u00A0\u2014 say 1.5\u00A0rem\u00A0\u2014 and derive all spacing from it. When margins, padding, and leading share a common measure, the page finds its\u00A0harmony.",
     code: `:root { --rhythm: 1.5rem; }\np { margin-bottom: var(--rhythm); }\nh2 { margin-top: calc(var(--rhythm) * 2); }`,
   },
   {
     title: "Responsive Type Scales",
     content:
-      "Use clamp() for fluid type that scales smoothly between breakpoints. No more jagged media-query jumps\u00A0— just smooth, steady\u00A0scaling.",
+      "Use clamp() for fluid type that scales between breakpoints. No jagged media-query jumps\u00A0\u2014 just smooth, steady\u00A0scaling.",
     code: `h1 { font-size: clamp(2rem, 5vw + 1rem, 4.5rem); }\np  { font-size: clamp(1rem, 1vw + 0.75rem, 1.25rem); }`,
   },
   {
     title: "text-wrap: balance and pretty",
     content:
-      "CSS now has native text wrapping control. Use \u2018balance\u2019 on headings to even out line lengths, and \u2018pretty\u2019 on body text to prevent orphans. Browser support is\u00A0growing\u00A0fast.",
+      "CSS now offers native wrapping control. Use \u2018balance\u2019 on headings to even out line lengths, and \u2018pretty\u2019 on body text to prevent\u00A0orphans.",
     code: `h1, h2, h3 { text-wrap: balance; }\np { text-wrap: pretty; }`,
   },
   {
     title: "font-feature-settings",
     content:
-      "Unlock hidden type features: ligatures smooth letter joins, oldstyle numerals blend into body text, and tabular figures align\u00A0in\u00A0tables.",
+      "Unlock hidden type features: ligatures smooth letter joins, oldstyle numerals blend into running text, and tabular figures keep columns\u00A0aligned.",
     code: `body {\n  font-feature-settings: "liga" 1, "calt" 1;\n}\n.body-numerals {\n  font-feature-settings: "onum" 1;\n}\n.table-numerals {\n  font-feature-settings: "tnum" 1;\n}`,
   },
   {
     title: "Orphans and Widows",
     content:
-      "CSS orphans and widows control how many lines appear at the bottom and top of page breaks. On the web, combine them with text-wrap:\u00A0pretty and tools like\u00A0typeset.ts.",
+      "CSS orphans and widows set how many lines sit at the top and bottom of page breaks. On the web, pair them with text-wrap:\u00A0pretty and tools like\u00A0typeset.ts.",
     code: `p {\n  orphans: 2;\n  widows: 2;\n  text-wrap: pretty;\n}`,
   },
   {
     title: "Optical Margin Alignment",
     content:
-      "Punctuation and certain letters (T, V, W, quote marks) create visual indents. The hanging-punctuation property aligns text to the optical edge, not the\u00A0geometric\u00A0one.",
+      "Letters like T, V, W and quote marks create false indents. The hanging-punctuation property aligns text to the optical edge, not the\u00A0metric\u00A0one.",
     code: `p {\n  hanging-punctuation: first last;\n}\nblockquote {\n  hanging-punctuation: first;\n}`,
   },
 ];
