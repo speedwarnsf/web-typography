@@ -172,11 +172,41 @@ function typesetBodyText(text: string, measure?: number): string {
 }
 
 /**
+ * Measure an element's width in `ch` units (width of one '0' character).
+ * Falls back to an estimate from pixel width if measurement fails.
+ */
+function measureCh(element: HTMLElement): number {
+  const cs = getComputedStyle(element);
+  const containerPx = element.clientWidth
+    - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+
+  // Measure the width of '0' in the element's font context
+  const probe = document.createElement('span');
+  probe.style.cssText =
+    'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
+    'font:inherit;letter-spacing:inherit;';
+  probe.textContent = '0000000000'; // 10 zeros
+  element.appendChild(probe);
+  const chPx = probe.getBoundingClientRect().width / 10;
+  element.removeChild(probe);
+
+  if (chPx <= 0) return 65; // fallback
+  return Math.floor(containerPx / chPx);
+}
+
+/**
  * Apply typographic rules to a DOM element's text content.
  * Processes text nodes recursively.
+ *
+ * Measures the element's actual width in `ch` units so that binding rules
+ * scale appropriately — narrow mobile columns won't get aggressive bindings
+ * that create near-justified text with a stranded last line.
  */
 export function typeset(element: HTMLElement): void {
   if (!element) return;
+
+  // Measure once for the whole element
+  const measure = measureCh(element);
 
   const walker = document.createTreeWalker(
     element,
@@ -196,7 +226,7 @@ export function typeset(element: HTMLElement): void {
     // Preserve leading/trailing whitespace (critical around inline elements like <strong>)
     const leadingSpace = original.match(/^\s*/)?.[0] || '';
     const trailingSpace = original.match(/\s*$/)?.[0] || '';
-    const processed = typesetText(original.trim());
+    const processed = typesetText(original.trim(), { measure });
     textNode.textContent = leadingSpace + processed + trailingSpace;
   }
 }
@@ -315,9 +345,21 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
     // Phase 3: Compute target (median of non-last line widths)
     const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
     const midIdx = Math.floor(nonLastWidths.length / 2);
-    const target = nonLastWidths.length % 2 === 0
+    let target = nonLastWidths.length % 2 === 0
       ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
       : nonLastWidths[midIdx];
+
+    // Phase 3b: Detect "near-justified + orphan last line" pattern.
+    // If non-last lines all fill >88% and last line fills <60%,
+    // shift target DOWN so we tighten all non-last lines, creating a
+    // more natural rag instead of near-justified + stranded last line.
+    const lastLineWidth = lines[lines.length - 1].width;
+    const avgNonLastFill = nonLastWidths.reduce((s, w) => s + w, 0) / nonLastWidths.length / containerWidth;
+    const lastFill = lastLineWidth / containerWidth;
+    if (avgNonLastFill > 0.88 && lastFill < 0.60 && lines.length > 2) {
+      // Pull target down to ~80% of container to create visible rag
+      target = Math.min(target, containerWidth * 0.82);
+    }
 
     // Phase 4: Build HTML with per-line word-spacing
     const isNarrow = containerWidth < 350;
@@ -424,9 +466,17 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
     // Compute target: median of non-last line widths
     const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
     const midIdx = Math.floor(nonLastWidths.length / 2);
-    const target = nonLastWidths.length % 2 === 0
+    let target = nonLastWidths.length % 2 === 0
       ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
       : nonLastWidths[midIdx];
+
+    // Detect "near-justified + orphan last line" — same logic as light smooth
+    const lastWidth = lines[lines.length - 1].width;
+    const avgFill = nonLastWidths.reduce((s, w) => s + w, 0) / nonLastWidths.length / containerWidth;
+    const lastFill = lastWidth / containerWidth;
+    if (avgFill > 0.88 && lastFill < 0.60 && lines.length > 2) {
+      target = Math.min(target, containerWidth * 0.82);
+    }
 
     // Build HTML with per-line word-spacing (delta added to user's base)
     // Asymmetric: more expansion room than tightening
@@ -499,8 +549,35 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
           // Line is too long (beyond 3% tolerance)
           badness = Math.pow(Math.abs(ratio), 2) * 1000;
         } else if (isLastLine) {
-          // Last line: very lenient — only penalize if very short
-          badness = ratio > 0.5 ? Math.pow(ratio - 0.5, 2) * 20 : 0;
+          // Last line: penalize proportional to how short it is.
+          // A line at 50% fill is acceptable, but anything under 35%
+          // looks orphaned. Also consider how full previous lines are —
+          // if they're all >90% fill and the last is <55%, the contrast
+          // is jarring (looks like forced justification + orphan).
+          const fill = w / lineWidth;
+          if (fill < 0.35) {
+            badness = Math.pow(0.35 - fill, 2) * 300;
+          } else if (fill < 0.55) {
+            // Check if prior lines are uniformly full (near-justified look)
+            // Use lineWidthAt to estimate average prior fill
+            let priorFillSum = 0;
+            let priorCount = 0;
+            for (let pi = 1; pi < j; pi++) {
+              if (lineWidthAt[pi] > 0) {
+                priorFillSum += lineWidthAt[pi] / lineWidth;
+                priorCount++;
+              }
+            }
+            const avgPriorFill = priorCount > 0 ? priorFillSum / priorCount : 0.8;
+            if (avgPriorFill > 0.88) {
+              // High contrast: near-justified lines + short last line
+              badness = Math.pow(avgPriorFill - fill, 2) * 150;
+            } else {
+              badness = ratio > 0.5 ? Math.pow(ratio - 0.5, 2) * 20 : 0;
+            }
+          } else {
+            badness = 0;
+          }
         } else {
           // Normal line: penalize deviation from ~85% fill
           const ideal = lineWidth * 0.85;

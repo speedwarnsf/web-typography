@@ -21,7 +21,7 @@ export const rules: Rule[] = [
     name: "Sentence-Start Protection",
     id: "sentence-start",
     description:
-      "When a new sentence starts near the end of a line, the first word can get stranded alone. Typeset keeps the first two words of a sentence together.",
+      "When a sentence begins near the end of a line, the first word can get stranded alone. Typeset keeps the opening two words of each sentence\u00A0together.",
     code: `export function protectSentenceStart(text: string): string {
   return text.replace(/([.!?])\\s+(\\w+)\\s+/g, "$1 $2\\u00A0");
 }`,
@@ -39,7 +39,7 @@ export const rules: Rule[] = [
     name: "Rag Smoothing",
     id: "rag",
     description:
-      "Without rag control, line lengths vary wildly \u2014 one line barely reaches half the column while the next fills it completely. Smoothing adjusts word-spacing line by line, gently extending short lines and tightening long ones to create a cleaner right edge.",
+      "Without rag control, line lengths vary wildly\u00A0\u2014 one line barely reaches half the column while the next fills it. Smoothing adjusts word-spacing line by line, gently extending short lines and tightening long ones for a cleaner right\u00A0edge.",
     code: `export function smoothRag(el: HTMLElement): void {
   const target = el.offsetWidth * 0.93;
   const lines = getLines(el); // detect line breaks via Range API
@@ -57,7 +57,7 @@ export const rules: Rule[] = [
     name: "Short Word Binding",
     id: "short-words",
     description:
-      "Prepositions and articles like \"of\" \"in\" \"a\" and \"the\" look wrong sitting alone at the end of a line. Typeset binds them to the next word so they always travel together.",
+      "Words like \u201Cof,\u201D \u201Cin,\u201D \u201Ca,\u201D and \u201Cthe\u201D look wrong stranded at the end of a line. Typeset binds each one to the word that follows, so they always travel\u00A0together.",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or)\\s/gi,
