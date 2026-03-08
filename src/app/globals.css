@@ -64,6 +64,19 @@ p, li, blockquote, figcaption {
   text-wrap: pretty;
 }
 
+/* Code blocks: wrap on mobile instead of horizontal scroll */
+@media (max-width: 640px) {
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: hidden;
+  }
+  /* Prevent code block touch from hijacking page scroll */
+  pre, code {
+    touch-action: pan-y;
+  }
+}
+
 /* Hyphenation for narrow measures on mobile */
 @media (max-width: 640px) {
   p, li, blockquote, figcaption,
