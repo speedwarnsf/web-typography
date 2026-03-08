@@ -941,7 +941,7 @@ export default function RhetoricPage() {
         </h2>
         <div
           className="text-neutral-400 leading-relaxed space-y-4 max-w-3xl"
-          style={{ fontFamily: "var(--font-source-sans)" }}
+          style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
           <p>
             This tool is based on <strong>Aristotle's rhetorical triangle</strong>{" "}
@@ -949,17 +949,16 @@ export default function RhetoricPage() {
             persuasion: ethos (credibility), pathos (emotion), and logos (logic).
           </p>
           <p>
-            Typography is never neutral. Every typeface choice is a rhetorical
-            decision that shapes how a message is received. After 30 years of
-            professional practice in social marketing and communication design,
-            these mappings reflect real-world strategic choices made for campaigns
-            addressing HIV/AIDS, tobacco cessation, mental health, LGBTQ+ rights,
-            and social justice.
+            Typography is never neutral. Every typeface choice is a rhetorical act
+            that shapes how a message lands. After 30{"\u00A0"}years of practice in social
+            marketing and design for public good, these mappings reflect real choices
+            made for campaigns on HIV/AIDS, tobacco, mental health, LGBTQ+ rights,
+            and social{"\u00A0"}justice.
           </p>
           <p>
-            This is the only tool on the internet that maps typeface selection to
-            classical rhetorical strategy. Use it to make informed, strategic
-            decisions about typography in contexts where persuasion matters.
+            No other tool on the web maps typeface choices to rhetorical strategy.
+            Use it to make informed, deliberate decisions about type in any context
+            where persuasion{"\u00A0"}matters.
           </p>
         </div>
       </section>
