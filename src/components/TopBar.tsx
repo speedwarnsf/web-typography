@@ -21,8 +21,8 @@ export default function TopBar() {
       <div
         className="pointer-events-none"
         style={{
-          height: '24px',
-          background: 'linear-gradient(to bottom, #0a0a0a, transparent)',
+          height: '40px',
+          background: 'linear-gradient(to bottom, #0a0a0a 0%, rgba(10,10,10,0.8) 40%, rgba(10,10,10,0.3) 70%, transparent 100%)',
         }}
       />
     </header>
