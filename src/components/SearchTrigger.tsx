@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * A subtle ⌘K trigger in the top-right corner.
- * Clicking it dispatches the same keyboard shortcut the CommandPalette listens for.
+ * Search trigger — sits inside TopBar.
+ * Dispatches ⌘K to open CommandPalette.
+ * Larger icon and 44px minimum hit area for mobile.
  */
 export default function SearchTrigger() {
   return (
@@ -16,11 +17,11 @@ export default function SearchTrigger() {
           })
         );
       }}
-      className="fixed top-4 right-5 z-50 flex items-center gap-2 text-neutral-600 hover:text-neutral-400 transition-colors cursor-pointer"
+      className="flex items-center justify-center gap-2 px-4 sm:px-5 min-h-[44px] h-[var(--topbar-h,52px)] text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
       aria-label="Search (⌘K)"
     >
       <svg
-        className="w-3.5 h-3.5"
+        className="w-5 h-5 sm:w-4 sm:h-4"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

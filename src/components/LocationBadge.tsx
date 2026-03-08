@@ -50,11 +50,11 @@ export default function LocationBadge() {
   const pageName = pageInfo?.name ?? metaPages.find((p) => p.slug === pathname)?.name ?? 'Home';
 
   return (
-    <div ref={badgeRef} className="fixed top-0 left-0 z-50">
-      {/* The badge itself */}
+    <div ref={badgeRef} className="relative">
+      {/* The badge itself — min 44px hit area for mobile accessibility */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="group flex flex-col items-start px-5 py-4 cursor-pointer select-none"
+        className="group flex flex-col items-start justify-center px-4 sm:px-5 min-h-[44px] h-[var(--topbar-h,52px)] cursor-pointer select-none"
         aria-expanded={isOpen}
         aria-label="Site navigation"
       >
@@ -65,7 +65,7 @@ export default function LocationBadge() {
           {sectionName}
         </span>
         <span
-          className="text-[15px] text-neutral-300 mt-0.5 transition-colors group-hover:text-white"
+          className="text-[14px] sm:text-[15px] text-neutral-300 mt-0.5 transition-colors group-hover:text-white"
           style={{ fontFamily: sectionFont }}
         >
           {pageName}

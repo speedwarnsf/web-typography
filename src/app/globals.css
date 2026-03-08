@@ -4,6 +4,7 @@
   --gold: #B8963E;
   --bg: #0a0a0a;
   --fg: #e5e5e5;
+  --topbar-h: 52px;
 }
 
 * {
@@ -21,7 +22,7 @@ body {
   max-width: 100vw;
   background: var(--bg);
   color: var(--fg);
-  padding-top: 52px;
+  padding-top: var(--topbar-h);
   line-height: 1.6;
   font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
   /* Lock scroll to vertical only on touch devices */
