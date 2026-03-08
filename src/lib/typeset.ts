@@ -201,26 +201,44 @@ function typesetBodyText(text: string, measure?: number): string {
 }
 
 /**
- * Measure an element's width in `ch` units (width of one '0' character).
- * Falls back to an estimate from pixel width if measurement fails.
+ * Measure an element's width in `ch` units using Canvas (no DOM mutation).
+ * Falls back to an estimate if measurement fails.
  */
+const _chCache = new WeakMap<HTMLElement, { width: number; ch: number }>();
+let _canvas: CanvasRenderingContext2D | null = null;
+
 function measureCh(element: HTMLElement): number {
+  // Check cache — invalidate if element width changed
+  const cached = _chCache.get(element);
+  const elWidth = element.clientWidth;
+  if (cached && cached.width === elWidth) return cached.ch;
+
   const cs = getComputedStyle(element);
-  const containerPx = element.clientWidth
+  const containerPx = elWidth
     - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
 
-  // Measure the width of '0' in the element's font context
-  const probe = document.createElement('span');
-  probe.style.cssText =
-    'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
-    'font:inherit;letter-spacing:inherit;';
-  probe.textContent = '0000000000'; // 10 zeros
-  element.appendChild(probe);
-  const chPx = probe.getBoundingClientRect().width / 10;
-  element.removeChild(probe);
+  if (containerPx <= 0) return 65;
 
-  if (chPx <= 0) return 65; // fallback
-  return Math.floor(containerPx / chPx);
+  // Use Canvas to measure '0' width — zero DOM mutations
+  if (!_canvas) {
+    const c = document.createElement('canvas');
+    _canvas = c.getContext('2d');
+  }
+  if (_canvas) {
+    _canvas.font = `${cs.fontSize} ${cs.fontFamily}`;
+    const chPx = _canvas.measureText('0').width;
+    if (chPx > 0) {
+      const ch = Math.floor(containerPx / chPx);
+      _chCache.set(element, { width: elWidth, ch });
+      return ch;
+    }
+  }
+
+  // Fallback: estimate from font-size
+  const fsPx = parseFloat(cs.fontSize) || 16;
+  const ch = Math.floor(containerPx / (fsPx * 0.6));
+  _chCache.set(element, { width: elWidth, ch });
+  return ch;
 }
 
 /**
