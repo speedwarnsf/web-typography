@@ -10,16 +10,22 @@ import SearchTrigger from './SearchTrigger';
 export default function TopBar() {
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a] border-b border-neutral-800/50"
+      className="fixed top-0 left-0 right-0 z-50"
       style={{ height: 'var(--topbar-h, 52px)' }}
     >
-      <div className="relative h-full flex items-center justify-between">
-        {/* Left: Navigation badge (LocationBadge handles its own content) */}
+      {/* Solid bar */}
+      <div className="relative h-full flex items-center justify-between bg-[#0a0a0a]">
         <LocationBadge />
-
-        {/* Right: Search trigger */}
         <SearchTrigger />
       </div>
+      {/* Gradient fade — content dissolves as it scrolls under */}
+      <div
+        className="pointer-events-none"
+        style={{
+          height: '24px',
+          background: 'linear-gradient(to bottom, #0a0a0a, transparent)',
+        }}
+      />
     </header>
   );
 }
