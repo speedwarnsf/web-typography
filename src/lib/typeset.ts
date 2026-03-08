@@ -170,6 +170,12 @@ function typesetBodyText(text: string, measure?: number): string {
     // Tiered short-word binding: tiny words first, then medium, then full
     const lc = word.toLowerCase();
     if (nextWord && !/[,;:.!?]$/.test(word)) {
+      // Numbers (1-3 digits) always bind forward — "30 years" should never break
+      if (doTinyWordBinding && /^\d{1,3}$/.test(word)) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
       if (doTinyWordBinding && tinyWords.has(lc)) {
         result.push(word + NBSP + words[i + 1]);
         i++;

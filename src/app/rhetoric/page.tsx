@@ -278,10 +278,10 @@ export default function RhetoricPage() {
           className="text-base sm:text-lg text-neutral-400 leading-relaxed max-w-3xl"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
-          Every typeface carries rhetorical weight. It persuades, positions, and
-          speaks beyond the literal meaning of words. This tool maps typefaces
-          to classical rhetorical modes — drawn from 30 years of practice in
-          design for social&nbsp;good.
+          Every typeface carries rhetorical weight. It persuades, positions,
+          and speaks beyond the literal meaning of words. This tool maps
+          typefaces to rhetorical modes{"\u00A0\u2014"} drawn from 30{"\u00A0"}years
+          of practice in design for social{"\u00A0"}good.
         </p>
       </section>
 
