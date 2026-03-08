@@ -263,7 +263,7 @@ export default function RhetoricPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           10 -- Rhetorical Type
@@ -275,13 +275,13 @@ export default function RhetoricPage() {
           Typography as Rhetoric
         </h1>
         <p
-          className="text-lg text-neutral-400 leading-relaxed max-w-3xl"
-          style={{ fontFamily: "var(--font-source-sans)" }}
+          className="text-base sm:text-lg text-neutral-400 leading-relaxed max-w-3xl"
+          style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
           Every typeface carries rhetorical weight. It persuades, positions, and
-          communicates beyond the literal meaning of words. This tool maps
-          typefaces to classical rhetorical strategies based on 30 years of
-          professional practice in communication design.
+          speaks beyond the literal meaning of words. This tool maps typefaces
+          to classical rhetorical modes — drawn from 30 years of practice in
+          design for social&nbsp;good.
         </p>
       </section>
 
@@ -294,12 +294,12 @@ export default function RhetoricPage() {
         </h2>
         <p
           className="text-neutral-400 leading-relaxed mb-12 max-w-3xl"
-          style={{ fontFamily: "var(--font-source-sans)" }}
+          style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
-          Aristotle identified three modes of persuasion: <strong>Ethos</strong>{" "}
-          (credibility), <strong>Pathos</strong> (emotion), and{" "}
-          <strong>Logos</strong> (logic). Typography operates on all three axes
-          simultaneously. Hover over any point to see the font and sample text.
+          Aristotle named three modes of persuasion: <strong>Ethos</strong>{" "}
+          (trust), <strong>Pathos</strong> (emotion), and{" "}
+          <strong>Logos</strong> (logic). Type works on all three axes at once.
+          Hover any point to see the font and sample&nbsp;text.
         </p>
 
         <div className="relative w-full max-w-2xl mx-auto mb-16">
@@ -409,7 +409,7 @@ export default function RhetoricPage() {
           </svg>
         </div>
 
-        <div className="bg-neutral-950/50 border border-neutral-800 p-6">
+        <div className="bg-neutral-950/50 border border-neutral-800 p-4 sm:p-6">
           <h3
             className="text-xl font-bold mb-3"
             style={{ fontFamily: "var(--font-playfair)" }}
@@ -470,7 +470,7 @@ export default function RhetoricPage() {
                 selectedFonts.includes(font.name)
                   ? "border-[#B8963E] bg-neutral-950/80"
                   : "border-neutral-800 bg-neutral-950/50"
-              } p-6 cursor-pointer transition-all hover:border-[#B8963E]/50`}
+              } p-4 sm:p-6 cursor-pointer transition-all hover:border-[#B8963E]/50`}
               onClick={() => toggleFontSelection(font.name)}
             >
               <h3
@@ -563,7 +563,7 @@ export default function RhetoricPage() {
             {comparisonFonts.map((font) => (
               <div
                 key={font.name}
-                className="border border-neutral-800 bg-neutral-950/50 p-6"
+                className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6"
               >
                 <h3
                   className="text-3xl font-bold mb-4"
@@ -598,7 +598,7 @@ export default function RhetoricPage() {
             ))}
           </div>
 
-          <div className="mt-8 bg-neutral-950/50 border border-neutral-800 p-6">
+          <div className="mt-8 bg-neutral-950/50 border border-neutral-800 p-4 sm:p-6">
             <h3
               className="text-xl font-bold mb-3"
               style={{ fontFamily: "var(--font-playfair)" }}
@@ -660,7 +660,7 @@ export default function RhetoricPage() {
           on rhetorical strategy.
         </p>
 
-        <div className="bg-neutral-950/50 border border-neutral-800 p-8">
+        <div className="bg-neutral-950/50 border border-neutral-800 p-4 sm:p-6 lg:p-8">
           {wizardStep === 0 && (
             <div>
               <h3
@@ -790,7 +790,7 @@ export default function RhetoricPage() {
                 {getWizardRecommendations().map((font, idx) => (
                   <div
                     key={font.name}
-                    className="border border-neutral-800 bg-neutral-900/50 p-6"
+                    className="border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -896,7 +896,7 @@ export default function RhetoricPage() {
           ].map(({ font, annotation }) => (
             <div
               key={font.name}
-              className="border border-neutral-800 bg-neutral-950/50 p-8"
+              className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8"
             >
               <h3
                 className="text-4xl sm:text-5xl font-bold mb-4"

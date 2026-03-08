@@ -346,7 +346,7 @@ export default function FontInspector() {
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed ${
             dragOver ? "border-[#B8963E] bg-[#B8963E]/5" : "border-neutral-700"
-          } p-8 sm:p-12 text-center cursor-pointer transition-colors hover:border-neutral-500`}
+          } p-4 sm:p-6 lg:p-8 sm:p-12 text-center cursor-pointer transition-colors hover:border-neutral-500`}
         >
           <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-neutral-500 mb-2">
             Drop a font file here

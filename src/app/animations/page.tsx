@@ -271,7 +271,7 @@ const FONT_OPTIONS = [
 
 function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange: (s: ResolvedStyle) => void }) {
   return (
-    <div className="mb-6 p-6 border border-neutral-800 bg-neutral-950/50">
+    <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-4">
         Target Style (resolved form)
       </p>
@@ -400,7 +400,7 @@ function ChaosControlsPanel({ speed, onSpeedChange, regularity, onRegularityChan
   // Map speed 1-10 to display
   const speedLabels = ["", "Glacial", "Slow", "Gentle", "Easy", "Medium", "Quick", "Fast", "Rapid", "Frantic", "Insane"];
   return (
-    <div className="mb-6 p-6 border border-neutral-800 bg-neutral-950/50">
+    <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-4">
         Chaos Controls
       </p>
@@ -478,7 +478,7 @@ function ColorPaletteBuilder({ colors, onChange }: { colors: string[]; onChange:
   }, [colors, onChange]);
 
   return (
-    <div className="mb-12 p-6 border border-neutral-800 bg-neutral-950/50">
+    <div className="mb-12 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <div className="flex items-center justify-between mb-4">
         <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
           Color Palette ({colors.length} color{colors.length !== 1 ? "s" : ""})
@@ -1411,7 +1411,7 @@ function FontClashPicker({ selected, onChange }: {
   };
 
   return (
-    <div className="mb-6 p-6 border border-neutral-800 bg-neutral-950/50">
+    <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <div className="flex items-center justify-between mb-4">
         <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
           Font Mix ({selected.length} selected — min 2)
@@ -2883,7 +2883,7 @@ export default function AnimationsPage() {
           >
             Web Typography
           </a>
-          <nav className="flex gap-6 text-xs font-mono uppercase tracking-widest text-neutral-600">
+          <nav className="hidden sm:flex gap-6 text-xs font-mono uppercase tracking-widest text-neutral-600">
             <a href="/" className="hover:text-[#B8963E] transition-colors">Home</a>
             <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
             <a href="/animations" className="text-[#B8963E]">Animations</a>

@@ -38,7 +38,7 @@ export default function SupportPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
       <div className="mx-auto max-w-4xl px-6 py-10 sm:py-16 md:py-12 sm:py-24">
         {/* Header */}
         <div className="mb-16">
@@ -48,8 +48,9 @@ export default function SupportPage() {
           <h1 className="font-playfair text-4xl md:text-5xl mb-6 text-neutral-100">
             Help Us Build Better Tools
           </h1>
-          <p className="font-source-sans text-lg text-neutral-400 leading-relaxed max-w-2xl">
-            Typeset.us is free, open, and built by one designer with 30 years of practice. Your support helps us expand the toolset and keep everything accessible.
+          <p className="font-source-sans text-base sm:text-lg text-neutral-400 leading-relaxed max-w-2xl" style={{ textWrap: "pretty" }}>
+            Typeset.us is free, open, and built by one designer with 30 years
+            of practice. Your support helps expand the toolset and keep it all&nbsp;accessible.
           </p>
         </div>
 
@@ -113,7 +114,7 @@ export default function SupportPage() {
           {tiers.map((tier) => (
             <div
               key={tier.id}
-              className="border border-neutral-800 bg-neutral-950/50 p-8 flex flex-col"
+              className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8 flex flex-col"
             >
               <h3 className="font-playfair text-2xl mb-3 text-neutral-100">
                 {tier.name}

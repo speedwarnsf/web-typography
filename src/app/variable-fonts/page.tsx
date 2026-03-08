@@ -660,7 +660,7 @@ export default function VariableFontsPage() {
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed p-8 sm:p-12 text-center cursor-pointer transition-colors duration-200 ${
+            className={`border-2 border-dashed p-4 sm:p-6 lg:p-8 sm:p-12 text-center cursor-pointer transition-colors duration-200 ${
               isDragOver
                 ? "border-[#B8963E] bg-[#B8963E]/5"
                 : "border-neutral-700 hover:border-neutral-500"

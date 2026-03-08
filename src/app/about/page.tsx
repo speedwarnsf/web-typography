@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
       {/* Header */}
       <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16 border-b border-neutral-800">
         <p
@@ -154,7 +154,7 @@ export default function AboutPage() {
         {/* Credentials */}
         <aside className="mt-20 pt-12 border-t border-neutral-800">
           <div
-            className="border border-neutral-800 bg-neutral-950/50 p-8"
+            className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8"
             style={{ borderRadius: 0, maxWidth: "65ch" }}
           >
             <p

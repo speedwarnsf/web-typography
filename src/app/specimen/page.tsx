@@ -379,7 +379,7 @@ export default function TypeSpecimenGenerator() {
               className={`${isDarkMode ? "text-neutral-400" : "text-neutral-600"} mt-2 leading-relaxed text-sm sm:text-base`}
               style={{ fontFamily: "var(--font-source-sans)" }}
             >
-              Upload a font or select from Google Fonts to generate a professional specimen sheet
+              Upload any font or pick one from Google Fonts to build a full specimen&nbsp;sheet
             </p>
           </div>
           <div className="flex gap-2">
@@ -414,7 +414,7 @@ export default function TypeSpecimenGenerator() {
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed ${
               dragOver ? "border-[#B8963E] bg-[#B8963E]/5" : borderClass
-            } p-8 sm:p-12 text-center cursor-pointer transition-colors ${isDarkMode ? "hover:border-neutral-500" : "hover:border-neutral-400"}`}
+            } p-4 sm:p-6 lg:p-8 sm:p-12 text-center cursor-pointer transition-colors ${isDarkMode ? "hover:border-neutral-500" : "hover:border-neutral-400"}`}
             style={{ borderRadius: 0 }}
           >
             <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-[#B8963E] mb-2">
@@ -470,7 +470,7 @@ export default function TypeSpecimenGenerator() {
           <div className="space-y-8 sm:space-y-12">
             {/* ── Header Info ── */}
             <section>
-              <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+              <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                 <h2
                   className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4"
                   style={{ ...specimenStyle, fontFamily: fontData.fontFamily }}
@@ -499,7 +499,7 @@ export default function TypeSpecimenGenerator() {
             {/* ── Size Waterfall ── */}
             <section>
               <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">01 -- Size Waterfall</h3>
-              <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+              <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                 {waterfallSizes.map((size) => (
                   <div key={size} className="mb-2 flex items-baseline gap-4">
                     <span style={{ ...specimenStyle, fontSize: `${size}px`, lineHeight: 1.2 }}>
@@ -517,7 +517,7 @@ export default function TypeSpecimenGenerator() {
             {fontData.isGoogleFont && (
               <section>
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">02 -- Weight Waterfall</h3>
-                <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+                <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                   {weights.map((weight) => (
                     <div key={weight} className="mb-2 flex items-baseline gap-4">
                       <span style={{ ...specimenStyle, fontSize: "48px", fontWeight: weight, lineHeight: 1.2 }}>
@@ -535,7 +535,7 @@ export default function TypeSpecimenGenerator() {
             {/* ── Character Set ── */}
             <section>
               <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">03 -- Character Set</h3>
-              <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+              <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                 <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-10 gap-4">
                   {characters.split("").map((char, idx) => (
                     <div key={idx} className={`text-center border ${borderClass} p-3`} style={{ borderRadius: 0 }}>
@@ -556,7 +556,7 @@ export default function TypeSpecimenGenerator() {
               <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">04 -- Paragraph Settings</h3>
               <div className="space-y-6">
                 {[14, 16, 18].map((size) => (
-                  <div key={size} className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+                  <div key={size} className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                     <div className={`font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-4`}>
                       {size}px / {Math.round(size * 1.6)}px leading
                     </div>
@@ -579,7 +579,7 @@ export default function TypeSpecimenGenerator() {
             {features.length > 0 && (
               <section>
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">05 -- OpenType Features</h3>
-                <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+                <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                     {features.map((f) => (
                       <label
@@ -617,7 +617,7 @@ export default function TypeSpecimenGenerator() {
             {axes.length > 0 && (
               <section>
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">06 -- Variable Axes</h3>
-                <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+                <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                   <div className="space-y-6 mb-8">
                     {axes.map((a) => (
                       <div key={a.tag}>
@@ -662,7 +662,7 @@ export default function TypeSpecimenGenerator() {
             {/* ── Kerning Pairs ── */}
             <section>
               <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">07 -- Kerning Pairs</h3>
-              <div className={`border ${borderClass} ${cardBgClass} p-6 sm:p-8`} style={{ borderRadius: 0 }}>
+              <div className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
                 <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-4">
                   {kerningPairs.map((pair) => (
                     <div key={pair} className={`text-center border ${borderClass} p-4`} style={{ borderRadius: 0 }}>

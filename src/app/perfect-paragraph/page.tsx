@@ -184,8 +184,8 @@ export default function PerfectParagraph() {
   const jsCode = generateJS();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 px-4 py-6 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto min-w-0 overflow-hidden">
         {/* Header */}
         <div className="mb-12">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
@@ -194,15 +194,16 @@ export default function PerfectParagraph() {
           <h1 className="text-3xl sm:text-5xl font-serif mb-4" style={{ fontFamily: 'var(--font-playfair)' }}>
             The Perfect Paragraph
           </h1>
-          <p className="text-neutral-400 text-lg max-w-3xl">
-            See the difference between default browser typography and professionally typeset text.
-            Toggle each refinement layer to understand how small details accumulate into exceptional design.
+          <p className="text-neutral-400 text-base sm:text-lg max-w-3xl" style={{ textWrap: "pretty" }}>
+            The gap between default browser text and well-set type is vast — but
+            made of small, precise choices. Toggle each layer below to see how
+            they add up to something&nbsp;exceptional.
           </p>
         </div>
 
         {/* Refinement Score */}
-        <div className="mb-8 border border-neutral-800 bg-neutral-950/50 p-6">
-          <div className="flex items-center justify-between mb-3">
+        <div className="mb-8 border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
               Refinement Score
             </p>
@@ -238,26 +239,26 @@ export default function PerfectParagraph() {
         {/* Side-by-side comparison */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {/* Left: Browser Default */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
               Browser Default
             </p>
-            <p className="text-neutral-400 text-lg leading-relaxed">
+            <p className="text-neutral-400 text-base sm:text-lg leading-relaxed break-words">
               {text}
             </p>
           </div>
 
           {/* Right: Typeset */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
               Typeset
             </p>
             <p
               ref={typesetRef}
-              className="text-neutral-200 text-lg leading-relaxed"
+              className="text-neutral-200 text-base sm:text-lg leading-relaxed break-words"
               style={{
                 lineHeight: toggles.lineHeight ? '1.6' : undefined,
-                maxWidth: toggles.measure ? '65ch' : undefined,
+                maxWidth: toggles.measure ? 'min(65ch, 100%)' : undefined,
                 hangingPunctuation: toggles.hangingPunct ? 'first last' : undefined,
                 fontFeatureSettings: toggles.fontFeatures ? '"liga" 1, "onum" 1, "calt" 1' : undefined,
                 textWrap: toggles.textWrap ? 'pretty' : undefined,
@@ -269,7 +270,7 @@ export default function PerfectParagraph() {
         </div>
 
         {/* Edit text */}
-        <div className="mb-12 border border-neutral-800 bg-neutral-950/50 p-6">
+        <div className="mb-12 border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             Edit Text
           </p>
@@ -290,7 +291,7 @@ export default function PerfectParagraph() {
             {TOGGLE_OPTIONS.map((option) => (
               <div
                 key={option.id}
-                className="border border-neutral-800 bg-neutral-950/50 p-4 hover:border-neutral-700 transition-colors"
+                className="border border-neutral-800 bg-neutral-950/50 p-3 sm:p-4 hover:border-neutral-700 transition-colors"
               >
                 <label className="flex items-start gap-4 cursor-pointer">
                   <div className="relative flex-shrink-0 mt-1">
@@ -339,7 +340,7 @@ export default function PerfectParagraph() {
 
         {/* Copy the code */}
         {(cssCode || jsCode) && (
-          <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
               Copy the Code
             </p>

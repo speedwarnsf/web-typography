@@ -808,7 +808,7 @@ export default function TypographicAudit() {
         {result && (
           <div className="mt-8 space-y-6 sm:mt-12 sm:space-y-8">
             {/* Overall Score */}
-            <section className="border border-neutral-800 bg-neutral-950/50 p-6 text-center sm:p-8">
+            <section className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 text-center sm:p-8">
               <p className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-4">
                 Overall Typography Score
               </p>

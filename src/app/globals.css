@@ -43,12 +43,41 @@ body {
   }
 }
 
+main {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+pre, code {
+  overflow-wrap: break-word;
+}
+
+pre {
+  max-width: 100%;
+}
+
 h1, h2, h3, h4 {
   text-wrap: balance;
 }
 
-p, li, blockquote {
+p, li, blockquote, figcaption {
   text-wrap: pretty;
+}
+
+/* Hyphenation for narrow measures on mobile */
+@media (max-width: 640px) {
+  p, li, blockquote, figcaption,
+  .hyphenate {
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    hyphenate-limit-chars: 8 4 3;
+  }
+  /* Never hyphenate headings, labels, or code */
+  h1, h2, h3, h4, pre, code, .no-hyphen,
+  [class*="font-mono"], [class*="uppercase"] {
+    hyphens: none;
+    -webkit-hyphens: none;
+  }
 }
 
 ::selection {

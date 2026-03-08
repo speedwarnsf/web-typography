@@ -187,25 +187,24 @@ const cleanup = smoothRag(element);
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-10 sm:py-16">
+    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-10 sm:py-16 min-w-0 overflow-hidden">
         {/* Header */}
         <div className="mb-12">
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             06 -- Reading Comfort Lab
           </div>
-          <h1 className="text-4xl md:text-5xl font-playfair mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-playfair mb-4">
             Evidence-Based Typography
           </h1>
-          <p className="text-lg text-neutral-400 max-w-3xl font-source-sans">
-            Adjust typographic parameters and see both the visual effect and the
-            research behind each setting. Find the balance between aesthetics
-            and reading comfort.
+          <p className="text-base sm:text-lg text-neutral-400 max-w-3xl font-source-sans" style={{ textWrap: "pretty" }}>
+            Adjust each setting and see the visual result alongside the research
+            behind it. Find the balance between aesthetics and reading&nbsp;comfort.
           </p>
         </div>
 
         {/* Comfort Score */}
-        <div className="mb-8 border border-neutral-800 bg-neutral-950/50 p-6">
+        <div className="mb-8 border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3">
             <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
               Reading Comfort Score
@@ -225,8 +224,8 @@ const cleanup = smoothRag(element);
         {/* Main Layout */}
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Controls Panel */}
-          <div className="space-y-6">
-            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="space-y-6 min-w-0">
+            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
               <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
                 Controls
               </h2>
@@ -419,7 +418,7 @@ const cleanup = smoothRag(element);
             </div>
 
             {/* Presets */}
-            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
               <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                 Presets
               </h2>
@@ -453,8 +452,8 @@ const cleanup = smoothRag(element);
           </div>
 
           {/* Preview Panel */}
-          <div className="space-y-4">
-            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="space-y-4 min-w-0">
+            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
                   Live Preview
@@ -468,7 +467,7 @@ const cleanup = smoothRag(element);
               </div>
 
               <div
-                className={`p-8 transition-colors ${
+                className={`p-4 sm:p-6 lg:p-8 transition-colors overflow-x-auto ${
                   previewDark
                     ? "bg-neutral-900 text-neutral-200"
                     : "bg-white text-neutral-900"
@@ -479,11 +478,12 @@ const cleanup = smoothRag(element);
                   style={{
                     fontSize: `${settings.fontSize}px`,
                     lineHeight: settings.lineHeight,
-                    maxWidth: `${settings.lineLength}ch`,
+                    maxWidth: `min(${settings.lineLength}ch, 100%)`,
                     letterSpacing: `${settings.letterSpacing}em`,
                     wordSpacing: `${(settings.wordSpacing - 1).toFixed(2)}em`,
                     fontWeight: settings.fontWeight,
                     textWrap: 'pretty' as any,
+                    overflowWrap: 'break-word',
                   }}
                   className="font-source-sans"
                 >
@@ -519,7 +519,7 @@ const cleanup = smoothRag(element);
             </div>
 
             {/* Generated Code */}
-            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
                   Generated CSS
@@ -528,18 +528,18 @@ const cleanup = smoothRag(element);
                   onClick={() => {
                     navigator.clipboard.writeText(generatedCSS);
                   }}
-                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors"
+                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors flex-shrink-0"
                 >
                   Copy CSS
                 </button>
               </div>
-              <pre className="text-sm font-mono text-neutral-300 bg-neutral-900 p-6 overflow-x-auto whitespace-pre leading-relaxed">
+              <pre className="text-xs sm:text-sm font-mono text-neutral-300 bg-neutral-900 p-4 sm:p-6 overflow-x-auto whitespace-pre leading-relaxed">
                 {generatedCSS}
               </pre>
             </div>
 
             {/* Generated JS (typeset rules) */}
-            <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
                   Typeset.js Rules
@@ -548,12 +548,12 @@ const cleanup = smoothRag(element);
                   onClick={() => {
                     navigator.clipboard.writeText(generatedJS);
                   }}
-                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors"
+                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors flex-shrink-0"
                 >
                   Copy JS
                 </button>
               </div>
-              <pre className="text-sm font-mono text-neutral-300 bg-neutral-900 p-6 overflow-x-auto whitespace-pre leading-relaxed">
+              <pre className="text-xs sm:text-sm font-mono text-neutral-300 bg-neutral-900 p-4 sm:p-6 overflow-x-auto whitespace-pre leading-relaxed">
                 {generatedJS}
               </pre>
             </div>

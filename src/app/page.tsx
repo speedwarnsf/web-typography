@@ -6,7 +6,7 @@ import { readFileSync } from "fs";
 import path from "path";
 
 const SAMPLE_TEXT =
-  "Good typography is invisible. Great typography speaks to the reader without ever being noticed. It carries meaning through form, guides the eye with rhythm, and transforms raw content into an experience worth having.";
+  "Good typography is invisible. Great typography speaks to the reader without ever being noticed. It carries meaning through form, guides the eye with rhythm, and turns raw content into something worth\u00A0reading.";
 
 const typesetFullCode = (() => {
   try {
@@ -185,7 +185,7 @@ const tips = [
   {
     title: "Measure (Line Length)",
     content:
-      "The ideal line length for comfortable reading is 45 to 75 characters. Too wide and the eye loses its place; too narrow and the rhythm breaks with constant line returns.",
+      "The ideal line length for reading comfort is 45 to 75 characters. Too wide and the eye loses its place; too narrow and the rhythm breaks with constant returns.",
     code: `p { max-width: 65ch; }`,
   },
   {
@@ -197,31 +197,31 @@ const tips = [
   {
     title: "Responsive Type Scales",
     content:
-      "Use clamp() for fluid typography that scales smoothly between breakpoints. No more jagged media-query jumps -- just continuous, proportional scaling.",
+      "Use clamp() for fluid type that scales smoothly between breakpoints. No more jagged media-query jumps\u00A0— just smooth, steady\u00A0scaling.",
     code: `h1 { font-size: clamp(2rem, 5vw + 1rem, 4.5rem); }\np  { font-size: clamp(1rem, 1vw + 0.75rem, 1.25rem); }`,
   },
   {
     title: "text-wrap: balance and pretty",
     content:
-      "CSS now supports native text wrapping control. Use 'balance' on headings to even out line lengths, and 'pretty' on body text to avoid orphans. Browser support is growing fast.",
+      "CSS now has native text wrapping control. Use \u2018balance\u2019 on headings to even out line lengths, and \u2018pretty\u2019 on body text to prevent orphans. Browser support is\u00A0growing\u00A0fast.",
     code: `h1, h2, h3 { text-wrap: balance; }\np { text-wrap: pretty; }`,
   },
   {
     title: "font-feature-settings",
     content:
-      "Unlock hidden typographic features: ligatures smooth letter connections, oldstyle numerals blend into body text, and tabular figures align in tables.",
+      "Unlock hidden type features: ligatures smooth letter joins, oldstyle numerals blend into body text, and tabular figures align\u00A0in\u00A0tables.",
     code: `body {\n  font-feature-settings: "liga" 1, "calt" 1;\n}\n.body-numerals {\n  font-feature-settings: "onum" 1;\n}\n.table-numerals {\n  font-feature-settings: "tnum" 1;\n}`,
   },
   {
     title: "Orphans and Widows",
     content:
-      "CSS orphans and widows properties control how many lines appear at the bottom and top of page breaks. For web, combine with text-wrap: pretty and JavaScript solutions like typeset.ts.",
+      "CSS orphans and widows control how many lines appear at the bottom and top of page breaks. On the web, combine them with text-wrap:\u00A0pretty and tools like\u00A0typeset.ts.",
     code: `p {\n  orphans: 2;\n  widows: 2;\n  text-wrap: pretty;\n}`,
   },
   {
     title: "Optical Margin Alignment",
     content:
-      "Punctuation and certain letterforms (T, V, W, quotation marks) create visual indentation. hanging-punctuation aligns text to the visual edge rather than the geometric one.",
+      "Punctuation and certain letters (T, V, W, quote marks) create visual indents. The hanging-punctuation property aligns text to the optical edge, not the\u00A0geometric\u00A0one.",
     code: `p {\n  hanging-punctuation: first last;\n}\nblockquote {\n  hanging-punctuation: first;\n}`,
   },
 ];
@@ -270,10 +270,9 @@ export default function Home() {
         >
           Clean Text, Automatically
         </h2>
-        <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
-          Five rules that transform raw text into professionally typeset copy.
-          Each function uses non-breaking spaces to control line breaks without
-          altering content.
+        <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+          Five rules that turn raw text into clean, well-set copy. Each uses
+          non-breaking spaces to control line breaks without changing your&nbsp;content.
         </p>
 
         <div className="space-y-12">
@@ -344,10 +343,9 @@ export default function Home() {
           >
             Curated Combinations
           </h2>
-          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
-            {totalPairings} handpicked font pairings, all loaded from Google Fonts.
-            Each pair is shown with a live preview. Copy the CSS to use them in
-            your project.
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif", textWrap: "pretty" }}>
+            {totalPairings} curated font pairings, all loaded from Google Fonts.
+            Each one is shown with a live preview — copy the CSS and use it&nbsp;today.
           </p>
 
           {pairingCategories.map((category) => (
@@ -411,9 +409,9 @@ export default function Home() {
           >
             The Details That Matter
           </h2>
-          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
-            Practical CSS techniques for better reading experiences. Each tip is
-            something you can apply to your next project today.
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            Practical CSS for better reading. Each tip is something you can
+            apply to your next project&nbsp;today.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-8">
@@ -453,11 +451,10 @@ export default function Home() {
           >
             typeset.ts
           </h2>
-          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
-            Drop this single file into any TypeScript project. Call{" "}
+          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            Drop this file into any TypeScript project. Call{" "}
             <code className="font-mono text-[#B8963E]">typeset(text)</code> to
-            apply all five rules at once, or use individual functions for
-            granular control.
+            apply all five rules at once, or use each function on its&nbsp;own.
           </p>
 
           <CodeBlock code={typesetFullCode} title="typeset.ts" />

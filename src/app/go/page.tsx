@@ -23,7 +23,7 @@ export default function GoPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16">
         <div className="mb-8">
@@ -37,12 +37,13 @@ export default function GoPage() {
           Book-quality typography.
         </h1>
 
-        <p className="font-[family-name:var(--font-source-sans)] text-xl text-neutral-400 mb-12 max-w-2xl" style={{ textWrap: 'pretty' }}>
-          Drop this single script into any website and instantly apply professional typographic rules used by book publishers and design studios.
+        <p className="font-[family-name:var(--font-source-sans)] text-base sm:text-xl text-neutral-400 mb-12 max-w-2xl" style={{ textWrap: "pretty" }}>
+          One script tag. Instant access to the same typographic rules used by
+          book publishers and design&nbsp;studios.
         </p>
 
         {/* Script tag with copy button */}
-        <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+        <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
           <div className="flex items-start justify-between gap-4 mb-2">
             <code className="font-mono text-sm text-neutral-300 break-all flex-1">
               {scriptTag}
@@ -70,7 +71,7 @@ export default function GoPage() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Before */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-4">
               Without go.js
             </h3>
@@ -80,7 +81,7 @@ export default function GoPage() {
           </div>
 
           {/* After */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
               With go.js
             </h3>
@@ -138,7 +139,7 @@ export default function GoPage() {
               desc: "Activates ligatures, contextual alternates, and kerning (liga, calt, kern) for professional-grade letter spacing and connections."
             }
           ].map((item, idx) => (
-            <div key={idx} className="border border-neutral-800 bg-neutral-950/50 p-6">
+            <div key={idx} className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
               <h4 className="font-[family-name:var(--font-source-sans)] font-semibold text-neutral-100 mb-2">
                 {item.rule}
               </h4>
@@ -158,7 +159,7 @@ export default function GoPage() {
           </span>
         </div>
 
-        <div className="border border-neutral-800 bg-neutral-950/50 p-6 space-y-6">
+        <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 space-y-6">
           <div>
             <h4 className="font-mono text-sm text-neutral-100 mb-2">
               data-typeset-selector
@@ -205,7 +206,7 @@ export default function GoPage() {
           </span>
         </div>
 
-        <div className="border border-neutral-800 bg-neutral-950/50 p-6 space-y-6">
+        <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 space-y-6">
           <div>
             <h4 className="font-mono text-sm text-neutral-100 mb-2">
               window.typeset.run(element)

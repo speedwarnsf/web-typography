@@ -470,7 +470,7 @@ export default function DNAPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         {/* Header */}
         <div className="mb-12">
@@ -478,8 +478,9 @@ export default function DNAPage() {
             09 -- TYPOGRAPHIC DNA
           </div>
           <h1 className="font-playfair text-3xl sm:text-5xl mb-4">Typographic DNA Extractor</h1>
-          <p className="text-neutral-400 text-lg max-w-3xl">
-            Reverse-engineer any website's typography system. Paste HTML and CSS to extract fonts, scales, spacing, and patterns into reusable design tokens.
+          <p className="text-neutral-400 text-base sm:text-lg max-w-3xl" style={{ textWrap: "pretty" }}>
+            Pull apart any site's type system. Paste HTML and CSS to extract fonts, scales,
+            spacing, and patterns into reusable design&nbsp;tokens.
           </p>
         </div>
 
@@ -509,7 +510,7 @@ export default function DNAPage() {
             </button>
           </div>
 
-          <div className="border border-neutral-800 bg-neutral-950/50 p-8">
+          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8">
             {inputMode === 'url' ? (
               <>
                 <label className="block font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
@@ -593,7 +594,7 @@ export default function DNAPage() {
             {/* Results Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Font Stacks */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   01 -- Font Stack
                 </h3>
@@ -614,7 +615,7 @@ export default function DNAPage() {
               </div>
 
               {/* Type Scale */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   02 -- Type Scale
                 </h3>
@@ -643,7 +644,7 @@ export default function DNAPage() {
               </div>
 
               {/* Weight Map */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   03 -- Weight Map
                 </h3>
@@ -663,7 +664,7 @@ export default function DNAPage() {
               </div>
 
               {/* Line Heights */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   04 -- Line Heights
                 </h3>
@@ -689,7 +690,7 @@ export default function DNAPage() {
 
               {/* Letter Spacing */}
               {extractedDNA.letterSpacing.length > 0 && (
-                <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+                <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                   <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                     05 -- Letter Spacing
                   </h3>
@@ -707,7 +708,7 @@ export default function DNAPage() {
               )}
 
               {/* Color Palette */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   06 -- Color Palette
                 </h3>
@@ -733,7 +734,7 @@ export default function DNAPage() {
               </div>
 
               {/* Spacing System */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   07 -- Spacing System
                 </h3>
@@ -752,7 +753,7 @@ export default function DNAPage() {
               </div>
 
               {/* Vertical Rhythm */}
-              <div className="border border-neutral-800 bg-neutral-950/50 p-6">
+              <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
                 <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                   08 -- Vertical Rhythm
                 </h3>
@@ -794,7 +795,7 @@ export default function DNAPage() {
 
               {/* Responsive Patterns */}
               {extractedDNA.responsivePatterns.length > 0 && (
-                <div className="border border-neutral-800 bg-neutral-950/50 p-6 lg:col-span-2">
+                <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:col-span-2">
                   <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
                     09 -- Responsive Patterns
                   </h3>
