@@ -118,6 +118,7 @@ export default function AnimatedHeroHeading() {
 
   return (
     <h1
+      data-no-typeset
       className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.9] mb-8"
       style={{
         minHeight: "1.1em",
