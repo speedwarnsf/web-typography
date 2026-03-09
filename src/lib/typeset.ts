@@ -300,6 +300,225 @@ export function typesetAll(selector: string): void {
   elements.forEach(typeset);
 }
 
+// ─── Post-Render Analysis ───
+//
+// These functions work by measuring the ACTUAL rendered layout, then applying
+// targeted fixes. Unlike pre-render bindings (typesetText), they can't make
+// things worse — they only intervene when they detect a real problem.
+
+interface LineInfo {
+  indices: number[];
+  words: string[];
+  width: number;
+  fill: number;
+}
+
+interface LineAnalysis {
+  lines: LineInfo[];
+  words: string[];
+  containerWidth: number;
+}
+
+/**
+ * Detect actual rendered lines by wrapping words in measurement spans
+ * and grouping by vertical position.
+ *
+ * IMPORTANT: This temporarily replaces innerHTML to measure, then restores it.
+ * Must not be called inside a MutationObserver callback.
+ */
+function detectLines(el: HTMLElement): LineAnalysis | null {
+  const text = el.textContent || '';
+  if (!text.trim() || text.length < 20) return null;
+
+  // Split on regular spaces only — preserve nbsp bindings as atoms
+  const words = text.split(/ +/).filter(Boolean);
+  if (words.length < 3) return null;
+
+  const originalHTML = el.innerHTML;
+  const originalWhiteSpace = el.style.whiteSpace;
+
+  // Wrap each word in a measurement span
+  el.innerHTML = words
+    .map((w, i) => `<span data-lw="${i}">${w}</span>`)
+    .join(' ');
+
+  const spans = el.querySelectorAll<HTMLElement>('span[data-lw]');
+  const cs = getComputedStyle(el);
+  const containerWidth = el.clientWidth
+    - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+
+  const lines: LineInfo[] = [];
+  let currentTop = -1;
+  let currentLine: number[] = [];
+
+  spans.forEach((span, idx) => {
+    const top = Math.round(span.getBoundingClientRect().top);
+    if (currentTop === -1) {
+      currentTop = top;
+      currentLine = [idx];
+    } else if (Math.abs(top - currentTop) > 3) {
+      if (currentLine.length > 0) {
+        const first = spans[currentLine[0]];
+        const last = spans[currentLine[currentLine.length - 1]];
+        const width = last.getBoundingClientRect().right - first.getBoundingClientRect().left;
+        lines.push({
+          indices: currentLine,
+          words: currentLine.map(i => words[i]),
+          width,
+          fill: width / containerWidth,
+        });
+      }
+      currentTop = top;
+      currentLine = [idx];
+    } else {
+      currentLine.push(idx);
+    }
+  });
+
+  // Last line
+  if (currentLine.length > 0) {
+    const first = spans[currentLine[0]];
+    const last = spans[currentLine[currentLine.length - 1]];
+    const width = last.getBoundingClientRect().right - first.getBoundingClientRect().left;
+    lines.push({
+      indices: currentLine,
+      words: currentLine.map(i => words[i]),
+      width,
+      fill: width / containerWidth,
+    });
+  }
+
+  // Restore
+  el.innerHTML = originalHTML;
+  el.style.whiteSpace = originalWhiteSpace;
+
+  return { lines, words, containerWidth };
+}
+
+/**
+ * Fix real orphans: only bind the last two words if the last line
+ * actually contains a single word in the rendered layout.
+ *
+ * This is more accurate than the pre-render approach (which always binds
+ * the last two words regardless of whether it's actually an orphan).
+ */
+export function fixRealOrphans(el: HTMLElement): boolean {
+  const analysis = detectLines(el);
+  if (!analysis || analysis.lines.length < 2) return false;
+
+  const lastLine = analysis.lines[analysis.lines.length - 1];
+
+  // Only intervene if last line has exactly 1 word (a true rendered orphan)
+  if (lastLine.words.length !== 1) return false;
+
+  const prevLine = analysis.lines[analysis.lines.length - 2];
+  if (prevLine.words.length < 2) return false;
+
+  // Pull the last word of the previous line down by binding it to the orphan
+  const pullWord = prevLine.words[prevLine.words.length - 1];
+  const orphanWord = lastLine.words[0];
+
+  const text = el.textContent || '';
+  const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    escaped(pullWord) + '\\s+' + escaped(orphanWord) + '\\s*$'
+  );
+  const newText = text.replace(pattern, pullWord + NBSP + orphanWord);
+
+  if (newText !== text) {
+    el.textContent = newText;
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Detect and fix lines with poor rag by applying targeted word-spacing
+ * adjustments. Measures actual rendered line widths, computes a target,
+ * and gently adjusts word-spacing per line to even out the right edge.
+ *
+ * This is a lighter version of smoothRag designed for all widths including mobile.
+ * Uses smaller adjustment ranges on narrow screens.
+ */
+export function fixRag(el: HTMLElement): (() => void) | null {
+  const analysis = detectLines(el);
+  if (!analysis || analysis.lines.length < 3) return null;
+
+  const { lines, words, containerWidth } = analysis;
+  const isNarrow = containerWidth < 350;
+
+  // Compute target: median of non-last line widths
+  const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
+  const mid = Math.floor(nonLastWidths.length / 2);
+  const target = nonLastWidths.length % 2 === 0
+    ? (nonLastWidths[mid - 1] + nonLastWidths[mid]) / 2
+    : nonLastWidths[mid];
+
+  // Narrow screens: very subtle adjustments. Wide: more room.
+  const MAX_EXPAND = isNarrow ? 0.5 : 1.8;
+  const MAX_TIGHTEN = isNarrow ? 0.3 : 1.0;
+
+  const baseWS = parseFloat(getComputedStyle(el).wordSpacing) || 0;
+  const htmlParts: string[] = [];
+  let anyAdjustment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineText = line.words.join(' ');
+    const isLast = i === lines.length - 1;
+    const spaces = line.words.length - 1;
+    const gap = target - line.width;
+
+    if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
+      const rawDelta = gap / spaces;
+      const wsDelta = rawDelta > 0
+        ? Math.min(MAX_EXPAND, rawDelta * 0.7)
+        : Math.max(-MAX_TIGHTEN, rawDelta * 0.5);
+
+      if (Math.abs(wsDelta) > 0.05) {
+        const finalWS = baseWS + wsDelta;
+        htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
+        anyAdjustment = true;
+        continue;
+      }
+    }
+    htmlParts.push(lineText);
+  }
+
+  if (!anyAdjustment) return null;
+
+  const originalHTML = el.innerHTML;
+  const originalWhiteSpace = el.style.whiteSpace;
+
+  el.style.whiteSpace = 'pre-line';
+  el.innerHTML = htmlParts.join('\n');
+
+  // Return cleanup function
+  return () => {
+    el.innerHTML = originalHTML;
+    el.style.whiteSpace = originalWhiteSpace;
+  };
+}
+
+/**
+ * Full post-render typography pass: runs after the browser has laid out text.
+ * Detects and fixes actual rendered problems without pre-render guessing.
+ *
+ * Call this AFTER typeset() (which handles pre-render bindings).
+ */
+export function postRenderFix(element: HTMLElement): (() => void) | null {
+  if (!element) return null;
+  const text = element.textContent || '';
+  if (text.length < 40) return null;
+
+  // Step 1: Fix real orphans (only if actually orphaned in rendered layout)
+  fixRealOrphans(element);
+
+  // Step 2: Smooth rag with subtle word-spacing
+  return fixRag(element);
+}
+
 /**
  * React hook: apply typeset to a ref on mount/update
  */

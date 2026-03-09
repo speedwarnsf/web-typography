@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import CopyButton from "@/components/CopyButton";
-import { typeset } from "@/lib/typeset";
+import { typeset, postRenderFix } from "@/lib/typeset";
 
 export default function GoPage() {
   const scriptTag = '<script src="https://typeset.us/go.js"></script>';
@@ -15,13 +15,17 @@ export default function GoPage() {
   const afterRef = useRef<HTMLParagraphElement>(null);
 
   // Apply real typeset to the "after" paragraph.
-  // Uses typeset() (DOM function) which measures the actual container width
-  // and passes the correct measure to typesetText. This ensures bindings
-  // scale appropriately for mobile vs desktop.
+  // Phase 1: typeset() applies measure-aware bindings.
+  // Phase 2: postRenderFix() measures actual rendered lines and fixes
+  //          real orphans + smooths rag with subtle word-spacing.
   useEffect(() => {
     if (!afterRef.current) return;
     afterRef.current.textContent = afterText;
     typeset(afterRef.current);
+    // Post-render: wait for layout, then fix real problems
+    requestAnimationFrame(() => {
+      if (afterRef.current) postRenderFix(afterRef.current);
+    });
   }, []);
 
   return (

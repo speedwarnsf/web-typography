@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { typesetAll, typesetHeading, smoothRag } from '@/lib/typeset';
+import { typesetAll, typesetHeading, smoothRag, fixRealOrphans } from '@/lib/typeset';
 
 /**
  * GlobalTypeset — applies typographic rules to all text on the page.
@@ -70,6 +70,31 @@ export default function GlobalTypeset() {
       runHeadings();
     };
 
+    /**
+     * Phase 2b: Post-render orphan fix.
+     * After the browser has laid out text, detect actual rendered orphans
+     * (single-word last lines) and fix them. This works at ALL widths
+     * including mobile, because it measures real rendered lines instead
+     * of guessing from character counts.
+     */
+    const runPostRender = () => {
+      mutationPaused = true;
+      const paragraphs = document.querySelectorAll<HTMLElement>(
+        'p:not([data-no-typeset]):not([data-no-smooth])'
+      );
+      paragraphs.forEach((p) => {
+        try {
+          const text = p.textContent || '';
+          if (text.length < 40) return;
+          if (p.closest('[data-no-typeset], pre, code, .demo, [role="tabpanel"]')) return;
+          fixRealOrphans(p);
+        } catch {
+          // silently skip
+        }
+      });
+      requestAnimationFrame(() => { mutationPaused = false; });
+    };
+
     // Delay Phase 1 to avoid hydration mismatch — React must finish
     // reconciling the DOM before we mutate text nodes.
     const timers = [
@@ -77,8 +102,10 @@ export default function GlobalTypeset() {
       setTimeout(runTypeset, 600),
       setTimeout(() => {
         runTypeset();
-        // Run smoothRag after final typeset pass
-        requestAnimationFrame(runSmooth);
+        // Phase 2b: Post-render orphan fix (after layout settles)
+        requestAnimationFrame(runPostRender);
+        // Phase 3: smoothRag after orphan fix
+        setTimeout(() => requestAnimationFrame(runSmooth), 200);
       }, 1600),
     ];
 

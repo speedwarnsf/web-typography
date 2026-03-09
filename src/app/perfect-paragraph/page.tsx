@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { typesetText, smoothRag, measureCh } from '@/lib/typeset';
+import { typesetText, smoothRag, measureCh, postRenderFix } from '@/lib/typeset';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
 
@@ -78,6 +78,7 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
 
 export default function PerfectParagraph() {
   const [text, setText] = useState(DEFAULT_TEXT);
+  const [activePanel, setActivePanel] = useState<'default' | 'typeset'>('typeset');
   const [toggles, setToggles] = useState<Record<string, boolean>>({
     orphan: true,
     shortWord: true,
@@ -120,9 +121,23 @@ export default function PerfectParagraph() {
       typesetRef.current.innerHTML = typesetText(text, { measure });
     }
 
-    // Apply smoothRag if enabled
+    // Apply smoothRag if enabled (legacy full Knuth-Plass)
     if (toggles.ragSmoothing) {
       smoothRagCleanupRef.current = smoothRag(typesetRef.current);
+    }
+
+    // Post-render analysis: detect and fix actual rendered problems.
+    // This runs AFTER the browser has laid out the text, so it can
+    // measure real line widths and fix real orphans.
+    if (needsTypesetting && !toggles.ragSmoothing) {
+      // Only run post-render fix when smoothRag isn't handling it
+      // (smoothRag already does its own line analysis)
+      requestAnimationFrame(() => {
+        if (typesetRef.current) {
+          const cleanup = postRenderFix(typesetRef.current);
+          if (cleanup) smoothRagCleanupRef.current = cleanup;
+        }
+      });
     }
   }, [text, toggles]);
 
@@ -240,11 +255,36 @@ export default function PerfectParagraph() {
           </div>
         </div>
 
-        {/* Side-by-side comparison */}
+        {/* Mobile: toggle between panels. Desktop: side-by-side. */}
+        <div className="md:hidden flex mb-4 border border-neutral-800 bg-neutral-950/50">
+          <button
+            onClick={() => setActivePanel('default')}
+            className={`flex-1 py-3 font-mono text-xs uppercase tracking-[0.3em] transition-colors ${
+              activePanel === 'default'
+                ? 'text-neutral-200 bg-neutral-800/50'
+                : 'text-neutral-500 hover:text-neutral-300'
+            }`}
+          >
+            Default
+          </button>
+          <button
+            onClick={() => setActivePanel('typeset')}
+            className={`flex-1 py-3 font-mono text-xs uppercase tracking-[0.3em] transition-colors ${
+              activePanel === 'typeset'
+                ? 'text-[#B8963E] bg-neutral-800/50'
+                : 'text-neutral-500 hover:text-neutral-300'
+            }`}
+          >
+            Typeset
+          </button>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6 mb-12">
-          {/* Left: Browser Default */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
+          {/* Left: Browser Default — hidden on mobile when Typeset panel active */}
+          <div className={`border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden ${
+            activePanel !== 'default' ? 'hidden md:block' : ''
+          }`}>
+            <p className="hidden md:block font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
               Browser Default
             </p>
             <p
@@ -256,9 +296,11 @@ export default function PerfectParagraph() {
             </p>
           </div>
 
-          {/* Right: Typeset */}
-          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
+          {/* Right: Typeset — hidden on mobile when Default panel active */}
+          <div className={`border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden ${
+            activePanel !== 'typeset' ? 'hidden md:block' : ''
+          }`}>
+            <p className="hidden md:block font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
               Typeset
             </p>
             <p

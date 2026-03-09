@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { typesetText, smoothRag, typeset, measureCh } from "@/lib/typeset";
+import { typesetText, smoothRag, typeset, measureCh, postRenderFix } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -221,13 +221,16 @@ function PairingCardBuilder() {
 
   const rawText = useCustomText && customText ? customText : LOREM;
 
-  // Apply typeset to the live preview body paragraph using actual container
-  // measurement, so bindings scale correctly at mobile vs desktop widths.
-  // smoothRag disabled — text-wrap: pretty handles rag in the builder.
+  // Apply typeset + post-render analysis to the live preview body paragraph.
+  // Measures actual container width, applies appropriate bindings, then
+  // detects and fixes real rendered problems (orphans, rag).
   useEffect(() => {
     if (!bodyParaRef.current) return;
     bodyParaRef.current.textContent = rawText;
     typeset(bodyParaRef.current);
+    requestAnimationFrame(() => {
+      if (bodyParaRef.current) postRenderFix(bodyParaRef.current);
+    });
   }, [rawText, heading, body, bSize, leading, colW]);
 
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
