@@ -72,28 +72,21 @@ export default function GoPage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Before — raw browser defaults */}
+          {/* Before — same font, same size, no typesetting */}
           <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-4">
               Without go.js
             </h3>
             <p
-              className="text-neutral-400"
+              className="font-[family-name:var(--font-source-sans)] text-neutral-400 leading-relaxed"
               data-no-typeset
               data-no-smooth
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontSize: '16px',
-                lineHeight: 1.2,
-                letterSpacing: 'normal',
-                fontFeatureSettings: 'normal',
-              }}
             >
               {beforeText}
             </p>
           </div>
 
-          {/* After — fully enhanced */}
+          {/* After — same font, same size, with typesetting + CSS */}
           <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
               With go.js
@@ -102,10 +95,8 @@ export default function GoPage() {
               ref={afterRef}
               data-no-typeset
               data-no-smooth
-              className="font-[family-name:var(--font-source-sans)] text-neutral-200"
+              className="font-[family-name:var(--font-source-sans)] text-neutral-200 leading-relaxed"
               style={{
-                fontSize: '16px',
-                lineHeight: 1.65,
                 textWrap: 'pretty' as any,
                 hangingPunctuation: 'first last',
                 fontFeatureSettings: '"liga" 1, "calt" 1, "kern" 1',
@@ -114,6 +105,20 @@ export default function GoPage() {
               {afterText}
             </p>
           </div>
+        </div>
+
+        {/* Call out what changed */}
+        <div className="mt-6 border border-neutral-800 bg-neutral-950/30 p-4 sm:p-6">
+          <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-3">
+            What changed
+          </h3>
+          <ul className="text-sm text-neutral-400 space-y-1 font-[family-name:var(--font-source-sans)]" data-no-typeset>
+            <li>• Short words like {"\u201C"}a,{"\u201D"} {"\u201C"}it,{"\u201D"} {"\u201C"}of{"\u201D"} bound to the next word{"\u00A0"}{"\u2014"} they never strand at a{"\u00A0"}line{"\u00A0"}end</li>
+            <li>• Last two words always stay together{"\u00A0"}{"\u2014"} no{"\u00A0"}orphans</li>
+            <li>• Sentence starts like {"\u201C"}It was{"\u201D"} and {"\u201C"}On clear{"\u201D"} are kept as{"\u00A0"}pairs</li>
+            <li>• Short sentence endings pulled back to the previous{"\u00A0"}line</li>
+            <li>• CSS: text-wrap:{"\u00A0"}pretty, hanging punctuation, ligatures</li>
+          </ul>
         </div>
       </section>
 
