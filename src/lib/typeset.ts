@@ -429,14 +429,14 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
           : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
         if (Math.abs(wsDelta) > 0.05) {
           const finalWS = baseWS + wsDelta;
-          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
+          htmlParts.push(`<span style="display:block;word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
-      htmlParts.push(lineText);
+      htmlParts.push(`<span style="display:block">${lineText}</span>`);
     }
 
-    el.innerHTML = htmlParts.join('<br>');
+    el.innerHTML = htmlParts.join('');
   }
 
   function apply() {
@@ -546,14 +546,14 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
           : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
         if (Math.abs(wsDelta) > 0.05) {
           const finalWS = baseWS + wsDelta;
-          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
+          htmlParts.push(`<span style="display:block;word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
-      htmlParts.push(lineText);
+      htmlParts.push(`<span style="display:block">${lineText}</span>`);
     }
 
-    element.innerHTML = htmlParts.join('<br>');
+    element.innerHTML = htmlParts.join('');
   }
 
   /**

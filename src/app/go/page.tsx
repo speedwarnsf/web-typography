@@ -87,6 +87,8 @@ export default function GoPage() {
             </h3>
             <p
               ref={afterRef}
+              data-no-typeset
+              data-no-smooth
               className="font-[family-name:var(--font-source-sans)] text-neutral-200 leading-relaxed"
               style={{
                 textWrap: 'pretty' as any,
