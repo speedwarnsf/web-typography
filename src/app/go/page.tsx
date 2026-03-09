@@ -72,17 +72,28 @@ export default function GoPage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Before */}
+          {/* Before — raw browser defaults */}
           <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-4">
               Without go.js
             </h3>
-            <p className="font-[family-name:var(--font-source-sans)] text-neutral-400 leading-relaxed" data-no-typeset data-no-smooth>
+            <p
+              className="text-neutral-400"
+              data-no-typeset
+              data-no-smooth
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: '16px',
+                lineHeight: 1.2,
+                letterSpacing: 'normal',
+                fontFeatureSettings: 'normal',
+              }}
+            >
               {beforeText}
             </p>
           </div>
 
-          {/* After */}
+          {/* After — fully enhanced */}
           <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6">
             <h3 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
               With go.js
@@ -91,11 +102,13 @@ export default function GoPage() {
               ref={afterRef}
               data-no-typeset
               data-no-smooth
-              className="font-[family-name:var(--font-source-sans)] text-neutral-200 leading-relaxed"
+              className="font-[family-name:var(--font-source-sans)] text-neutral-200"
               style={{
+                fontSize: '16px',
+                lineHeight: 1.65,
                 textWrap: 'pretty' as any,
                 hangingPunctuation: 'first last',
-                fontFeatureSettings: '"liga" 1, "calt" 1, "kern" 1'
+                fontFeatureSettings: '"liga" 1, "calt" 1, "kern" 1',
               }}
             >
               {afterText}
