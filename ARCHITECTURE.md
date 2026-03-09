@@ -10,17 +10,19 @@
 
 Most people visit websites on their phones. This is not an edge case — it is the primary use case. Typography that only works at 55-75ch desktop reading widths is solving a problem most users will never see.
 
-**typeset.us must improve typography at every width — mobile and desktop.** A tool that only works at 55-75ch desktop columns ignores where most reading happens. A tool that only works on phones ignores long-form content. Both matter.
+**Mobile is the primary context.** The tool must work at every width, but mobile is where 99% of users will see the outcome of typeset in use. People implementing this tool are building websites. People visit websites on their phones. That's the reality.
 
-The mistake we've made is treating mobile as a lesser context — disabling features at narrow widths instead of making them work there. The tool must deliver value across the full range:
+Desktop matters too — long-form articles, documentation, books — and the tool must serve those contexts. But if we have to choose where to get it right first, it's mobile. Always.
 
-- **Mobile (320-414px):** This is where most people read the web. If the tool makes things worse here, it's a regression.
-- **Tablet (768-1024px):** Mid-range columns, often the sweet spot for reading.
-- **Desktop (1200px+):** Long-form articles, documentation, books. The tool already works here.
+The mistake we've made is treating mobile as a lesser context — disabling features at narrow widths instead of making them work there. That's backwards. If the tool can't improve typography at 375px, it fails where it matters most.
+
+- **Mobile (320-414px):** The primary target. 99% of end users. If the tool makes things worse here, it's a regression — full stop.
+- **Tablet (768-1024px):** Important middle ground.
+- **Desktop (1200px+):** The tool already works here. Keep it working.
 
 This means:
-- **Test at 375px AND at reading widths.** Both must show improvement.
-- **Demos must show meaningful differences at mobile widths.** A comparison that only works at 65ch is incomplete.
+- **Test at 375px first.** Then verify at wider widths. Mobile is not the afterthought check.
+- **Demos must show meaningful differences at mobile widths.** A comparison that only works at 65ch is not selling the tool to anyone.
 - **If a typesetting rule makes mobile worse** (orphans, stranded words, worse rag), fix the algorithm for that width. Don't just disable it.
 - **All pages and components must be designed mobile-first, then enhanced for desktop.**
 
