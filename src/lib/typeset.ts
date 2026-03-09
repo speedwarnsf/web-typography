@@ -341,8 +341,9 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
     // Get baseline word-spacing so we add our delta on top
     const baseWS = parseFloat(getComputedStyle(el).wordSpacing) || 0;
 
-    // Split on any whitespace (regular + nbsp), preserving word content
-    const words = text.split(/[\s\u00A0]+/).filter(Boolean);
+    // Split on regular spaces ONLY — preserve \u00A0 (nbsp) bindings from typesetText
+    // so "worked\u00A0as" stays as one atomic unit, never split across lines
+    const words = text.split(/ +/).filter(Boolean);
     if (words.length < 4) return;
 
     // Phase 1: Wrap each word in a span to detect line positions
@@ -421,7 +422,8 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
       const isLast = i === lines.length - 1;
       const lineWords = line.wordIndices.map(idx => words[idx]);
       const lineText = lineWords.join(' ');
-      const spaces = lineWords.length - 1;
+      // Count ALL spaces (regular + nbsp inside atomic words) for word-spacing calc
+      const spaces = (lineText.match(/[\s\u00A0]/g) || []).length;
       const gap = target - line.width;
 
       if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
