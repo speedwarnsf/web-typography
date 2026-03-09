@@ -409,9 +409,11 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
     }
 
     // Phase 4: Build HTML with per-line word-spacing
+    // Narrow containers need much smaller adjustments — even 1px/gap
+    // creates a justified appearance at ~6 words per line.
     const isNarrow = containerWidth < 350;
-    const MAX_EXPAND = isNarrow ? 1.5 : 2.5;
-    const MAX_TIGHTEN = isNarrow ? 0.75 : 1.5;
+    const MAX_EXPAND = isNarrow ? 0.6 : 2.5;
+    const MAX_TIGHTEN = isNarrow ? 0.4 : 1.5;
     const htmlParts: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {

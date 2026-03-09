@@ -22,14 +22,14 @@ const rules = [
   },
   {
     id: 'sentence-end',
-    width: 345,
-    before: 'She read the brief once and set it aside. The concept was ambitious but the timeline made it hard to say yes.',
-    after: 'She read the brief once and set it\u00A0aside. The concept was ambitious but the timeline made it hard to say\u00A0yes.',
+    width: 310,
+    before: 'The contract stipulated that all parties must agree before anyone could sign it. Negotiations stalled for weeks.',
+    after: 'The contract stipulated that all parties must agree before anyone could sign\u00A0it. Negotiations stalled for\u00A0weeks.',
   },
   {
     id: 'rag',
-    width: 380,
-    before: 'He arrived early and found a seat by the window overlooking the courtyard. The tables around him filled up slowly. A waiter brought coffee without being asked. Outside, two children chased a cat across the cobblestones while their parents watched from a doorway.',
+    width: 360,
+    before: 'Typography has always been about rhythm. The interplay of long words and short ones creates a pattern the eye follows instinctively. When that rhythm falters \u2014 when a line reaches far while the next barely starts \u2014 the reader stumbles.',
     ragSmooth: true, // special handling: per-line word-spacing adjustment
   },
   {
