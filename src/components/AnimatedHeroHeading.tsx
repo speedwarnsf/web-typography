@@ -119,17 +119,23 @@ export default function AnimatedHeroHeading() {
   return (
     <h1
       data-no-typeset
-      className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.95] mb-8"
+      className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[1.1] mb-8"
       style={{
         minHeight: "1.1em",
         /*
-         * DESCENDER FIX (2026-03-09):
-         * "Typography" has descenders (y, p). overflow:hidden on ANY ancestor
-         * clips them. We use overflow-x:hidden to contain horizontal chaos
-         * but leave vertical overflow visible so descenders render fully.
+         * DESCENDER FIX v3 (2026-03-09):
+         * 
+         * overflow:hidden forces overflow-y:visible → auto (CSS spec).
+         * overflow:clip does NOT — it's a true directional clip.
+         * 
+         * overflow-x:clip — contains horizontal chaos animation
+         * overflow-y:visible — descenders render fully below the box
+         * 
+         * This is the ONLY approach that works. Do not use overflow:hidden
+         * or overflow-x:hidden anywhere in this component.
          * See ARCHITECTURE.md "AnimatedHeroHeading" section.
          */
-        overflowX: "hidden",
+        overflowX: "clip",
         overflowY: "visible",
         paddingBottom: "0.15em",
         /* Don't let touch events on the animation interfere with scrolling */
@@ -148,12 +154,10 @@ export default function AnimatedHeroHeading() {
           alignItems: "baseline",
           whiteSpace: "nowrap",
           /*
-           * DESCENDER FIX (2026-03-09):
-           * DO NOT use overflow:hidden here — it clips descenders on y/p.
-           * Horizontal containment is handled by the parent <h1>.
+           * NO overflow properties here. The parent <h1> handles containment.
+           * Any overflow property on this element would clip descenders
+           * (CSS spec: overflow-x:hidden forces overflow-y:visible → auto).
            */
-          overflowX: "hidden",
-          overflowY: "visible",
           /* Promote to GPU layer for smoother animation */
           willChange: "contents",
         }}
@@ -170,17 +174,14 @@ export default function AnimatedHeroHeading() {
                 fontWeight: 700,
                 fontSize: "1em",
                 color: "transparent",
-                lineHeight: 1,
+                lineHeight: 1.2,
                 position: "relative",
                 letterSpacing: "0px",
                 /*
-                 * DESCENDER FIX (2026-03-09):
-                 * overflow:hidden here clips the bottom of y/p descenders.
-                 * The chaos animation is contained by the parent containers;
-                 * individual letter slots must allow vertical overflow.
+                 * NO overflow properties. Parent <h1> handles containment.
+                 * lineHeight bumped from 1 to 1.2 to give descenders room
+                 * within each letter slot's natural bounds.
                  */
-                overflowX: "hidden",
-                overflowY: "visible",
               }}
             >
               {letter}

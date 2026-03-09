@@ -36,18 +36,22 @@ The homepage hero displays "Web Typography" where the word "Typography" animates
 
 **The word "Typography" contains descenders (y, p).** Any `overflow: hidden` on the letter slots, the inline-flex wrapper, or the `<h1>` will clip the bottom of these characters.
 
-**Rule: NEVER use `overflow: hidden` vertically on any ancestor of the animated text.**
+**Rule: Use `overflow-x: clip` + `overflow-y: visible` on the `<h1>`. NO overflow properties on inner elements.**
 
-Use `overflow-x: hidden` (to contain horizontal chaos animation) + `overflow-y: visible` (to preserve descenders). This applies to ALL THREE layers:
-1. `<h1>` — the outermost container
-2. `<span style="display: inline-flex">` — the "Typography" wrapper
-3. Each letter `<span>` — individual character slots
+**CSS spec gotcha:** `overflow-x: hidden` forces `overflow-y: visible` → `auto` (which clips). `overflow-x: clip` does NOT have this behavior — `clip` is not `hidden`. With `clip`, you can truly have `overflow-x: clip` + `overflow-y: visible`.
+
+**The correct fix (v3):**
+1. `<h1>`: `overflow-x: clip; overflow-y: visible` — clips horizontal chaos, descenders render freely below
+2. `<span style="display: inline-flex">` (Typography wrapper): **NO overflow properties**
+3. Each letter `<span>`: **NO overflow properties**, `lineHeight: 1.2` for descender room in slots
 
 **History of this bug:**
 - First appeared when overflow:hidden was added to prevent chaos animation from causing horizontal scroll
-- "Fixed" multiple times by adjusting padding-bottom and line-height, but those are band-aids
-- The real fix is overflow-x/overflow-y split (applied 2026-03-09)
-- DO NOT revert to `overflow: hidden` — it WILL clip descenders again
+- "Fixed" with padding-bottom adjustments — band-aid, descenders still clipped at certain sizes
+- "Fixed" with overflow-x:hidden + overflow-y:visible — doesn't work (CSS spec: visible → auto)
+- "Fixed" with overflow:hidden + large paddingBottom — works at some sizes, fails at others (animation chaos phase pushes content beyond padding)
+- **Real fix (2026-03-09 v3):** `overflow-x: clip; overflow-y: visible` — the ONLY approach that truly allows vertical overflow while clipping horizontal. Works at all sizes and during all animation phases.
+- DO NOT use `overflow: hidden` or `overflow-x: hidden` anywhere in this component
 
 ### Animation Timing
 - Tick speed: 140ms
