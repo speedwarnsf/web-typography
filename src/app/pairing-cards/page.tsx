@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { typesetText, smoothRag } from "@/lib/typeset";
+import { typesetText, smoothRag, typeset, measureCh } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -220,11 +220,15 @@ function PairingCardBuilder() {
   useEffect(() => { updateURL(); }, [updateURL]);
 
   const rawText = useCustomText && customText ? customText : LOREM;
-  const displayText = typesetText(rawText);
 
-  // smoothRag disabled on builder — text-wrap: pretty handles it
-  // The builder preview is user-configurable (font/size/width), so
-  // algorithmic re-breaking can conflict with user intent.
+  // Apply typeset to the live preview body paragraph using actual container
+  // measurement, so bindings scale correctly at mobile vs desktop widths.
+  // smoothRag disabled — text-wrap: pretty handles rag in the builder.
+  useEffect(() => {
+    if (!bodyParaRef.current) return;
+    bodyParaRef.current.textContent = rawText;
+    typeset(bodyParaRef.current);
+  }, [rawText, heading, body, bSize, leading, colW]);
 
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");
@@ -665,6 +669,8 @@ document.addEventListener('DOMContentLoaded', function() {
             </h2>
             <p
               ref={bodyParaRef}
+              data-no-typeset
+              data-no-smooth
               style={{
                 fontFamily: `'${body}', sans-serif`,
                 fontSize: `clamp(${Math.max(bSize * 0.8, 14)}px, ${bSize * 0.9}px, ${bSize}px)`,
@@ -677,9 +683,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 wordBreak: "normal",
                 maxWidth: "100%",
               }}
-            >
-              {rawText}
-            </p>
+            />
             <div
               className="mt-8 pt-4 border-t"
               style={{ borderColor: `#${fg}22` }}

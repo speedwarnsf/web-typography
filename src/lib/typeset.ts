@@ -108,16 +108,27 @@ function typesetBodyText(text: string, measure?: number): string {
   if (words.length < 3) return text;
 
   // Tiered binding based on actual column width.
-  // Tiny words (1-2 chars) are safe to bind at ANY width — they never
-  // cause overflow. Sentence protection works at medium widths. The full
-  // set of prepositions/articles only binds at wide measures where the
-  // extra atoms won't force near-justified lines.
+  //
+  // MOBILE-FIRST PRINCIPLE (2026-03-09):
+  // At narrow widths (<40ch, ~5-7 words per line), each nbsp binding
+  // creates a forced word pair that constrains the browser's line-breaking
+  // algorithm. With 10-15 bindings in a paragraph, the browser has almost
+  // no freedom, and the result is WORSE than default — stranded words,
+  // uneven lines, and orphan-like breaks that wouldn't exist without us.
+  //
+  // At narrow widths, let CSS text-wrap:pretty do the heavy lifting.
+  // JS bindings should only handle what CSS can't: orphan prevention
+  // and keeping numbers with their units.
+  //
+  // The thresholds below were tuned by testing at 375px (iPhone SE)
+  // through 1200px+ desktop. DO NOT lower them without testing mobile.
   const m = measure ?? 65;
-  const doOrphans = m >= 30;                     // always, except absurdly narrow
-  const doTinyWordBinding = m >= 25;             // 1-2 char words: always safe
-  const doSentenceProtection = m >= 35;          // sentence start/end: most measures
-  const doMediumWordBinding = m >= 45;           // 3-char words (the, to, etc.)
-  const doFullShortWordBinding = m >= 55;        // full list: wide measures only
+  const doOrphans = m >= 25;                     // almost always — single-word last lines look bad at any width
+  const doNumberBinding = m >= 25;               // "30 years" — always safe, very short atom
+  const doTinyWordBinding = m >= 45;             // 1-2 char words: safe at medium+ widths, harmful at mobile
+  const doSentenceProtection = m >= 50;          // sentence start/end: needs room to work
+  const doMediumWordBinding = m >= 55;           // 3-char words (the, and, but, for)
+  const doFullShortWordBinding = m >= 65;        // full list: wide measures only
 
   // Build word lists by size tier
   const tinyWords = new Set(['a', 'i', 'an', 'as', 'at', 'be', 'by', 'do', 'go', 'if', 'in', 'is', 'it', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we']);
@@ -167,11 +178,11 @@ function typesetBodyText(text: string, measure?: number): string {
       }
     }
 
-    // Tiered short-word binding: tiny words first, then medium, then full
+    // Tiered short-word binding: numbers first, then tiny words, then medium, then full
     const lc = word.toLowerCase();
     if (nextWord && !/[,;:.!?]$/.test(word)) {
       // Numbers (1-3 digits) always bind forward — "30 years" should never break
-      if (doTinyWordBinding && /^\d{1,3}$/.test(word)) {
+      if (doNumberBinding && /^\d{1,3}$/.test(word)) {
         result.push(word + NBSP + words[i + 1]);
         i++;
         continue;
@@ -203,11 +214,14 @@ function typesetBodyText(text: string, measure?: number): string {
 /**
  * Measure an element's width in `ch` units using Canvas (no DOM mutation).
  * Falls back to an estimate if measurement fails.
+ *
+ * Exported so pages that call typesetText() directly can pass accurate measure.
+ * NEVER use DOM probe spans for measurement — triggers MutationObserver loops.
  */
 const _chCache = new WeakMap<HTMLElement, { width: number; ch: number }>();
 let _canvas: CanvasRenderingContext2D | null = null;
 
-function measureCh(element: HTMLElement): number {
+export function measureCh(element: HTMLElement): number {
   // Check cache — invalidate if element width changed
   const cached = _chCache.get(element);
   const elWidth = element.clientWidth;

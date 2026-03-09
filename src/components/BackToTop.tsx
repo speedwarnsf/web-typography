@@ -26,12 +26,14 @@ export default function BackToTop() {
 
   const style: React.CSSProperties = {
     position: "fixed",
-    bottom: 32,
+    bottom: 16,
     zIndex: 50,
-    // If mouse tracked, center on mouse X; otherwise default to right side
+    // On mobile (no mouse events → mouseX stays null), pin to right edge
+    // with enough clearance to not overlap content panels.
+    // On desktop, follow mouse X position.
     ...(mouseX !== null
       ? { left: mouseX, transform: "translateX(-50%)" }
-      : { right: 32 }),
+      : { right: 16 }),
     transition: "left 0.15s ease-out, opacity 0.2s",
   };
 

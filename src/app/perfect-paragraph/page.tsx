@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { typesetText, smoothRag } from '@/lib/typeset';
+import { typesetText, smoothRag, measureCh } from '@/lib/typeset';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
 
@@ -111,9 +111,13 @@ export default function PerfectParagraph() {
     }
 
     // Apply typesetText if any of the text-processing toggles are enabled
+    // CRITICAL: pass actual container measure so bindings scale correctly
+    // for the viewport width. Without this, defaults to 65ch and fires
+    // all bindings even on a 30ch mobile screen.
     const needsTypesetting = toggles.orphan || toggles.shortWord || toggles.sentenceStart || toggles.sentenceEnd;
     if (needsTypesetting) {
-      typesetRef.current.innerHTML = typesetText(text);
+      const measure = measureCh(typesetRef.current);
+      typesetRef.current.innerHTML = typesetText(text, { measure });
     }
 
     // Apply smoothRag if enabled
