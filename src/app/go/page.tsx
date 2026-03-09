@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import CopyButton from "@/components/CopyButton";
-import { typesetText, smoothRag } from "@/lib/typeset";
+import { typesetText } from "@/lib/typeset";
 
 export default function GoPage() {
   const scriptTag = '<script src="https://typeset.us/go.js"></script>';
@@ -17,9 +17,11 @@ export default function GoPage() {
   // Apply real typesetText + smoothRag to the "after" paragraph
   useEffect(() => {
     if (!afterRef.current) return;
+    // Apply typesetText only — no smoothRag. The demo shows what the
+    // script tag does: nbsp bindings (orphan, short-word, sentence
+    // protection) plus the CSS properties on the element. SmoothRag's
+    // HTML rewriting destroys the nbsp characters.
     afterRef.current.textContent = typesetText(afterText);
-    const cleanup = smoothRag(afterRef.current);
-    return cleanup;
   }, []);
 
   return (
