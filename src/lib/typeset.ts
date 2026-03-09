@@ -327,6 +327,7 @@ export interface SmoothRagOptions {
 
 export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () => void {
   const originalHTML = element.innerHTML;
+  const originalWhiteSpace = element.style.whiteSpace;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
@@ -440,7 +441,10 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
       htmlParts.push(lineText);
     }
 
-    el.innerHTML = htmlParts.join('<br>');
+    // Use \n with white-space:pre-line so textContent has real whitespace
+    // (both <br> and display:block spans lose spaces in textContent)
+    el.style.whiteSpace = 'pre-line';
+    el.innerHTML = htmlParts.join('\n');
   }
 
   function apply() {
@@ -557,7 +561,8 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
       htmlParts.push(lineText);
     }
 
-    element.innerHTML = htmlParts.join('<br>');
+    element.style.whiteSpace = 'pre-line';
+    element.innerHTML = htmlParts.join('\n');
   }
 
   /**
@@ -681,6 +686,7 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
     observer.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
     element.innerHTML = originalHTML;
+    element.style.whiteSpace = originalWhiteSpace;
   };
 }
 
