@@ -105,14 +105,16 @@ Of the techniques listed above, here's what exists today vs what's planned:
 | Technique | Status | Notes |
 |-----------|--------|-------|
 | smoothRag (word-spacing) | ✅ Implemented | Light mode works; Knuth-Plass path works at wide widths. Mobile needs refinement (word-spacing limits reduced but approach is sound). |
-| Post-render line analysis | ❌ Not built | Foundation exists in smoothRag's line detection (wrapping words in spans, grouping by offsetTop). Needs to be generalized. |
+| Post-render line analysis | ✅ Implemented | `detectLines()` wraps words in spans, groups by offsetTop, measures actual line widths. Foundation for orphan detection and rag smoothing. |
 | Dynamic hyphenation | ❌ Not built | CSS `hyphens: auto` is applied globally. JS-controlled soft hyphens not implemented. |
 | Letter-spacing micro-adjustments | ❌ Not built | |
 | Optical margin alignment | ⚠️ CSS only | `hanging-punctuation: first last` applied via CSS. No JS-driven optical alignment. |
-| Targeted line-break optimization | ❌ Not built | Current approach is blanket binding. Measure-then-fix approach not implemented. |
-| Real-line widow/orphan detection | ❌ Not built | Current orphan prevention always binds last two words regardless of whether it's actually an orphan in the rendered layout. |
+| Targeted line-break optimization | ⚠️ Partial | `fixRag()` applies per-line word-spacing based on measured widths. Targeted nbsp insertion for specific bad breaks not yet implemented. |
+| Real-line widow/orphan detection | ✅ Implemented | `fixRealOrphans()` measures actual rendered lines, only binds when last line has exactly 1 word. Runs via GlobalTypeset on all pages. |
 
-**Priority for mobile value:** Post-render line analysis (#2) and real-line widow/orphan detection (#7) would give the most immediate mobile improvement. They work by measuring what the browser actually rendered, then fixing only what's broken — no risk of making things worse.
+**What's live now:** Post-render line analysis (#2) and real-line widow/orphan detection (#7) are implemented and integrated into GlobalTypeset, the go.js distributable, and all demo pages. These work at every width including mobile — measuring real rendered lines and fixing only what's actually broken.
+
+**Next priorities:** Dynamic hyphenation control (#3) and letter-spacing micro-adjustments (#4) would add the next layer of mobile value.
 
 ### smoothRag()
 
@@ -146,9 +148,9 @@ Fixed-position button that appears after scrolling 600px. On desktop, follows mo
 ## Page-Specific Notes
 
 ### Perfect Paragraph (`/perfect-paragraph`)
-- Side-by-side comparison: "Browser Default" vs "Typeset" panels
-- **Mobile UX problem:** Panels stack vertically — user can't see both simultaneously to compare. Consider a toggle/overlay approach for mobile instead of stacked panels.
-- The "Typeset" panel measures its container via `measureCh()` and passes to `typesetText()`. At mobile widths, only orphan prevention fires — CSS toggles (line-height, text-wrap:pretty) create the visible difference.
+- Side-by-side comparison on desktop: "Browser Default" vs "Typeset" panels
+- **Mobile: toggle bar** — Default/Typeset toggle shows one panel at a time. Users tap to compare. Desktop keeps side-by-side layout unchanged.
+- The "Typeset" panel measures its container via `measureCh()` and passes to `typesetText()`. Post-render analysis (`postRenderFix`) runs after layout to catch real orphans and smooth rag.
 - Both panels MUST have `data-no-typeset` and `data-no-smooth` to prevent GlobalTypeset from processing them (which would make both panels identical, defeating the comparison).
 
 ### Go Page (`/go`)
@@ -157,27 +159,19 @@ Fixed-position button that appears after scrolling 600px. On desktop, follows mo
 
 ### go.js — The Distributable (`public/go.js`)
 
-**⚠️ CRITICAL: go.js is completely out of sync with typeset.ts.**
+go.js v2.0 is the script users download via `<script src="https://typeset.us/go.js">`. It is a standalone IIFE (no dependencies) that mirrors the core typeset.ts algorithm.
 
-go.js is the script users download via `<script src="https://typeset.us/go.js">`. It is a separate, simpler implementation that does NOT share code with typeset.ts.
-
-| Feature | typeset.ts | go.js |
-|---------|-----------|-------|
-| Measure-aware binding tiers | ✅ Yes | ❌ No — binds ALL short words at ALL widths |
-| smoothRag | ✅ Yes | ❌ No |
-| Orphan prevention | ✅ Measure-aware | ⚠️ Always fires |
-| Short word binding | ✅ Tiered by width | ❌ Regex-based, always fires |
-| Sentence protection | ✅ Tiered by width | ❌ Regex-based, always fires |
+| Feature | typeset.ts | go.js v2.0 |
+|---------|-----------|------------|
+| Measure-aware binding tiers | ✅ | ✅ Same thresholds |
+| Post-render orphan detection | ✅ fixRealOrphans | ✅ fixRealOrphans |
+| Post-render rag smoothing | ✅ fixRag | ✅ smoothRagLight |
+| smoothRag (Knuth-Plass) | ✅ Full | ❌ Light version only |
 | CSS enhancements | ✅ Via toggles | ✅ text-wrap, hanging-punctuation, font-features |
-| MutationObserver | ✅ Careful with pausing | ⚠️ Processes descendants twice on added nodes |
+| MutationObserver | ✅ Paused during mutations | ✅ Paused during mutations, no double-processing |
+| Heading mode | ✅ | ✅ |
 
-**This means:** The go.js page demo shows typeset.ts working (with all our fixes), but the actual script users download will aggressively bind everything at mobile widths — creating the exact problems we just fixed. Users get a worse experience than what the demo promises.
-
-**Resolution needed:** Either:
-1. Build go.js from typeset.ts (shared source, compiled/bundled for standalone use)
-2. Or port the measure-aware tiers into go.js manually and keep them in sync
-
-Until this is resolved, go.js will harm mobile typography for anyone who uses it.
+**Keeping in sync:** go.js is manually maintained. When changing binding thresholds, word lists, or detection logic in typeset.ts, the same changes MUST be ported to go.js. Future improvement: build go.js from typeset.ts via a bundler.
 
 ### Font Pairing Cards (`/pairing-cards`)
 - Live preview uses `typeset()` via ref + useEffect, auto-measuring the container
