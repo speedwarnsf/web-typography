@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { typesetText, smoothRag } from '@/lib/typeset';
 
-const DEFAULT_TEXT = "Good typography is invisible. Great typography speaks to the reader without ever being noticed. It carries meaning through form, guides the eye with rhythm, and transforms raw content into an experience worth having. The difference between adequate and exceptional design often comes down to the smallest details — the space between letters, the length of a line, the weight of a stroke. These decisions accumulate into something the reader feels but cannot name.";
+const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
 
 interface ToggleOption {
   id: string;
