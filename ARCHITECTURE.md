@@ -10,17 +10,21 @@
 
 Most people visit websites on their phones. This is not an edge case — it is the primary use case. Typography that only works at 55-75ch desktop reading widths is solving a problem most users will never see.
 
-**The core value proposition of typeset.us is improving typography where people actually read: on mobile devices, at narrow widths, on small screens.**
+**typeset.us must improve typography at every width — mobile and desktop.** A tool that only works at 55-75ch desktop columns ignores where most reading happens. A tool that only works on phones ignores long-form content. Both matter.
 
-Every feature, every demo, every comparison must work and show value at phone widths first. If something looks worse on mobile than the browser default, it is a regression — full stop. Desktop is the bonus, not the target.
+The mistake we've made is treating mobile as a lesser context — disabling features at narrow widths instead of making them work there. The tool must deliver value across the full range:
+
+- **Mobile (320-414px):** This is where most people read the web. If the tool makes things worse here, it's a regression.
+- **Tablet (768-1024px):** Mid-range columns, often the sweet spot for reading.
+- **Desktop (1200px+):** Long-form articles, documentation, books. The tool already works here.
 
 This means:
-- **Test at 375px (iPhone) before any other width.** If it doesn't improve things there, it doesn't ship.
-- **Demos must show meaningful differences at mobile widths.** A comparison that only works at 65ch is not a valid demo.
-- **If a typesetting rule makes mobile worse** (orphans, stranded words, worse rag), disable it at that width or fix the algorithm. Never ship "it works on desktop" as acceptable.
-- **All pages, all components, all text must be designed mobile-first.** This applies to typeset.us itself and to the tool it's selling.
+- **Test at 375px AND at reading widths.** Both must show improvement.
+- **Demos must show meaningful differences at mobile widths.** A comparison that only works at 65ch is incomplete.
+- **If a typesetting rule makes mobile worse** (orphans, stranded words, worse rag), fix the algorithm for that width. Don't just disable it.
+- **All pages and components must be designed mobile-first, then enhanced for desktop.**
 
-This principle applies to every web project, not just this one. But for a typography tool, failing on mobile is failing at the job.
+This principle applies to every web project, not just this one.
 
 ## AnimatedHeroHeading
 
