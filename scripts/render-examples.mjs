@@ -23,8 +23,8 @@ const rules = [
   {
     id: 'sentence-end',
     width: 345,
-    before: 'The proposal sat on her desk for days and she kept finding reasons not to respond to it.',
-    after: 'The proposal sat on her desk for days and she kept finding reasons not to respond to\u00A0it.',
+    before: 'She read the brief once and set it aside. The concept was ambitious but the timeline made it hard to say yes.',
+    after: 'She read the brief once and set it\u00A0aside. The concept was ambitious but the timeline made it hard to say\u00A0yes.',
   },
   {
     id: 'rag',

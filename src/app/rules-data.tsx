@@ -30,7 +30,7 @@ export const rules: Rule[] = [
     name: "Sentence-End Protection",
     id: "sentence-end",
     description:
-      "Short words like \"it\" \"to\" and \"so\" shouldn't dangle at the end of a sentence on their own line. They get pulled back to the previous line.",
+      "Short closing words like \u201Cit,\u201D \u201Cto,\u201D and \u201Cso\u201D shouldn\u2019t sit alone at the end of a sentence. Typeset pulls them back to the line\u00A0before.",
     code: `export function protectSentenceEnd(text: string): string {
   return text.replace(/\\s+(\\w{1,3})([.!?])/g, "\\u00A0$1$2");
 }`,
