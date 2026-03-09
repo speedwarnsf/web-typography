@@ -122,7 +122,7 @@ export default function AnimatedHeroHeading() {
       className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.95] mb-8"
       style={{
         minHeight: "1.1em",
-        paddingBottom: "0.15em",
+        paddingBottom: "0.3em",
         /* Contain the chaos animation — prevent horizontal overflow */
         overflow: "hidden",
         /* Don't let touch events on the animation interfere with scrolling */
