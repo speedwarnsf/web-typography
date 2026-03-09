@@ -6,6 +6,22 @@
 - **Repo:** speedwarnsf/web-typography
 - **Deploy:** Git auto-deploy broken as of March 2026. Use `vercel --prod --yes` manually.
 
+## Mobile Is the Priority
+
+Most people visit websites on their phones. This is not an edge case — it is the primary use case. Typography that only works at 55-75ch desktop reading widths is solving a problem most users will never see.
+
+**The core value proposition of typeset.us is improving typography where people actually read: on mobile devices, at narrow widths, on small screens.**
+
+Every feature, every demo, every comparison must work and show value at phone widths first. If something looks worse on mobile than the browser default, it is a regression — full stop. Desktop is the bonus, not the target.
+
+This means:
+- **Test at 375px (iPhone) before any other width.** If it doesn't improve things there, it doesn't ship.
+- **Demos must show meaningful differences at mobile widths.** A comparison that only works at 65ch is not a valid demo.
+- **If a typesetting rule makes mobile worse** (orphans, stranded words, worse rag), disable it at that width or fix the algorithm. Never ship "it works on desktop" as acceptable.
+- **All pages, all components, all text must be designed mobile-first.** This applies to typeset.us itself and to the tool it's selling.
+
+This principle applies to every web project, not just this one. But for a typography tool, failing on mobile is failing at the job.
+
 ## AnimatedHeroHeading
 
 The homepage hero displays "Web Typography" where the word "Typography" animates through chaotic font/weight/size/rotation states before resolving to Playfair Display.
@@ -34,16 +50,15 @@ Use `overflow-x: hidden` (to contain horizontal chaos animation) + `overflow-y: 
 
 ## typeset.ts — The Typesetting Engine
 
-### What It Does Well (45-75ch reading widths)
-- Prevents orphans and widows
-- Binds short words to neighbors (prevents stranded prepositions)
-- Protects sentence starts from dangling
-- Binds numbers to their units
+### Current State (honest)
+- At desktop reading widths (45-75ch), the tool prevents orphans, binds short words, protects sentence starts, and binds numbers to units. These work.
+- At mobile widths (< 35ch), the tool currently **makes things worse** — nbsp bindings create stranded words and awkward breaks that the browser would have handled better on its own.
+- Binding rules are tiered by measure but the tiers are wrong. Disabling features at narrow widths means the tool does nothing where most users are.
 
-### What It Doesn't Do (< 35ch / mobile)
-- At narrow widths, nbsp bindings don't change visible line breaks because bound pairs already fit on one line
-- Binding rules are tiered by measure: no binding under 35ch, orphan-only at 35-45ch, full rules at 55ch+
-- **Do not demo the tool at mobile widths — it won't show meaningful differences**
+### The Problem to Solve
+The algorithm was designed for reading-width columns and then disabled at mobile. That's backwards. **Mobile is where most reading happens.** The tool needs to actively improve typography at 320-414px widths or it has no reason to exist.
+
+This is the central engineering challenge of the project.
 
 ### smoothRag()
 
