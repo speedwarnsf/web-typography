@@ -243,7 +243,11 @@ export default function PerfectParagraph() {
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
               Browser Default
             </p>
-            <p className="text-neutral-400 text-base sm:text-lg leading-relaxed break-words">
+            <p
+              className="text-neutral-400 text-base sm:text-lg break-words"
+              data-no-typeset
+              data-no-smooth
+            >
               {text}
             </p>
           </div>
@@ -255,6 +259,8 @@ export default function PerfectParagraph() {
             </p>
             <p
               ref={typesetRef}
+              data-no-typeset
+              data-no-smooth
               className="text-neutral-200 text-base sm:text-lg leading-relaxed break-words"
               style={{
                 lineHeight: toggles.lineHeight ? '1.6' : undefined,
