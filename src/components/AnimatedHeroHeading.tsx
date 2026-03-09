@@ -122,9 +122,16 @@ export default function AnimatedHeroHeading() {
       className="text-[2.75rem] sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.95] mb-8"
       style={{
         minHeight: "1.1em",
-        paddingBottom: "0.3em",
-        /* Contain the chaos animation — prevent horizontal overflow */
-        overflow: "hidden",
+        /*
+         * DESCENDER FIX (2026-03-09):
+         * "Typography" has descenders (y, p). overflow:hidden on ANY ancestor
+         * clips them. We use overflow-x:hidden to contain horizontal chaos
+         * but leave vertical overflow visible so descenders render fully.
+         * See ARCHITECTURE.md "AnimatedHeroHeading" section.
+         */
+        overflowX: "hidden",
+        overflowY: "visible",
+        paddingBottom: "0.15em",
         /* Don't let touch events on the animation interfere with scrolling */
         touchAction: "pan-y",
         /* Prevent accidental text selection of invisible spacer letters */
@@ -140,8 +147,13 @@ export default function AnimatedHeroHeading() {
           display: "inline-flex",
           alignItems: "baseline",
           whiteSpace: "nowrap",
-          /* Extra safety: clip any letters that escape bounds */
-          overflow: "hidden",
+          /*
+           * DESCENDER FIX (2026-03-09):
+           * DO NOT use overflow:hidden here — it clips descenders on y/p.
+           * Horizontal containment is handled by the parent <h1>.
+           */
+          overflowX: "hidden",
+          overflowY: "visible",
           /* Promote to GPU layer for smoother animation */
           willChange: "contents",
         }}
@@ -161,7 +173,14 @@ export default function AnimatedHeroHeading() {
                 lineHeight: 1,
                 position: "relative",
                 letterSpacing: "0px",
-                overflow: "hidden",
+                /*
+                 * DESCENDER FIX (2026-03-09):
+                 * overflow:hidden here clips the bottom of y/p descenders.
+                 * The chaos animation is contained by the parent containers;
+                 * individual letter slots must allow vertical overflow.
+                 */
+                overflowX: "hidden",
+                overflowY: "visible",
               }}
             >
               {letter}
