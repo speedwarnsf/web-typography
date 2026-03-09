@@ -433,14 +433,14 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
           : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
         if (Math.abs(wsDelta) > 0.05) {
           const finalWS = baseWS + wsDelta;
-          htmlParts.push(`<span style="display:block;word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
+          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
-      htmlParts.push(`<span style="display:block">${lineText}</span>`);
+      htmlParts.push(lineText);
     }
 
-    el.innerHTML = htmlParts.join('');
+    el.innerHTML = htmlParts.join('<br>');
   }
 
   function apply() {
@@ -550,14 +550,14 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
           : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
         if (Math.abs(wsDelta) > 0.05) {
           const finalWS = baseWS + wsDelta;
-          htmlParts.push(`<span style="display:block;word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
+          htmlParts.push(`<span style="word-spacing:${finalWS.toFixed(2)}px">${lineText}</span>`);
           continue;
         }
       }
-      htmlParts.push(`<span style="display:block">${lineText}</span>`);
+      htmlParts.push(lineText);
     }
 
-    element.innerHTML = htmlParts.join('');
+    element.innerHTML = htmlParts.join('<br>');
   }
 
   /**
