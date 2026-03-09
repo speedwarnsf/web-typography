@@ -98,6 +98,22 @@ Techniques available at ANY width, including mobile:
 
 The current binding tiers (above) are a safety floor. The real value comes from the post-render techniques that work at every width.
 
+### Implementation Status
+
+Of the techniques listed above, here's what exists today vs what's planned:
+
+| Technique | Status | Notes |
+|-----------|--------|-------|
+| smoothRag (word-spacing) | ✅ Implemented | Light mode works; Knuth-Plass path works at wide widths. Mobile needs refinement (word-spacing limits reduced but approach is sound). |
+| Post-render line analysis | ❌ Not built | Foundation exists in smoothRag's line detection (wrapping words in spans, grouping by offsetTop). Needs to be generalized. |
+| Dynamic hyphenation | ❌ Not built | CSS `hyphens: auto` is applied globally. JS-controlled soft hyphens not implemented. |
+| Letter-spacing micro-adjustments | ❌ Not built | |
+| Optical margin alignment | ⚠️ CSS only | `hanging-punctuation: first last` applied via CSS. No JS-driven optical alignment. |
+| Targeted line-break optimization | ❌ Not built | Current approach is blanket binding. Measure-then-fix approach not implemented. |
+| Real-line widow/orphan detection | ❌ Not built | Current orphan prevention always binds last two words regardless of whether it's actually an orphan in the rendered layout. |
+
+**Priority for mobile value:** Post-render line analysis (#2) and real-line widow/orphan detection (#7) would give the most immediate mobile improvement. They work by measuring what the browser actually rendered, then fixing only what's broken — no risk of making things worse.
+
 ### smoothRag()
 
 Adjusts word-spacing per line to create even rag (right edge alignment).
@@ -118,6 +134,74 @@ Adjusts word-spacing per line to create even rag (right edge alignment).
 Measures container width in `ch` units. 
 
 **NEVER use DOM probe spans** (inserting elements to measure) — this triggers MutationObserver infinite loops when GlobalTypeset is active. Use `Canvas.measureText()` with WeakMap caching instead. (Bug found 2026-03-08)
+
+## BackToTop Component
+
+Fixed-position button that appears after scrolling 600px. On desktop, follows mouse X position. On mobile (no mousemove events), pins to bottom-right corner.
+
+**Positioning:** `position: fixed; bottom: 16px; right: 16px` (mobile) or `left: [mouseX]` (desktop). z-index: 50.
+
+**Known issue:** On mobile, the button can overlap content in comparison panels or text blocks near the bottom of the viewport. Content sections that extend to the bottom of the page should account for the button's 40x40px footprint.
+
+## Page-Specific Notes
+
+### Perfect Paragraph (`/perfect-paragraph`)
+- Side-by-side comparison: "Browser Default" vs "Typeset" panels
+- **Mobile UX problem:** Panels stack vertically — user can't see both simultaneously to compare. Consider a toggle/overlay approach for mobile instead of stacked panels.
+- The "Typeset" panel measures its container via `measureCh()` and passes to `typesetText()`. At mobile widths, only orphan prevention fires — CSS toggles (line-height, text-wrap:pretty) create the visible difference.
+- Both panels MUST have `data-no-typeset` and `data-no-smooth` to prevent GlobalTypeset from processing them (which would make both panels identical, defeating the comparison).
+
+### Go Page (`/go`)
+- "Without go.js" vs "With go.js" comparison
+- Uses `typeset()` (DOM function) on the "With" panel, which auto-measures
+
+### go.js — The Distributable (`public/go.js`)
+
+**⚠️ CRITICAL: go.js is completely out of sync with typeset.ts.**
+
+go.js is the script users download via `<script src="https://typeset.us/go.js">`. It is a separate, simpler implementation that does NOT share code with typeset.ts.
+
+| Feature | typeset.ts | go.js |
+|---------|-----------|-------|
+| Measure-aware binding tiers | ✅ Yes | ❌ No — binds ALL short words at ALL widths |
+| smoothRag | ✅ Yes | ❌ No |
+| Orphan prevention | ✅ Measure-aware | ⚠️ Always fires |
+| Short word binding | ✅ Tiered by width | ❌ Regex-based, always fires |
+| Sentence protection | ✅ Tiered by width | ❌ Regex-based, always fires |
+| CSS enhancements | ✅ Via toggles | ✅ text-wrap, hanging-punctuation, font-features |
+| MutationObserver | ✅ Careful with pausing | ⚠️ Processes descendants twice on added nodes |
+
+**This means:** The go.js page demo shows typeset.ts working (with all our fixes), but the actual script users download will aggressively bind everything at mobile widths — creating the exact problems we just fixed. Users get a worse experience than what the demo promises.
+
+**Resolution needed:** Either:
+1. Build go.js from typeset.ts (shared source, compiled/bundled for standalone use)
+2. Or port the measure-aware tiers into go.js manually and keep them in sync
+
+Until this is resolved, go.js will harm mobile typography for anyone who uses it.
+
+### Font Pairing Cards (`/pairing-cards`)
+- Live preview uses `typeset()` via ref + useEffect, auto-measuring the container
+- Body text set via `data-no-typeset data-no-smooth` to prevent GlobalTypeset double-processing
+- Generated PNG cards (mobile + square) are created via html2canvas — these apply smoothRag in an off-screen container. Test that generated images look correct at both sizes.
+- On mobile, the sidebar controls stack above the preview. Font dropdowns need 44px min touch targets.
+
+### Homepage (`/`)
+- AnimatedHeroHeading: see dedicated section above
+- GlobalTypeset processes all body text on this page — no page-specific overrides
+
+## GlobalTypeset Double-Processing
+
+**Risk:** If a page does its own `typeset()` or `typesetText()` on an element, AND GlobalTypeset also processes that element, the text gets double-processed. This can compound bindings (creating chains of nbsp-bound words) or cause smoothRag to run on already-smoothed text.
+
+**Prevention:** Any element that a page processes directly MUST have `data-no-typeset` (to skip GlobalTypeset's typesetText pass) and optionally `data-no-smooth` (to skip smoothRag). The page then handles typesetting itself with the correct measure.
+
+Currently protected:
+- Perfect Paragraph: both panels have `data-no-typeset data-no-smooth`
+- Go page: both panels have `data-no-typeset data-no-smooth`
+- Pairing cards: preview body has `data-no-typeset data-no-smooth`
+- AnimatedHeroHeading: `data-no-typeset` on the `<h1>`
+
+**If you add a new page with custom typesetting, add these attributes.**
 
 ## Pages
 
