@@ -56,15 +56,26 @@ Use `overflow-x: hidden` (to contain horizontal chaos animation) + `overflow-y: 
 
 ## typeset.ts — The Typesetting Engine
 
-### Current State (honest)
-- At desktop reading widths (45-75ch), the tool prevents orphans, binds short words, protects sentence starts, and binds numbers to units. These work.
-- At mobile widths (< 35ch), the tool currently **makes things worse** — nbsp bindings create stranded words and awkward breaks that the browser would have handled better on its own.
-- Binding rules are tiered by measure but the tiers are wrong. Disabling features at narrow widths means the tool does nothing where most users are.
+### Current State (as of 2026-03-09)
 
-### The Problem to Solve
-The algorithm was designed for reading-width columns and then disabled at mobile. That's backwards. **Mobile is where most reading happens.** The tool needs to actively improve typography at 320-414px widths or it has no reason to exist.
+The algorithm tiers bindings by actual container width in `ch` units:
 
-This is the central engineering challenge of the project.
+| Measure | What fires | Why |
+|---------|-----------|-----|
+| < 25ch | Nothing | Too narrow for any binding to help |
+| 25-44ch | Orphan prevention + number binding | At ~5-7 words/line, more bindings constrain the browser and make things worse |
+| 45-49ch | + tiny word binding (1-2 char) | Medium columns can absorb small forced pairs |
+| 50-54ch | + sentence protection | Enough room for sentence-start/end rules |
+| 55-64ch | + medium word binding (3 char) | "the", "and", "but" etc. |
+| 65ch+ | + full short-word binding | Wide columns, full rules |
+
+**Critical: every page that calls `typesetText()` directly MUST pass `measure`.**
+The `typeset()` DOM function measures automatically via `measureCh()`. But if you call `typesetText(text)` without options, it defaults to 65ch and fires ALL bindings — even on a 30ch mobile screen. This was the root cause of the "tool makes mobile worse" bug.
+
+At mobile widths, CSS `text-wrap: pretty` does the heavy lifting. JS adds orphan prevention (last two words bound) and number binding ("30 years" stays together). That's honest and it works.
+
+### The Ongoing Challenge
+Making the tool more valuable at mobile widths without making things worse. The browser's line-breaking is already good at narrow widths. Any binding we add constrains it. Only add bindings where the benefit clearly outweighs the constraint.
 
 ### smoothRag()
 
