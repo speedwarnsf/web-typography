@@ -74,8 +74,29 @@ The `typeset()` DOM function measures automatically via `measureCh()`. But if yo
 
 At mobile widths, CSS `text-wrap: pretty` does the heavy lifting. JS adds orphan prevention (last two words bound) and number binding ("30 years" stays together). That's honest and it works.
 
-### The Ongoing Challenge
-Making the tool more valuable at mobile widths without making things worse. The browser's line-breaking is already good at narrow widths. Any binding we add constrains it. Only add bindings where the benefit clearly outweighs the constraint.
+### Beyond Bindings — JS Is a Multi-Functional System
+
+The nbsp binding approach is ONE technique. JS has full DOM access — it can measure rendered lines, detect bad patterns, and apply targeted fixes that CSS alone cannot.
+
+Techniques available at ANY width, including mobile:
+
+1. **smoothRag (word-spacing adjustment):** Measures actual line widths, adjusts word-spacing per line to even out the right edge. Works at every width because it reads the real layout, not guessing from character counts. Already implemented — needs mobile refinement.
+
+2. **Post-render analysis:** After the browser lays out text, JS can measure each line and detect problems: orphaned last lines, lines significantly shorter/longer than neighbors, bad rag shapes. Then apply targeted fixes.
+
+3. **Dynamic hyphenation control:** CSS `hyphens: auto` is blunt. JS can measure where a hyphen would actually help (preventing a very short or very long line) and insert soft hyphens (`&shy;`) only where they improve the layout.
+
+4. **Letter-spacing micro-adjustments:** Per-line letter-spacing (±0.02em) to smooth rag without visible change to character spacing. More subtle than word-spacing.
+
+5. **Optical margin alignment:** Move punctuation and certain glyphs slightly outside the text block for optically even edges. CSS `hanging-punctuation` covers some cases; JS can handle more.
+
+6. **Line-break optimization:** Measure actual rendered line lengths, then use targeted nbsp or `<wbr>` insertions to fix specific bad breaks — not blanket binding of all short words.
+
+7. **Widow/orphan detection on real lines:** Instead of always binding the last two words (which may not help), measure whether the last line actually IS an orphan in the current layout, and only intervene when needed.
+
+**The principle:** Measure first, then intervene surgically. Don't apply blanket rules based on character counts — read the actual rendered layout and fix what's actually broken.
+
+The current binding tiers (above) are a safety floor. The real value comes from the post-render techniques that work at every width.
 
 ### smoothRag()
 
