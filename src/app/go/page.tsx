@@ -8,9 +8,9 @@ export default function GoPage() {
   const scriptTag = '<script src="https://typeset.us/go.js"></script>';
   const fileSize = "6KB";
 
-  const beforeText = "This is a sample paragraph that demonstrates what text looks like without professional typesetting. Notice how the last word might sit alone on a line, creating an orphan. Short words like a, an, the are not bound to the following word, and there are other issues.";
+  const beforeText = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
 
-  const afterText = "This is a sample paragraph that demonstrates what text looks like with professional typesetting. Notice how the last two words are bound together, preventing orphans. Short words like a, an, the are properly bound to the following word, and sentence breaks are handled elegantly.";
+  const afterText = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
 
   const afterRef = useRef<HTMLParagraphElement>(null);
 
