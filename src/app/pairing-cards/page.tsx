@@ -262,7 +262,7 @@ function PairingCardBuilder() {
           ${typesetText(headingText)}
         </h1>
         <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0; color: #${bColor || fg}; text-wrap: pretty;">
-          ${rawText}
+          ${typesetText(rawText)}
         </p>
       </div>
       <div style="font-family: monospace; font-size: 10px; color: #${fg}44; margin-top: auto; padding-top: 24px; letter-spacing: 0.1em; text-transform: uppercase;">
@@ -274,10 +274,12 @@ function PairingCardBuilder() {
     document.body.appendChild(container);
     await new Promise((r) => setTimeout(r, 300));
 
-    // Apply smoothRag to even out the right edge
+    // Apply post-render fixes then smoothRag
     const bodyP = container.querySelector("p");
     let cleanupRag: (() => void) | undefined;
     if (bodyP) {
+      postRenderFix(bodyP as HTMLElement);
+      await new Promise((r) => setTimeout(r, 100));
       cleanupRag = smoothRag(bodyP as HTMLElement);
     }
     await new Promise((r) => setTimeout(r, 200));
