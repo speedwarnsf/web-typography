@@ -1,9 +1,16 @@
 import { chromium } from 'playwright';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
 const OUT = join(import.meta.dirname, '..', 'public', 'examples');
 mkdirSync(OUT, { recursive: true });
+
+// Bundle typeset.ts for browser injection
+execSync('npx esbuild src/lib/typeset.ts --bundle --format=iife --global-name=Typeset --outfile=/tmp/typeset-bundle.js --platform=browser', {
+  cwd: join(import.meta.dirname, '..'),
+});
+const typesetBundle = readFileSync('/tmp/typeset-bundle.js', 'utf-8');
 
 const STYLE = `font-family: Georgia, 'Times New Roman', serif; font-size: 18px; line-height: 1.65; color: #d4d4d4;`;
 
@@ -11,32 +18,27 @@ const rules = [
   {
     id: 'orphans',
     width: 360,
-    before: 'We opened the new location on March 15th and the response from the community was overwhelming.',
-    after: 'We opened the new location on March 15th and the response from the community was\u00A0overwhelming.',
+    text: 'We opened the new location on March 15th and the response from the community was overwhelming.',
   },
   {
     id: 'sentence-start',
     width: 360,
-    before: 'The budget was approved last Tuesday. He immediately began hiring for the three open positions they had been waiting to fill since January.',
-    after: 'The budget was approved last Tuesday. He\u00A0immediately began hiring for the three open positions they had been waiting to fill since\u00A0January.',
+    text: 'The budget was approved last Tuesday. He immediately began hiring for the three open positions they had been waiting to fill since January.',
   },
   {
     id: 'sentence-end',
     width: 310,
-    before: 'The contract stipulated that all parties must agree before anyone could sign it. Negotiations stalled for weeks.',
-    after: 'The contract stipulated that all parties must agree before anyone could sign\u00A0it. Negotiations stalled for\u00A0weeks.',
+    text: 'The contract stipulated that all parties must agree before anyone could sign it. Negotiations stalled for weeks.',
   },
   {
     id: 'rag',
     width: 360,
-    before: 'Typography has always been about rhythm. The interplay of long words and short ones creates a pattern the eye follows instinctively. When that rhythm falters \u2014 when a line reaches far while the next barely starts \u2014 the reader stumbles.',
-    ragSmooth: true, // special handling: per-line word-spacing adjustment
+    text: 'Typography has always been about rhythm. The interplay of long words and short ones creates a pattern the eye follows instinctively. When that rhythm falters \u2014 when a line reaches far while the next barely starts \u2014 the reader stumbles.',
   },
   {
     id: 'short-words',
     width: 360,
-    before: 'The foundation was built on the principles of transparency and the belief that every member of the community deserves a voice.',
-    after: 'The foundation was built on\u00A0the principles of\u00A0transparency and the belief that every member of\u00A0the community deserves a\u00A0voice.',
+    text: 'The foundation was built on the principles of transparency and the belief that every member of the community deserves a voice.',
   },
 ];
 
@@ -45,135 +47,50 @@ async function render() {
   const ctx = await browser.newContext({ deviceScaleFactor: 2 });
   const page = await ctx.newPage();
 
+  // Inject typeset library
+  await page.addScriptTag({ content: typesetBundle });
+
   for (const rule of rules) {
-    if (rule.ragSmooth) {
-      // Special rag smoothing: render before normally, then after with per-line word-spacing
-      const text = rule.before;
+    // ── BEFORE: plain text, no processing ──
+    await page.setContent(`
+      <html><body style="background:transparent;margin:0;padding:0">
+        <div id="d" style="width:${rule.width}px;${STYLE}">${rule.text}</div>
+      </body></html>
+    `);
+    await page.waitForTimeout(300);
+    let el = await page.$('#d');
+    let buf = await el.screenshot({ omitBackground: true });
+    writeFileSync(join(OUT, `${rule.id}-before.png`), buf);
+    console.log(`  ${rule.id}-before.png`);
 
-      // Render "before" (raw ragged text)
-      await page.setContent(`
-        <html><body style="background:transparent;margin:0;padding:0">
-          <div id="d" style="width:${rule.width}px;${STYLE}">${text}</div>
-        </body></html>
-      `);
-      await page.waitForTimeout(300);
-      let el = await page.$('#d');
-      let buf = await el.screenshot({ omitBackground: true });
-      writeFileSync(join(OUT, `${rule.id}-before.png`), buf);
-      console.log(`  ${join(OUT, `${rule.id}-before.png`)}`);
+    // ── AFTER: apply real typeset library ──
+    // Re-inject library (setContent resets the page)
+    await page.setContent(`
+      <html><body style="background:transparent;margin:0;padding:0">
+        <script>${typesetBundle}<\/script>
+        <div id="d" style="width:${rule.width}px;${STYLE}">${rule.text}</div>
+      </body></html>
+    `);
+    await page.waitForTimeout(300);
 
-      // Detect line breaks and measure each line's pixel width
-      const lineData = await page.evaluate(() => {
-        const div = document.getElementById('d');
-        const tn = div.firstChild;
-        const range = document.createRange();
-        let lastY = -1, lineStart = 0, lineText = '';
-        const lines = [];
-        for (let i = 0; i < tn.textContent.length; i++) {
-          range.setStart(tn, i); range.setEnd(tn, i + 1);
-          const rect = range.getBoundingClientRect();
-          if (lastY !== -1 && Math.abs(rect.top - lastY) > 5) {
-            range.setStart(tn, lineStart); range.setEnd(tn, i);
-            lines.push({ text: lineText.trim(), width: range.getBoundingClientRect().width });
-            lineStart = i; lineText = '';
-          }
-          lineText += tn.textContent[i];
-          lastY = rect.top;
-        }
-        if (lineText) {
-          range.setStart(tn, lineStart); range.setEnd(tn, tn.textContent.length);
-          lines.push({ text: lineText.trim(), width: range.getBoundingClientRect().width });
-        }
-        return { lines, containerWidth: div.getBoundingClientRect().width };
-      });
+    // Apply typesetText (text-level rules: orphans, sentence protection, short words)
+    // Then smoothRag (per-line word-spacing for even rag)
+    await page.evaluate(() => {
+      const el = document.getElementById('d');
+      const text = el.textContent;
+      // Apply all text rules
+      el.innerHTML = Typeset.typesetText(text);
+      // Apply rag smoothing
+      Typeset.smoothRag(el);
+    });
 
-      // Build "after" HTML: each line as a span with adjusted word-spacing
-      // First: merge orphaned last line (short single word) into previous line
-      let lines = [...lineData.lines];
-      const lastLine = lines[lines.length - 1];
-      if (lastLine && lastLine.text.split(' ').length <= 2 && lines.length > 1) {
-        const prev = lines[lines.length - 2];
-        lines[lines.length - 2] = { text: prev.text + ' ' + lastLine.text, width: prev.width + lastLine.width };
-        lines.pop();
-      }
+    // Wait for smoothRag to apply (it's synchronous but layout needs a frame)
+    await page.waitForTimeout(500);
 
-      // Subtle smoothing — nudge short lines slightly closer to longest line
-      // NOT justification. The rag should still be visible, just gentler.
-      const maxLineWidth = Math.max(...lines.map(l => l.width));
-      const target = maxLineWidth * 0.97; // aim for ~97% of the longest line
-      const spanLines = lines.map((l, i) => {
-        const spaces = (l.text.match(/ /g) || []).length;
-        const isLast = i === lines.length - 1;
-        if (isLast || spaces === 0) {
-          return `<span style="display:block">${l.text}</span>`;
-        }
-        const gap = target - l.width;
-        if (gap <= 2) {
-          // Line is already close enough — leave it alone
-          return `<span style="display:block">${l.text}</span>`;
-        }
-        // Very subtle: only letter-spacing, capped at 0.35px
-        const chars = l.text.length;
-        const ls = Math.min(gap / chars, 0.35);
-        // If even max letter-spacing can't bridge most of the gap, also add tiny word-spacing
-        const lsTotal = ls * chars;
-        const remaining = gap - lsTotal;
-        const ws = remaining > 1 && spaces > 0 ? Math.min(remaining / spaces, 1.2) : 0;
-        const parts = [];
-        if (ws > 0.05) parts.push(`word-spacing:${ws.toFixed(2)}px`);
-        if (ls > 0.02) parts.push(`letter-spacing:${ls.toFixed(2)}px`);
-        if (parts.length === 0) return `<span style="display:block">${l.text}</span>`;
-        return `<span style="display:block;${parts.join(';')}">${l.text}</span>`;
-      });
-
-      // Render "after" with a subtle guide line showing the target right edge
-      const guidePos = Math.round(target);
-      await page.setContent(`
-        <html><body style="background:transparent;margin:0;padding:0;position:relative">
-          <div style="width:${rule.width}px;${STYLE};position:relative">
-            ${spanLines.join('')}
-            <div style="position:absolute;top:0;bottom:0;left:${guidePos}px;width:1px;background:rgba(184,150,62,0.25)"></div>
-          </div>
-        </body></html>
-      `);
-      await page.waitForTimeout(300);
-      el = await page.$('div');
-      buf = await el.screenshot({ omitBackground: true });
-      writeFileSync(join(OUT, `${rule.id}-after.png`), buf);
-      console.log(`  ${join(OUT, `${rule.id}-after.png`)}`);
-
-      // Also add guide line to "before" for comparison
-      await page.setContent(`
-        <html><body style="background:transparent;margin:0;padding:0">
-          <div style="width:${rule.width}px;${STYLE};position:relative">
-            ${text}
-            <div style="position:absolute;top:0;bottom:0;left:${guidePos}px;width:1px;background:rgba(184,150,62,0.25)"></div>
-          </div>
-        </body></html>
-      `);
-      await page.waitForTimeout(300);
-      el = await page.$('#d') || await page.$('div');
-      buf = await el.screenshot({ omitBackground: true });
-      writeFileSync(join(OUT, `${rule.id}-before.png`), buf);
-      console.log(`  ${join(OUT, `${rule.id}-before.png`)} (with guide)`);
-      continue;
-    }
-
-    for (const side of ['before', 'after']) {
-      const text = rule[side];
-      // Transparent background — no grey block
-      await page.setContent(`
-        <html><body style="background:transparent;margin:0;padding:0">
-          <div style="width:${rule.width}px;${STYLE}">${text}</div>
-        </body></html>
-      `);
-      await page.waitForTimeout(300);
-      const el = await page.$('div');
-      const buf = await el.screenshot({ omitBackground: true });
-      const path = join(OUT, `${rule.id}-${side}.png`);
-      writeFileSync(path, buf);
-      console.log(`  ${path}`);
-    }
+    el = await page.$('#d');
+    buf = await el.screenshot({ omitBackground: true });
+    writeFileSync(join(OUT, `${rule.id}-after.png`), buf);
+    console.log(`  ${rule.id}-after.png`);
   }
 
   await browser.close();
