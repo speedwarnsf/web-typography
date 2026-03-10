@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
+import FontSelect from "@/components/FontSelect";
 
 /* ─────────────────────────────────────────────
    Copy Button (inline to keep page self-contained)
@@ -85,6 +86,7 @@ function AnimationCard({
   reactCode: string;
 }) {
   const [tab, setTab] = useState<"css" | "react">("css");
+  const [codeOpen, setCodeOpen] = useState(false);
   const [replayKey, setReplayKey] = useState(0);
   return (
     <div className="border border-neutral-800 bg-neutral-950/50" style={{ borderRadius: 0 }}>
@@ -125,32 +127,51 @@ function AnimationCard({
         </div>
       </div>
 
-      {/* Code tabs */}
+      {/* Code tabs — collapsed by default */}
       <div>
-        <div className="flex border-b border-neutral-800">
-          <button
-            onClick={() => setTab("css")}
-            className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
-              tab === "css" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
-            }`}
-          >
-            CSS
-          </button>
-          <button
-            onClick={() => setTab("react")}
-            className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
-              tab === "react" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
-            }`}
-          >
-            React
-          </button>
-          <div className="ml-auto flex items-center pr-4 gap-2">
-            <CopyBtn text={tab === "css" ? cssCode : reactCode} label={tab === "css" ? "Copy CSS" : "Copy Component"} />
+        <div
+          className="flex items-center border-b border-neutral-800 cursor-pointer select-none"
+          onClick={() => setCodeOpen(!codeOpen)}
+        >
+          <div className="flex items-center gap-2 px-4 py-2">
+            <svg
+              className={`w-3 h-3 text-neutral-600 transition-transform duration-200 ${codeOpen ? "rotate-90" : ""}`}
+              viewBox="0 0 12 12"
+              fill="currentColor"
+            >
+              <path d="M4 1l5 5-5 5V1z" />
+            </svg>
+            <span className="text-xs font-mono uppercase tracking-widest text-neutral-500">Code</span>
           </div>
+          {codeOpen && (
+            <div className="flex ml-auto" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setTab("css")}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
+                  tab === "css" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
+                }`}
+              >
+                CSS
+              </button>
+              <button
+                onClick={() => setTab("react")}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
+                  tab === "react" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
+                }`}
+              >
+                React
+              </button>
+              <div className="flex items-center pr-4 gap-2">
+                <CopyBtn text={tab === "css" ? cssCode : reactCode} label={tab === "css" ? "Copy CSS" : "Copy Component"} />
+              </div>
+            </div>
+          )}
         </div>
-        <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
-          <code className="font-mono text-neutral-300">{tab === "css" ? cssCode : reactCode}</code>
-        </pre>
+        {codeOpen && (
+          <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
+            <code className="font-mono text-neutral-300">{tab === "css" ? cssCode : reactCode}</code>
+          </pre>
+        )}
       </div>
     </div>
   );
@@ -294,19 +315,19 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
         {/* Font family */}
         <div className="flex items-center gap-3">
           <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Font</label>
-          <select
+          <FontSelect
+            options={FONT_OPTIONS.map(f => ({
+              label: f.label,
+              value: f.value,
+              fontFamily: f.value,
+            }))}
             value={style.fontFamily}
-            onChange={(e) => {
-              const opt = FONT_OPTIONS.find(f => f.value === e.target.value);
-              onChange({ ...style, fontFamily: e.target.value, fontFamilyLabel: opt?.label || e.target.value });
+            onChange={(v) => {
+              const opt = FONT_OPTIONS.find(f => f.value === v);
+              onChange({ ...style, fontFamily: String(v), fontFamilyLabel: opt?.label || String(v) });
             }}
-            className="font-mono text-xs text-neutral-300 bg-neutral-950 border border-neutral-800 px-2 py-1.5 flex-1"
-            style={{ borderRadius: 0 }}
-          >
-            {FONT_OPTIONS.map(f => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
+            className="flex-1"
+          />
         </div>
 
         {/* Weight */}
@@ -2883,10 +2904,10 @@ export default function AnimationsPage() {
           >
             Web Typography
           </a>
-          <nav className="hidden sm:flex gap-6 text-xs font-mono uppercase tracking-widest text-neutral-600">
-            <a href="/" className="hover:text-[#B8963E] transition-colors">Home</a>
-            <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
-            <a href="/animations" className="text-[#B8963E]">Animations</a>
+          <nav className="hidden sm:flex gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+            <a href="/" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Home</a>
+            <a href="/pairing-cards" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Builder</a>
+            <a href="/animations" className="border border-[#B8963E] px-4 py-2 text-[#B8963E]">Animations</a>
           </nav>
         </div>
       </header>
@@ -2909,12 +2930,12 @@ export default function AnimationsPage() {
           17 typography animations -- from tasteful entrances to pure
           combinatorial chaos. Each one outputs copy-paste code.
         </p>
-        <div className="mt-8 flex flex-wrap gap-6 text-xs font-mono uppercase tracking-widest text-neutral-600">
-          <a href="#entrances" className="hover:text-[#B8963E] transition-colors">Entrances</a>
-          <a href="#emphasis" className="hover:text-[#B8963E] transition-colors">Emphasis</a>
-          <a href="#transitions" className="hover:text-[#B8963E] transition-colors">Transitions</a>
-          <a href="#scrolling" className="hover:text-[#B8963E] transition-colors">Scrolling</a>
-          <a href="#experimental" className="hover:text-[#B8963E] transition-colors">Experimental</a>
+        <div className="mt-8 flex flex-wrap gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+          <a href="#entrances" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Entrances</a>
+          <a href="#emphasis" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Emphasis</a>
+          <a href="#transitions" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Transitions</a>
+          <a href="#scrolling" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Scrolling</a>
+          <a href="#experimental" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Experimental</a>
         </div>
       </section>
 

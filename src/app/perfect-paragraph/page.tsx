@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { typesetText, smoothRag, measureCh, postRenderFix } from '@/lib/typeset';
+import CodeBlock from '@/components/CodeBlock';
 
-const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park. On clear days she could see all the way to the bridge. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a chain. Everything in its place. She believed good work came from good order, and she was right about that.";
+const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park across the road. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a brass chain. Everything had its place and every place had a purpose. She believed good work came from good order, and two decades of practice had proven her right.";
 
 interface ToggleOption {
   id: string;
@@ -395,28 +396,12 @@ export default function PerfectParagraph() {
 
         {/* Copy the code */}
         {(cssCode || jsCode) && (
-          <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
+          <div className="space-y-4">
+            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
               Copy the Code
             </p>
-
-            {cssCode && (
-              <div className="mb-6">
-                <p className="text-neutral-400 text-sm mb-2 font-mono">CSS</p>
-                <pre className="bg-neutral-900 border border-neutral-800 p-4 overflow-x-auto text-sm text-neutral-300 font-mono">
-                  {cssCode}
-                </pre>
-              </div>
-            )}
-
-            {jsCode && (
-              <div>
-                <p className="text-neutral-400 text-sm mb-2 font-mono">JavaScript</p>
-                <pre className="bg-neutral-900 border border-neutral-800 p-4 overflow-x-auto text-sm text-neutral-300 font-mono">
-                  {jsCode}
-                </pre>
-              </div>
-            )}
+            {cssCode && <CodeBlock code={cssCode} title="CSS" />}
+            {jsCode && <CodeBlock code={jsCode} title="JavaScript" />}
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
+import CodeBlock from "@/components/CodeBlock";
 import { typesetText, smoothRag, typeset, measureCh, postRenderFix } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
@@ -770,64 +771,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 {showCode && (
                   <div className="space-y-6">
                     {/* CSS */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">CSS</p>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(generatedCSS);
-                            setCopiedField("css");
-                            setTimeout(() => setCopiedField(""), 2000);
-                          }}
-                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
-                        >
-                          {copiedField === "css" ? "Copied" : "Copy CSS"}
-                        </button>
-                      </div>
-                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap">
-                        {generatedCSS}
-                      </pre>
-                    </div>
+                    <CodeBlock code={generatedCSS} title="CSS" />
 
                     {/* HTML */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">HTML</p>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(generatedHTML);
-                            setCopiedField("html");
-                            setTimeout(() => setCopiedField(""), 2000);
-                          }}
-                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
-                        >
-                          {copiedField === "html" ? "Copied" : "Copy HTML"}
-                        </button>
-                      </div>
-                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap">
-                        {generatedHTML}
-                      </pre>
-                    </div>
+                    <CodeBlock code={generatedHTML} title="HTML" />
 
                     {/* Typeset.js */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">Typeset.js -- rag control + word binding</p>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(typesetJS);
-                            setCopiedField("js");
-                            setTimeout(() => setCopiedField(""), 2000);
-                          }}
-                          className="border border-neutral-700 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
-                        >
-                          {copiedField === "js" ? "Copied" : "Copy JS"}
-                        </button>
-                      </div>
-                      <pre className="bg-neutral-950 border border-neutral-800 p-4 overflow-x-auto text-[12px] font-mono text-neutral-400 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
-                        {typesetJS}
-                      </pre>
-                    </div>
+                    <CodeBlock code={typesetJS} title="Typeset.js — rag control + word binding" />
 
                     {/* Share Code */}
                     <button

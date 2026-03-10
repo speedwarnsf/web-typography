@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import FontSelect from "@/components/FontSelect";
+import type { FontOption } from "@/components/FontSelect";
+import CodeBlock from "@/components/CodeBlock";
 
 // ── Font Database ──
 type AxisDef = {
@@ -340,17 +343,15 @@ function FontPanel({
       {/* Header */}
       <div className="p-4 sm:p-6 border-b border-neutral-800">
         <div className="flex flex-col gap-3">
-          <select
+          <FontSelect
+            options={allFonts.map((f, i) => ({
+              label: `${f.name} (${f.axes.length} ${f.axes.length === 1 ? "axis" : "axes"})`,
+              value: i,
+              fontFamily: `'${f.family}', sans-serif`,
+            }))}
             value={fontIndex}
-            onChange={(e) => setFontIndex(Number(e.target.value))}
-            className="bg-neutral-900 border border-neutral-700 text-neutral-200 text-sm font-mono px-3 py-2 focus:border-[#B8963E] focus:outline-none w-full appearance-none"
-          >
-            {allFonts.map((f, i) => (
-              <option key={`${id}-${f.name}-${i}`} value={i}>
-                {f.name} ({f.axes.length} {f.axes.length === 1 ? "axis" : "axes"})
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setFontIndex(Number(v))}
+          />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsAnimating(!isAnimating)}
@@ -447,17 +448,7 @@ function FontPanel({
           </div>
 
           {/* CSS Output */}
-          <div className="border border-neutral-800 bg-neutral-900">
-            <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono uppercase tracking-widest text-neutral-500">
-                CSS Output
-              </span>
-              <CopyBtn text={fullCss} />
-            </div>
-            <pre className="p-3 sm:p-4 overflow-x-auto text-xs leading-relaxed">
-              <code className="font-mono text-neutral-300 break-all">{fullCss}</code>
-            </pre>
-          </div>
+          <CodeBlock code={fullCss} title="CSS Output" />
         </div>
       </div>
     </div>
@@ -596,11 +587,11 @@ export default function VariableFontsPage() {
           Manipulate variation axes in real time. Animate between extremes.
           Compare configurations. Generate production-ready CSS.
         </p>
-        <div className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
-          <a href="/" className="hover:text-[#B8963E] transition-colors">Home</a>
-          <a href="/pairing-cards" className="hover:text-[#B8963E] transition-colors">Builder</a>
-          <a href="/clamp" className="hover:text-[#B8963E] transition-colors">Clamp</a>
-          <a href="/font-inspector" className="hover:text-[#B8963E] transition-colors">Inspector</a>
+        <div className="mt-12 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+          <a href="/" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Home</a>
+          <a href="/pairing-cards" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Builder</a>
+          <a href="/clamp" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Clamp</a>
+          <a href="/font-inspector" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Inspector</a>
         </div>
       </section>
 

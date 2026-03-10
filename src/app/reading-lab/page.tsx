@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { typesetText, smoothRagSpans } from "@/lib/typeset";
+import CodeBlock from "@/components/CodeBlock";
 
 interface TypographySettings {
   fontSize: number;
@@ -520,44 +521,10 @@ const cleanup = smoothRag(element);
             </div>
 
             {/* Generated Code */}
-            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
-                  Generated CSS
-                </h2>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedCSS);
-                  }}
-                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors flex-shrink-0"
-                >
-                  Copy CSS
-                </button>
-              </div>
-              <pre className="text-xs sm:text-sm font-mono text-neutral-300 bg-neutral-900 p-4 sm:p-6 overflow-x-auto whitespace-pre leading-relaxed">
-                {generatedCSS}
-              </pre>
-            </div>
+            <CodeBlock code={generatedCSS} title="Generated CSS" />
 
             {/* Generated JS (typeset rules) */}
-            <div className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 min-w-0 overflow-hidden">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E]">
-                  Typeset.js Rules
-                </h2>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedJS);
-                  }}
-                  className="border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 px-4 py-2 text-xs font-source-sans transition-colors flex-shrink-0"
-                >
-                  Copy JS
-                </button>
-              </div>
-              <pre className="text-xs sm:text-sm font-mono text-neutral-300 bg-neutral-900 p-4 sm:p-6 overflow-x-auto whitespace-pre leading-relaxed">
-                {generatedJS}
-              </pre>
-            </div>
+            <CodeBlock code={generatedJS} title="Typeset.js Rules" />
           </div>
         </div>
       </div>

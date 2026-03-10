@@ -250,11 +250,11 @@ export default function Home() {
           <br />
           This is a practical guide to getting it right on the&nbsp;web.
         </p>
-        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
-          <a href="#rules" className="hover:text-[#B8963E] transition-colors">Rules</a>
-          <a href="#pairings" className="hover:text-[#B8963E] transition-colors">Pairings</a>
-          <a href="#tips" className="hover:text-[#B8963E] transition-colors">Tips</a>
-          <a href="#utility" className="hover:text-[#B8963E] transition-colors">Utility</a>
+        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+          <a href="#rules" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Rules</a>
+          <a href="#pairings" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Pairings</a>
+          <a href="#tips" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Tips</a>
+          <a href="#utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
         </div>
       </section>
 
