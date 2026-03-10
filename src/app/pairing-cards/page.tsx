@@ -267,7 +267,7 @@ function PairingCardBuilder() {
       </div>
       <div style="font-family: monospace; font-size: 10px; color: #${fg}44; margin-top: auto; padding-top: 24px; letter-spacing: 0.1em; text-transform: uppercase;">
         ${heading} ${hSize}px / ${body} ${bSize}px / Leading ${leading}<br/>
-        <span style="font-size: 9px;">fonts.google.com -- web-typography.vercel.app</span>
+        <span style="font-size: 9px;">fonts.google.com -- typeset.us</span>
       </div>
     `;
 

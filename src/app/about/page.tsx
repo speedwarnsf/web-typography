@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About — Typeset.us",
   description:
-    "Typography is not decoration. It is the invisible architecture of meaning. The story of why Typeset.us exists, told through 30 years of professional practice.",
+    "Typography governs how language is experienced. The story of why Typeset.us exists, told through 20 years of professional practice.",
 };
 
 export default function AboutPage() {
@@ -22,7 +22,7 @@ export default function AboutPage() {
             src="/dustin-york.jpg"
             srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
             alt="Dustin York"
-            className="w-16 h-16 rounded-full object-cover shrink-0"
+            className="w-16 h-16 object-cover shrink-0"
           />
           <div>
             <h1
@@ -55,11 +55,12 @@ export default function AboutPage() {
             color: "#d4d4d4",
           }}
         >
-          <div style={{ maxWidth: "65ch", textWrap: "pretty" }}>
+          <div style={{ maxWidth: "51ch", textWrap: "pretty" }}>
             <p className="text-lg leading-[1.8] mb-8">
-              Typography is not decoration. It is the invisible architecture of
-              meaning — the difference between words that are read and words
-              that are felt. Typeset.us exists because that difference matters.
+              Typography governs how language is experienced — not just read,
+              but understood. For centuries, typographers have refined the
+              conventions that make text readable. Typeset.us applies those
+              conventions where they have been most neglected — the browser.
             </p>
 
             <h2
@@ -73,15 +74,17 @@ export default function AboutPage() {
               The Foundation
             </h2>
             <p className="leading-[1.8] mb-6">
-              Dustin York studied Communication Design (Honors) at the Nova
-              Scotia College of Art and Design (NSCAD), where he was mentored
-              by Peter Brooks and studied under Hanno Ehses. The program
-              centered on rhetoric and the use of its tropes in visual
-              communication — the idea that design choices carry persuasive
-              meaning beyond their literal function. His thesis applied these
-              principles to typography on the web. The right typeface does not
-              announce itself — but the rhetorical choices behind it are
-              deliberate, discoverable, and worth understanding.
+              Dustin York is an alumnus of the Honors Communication Design
+              program at NSCAD, where he studied rhetoric under Hanno Ehses
+              and was mentored by Peter Brooks at the Dawson
+              Printshop — learning typographic rigor and the art of
+              letterpress printing. Ehses pioneered the application of
+              classical rhetoric to visual communication, demonstrating that
+              the ancient structures of argumentation remain essential tools
+              for designers. The program instilled a discipline: design
+              choices carry persuasive meaning beyond their literal function.
+              Dustin&#39;s thesis extended these principles to typography on
+              the web.
             </p>
 
             <h2
@@ -95,15 +98,13 @@ export default function AboutPage() {
               The Practice
             </h2>
             <p className="leading-[1.8] mb-6">
-              For more than 30 years, York has worked as an Art Director at
-              Better World Advertising, a studio that exclusively creates
-              campaigns for social good — HIV/STD prevention, anti-tobacco
-              initiatives, LGBTQ+ rights, mental health awareness, foster care
-              advocacy, environmental protection. In this work, typography is
-              not aesthetic preference. It is ethical responsibility. The wrong
-              typeface on a healthcare campaign does not just look bad — it
-              erodes trust. The right one can save a life by making critical
-              information feel credible and accessible.
+              For over 20 years, York has served as Art Director at Better
+              World Advertising — a studio dedicated exclusively to social
+              good. HIV/STD prevention, anti-tobacco initiatives, LGBTQ+
+              rights, mental health, foster care, and environmental advocacy.
+              In public health communication, typographic decisions are
+              consequential. The wrong typeface undermines credibility. The
+              right one makes vital information accessible and trustworthy.
             </p>
 
             <h2
@@ -117,18 +118,12 @@ export default function AboutPage() {
               The Tool
             </h2>
             <p className="leading-[1.8] mb-6">
-              Typeset.us is the distillation of three decades spent caring
-              about the details that most people never notice: the orphan at
-              the end of a paragraph, the rag that disrupts reading flow, the
-              short word stranded alone at the edge of a line. These are small
-              things. They are also the difference between text that is merely
-              displayed and text that is truly set.
-            </p>
-            <p className="leading-[1.8] mb-6">
-              The web has never had professional typography. Browsers render
-              text with the same indifference they brought to the medium in
-              1995. Typeset.us changes that — one line of code, one tool at a
-              time.
+              Typeset.us addresses what browsers have long neglected: the
+              typographic details that separate professionally set text from
+              raw output. Orphan control, rag refinement, binding logic,
+              measure-aware line composition. These conventions are well
+              established in print. On the web, they have been largely absent.
+              This project works to close that gap.
             </p>
 
             <h2
@@ -142,11 +137,9 @@ export default function AboutPage() {
               The Craft
             </h2>
             <p className="leading-[1.8] mb-8">
-              This is a resource built by someone who has spent a career
-              believing that how we say something matters as much as what we
-              say. Typography is the craft of making language visible. This
-              site is an attempt to make that craft accessible to everyone who
-              puts words on screens.
+              Typography is the discipline of making language visible with
+              intention. This site is an effort to make that discipline
+              available to anyone working with text on screen.
             </p>
           </div>
         </div>
@@ -155,7 +148,7 @@ export default function AboutPage() {
         <aside className="mt-20 pt-12 border-t border-neutral-800">
           <div
             className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8"
-            style={{ borderRadius: 0, maxWidth: "65ch" }}
+            style={{ borderRadius: 0, maxWidth: "51ch" }}
           >
             <p
               className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#B8963E] mb-6"
@@ -179,7 +172,7 @@ export default function AboutPage() {
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Practice
                 </span>
-                <span className="text-neutral-400">30+ years professional</span>
+                <span className="text-neutral-400">20+ years professional</span>
               </li>
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
@@ -211,7 +204,7 @@ export default function AboutPage() {
             Back to Tools
           </a>
           <a
-            href="#donate"
+            href="/support"
             className="font-mono text-sm uppercase tracking-[0.25em] text-neutral-400 hover:text-neutral-200 transition-colors border-b border-neutral-700 hover:border-neutral-400 pb-1"
             style={{ borderRadius: 0 }}
           >
