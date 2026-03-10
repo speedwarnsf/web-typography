@@ -502,6 +502,66 @@ export function fixRag(el: HTMLElement): (() => void) | null {
 }
 
 /**
+ * Fix stranded sentence-start words: detect when the last word on a line
+ * is a sentence-start word (preceded by . ! ? punctuation), then bind it
+ * to the next word so they move to the next line together.
+ *
+ * This runs post-render so it measures actual line breaks, not guessing
+ * from character counts.
+ */
+export function fixStrandedSentenceStarts(el: HTMLElement): boolean {
+  const analysis = detectLines(el);
+  if (!analysis || analysis.lines.length < 2) return false;
+
+  const sentenceEndPattern = /[.!?]["'\u201D\u2019]?$/;
+  let modified = false;
+  const text = el.textContent || '';
+  let newText = text;
+
+  // Check each line except the last
+  for (let i = 0; i < analysis.lines.length - 1; i++) {
+    const line = analysis.lines[i];
+    if (line.words.length === 0) continue;
+
+    const lastWord = line.words[line.words.length - 1];
+
+    // Check if this word itself ends with sentence-ending punctuation
+    const wordEndsSentence = sentenceEndPattern.test(lastWord);
+
+    // Or check if the previous word ended a sentence
+    const prevWord = line.words.length > 1 ? line.words[line.words.length - 2] : null;
+    const prevEndsSentence = prevWord && sentenceEndPattern.test(prevWord);
+
+    if (wordEndsSentence || prevEndsSentence) {
+      // This is a sentence-start word stranded at line end
+      const nextLine = analysis.lines[i + 1];
+      if (nextLine && nextLine.words.length > 0) {
+        const nextWord = nextLine.words[0];
+
+        // Bind lastWord to nextWord with nbsp
+        const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(
+          escaped(lastWord) + '\\s+' + escaped(nextWord),
+          'g'
+        );
+        const replacement = lastWord + NBSP + nextWord;
+
+        const before = newText;
+        newText = newText.replace(pattern, replacement);
+        if (newText !== before) modified = true;
+      }
+    }
+  }
+
+  if (modified) {
+    el.textContent = newText;
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Full post-render typography pass: runs after the browser has laid out text.
  * Detects and fixes actual rendered problems without pre-render guessing.
  *
@@ -512,10 +572,13 @@ export function postRenderFix(element: HTMLElement): (() => void) | null {
   const text = element.textContent || '';
   if (text.length < 40) return null;
 
-  // Step 1: Fix real orphans (only if actually orphaned in rendered layout)
+  // Step 1: Fix stranded sentence-start words
+  fixStrandedSentenceStarts(element);
+
+  // Step 2: Fix real orphans (only if actually orphaned in rendered layout)
   fixRealOrphans(element);
 
-  // Step 2: Smooth rag with subtle word-spacing
+  // Step 3: Smooth rag with subtle word-spacing
   return fixRag(element);
 }
 

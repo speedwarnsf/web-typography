@@ -59,6 +59,13 @@ function FontSearch({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Load visible fonts
+  useEffect(() => {
+    if (open) {
+      filtered.slice(0, 20).forEach(loadGoogleFont);
+    }
+  }, [open, filtered]);
+
   return (
     <div ref={ref} className="relative">
       <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-1">
@@ -68,6 +75,7 @@ function FontSearch({
         type="button"
         onClick={() => setOpen(!open)}
         className="w-full text-left bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-[#B8963E] transition-colors"
+        style={{ fontFamily: value }}
       >
         {value}
       </button>
@@ -93,6 +101,7 @@ function FontSearch({
               className={`w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-800 transition-colors ${
                 f === value ? "text-[#B8963E]" : "text-neutral-300"
               }`}
+              style={{ fontFamily: f }}
             >
               {f}
             </button>
@@ -288,13 +297,13 @@ function PairingCardBuilder() {
     setGenerating(true);
     setGeneratedImages([]);
     try {
-      const [mobile, square] = await Promise.all([
-        generatePNG(390, 844, "mobile"),
+      const [square, mobile] = await Promise.all([
         generatePNG(1080, 1080, "square"),
+        generatePNG(390, 844, "mobile"),
       ]);
       setGeneratedImages([
-        { label: "Mobile", dataUrl: mobile, width: 390, height: 844 },
         { label: "Square", dataUrl: square, width: 1080, height: 1080 },
+        { label: "Mobile", dataUrl: mobile, width: 390, height: 844 },
       ]);
     } finally {
       setGenerating(false);
@@ -734,7 +743,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     src={img.dataUrl}
                     alt={`${img.label} type specimen: ${heading} + ${body}`}
                     className="w-full border border-neutral-800"
-                    style={{ imageRendering: "auto" }}
+                    style={{
+                      imageRendering: "auto",
+                      maxWidth: img.label === "Mobile" ? "390px" : undefined
+                    }}
                   />
                 </div>
               ))}

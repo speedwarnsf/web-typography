@@ -232,6 +232,62 @@
   }
 
   /**
+   * Fix stranded sentence-start words: detect when the last word on a line
+   * is a sentence-start word (preceded by . ! ? punctuation), then bind it
+   * to the next word so they move to the next line together.
+   */
+  function fixStrandedSentenceStarts(el) {
+    var analysis = detectLines(el);
+    if (!analysis || analysis.lines.length < 2) return false;
+
+    var sentenceEndPattern = /[.!?]["'\u201D\u2019]?$/;
+    var modified = false;
+    var text = el.textContent || '';
+    var newText = text;
+
+    // Check each line except the last
+    for (var i = 0; i < analysis.lines.length - 1; i++) {
+      var line = analysis.lines[i];
+      if (line.words.length === 0) continue;
+
+      var lastWord = line.words[line.words.length - 1];
+
+      // Check if this word itself ends with sentence-ending punctuation
+      var wordEndsSentence = sentenceEndPattern.test(lastWord);
+
+      // Or check if the previous word ended a sentence
+      var prevWord = line.words.length > 1 ? line.words[line.words.length - 2] : null;
+      var prevEndsSentence = prevWord && sentenceEndPattern.test(prevWord);
+
+      if (wordEndsSentence || prevEndsSentence) {
+        // This is a sentence-start word stranded at line end
+        var nextLine = analysis.lines[i + 1];
+        if (nextLine && nextLine.words.length > 0) {
+          var nextWord = nextLine.words[0];
+
+          // Bind lastWord to nextWord with nbsp
+          var pattern = new RegExp(
+            escapeRegex(lastWord) + '\\s+' + escapeRegex(nextWord),
+            'g'
+          );
+          var replacement = lastWord + NBSP + nextWord;
+
+          var before = newText;
+          newText = newText.replace(pattern, replacement);
+          if (newText !== before) modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      setTextContent(el, newText);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Post-render orphan fix: only bind last two words if the last line
    * actually contains a single word in the rendered layout.
    */
@@ -395,6 +451,8 @@
 
     // Phase 3: Post-render analysis (paragraphs with enough text)
     if (!isH && (el.textContent || '').length >= 80) {
+      // Fix stranded sentence-start words
+      fixStrandedSentenceStarts(el);
       // Real-line orphan detection — only fix actual orphans
       fixRealOrphans(el);
 

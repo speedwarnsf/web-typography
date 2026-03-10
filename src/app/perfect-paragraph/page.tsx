@@ -53,8 +53,8 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
   {
     id: 'measure',
     label: 'Proper measure',
-    description: 'max-width: 65ch — optimal line length',
-    cssRule: 'max-width: 65ch;',
+    description: 'max-width: 51ch — optimal line length',
+    cssRule: 'max-width: 51ch;',
   },
   {
     id: 'hangingPunct',
@@ -84,11 +84,11 @@ export default function PerfectParagraph() {
     shortWord: true,
     sentenceStart: true,
     sentenceEnd: true,
-    ragSmoothing: false,
+    ragSmoothing: true,
     lineHeight: true,
     measure: true,
-    hangingPunct: false,
-    fontFeatures: false,
+    hangingPunct: true,
+    fontFeatures: true,
     textWrap: true,
   });
 
@@ -291,6 +291,9 @@ export default function PerfectParagraph() {
               className="text-neutral-400 text-base sm:text-lg break-words"
               data-no-typeset
               data-no-smooth
+              style={{
+                maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
+              }}
             >
               {text}
             </p>
@@ -310,7 +313,7 @@ export default function PerfectParagraph() {
               className="text-neutral-200 text-base sm:text-lg leading-relaxed break-words"
               style={{
                 lineHeight: toggles.lineHeight ? '1.6' : undefined,
-                maxWidth: toggles.measure ? 'min(65ch, 100%)' : undefined,
+                maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
                 hangingPunctuation: toggles.hangingPunct ? 'first last' : undefined,
                 fontFeatureSettings: toggles.fontFeatures ? '"liga" 1, "onum" 1, "calt" 1' : undefined,
                 textWrap: toggles.textWrap ? 'pretty' : undefined,

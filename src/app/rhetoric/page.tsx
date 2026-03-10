@@ -940,22 +940,22 @@ export default function RhetoricPage() {
           About This Framework
         </h2>
         <div
-          className="text-neutral-400 leading-relaxed space-y-4 max-w-3xl"
+          className="text-neutral-400 leading-relaxed space-y-4"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
-          <p>
+          <p style={{ maxWidth: "65ch" }}>
             This tool is based on <strong>Aristotle's rhetorical triangle</strong>{" "}
             — a framework from classical rhetoric that identifies three modes of
             persuasion: ethos (credibility), pathos (emotion), and logos (logic).
           </p>
-          <p>
+          <p style={{ maxWidth: "65ch" }}>
             Typography is never neutral. Every typeface choice is a rhetorical act
             that shapes how a message lands. After 30{"\u00A0"}years of practice in social
             marketing and design for public good, these mappings reflect real choices
             made for campaigns on HIV/AIDS, tobacco, mental health, LGBTQ+ rights,
             and social{"\u00A0"}justice.
           </p>
-          <p>
+          <p style={{ maxWidth: "65ch" }}>
             No other tool on the web maps typeface choices to rhetorical strategy.
             Use it to make informed, deliberate decisions about type in any context
             where persuasion{"\u00A0"}matters.

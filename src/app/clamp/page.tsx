@@ -144,7 +144,7 @@ export default function ClampPage() {
   const [basePx, setBasePx] = useState(16);
   const [previewVw, setPreviewVw] = useState(800);
 
-  const [scaleMode, setScaleMode] = useState(false);
+  const [scaleMode, setScaleMode] = useState(true);
   const [scaleRatio, setScaleRatio] = useState("Major Third (1.250)");
   const [scaleBase, setScaleBase] = useState(16);
   const [scaleMinVw, setScaleMinVw] = useState(320);
@@ -205,16 +205,6 @@ export default function ClampPage() {
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
               <button
-                onClick={() => setScaleMode(false)}
-                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${
-                  !scaleMode
-                    ? "border-[#B8963E] text-[#B8963E] bg-[#B8963E]/10"
-                    : "border-neutral-700 text-neutral-500 hover:border-neutral-500"
-                }`}
-              >
-                Single
-              </button>
-              <button
                 onClick={() => setScaleMode(true)}
                 className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${
                   scaleMode
@@ -223,6 +213,16 @@ export default function ClampPage() {
                 }`}
               >
                 Type Scale
+              </button>
+              <button
+                onClick={() => setScaleMode(false)}
+                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${
+                  !scaleMode
+                    ? "border-[#B8963E] text-[#B8963E] bg-[#B8963E]/10"
+                    : "border-neutral-700 text-neutral-500 hover:border-neutral-500"
+                }`}
+              >
+                Single
               </button>
             </div>
           </div>
@@ -377,6 +377,65 @@ export default function ClampPage() {
         ) : (
           /* ── Type Scale Generator ── */
           <div className="space-y-8 sm:space-y-10">
+            {/* Scale Preview */}
+            <section className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-8">
+              <h2
+                className="text-xl font-bold tracking-tight mb-4"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                Scale Preview
+              </h2>
+              <div className="mb-6">
+                <div className="flex justify-between items-baseline mb-1">
+                  <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+                    Simulated Viewport
+                  </label>
+                  <span className="font-mono text-[11px] text-neutral-400">{previewVw}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={200}
+                  max={2000}
+                  step={1}
+                  value={previewVw}
+                  onChange={handlePreviewVw}
+                  className="w-full accent-[#B8963E] h-1 touch-pan-x"
+                />
+                <div className="flex justify-between font-mono text-[10px] text-neutral-600 mt-1">
+                  <span>200px</span>
+                  <span>2000px</span>
+                </div>
+              </div>
+              <div className="border border-neutral-800 p-4 sm:p-6 space-y-4 overflow-hidden">
+                {[...scaleResults].reverse().map((s) => {
+                  const px = pxAtViewport(s.minPx, s.slope, s.intercept, s.maxPx, previewVw);
+                  const isHeading = s.label.startsWith("h");
+                  return (
+                    <div key={s.label} className="border-b border-neutral-800/50 pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-baseline gap-3 mb-1">
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 w-12 shrink-0">
+                          {s.label}
+                        </span>
+                        <span className="font-mono text-[10px] text-neutral-700">
+                          {px.toFixed(1)}px
+                        </span>
+                      </div>
+                      <p
+                        className="text-neutral-200 leading-snug break-words"
+                        style={{
+                          fontSize: `${px}px`,
+                          fontWeight: isHeading ? 700 : 400,
+                          fontFamily: isHeading ? "var(--font-playfair)" : "var(--font-source-sans)",
+                        }}
+                      >
+                        {PREVIEW_TEXT[s.label]}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Scale Inputs */}
             <section className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-8">
               <h2
@@ -450,7 +509,7 @@ export default function ClampPage() {
                     className="text-xl font-bold tracking-tight"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
-                    Generated Scale
+                    Generated CSS
                   </h2>
                   <CopyBtn text={scaleCSS} />
                 </div>
@@ -465,65 +524,6 @@ export default function ClampPage() {
                     </div>
                   ))}
                 </pre>
-              </div>
-            </section>
-
-            {/* Scale Preview */}
-            <section className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-8">
-              <h2
-                className="text-xl font-bold tracking-tight mb-4"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                Scale Preview
-              </h2>
-              <div className="mb-6">
-                <div className="flex justify-between items-baseline mb-1">
-                  <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-                    Simulated Viewport
-                  </label>
-                  <span className="font-mono text-[11px] text-neutral-400">{previewVw}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={200}
-                  max={2000}
-                  step={1}
-                  value={previewVw}
-                  onChange={handlePreviewVw}
-                  className="w-full accent-[#B8963E] h-1 touch-pan-x"
-                />
-                <div className="flex justify-between font-mono text-[10px] text-neutral-600 mt-1">
-                  <span>200px</span>
-                  <span>2000px</span>
-                </div>
-              </div>
-              <div className="border border-neutral-800 p-4 sm:p-6 space-y-4 overflow-hidden">
-                {[...scaleResults].reverse().map((s) => {
-                  const px = pxAtViewport(s.minPx, s.slope, s.intercept, s.maxPx, previewVw);
-                  const isHeading = s.label.startsWith("h");
-                  return (
-                    <div key={s.label} className="border-b border-neutral-800/50 pb-4 last:border-0 last:pb-0">
-                      <div className="flex items-baseline gap-3 mb-1">
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 w-12 shrink-0">
-                          {s.label}
-                        </span>
-                        <span className="font-mono text-[10px] text-neutral-700">
-                          {px.toFixed(1)}px
-                        </span>
-                      </div>
-                      <p
-                        className="text-neutral-200 leading-snug break-words"
-                        style={{
-                          fontSize: `${px}px`,
-                          fontWeight: isHeading ? 700 : 400,
-                          fontFamily: isHeading ? "var(--font-playfair)" : "var(--font-source-sans)",
-                        }}
-                      >
-                        {PREVIEW_TEXT[s.label]}
-                      </p>
-                    </div>
-                  );
-                })}
               </div>
             </section>
           </div>

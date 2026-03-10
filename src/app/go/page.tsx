@@ -294,13 +294,8 @@ export default function GoPage() {
               Home
             </a>
             <a
-              href="/demo"
-              className="text-sm text-neutral-400 hover:text-neutral-100 transition-colors font-[family-name:var(--font-source-sans)]"
-            >
-              Demo
-            </a>
-            <a
               href="/go.js"
+              download="go.js"
               className="text-sm text-neutral-400 hover:text-neutral-100 transition-colors font-[family-name:var(--font-source-sans)]"
             >
               Download

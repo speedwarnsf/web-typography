@@ -16,7 +16,7 @@ interface TypographySettings {
 const defaultSettings: TypographySettings = {
   fontSize: 16,
   lineHeight: 1.6,
-  lineLength: 65,
+  lineLength: 51,
   letterSpacing: 0,
   wordSpacing: 1,
   fontWeight: 400,
@@ -484,6 +484,7 @@ const cleanup = smoothRag(element);
                     fontWeight: settings.fontWeight,
                     textWrap: 'pretty' as any,
                     overflowWrap: 'break-word',
+                    margin: '0 auto',
                   }}
                   className="font-source-sans"
                 >
