@@ -584,8 +584,8 @@ export default function VariableFontsPage() {
           className="max-w-xl text-base sm:text-lg text-neutral-400 leading-relaxed"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "balance" }}
         >
-          Manipulate variation axes in real time. Animate between extremes.
-          Compare configurations. Generate production-ready CSS.
+          Manipulate variation axes in{"\u00A0"}real time. Animate between{"\u00A0"}extremes.
+          Compare{"\u00A0"}configurations. Generate production-ready{"\u00A0"}CSS.
         </p>
         <div className="mt-12 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
           <a href="/" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Home</a>
