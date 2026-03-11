@@ -23,7 +23,10 @@ const POPULAR_FONTS = [
   "Ubuntu", "Urbanist", "Vollkorn", "Zilla Slab",
 ].sort();
 
-const LOREM = "Good typography is invisible. Great typography speaks to the reader without ever being noticed. It carries meaning through form, guides the eye with rhythm, and transforms raw content into an experience worth having. The difference between adequate and exceptional design often comes down to the smallest details: the space between letters, the length of a line, the weight of a stroke. These decisions accumulate into something the reader feels but cannot name.";
+// nbsp bindings prevent bad breaks: prepositions, conjunctions, articles,
+// and sentence starters stay with the word that follows them.
+// \u00A0 = non-breaking space
+const LOREM = "Good typography is\u00A0invisible. Great typography speaks to\u00A0the reader without ever being\u00A0noticed. It\u00A0carries meaning through\u00A0form, guides the\u00A0eye with\u00A0rhythm, and\u00A0transforms raw content into\u00A0an experience worth\u00A0having. The\u00A0difference between adequate and\u00A0exceptional design often comes down to\u00A0the smallest details: the\u00A0space between\u00A0letters, the\u00A0length of\u00A0a line, the\u00A0weight of\u00A0a stroke. These\u00A0decisions accumulate into\u00A0something the\u00A0reader feels but\u00A0cannot name.";
 
 function loadGoogleFont(fontName: string) {
   const id = `gf-${fontName.replace(/\s+/g, "-")}`;
