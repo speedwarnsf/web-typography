@@ -1116,15 +1116,22 @@ function isOptSentenceEnd(w: string): boolean {
 export function optimizeBreaks(element: HTMLElement): () => void {
   const originalHTML = element.innerHTML;
   const originalWhiteSpace = element.style.whiteSpace;
+  const originalTextWrap = element.style.textWrap;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastWidth = -1; // Track width to prevent resize loops
 
   function apply() {
     // Restore original content before re-measuring
     element.innerHTML = originalHTML;
     element.style.whiteSpace = originalWhiteSpace;
+    element.style.textWrap = originalTextWrap;
 
     const text = element.textContent || '';
     if (!text.trim() || text.length < 40) return;
+
+    // Skip elements with rich HTML (strong, em, a, span with classes) —
+    // rewriting innerHTML would destroy formatting
+    if (/<(strong|em|b|i|a |span [^>]*class)/i.test(originalHTML)) return;
 
     const cs = getComputedStyle(element);
     const containerWidth =
@@ -1133,6 +1140,10 @@ export function optimizeBreaks(element: HTMLElement): () => void {
       parseFloat(cs.paddingRight);
 
     if (containerWidth < 200) return;
+
+    // Prevent resize observer loops: skip if width hasn't meaningfully changed
+    if (Math.abs(containerWidth - lastWidth) < 2) return;
+    lastWidth = containerWidth;
 
     // Create hidden measurer inheriting all font styles
     const measurer = document.createElement('span');
@@ -1279,16 +1290,18 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     // (For now, always apply — the DP consistently eliminates violations)
 
     // Render with pre-line to honor our line breaks
+    // Clear textWrap which can conflict with pre-line
     element.style.whiteSpace = 'pre-line';
+    element.style.textWrap = 'initial';
     element.innerHTML = lines.join('\n');
   }
 
   apply();
 
-  // Re-run on resize (debounced)
+  // Re-run on resize (debounced, only on real width changes)
   const observer = new ResizeObserver(() => {
     if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => requestAnimationFrame(apply), 150);
+    resizeTimer = setTimeout(() => requestAnimationFrame(apply), 250);
   });
   observer.observe(element);
 
@@ -1297,6 +1310,7 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     if (resizeTimer) clearTimeout(resizeTimer);
     element.innerHTML = originalHTML;
     element.style.whiteSpace = originalWhiteSpace;
+    element.style.textWrap = originalTextWrap;
   };
 }
 
