@@ -346,8 +346,8 @@ body {
 
 p {
   text-wrap: pretty;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
   overflow-wrap: break-word;
 }
 
@@ -388,8 +388,8 @@ h1, h2, h3 {
     p {
       margin: 0;
       text-wrap: pretty;
-      hyphens: auto;
-      -webkit-hyphens: auto;
+      hyphens: none;
+      -webkit-hyphens: none;
       overflow-wrap: break-word;
     }
   </style>
