@@ -33,7 +33,7 @@ const rules = [
   {
     id: 'rag',
     width: 310,
-    text: 'Every typeface carries rhetorical weight. It persuades, positions, and speaks beyond the literal meaning of words. This tool maps typefaces to rhetorical modes, drawn from thirty years of practice in design for social good.',
+    text: 'The contract required all parties to agree before anyone could sign it. Negotiations had stalled for weeks.',
   },
   {
     id: 'short-words',

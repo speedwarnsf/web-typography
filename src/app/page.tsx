@@ -301,7 +301,7 @@ export default function Home() {
                     </p>
                     <div className="px-6 py-6">
                       <img
-                        src={`/examples/${rule.id}-before.png?v=3`}
+                        src={`/examples/${rule.id}-before.png?v=4`}
                         alt="Default browser rendering"
                         className="w-full"
                         style={{ borderRadius: 0 }}
@@ -314,7 +314,7 @@ export default function Home() {
                     </p>
                     <div className="px-6 py-6">
                       <img
-                        src={`/examples/${rule.id}-after.png?v=3`}
+                        src={`/examples/${rule.id}-after.png?v=4`}
                         alt="With typeset applied"
                         className="w-full"
                         style={{ borderRadius: 0 }}

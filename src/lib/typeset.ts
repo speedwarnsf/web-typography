@@ -1103,11 +1103,12 @@ export function smoothRagSpans(container: HTMLElement): () => void {
  * Returns a cleanup function. Re-runs on resize via ResizeObserver.
  */
 
-const OPT_PREPOSITIONS = new Set(
-  'of in at by to for with from on into upon about between through without during before after against among within beyond toward towards across along behind beneath beside besides despite except inside outside underneath until unlike'.split(' ')
+// Only bind the shortest, most visually problematic words.
+// Binding too many creates rigid clusters that produce worse rag than the browser default.
+// Rule: only bind words ≤2 characters that look stranded at line end.
+const OPT_SHORT_BIND = new Set(
+  'a an the of in to at by on or is it if no so as we do be'.split(' ')
 );
-const OPT_CONJUNCTIONS = new Set('and or but nor yet so'.split(' '));
-const OPT_ARTICLES = new Set('a an the'.split(' '));
 
 function isOptSentenceEnd(w: string): boolean {
   return /[.!?]["'\u201D\u2019]?$/.test(w);
@@ -1171,16 +1172,14 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     const n = words.length;
     const cw = containerWidth;
 
-    // Build break-quality violation set
+    // Build break-quality violation set — conservative.
+    // Only bind short words (≤2-3 chars) that look bad stranded at line end.
+    // Do NOT bind longer prepositions (from, with, beyond, between, etc.)
+    // — they don't look stranded and over-binding worsens the rag.
     const noEndLine = new Set<number>();
     for (let i = 0; i < n - 1; i++) {
       const lower = words[i].toLowerCase().replace(/[.,;:!?'"\u201D\u2019]+$/, '');
-      if (OPT_PREPOSITIONS.has(lower)) noEndLine.add(i);
-      if (OPT_CONJUNCTIONS.has(lower)) noEndLine.add(i);
-      if (OPT_ARTICLES.has(lower)) noEndLine.add(i);
-      if (isOptSentenceEnd(words[i]) && i + 1 < n && /^[A-Z\u201C"]/.test(words[i + 1])) {
-        noEndLine.add(i + 1);
-      }
+      if (OPT_SHORT_BIND.has(lower)) noEndLine.add(i);
     }
 
     // Line width calculator
