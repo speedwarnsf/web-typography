@@ -32,8 +32,8 @@ const rules = [
   },
   {
     id: 'rag',
-    width: 360,
-    text: 'Typography has always been about rhythm. The interplay of long words and short ones creates a pattern the eye follows instinctively. When that rhythm falters \u2014 when a line reaches far while the next barely starts \u2014 the reader stumbles.',
+    width: 310,
+    text: 'Every typeface carries rhetorical weight. It persuades, positions, and speaks beyond the literal meaning of words. This tool maps typefaces to rhetorical modes, drawn from thirty years of practice in design for social good.',
   },
   {
     id: 'short-words',
@@ -74,17 +74,17 @@ async function render() {
     await page.waitForTimeout(300);
 
     // Apply typesetText (text-level rules: orphans, sentence protection, short words)
-    // Then smoothRag (per-line word-spacing for even rag)
+    // Then optimizeBreaks (Knuth-Plass DP with nbsp injection)
     await page.evaluate(() => {
       const el = document.getElementById('d');
       const text = el.textContent;
       // Apply all text rules
       el.innerHTML = Typeset.typesetText(text);
-      // Apply rag smoothing
-      Typeset.smoothRag(el);
+      // Apply break optimization
+      Typeset.optimizeBreaks(el);
     });
 
-    // Wait for smoothRag to apply (it's synchronous but layout needs a frame)
+    // Wait for optimizeBreaks to apply
     await page.waitForTimeout(500);
 
     el = await page.$('#d');

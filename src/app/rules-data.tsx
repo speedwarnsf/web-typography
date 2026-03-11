@@ -36,21 +36,17 @@ export const rules: Rule[] = [
 }`,
   },
   {
-    name: "Rag Smoothing",
+    name: "Break Optimization",
     id: "rag",
     description:
-      "Without rag control, line lengths vary wildly\u00A0\u2014 one line barely reaches half the column while the next fills it. Smoothing adjusts word-spacing line by line, gently extending short lines and tightening long ones for a cleaner right\u00A0edge.",
-    code: `export function smoothRag(el: HTMLElement): void {
-  const target = el.offsetWidth * 0.93;
-  const lines = getLines(el); // detect line breaks via Range API
-  lines.forEach((line, i) => {
-    if (i === lines.length - 1) return; // leave last line alone
-    const gap = target - line.width;
-    const spaces = (line.text.match(/ /g) || []).length;
-    if (!spaces) return;
-    const ws = gap / spaces; // px per word space
-    wrapLine(line, \`word-spacing: \${ws.toFixed(2)}px\`);
-  });
+      "The browser breaks lines greedily\u00A0\u2014 fill until full, then wrap. This leaves prepositions stranded, articles orphaned, and sentences split mid-thought. Break optimization uses dynamic programming to evaluate every possible configuration, keeping words with their syntactic\u00A0partners.",
+    code: `export function optimizeBreaks(el: HTMLElement): void {
+  const words = el.textContent.split(/ +/);
+  const widths = words.map(w => measure(w));
+  // Knuth-Plass DP: find globally optimal breaks
+  const breaks = knuthPlass(widths, spaceWidth, containerWidth);
+  // Bind words at non-break positions with nbsp
+  applyNbspBindings(el, breaks);
 }`,
   },
   {
