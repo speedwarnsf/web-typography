@@ -78,13 +78,12 @@ p, li, blockquote, figcaption {
   }
 }
 
-/* Hyphenation for narrow measures on mobile */
+/* No hyphenation — ever. We have math. */
 @media (max-width: 640px) {
   p, li, blockquote, figcaption,
   .hyphenate {
-    hyphens: auto;
-    -webkit-hyphens: auto;
-    hyphenate-limit-chars: 8 4 3;
+    hyphens: none;
+    -webkit-hyphens: none;
   }
   /* Never hyphenate headings, labels, or code */
   h1, h2, h3, h4, pre, code, .no-hyphen,
