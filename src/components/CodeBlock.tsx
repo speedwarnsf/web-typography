@@ -63,10 +63,12 @@ export default function CodeBlock({
             {title || "Code"}
           </span>
         </div>
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <CopyButton text={code} />
-          <DownloadButton code={code} filename={downloadName} />
-        </div>
+        {isOpen && (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <CopyButton text={code} />
+            <DownloadButton code={code} filename={downloadName} />
+          </div>
+        )}
       </div>
       {isOpen && (
         <pre className="p-3 sm:p-4 overflow-x-auto text-[11px] sm:text-xs md:text-sm leading-relaxed">

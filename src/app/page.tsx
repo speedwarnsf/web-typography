@@ -457,10 +457,6 @@ export default function Home() {
           </p>
 
           <CodeBlock code={typesetFullCode} title="typeset.ts" />
-
-          <div className="mt-8 flex gap-4">
-            <CopyButton text={typesetFullCode} />
-          </div>
         </div>
       </section>
 
