@@ -118,11 +118,11 @@ function AnimationCard({
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <div className="p-3 bg-neutral-900 border border-neutral-800">
             <p className="font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-1">When to use</p>
-            <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)" }}>{when}</p>
+            <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)", hyphens: "none", overflowWrap: "break-word" } as React.CSSProperties}>{when}</p>
           </div>
           <div className="p-3 bg-neutral-900 border border-neutral-800">
             <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-1">When not to</p>
-            <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)" }}>{whenNot}</p>
+            <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)", hyphens: "none", overflowWrap: "break-word" } as React.CSSProperties}>{whenNot}</p>
           </div>
         </div>
       </div>
@@ -2966,7 +2966,7 @@ export default function AnimationsPage() {
               name="Character Reveal"
               category="Entrance"
               when="Short, impactful phrases -- brand names, taglines, pull quotes."
-              whenNot="Anything longer than 30 characters. Per-letter animation on a paragraph is torture."
+              whenNot="Anything longer than 30\u00A0characters. Per-letter animation on\u00A0a paragraph is\u00A0torture."
               Demo={CharacterRevealDemo}
               cssCode={snippets.characterReveal.css}
               reactCode={snippets.characterReveal.react}
@@ -3119,7 +3119,7 @@ export default function AnimationsPage() {
               name="Progressive Reveal"
               category="Scrolling"
               when="Storytelling, long-form narratives, manifesto-style content."
-              whenNot="Content users need to scan quickly. Forced sequential reading frustrates skimmers."
+              whenNot="Content users need to\u00A0scan quickly. Forced sequential reading frustrates\u00A0skimmers."
               Demo={ProgressiveRevealDemo}
               cssCode={snippets.progressiveReveal.css}
               reactCode={snippets.progressiveReveal.react}
