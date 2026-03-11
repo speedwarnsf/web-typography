@@ -1115,23 +1115,15 @@ function isOptSentenceEnd(w: string): boolean {
 
 export function optimizeBreaks(element: HTMLElement): () => void {
   const originalHTML = element.innerHTML;
-  const originalWhiteSpace = element.style.whiteSpace;
-  const originalTextWrap = element.style.textWrap;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastWidth = -1; // Track width to prevent resize loops
+  let lastWidth = -1;
 
   function apply() {
     // Restore original content before re-measuring
     element.innerHTML = originalHTML;
-    element.style.whiteSpace = originalWhiteSpace;
-    element.style.textWrap = originalTextWrap;
 
     const text = element.textContent || '';
     if (!text.trim() || text.length < 40) return;
-
-    // Skip elements with rich HTML (strong, em, a, span with classes) —
-    // rewriting innerHTML would destroy formatting
-    if (/<(strong|em|b|i|a |span [^>]*class)/i.test(originalHTML)) return;
 
     const cs = getComputedStyle(element);
     const containerWidth =
@@ -1141,7 +1133,7 @@ export function optimizeBreaks(element: HTMLElement): () => void {
 
     if (containerWidth < 200) return;
 
-    // Prevent resize observer loops: skip if width hasn't meaningfully changed
+    // Prevent resize observer loops
     if (Math.abs(containerWidth - lastWidth) < 2) return;
     lastWidth = containerWidth;
 
@@ -1186,8 +1178,6 @@ export function optimizeBreaks(element: HTMLElement): () => void {
       if (OPT_PREPOSITIONS.has(lower)) noEndLine.add(i);
       if (OPT_CONJUNCTIONS.has(lower)) noEndLine.add(i);
       if (OPT_ARTICLES.has(lower)) noEndLine.add(i);
-      // Sentence start: if word[i] ends a sentence, word[i+1] starts next —
-      // don't let i+1 be the last word on its line (it should start a new visual unit)
       if (isOptSentenceEnd(words[i]) && i + 1 < n && /^[A-Z\u201C"]/.test(words[i + 1])) {
         noEndLine.add(i + 1);
       }
@@ -1214,30 +1204,29 @@ export function optimizeBreaks(element: HTMLElement): () => void {
       prevFill: number | null
     ): number {
       const lw = lineWidth(start, end);
-      if (lw > cw * 1.005) return 1e9; // overflow
+      if (lw > cw * 1.005) return 1e9;
       const fill = lw / cw;
       const nw = end - start;
       let badness = 0;
 
       if (isLast) {
-        // Last line: penalize orphans and runts
         if (nw === 1 && fill < 0.25) return 150;
         if (fill < 0.15) return 100;
         return 0;
       }
 
-      // Cubic badness: deviation from 0.85 ideal fill (Knuth)
+      // Cubic badness (Knuth)
       const deviation = Math.abs(fill - 0.85);
       badness += Math.pow(deviation / 0.15, 3) * 100;
 
-      // Stairstep demerits: penalize large jumps between consecutive lines
+      // Stairstep demerits
       if (prevFill !== null) {
         const step = Math.abs(fill - prevFill);
         if (step > 0.15) badness += 200;
         else if (step > 0.10) badness += 80;
       }
 
-      // Break quality: heavy penalty for stranded prepositions/conjunctions/articles
+      // Break quality
       if (noEndLine.has(end - 1)) badness += 500;
 
       // Short/thin line penalties
@@ -1266,42 +1255,110 @@ export function optimizeBreaks(element: HTMLElement): () => void {
       dp[i] = best;
     }
 
-    // Reconstruct break points
-    const breaks: number[] = [];
+    // Reconstruct break points → set of word indices where lines START
+    const lineStarts = new Set<number>();
+    lineStarts.add(0);
     let pos = n;
+    const breakStack: number[] = [];
     while (pos > 0) {
-      breaks.unshift(pos);
+      breakStack.push(dp[pos].prev);
       pos = dp[pos].prev;
     }
+    breakStack.reverse();
+    for (const s of breakStack) lineStarts.add(s);
 
-    // Build lines
-    const lines: string[] = [];
-    let start = 0;
-    for (const end of breaks) {
-      lines.push(words.slice(start, end).join(' '));
-      start = end;
+    // Determine which word gaps should be PREVENTED from breaking.
+    // Strategy: only bind words that the DP says must stay together —
+    // specifically, words flagged in noEndLine (prepositions, conjunctions,
+    // articles, sentence starters) that the DP chose to keep on the same line.
+    // All other spaces remain breakable so the browser can still wrap naturally.
+    const preventBreakAfter = new Set<number>();
+
+    // For each line the DP chose, check if any word in the line is in noEndLine
+    // and is NOT the last word — those spaces should be nbsp
+    let lineStart = 0;
+    for (const s of breakStack) {
+      if (s === 0) { lineStart = 0; continue; }
+      // Line is words[lineStart..s) — not used here
+      lineStart = s;
     }
 
-    if (lines.length < 2) return;
+    // Simpler: for every word in noEndLine, if the DP chose NOT to break
+    // after it (i.e., word i and word i+1 are on the same line), bind them.
+    for (const wordI of noEndLine) {
+      // word wordI should not end a line.
+      // If wordI+1 is NOT a lineStart, they're already on the same line — good, no action.
+      // If wordI+1 IS a lineStart... the DP broke there anyway (couldn't avoid it).
+      // Either way, bind wordI to wordI+1 with nbsp.
+      if (wordI < n - 1) {
+        preventBreakAfter.add(wordI);
+      }
+    }
 
-    // Check if optimization actually improved things by comparing to browser default.
-    // If the browser already has zero break violations and similar line count,
-    // don't rewrite — preserve natural spacing.
-    // (For now, always apply — the DP consistently eliminates violations)
+    // Apply: walk innerHTML, replace spaces after flagged words with nbsp.
+    // This preserves ALL HTML tags (strong, em, a, etc.)
+    const html = originalHTML;
+    let gapIndex = 0; // tracks inter-word gap position
+    let inTag = false;
+    let inWord = false;
+    let result = '';
 
-    // Render with pre-line to honor our line breaks
-    // Clear textWrap which can conflict with pre-line
-    element.style.whiteSpace = 'pre-line';
-    element.style.textWrap = 'initial';
-    element.innerHTML = lines.join('\n');
+    for (let i = 0; i < html.length; i++) {
+      const ch = html[i];
+
+      if (ch === '<') {
+        inTag = true;
+        result += ch;
+        continue;
+      }
+      if (ch === '>') {
+        inTag = false;
+        result += ch;
+        continue;
+      }
+      if (inTag) {
+        result += ch;
+        continue;
+      }
+
+      // Text content
+      if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t') {
+        if (inWord) {
+          gapIndex++;
+          inWord = false;
+        }
+        // gapIndex = gap after word (gapIndex-1), before word gapIndex
+        // preventBreakAfter has word indices — gap after word i is gapIndex when gapIndex === i+1
+        // Actually: gapIndex counts up each word boundary.
+        // After word 0, gapIndex=1. After word 1, gapIndex=2. etc.
+        // So the gap "after word i" corresponds to gapIndex === i+1
+        // preventBreakAfter.has(i) means "don't break after word i" = gapIndex === i+1
+        if (preventBreakAfter.has(gapIndex - 1)) {
+          result += '\u00A0';
+        } else {
+          result += ' ';
+        }
+      } else if (ch === '\u00A0') {
+        // Already nbsp — preserve
+        result += '\u00A0';
+      } else {
+        if (!inWord) inWord = true;
+        result += ch;
+      }
+    }
+
+    element.innerHTML = result;
   }
 
   apply();
 
-  // Re-run on resize (debounced, only on real width changes)
+  // Re-run on resize (debounced)
   const observer = new ResizeObserver(() => {
     if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => requestAnimationFrame(apply), 250);
+    resizeTimer = setTimeout(() => {
+      lastWidth = -1; // Reset so apply() doesn't skip
+      requestAnimationFrame(apply);
+    }, 250);
   });
   observer.observe(element);
 
@@ -1309,8 +1366,6 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     observer.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
     element.innerHTML = originalHTML;
-    element.style.whiteSpace = originalWhiteSpace;
-    element.style.textWrap = originalTextWrap;
   };
 }
 
