@@ -102,38 +102,58 @@ Techniques available at ANY width, including mobile:
 
 The current binding tiers (above) are a safety floor. The real value comes from the post-render techniques that work at every width.
 
-### Implementation Status
-
-Of the techniques listed above, here's what exists today vs what's planned:
+### Implementation Status (as of March 11, 2026)
 
 | Technique | Status | Notes |
 |-----------|--------|-------|
-| smoothRag (word-spacing) | ✅ Implemented | Light mode works; Knuth-Plass path works at wide widths. Mobile needs refinement (word-spacing limits reduced but approach is sound). |
-| Post-render line analysis | ✅ Implemented | `detectLines()` wraps words in spans, groups by offsetTop, measures actual line widths. Foundation for orphan detection and rag smoothing. |
-| Dynamic hyphenation | ❌ Not built | CSS `hyphens: auto` is applied globally. JS-controlled soft hyphens not implemented. |
-| Letter-spacing micro-adjustments | ❌ Not built | |
+| optimizeBreaks (Pass 1) | ✅ Deployed | Knuth-Plass DP with break quality rules, stairstep demerits, cubic badness. Applies via nbsp injection — preserves all HTML. |
+| shapeRag (Pass 2) | ✅ Deployed | Per-line word-spacing + letter-spacing with Tschichold tolerances, line-height scaling, neighbor dampening, anti-justification guard. |
+| Post-render line analysis | ✅ Deployed | Wraps words in spans, groups by offsetTop, measures actual line widths. Used by both passes. |
+| Real-line widow/orphan detection | ✅ Deployed | `fixRealOrphans()` measures actual rendered lines, only binds when last line has exactly 1 word. |
+| smoothRag (legacy) | Superseded | Replaced by the optimizeBreaks → shapeRag two-pass system. Code still exists but is not called. |
+| Dynamic hyphenation | ❌ Not built | Explicitly rejected — "Fuck the hyphen, we have math." |
 | Optical margin alignment | ⚠️ CSS only | `hanging-punctuation: first last` applied via CSS. No JS-driven optical alignment. |
-| Targeted line-break optimization | ⚠️ Partial | `fixRag()` applies per-line word-spacing based on measured widths. Targeted nbsp insertion for specific bad breaks not yet implemented. |
-| Real-line widow/orphan detection | ✅ Implemented | `fixRealOrphans()` measures actual rendered lines, only binds when last line has exactly 1 word. Runs via GlobalTypeset on all pages. |
 
-**What's live now:** Post-render line analysis (#2) and real-line widow/orphan detection (#7) are implemented and integrated into GlobalTypeset, the go.js distributable, and all demo pages. These work at every width including mobile — measuring real rendered lines and fixing only what's actually broken.
+**The full two-pass pipeline runs on every `<p>` with 80+ chars, 1.6s after page load, and re-runs on resize.**
 
-**Next priorities:** Dynamic hyphenation control (#3) and letter-spacing micro-adjustments (#4) would add the next layer of mobile value.
+**Next priorities:** Port shapeRag to go.js distributable. Replace static before/after PNGs with live interactive toggle.
 
-### smoothRag()
+### The Two-Pass System: optimizeBreaks → shapeRag
 
-Adjusts word-spacing per line to create even rag (right edge alignment).
+**Pass 1: `optimizeBreaks(element, { onApplied: () => shapeRag(element) })`**
+- Knuth-Plass DP over all break configurations (25-word lookback)
+- Break quality: 35 prepositions, 6 conjunctions, 3 articles (penalty 500 each)
+- Sentence start protection (penalty 500)
+- Stairstep demerits: >15% fill diff = +200, >10% = +80
+- Cubic badness centered on 85% fill
+- Applies via nbsp injection — walks innerHTML preserving all HTML tags
+- ResizeObserver re-runs on window resize
 
-**CRITICAL BUG HISTORY:**
+**Pass 2: `shapeRag(element)`**
+- Runs as callback after each optimizeBreaks application
+- Wraps words in measurement spans, groups by offsetTop into lines
+- Computes median target from non-last-line widths
+- Per-line word-spacing: Tschichold tolerances (80–133% of natural space × lhScale)
+- Per-line letter-spacing: ±2% of em × lhScale (secondary lever)
+- Line-height adaptive scaling: `lhScale = 1.0 + (lhRatio - 1.5)`
+- Asymmetric neighbor dampening: expanding × 0.85, contracting × 0.65
+- Anti-justification guard: >92% fill + <4% range → scale 50%
+- Near-justified + orphan pattern: avg >88% + last <60% → target at 82%
+
+**Rules:**
+- NEVER split on patterns that match `\u00A0` — it destroys typesetText bindings
+- ALWAYS verify textContent after processing (no concatenated words)
+- Word-spacing adjustments must be subtle — users should not perceive justification
+
+### smoothRag() — LEGACY
+
+Superseded by the optimizeBreaks → shapeRag two-pass system as of March 11, 2026. Code remains in typeset.ts but is no longer called by GlobalTypeset. Retained for reference and potential use in go.js until shapeRag is ported.
+
+**CRITICAL BUG HISTORY (from smoothRag era):**
 1. **Split on `[\s\u00A0]+`** destroyed nbsp bindings from typesetText. Fix: split on `/ +/` (regular spaces only). (2026-03-09)
 2. **`<br>` joins** concatenated words in textContent. Fix: use `white-space: pre-line` + `\n` joins. (2026-03-09)
 3. **display:block spans** also concatenated words in textContent. Same fix as above. (2026-03-09)
 4. **Word-spacing too aggressive on mobile** (MAX_EXPAND 1.5px created justified look). Reduced to 0.6px at <350px. (2026-03-09)
-
-**Rules:**
-- NEVER split on patterns that match `\u00A0` — it destroys typesetText bindings
-- ALWAYS verify textContent after smoothRag runs (no concatenated words)
-- Word-spacing adjustments must be subtle — users should not perceive justification
 
 ### measureCh()
 
@@ -217,8 +237,14 @@ Currently protected:
 
 ## GlobalTypeset
 
-Runs typesetText + smoothRag on all text elements via MutationObserver.
+Runs the full typesetting pipeline on all text elements:
 
-**Exclusions:** Elements with `data-no-typeset` skip typesetText. Elements with `data-no-smooth` skip smoothRag. The AnimatedHeroHeading uses `data-no-typeset` on its `<h1>`.
+1. **Phase 1 (100ms, 600ms, 1600ms):** `typesetAll` + `typesetHeading` — pre-render nbsp bindings
+2. **Phase 2b (1600ms + rAF):** `fixRealOrphans` — post-render orphan detection on actual rendered lines
+3. **Phase 3 (1600ms + rAF + 200ms):** `optimizeBreaks` → `shapeRag` — the full two-pass system
+
+MutationObserver handles dynamically added content (Phase 1 only — Phases 2/3 don't re-trigger to prevent infinite loops).
+
+**Exclusions:** Elements with `data-no-typeset` skip typesetText. Elements with `data-no-smooth` skip optimizeBreaks + shapeRag. The AnimatedHeroHeading uses `data-no-typeset` on its `<h1>`.
 
 The "Browser Default" panel on the Perfect Paragraph page MUST have both `data-no-typeset` and `data-no-smooth` — otherwise both panels look identical and the comparison is meaningless.

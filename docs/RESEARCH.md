@@ -173,30 +173,66 @@ The key insight: the "optimal" solution by badness score isn't always the most b
 
 ---
 
-## Part VI: The Spacing Pass
+## Part VI: The Spacing Pass (shapeRag)
 
-After breaks are optimized, spacing is adjusted to smooth the rag. This is the "accordion" — gently expanding short lines and contracting long lines toward the median fill.
+After breaks are optimized, spacing is adjusted to smooth the rag. This is the "accordion" — gently expanding short lines and contracting long lines toward the median fill. As of March 11, 2026, this pass is **fully implemented and deployed** as `shapeRag()` in `typeset.ts`, wired into `GlobalTypeset` as Pass 2 via a callback from `optimizeBreaks`.
 
 ### Two Levers
 
-1. **Word-spacing** (primary): CSS `word-spacing` is additive to the font's natural space. We adjust ±0.9 to +1.4px per gap (Tschichold tolerances).
+1. **Word-spacing** (primary): CSS `word-spacing` is additive to the font's natural space. We adjust within Tschichold tolerances: tighten by up to 20% of natural space, expand by up to 33%.
 
-2. **Letter-spacing** (secondary): ±2% of em, half that for tightening. Letter-spacing is more visible than word-spacing, so it's a last resort for what word-spacing alone can't fix.
+2. **Letter-spacing** (secondary): ±2% of em, half that for tightening. Letter-spacing is more visible than word-spacing, so it's a secondary lever for what word-spacing alone can't close.
 
 ### Scaling
 
 All tolerances derive from font metrics, not magic numbers:
-- `maxTighten = naturalSpace × 0.20`
-- `maxExpand = naturalSpace × 0.33`
-- `maxLetterSpacing = em × 0.02`
+- `maxTighten = naturalSpace × 0.20 × lhScale`
+- `maxExpand = naturalSpace × 0.33 × lhScale`
+- `maxLetterSpacing = em × 0.02 × lhScale`
 
 Change the font, change the size — the tolerances recalculate automatically.
+
+### Line-Height Adaptive Scaling
+
+Dustin's insight: higher line-height = more room for expansion (rivers are harder to see with more vertical space). The `lhScale` factor scales all tolerances based on computed line-height:
+- `lhScale = 1.0 + (lhRatio - 1.5)` — where lhRatio is `lineHeight / fontSize`
+- At the site's 1.65 leading: lhScale ≈ 1.15, so tolerances get ~15% more room
+- At tight leading (1.3): lhScale ≈ 0.8, so tolerances tighten proportionally
+
+### Asymmetric Neighbor Dampening
+
+When adjacent lines move in opposite directions (one expanding, one contracting), the visual difference is amplified. The system applies asymmetric dampening:
+- **Expanding line:** × 0.85 (lighter dampening — expansion matters more for readability)
+- **Contracting line:** × 0.65 (heavier dampening — contraction is more visible)
+
+Same-direction adjustments on adjacent lines get no dampening.
 
 ### The Anti-Justification Guard
 
 The rag is a feature, not a bug. Dustin's insight: the irregular right edge provides a "lattice" of landmarks that helps the eye track its position in the paragraph. Smooth too much and you lose the lattice — the text starts looking justified without actually being justified, which is the worst of both worlds.
 
-The guard: if a line's adjusted fill exceeds 92%, stop expanding. Leave the rag alone.
+**Two-part guard:**
+1. If all non-last fills > 92% AND within 4% of each other → scale all adjustments back 50%
+2. If average fill > 88% and last line < 60% (near-justified + orphan pattern) → pull target down to 82% of container to create intentional rag
+
+### Near-Justified + Orphan Pattern
+
+When most lines fill >88% but the last line is short (<60%), the paragraph looks accidentally justified with a stranded last line. The system detects this pattern and shifts the target downward, creating a more intentional rag shape instead of near-justification.
+
+### Implementation Architecture
+
+```
+optimizeBreaks(element, { onApplied: () => shapeRag(element) })
+```
+
+`shapeRag` runs as a callback after each `optimizeBreaks` application (including resize re-runs). It:
+1. Wraps words in measurement spans to detect actual rendered lines
+2. Groups by vertical position (offsetTop)
+3. Computes median target from non-last-line widths
+4. Applies per-line word-spacing + letter-spacing via `<span style="...">`
+5. Uses `white-space: pre-line` with `\n` joins for clean textContent
+
+No separate ResizeObserver — it inherits the resize lifecycle from `optimizeBreaks`.
 
 ---
 
@@ -228,16 +264,28 @@ At Tschichold's maximum expansion (133% of natural space = +1.4px), the spacing 
 
 ## Part VIII: Architecture
 
-### Two-Layer System
+### Two-Pass System (Deployed)
 
 ```
-Text → Break Optimizer (Knuth-Plass DP) → Spacing Pass (Tschichold accordion) → Rendered paragraph
-         ↑                                    ↑
-    Break quality rules                  Font-derived tolerances
-    Stairstep demerits                   Anti-justification guard
-    Cubic badness                        Median-targeting
-    Probabilistic variants               Neighbor-aware dampening
+Text → typesetText (pre-render bindings)
+     → Browser layout
+     → optimizeBreaks / Pass 1 (Knuth-Plass DP → nbsp injection)
+         ↑
+    Break quality rules (35 prepositions, 6 conjunctions, 3 articles)
+    Stairstep demerits (>10% = +80, >15% = +200)
+    Cubic badness centered on 85% fill
+    Sentence start protection (penalty 500)
+
+     → shapeRag / Pass 2 (Tschichold accordion → per-line CSS)
+         ↑
+    Font-derived tolerances (ws: 80-133%, ls: ±2% em)
+    Line-height adaptive scaling
+    Asymmetric neighbor dampening
+    Anti-justification guard (>92% + <4% range → scale 50%)
+    Near-justified + orphan pattern detection
 ```
+
+Both passes run via `GlobalTypeset` on all `<p>` elements with 80+ chars, 1.6s after page load. Pass 2 fires as a callback from Pass 1, sharing the same resize lifecycle.
 
 ### Font Metrics (measured, not assumed)
 
@@ -288,13 +336,37 @@ These publications solved narrow-column typography through craft:
 
 ---
 
-## Part X: Open Questions
+## Part X: What's Deployed (as of March 11, 2026)
 
-1. **Probabilistic variants**: How many iterations produce diminishing returns? Is 10 enough or do we need 20?
-2. **Contour quality**: What makes a rag "beautiful"? Alternating short/long? Gentle curves? Anti-monotonic patterns?
-3. **Expansion visibility**: Should the 133% Tschichold max be scaled back for web rendering, where subpixel differences are more visible than in print?
-4. **Dynamic content**: How does the optimizer handle text that changes (CMS, user input, localization)?
-5. **Performance budget**: Full DP with Monte Carlo on a long paragraph — can it stay under 16ms (one frame)?
+The full two-pass system is live on typeset.us:
+
+| Component | Function | Status |
+|-----------|----------|--------|
+| `typesetText()` | Pre-render nbsp bindings (measure-aware tiers) | ✅ Live |
+| `fixRealOrphans()` | Post-render orphan detection on actual lines | ✅ Live |
+| `optimizeBreaks()` | Pass 1: Knuth-Plass DP → nbsp injection | ✅ Live |
+| `shapeRag()` | Pass 2: Tschichold accordion → per-line CSS | ✅ Live (March 11) |
+| `smoothRag()` | Legacy rag smoother (Knuth-Plass + word-spacing) | Superseded by shapeRag |
+| Probabilistic breaking (v6) | Monte Carlo variant exploration | Tested, not deployed |
+| go.js v2.0 | Distributable script for users | ✅ Live (needs shapeRag port) |
+
+### Key Decision: Break-Only → Full Two-Pass
+
+From March 10 to March 11, the system ran break optimization only — no spacing adjustments. This was a deliberate conservative choice after a bug where spacing destroyed text (v3, words merging at -5.3px). 
+
+On March 11, Dustin asked: "I thought we designed a multipass system that would see irregularities and adjust? Is it running?" The answer was no. Pass 2 had never been wired into production.
+
+The full system is now deployed with correct Tschichold tolerances (80-133% of natural space, not ±'i' width), line-height scaling, neighbor dampening, and anti-justification guards.
+
+---
+
+## Part XI: Open Questions
+
+1. **Contour quality**: What makes a rag "beautiful"? Alternating short/long? Gentle curves? Anti-monotonic patterns? (Dustin's "musicality" insight — optimize for shape, not uniformity)
+2. **Expansion visibility at narrow widths**: At 310px with 6 gaps per line, even Tschichold-safe expansion (+1.4px) is visible. Should narrow measures use tighter tolerances?
+3. **go.js needs shapeRag**: The distributable script users download doesn't have Pass 2 yet. Port needed.
+4. **Live before/after demos**: Static PNGs of fabricated examples don't prove the tool works. Need interactive toggle on real text. (Dustin's March 11 insight: "if we have to keep using fake examples doesn't that mean our tool doesn't work?")
+5. **Performance at scale**: Full two-pass on every paragraph — measure impact on pages with 20+ paragraphs.
 
 ---
 
