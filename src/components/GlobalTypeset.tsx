@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { typesetAll, typesetHeading, smoothRag, fixRealOrphans, optimizeBreaks } from '@/lib/typeset';
+import { typesetAll, typesetHeading, smoothRag, fixRealOrphans, optimizeBreaks, shapeRag } from '@/lib/typeset';
 
 /**
  * GlobalTypeset — applies typographic rules to all text on the page.
@@ -54,9 +54,10 @@ export default function GlobalTypeset() {
           const text = p.textContent || '';
           if (text.length < 80) return;
           if (p.closest('[data-no-smooth], pre, code, .demo, [role="tabpanel"]')) return;
-          // optimizeBreaks: Knuth-Plass DP with break quality rules,
-          // stairstep demerits, and cubic badness. No spacing adjustments.
-          const cleanup = optimizeBreaks(p);
+          // Pass 1: optimizeBreaks — Knuth-Plass DP with break quality rules,
+          // stairstep demerits, and cubic badness. Sets nbsp bindings.
+          // Pass 2: shapeRag — runs automatically after optimizeBreaks via callback.
+          const cleanup = optimizeBreaks(p, { onApplied: () => shapeRag(p) });
           ragCleanups.push(cleanup);
         } catch {
           // silently skip

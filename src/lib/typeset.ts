@@ -1114,7 +1114,12 @@ function isOptSentenceEnd(w: string): boolean {
   return /[.!?]["'\u201D\u2019]?$/.test(w);
 }
 
-export function optimizeBreaks(element: HTMLElement): () => void {
+interface OptimizeBreaksOptions {
+  /** Called after each apply (including resize re-runs). Use for Pass 2. */
+  onApplied?: () => void;
+}
+
+export function optimizeBreaks(element: HTMLElement, opts?: OptimizeBreaksOptions): () => void {
   const originalHTML = element.innerHTML;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
   let lastWidth = -1;
@@ -1347,6 +1352,7 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     }
 
     element.innerHTML = result;
+    opts?.onApplied?.();
   }
 
   apply();
@@ -1366,6 +1372,222 @@ export function optimizeBreaks(element: HTMLElement): () => void {
     if (resizeTimer) clearTimeout(resizeTimer);
     element.innerHTML = originalHTML;
   };
+}
+
+/**
+ * shapeRag — Pass 2: Rag shaping via per-line word-spacing + letter-spacing.
+ *
+ * Runs AFTER optimizeBreaks (Pass 1) has set nbsp bindings.
+ * Measures actual rendered line widths, then applies bidirectional
+ * spacing adjustments with:
+ *   - Tschichold tolerances: word-spacing 80–133% of natural space
+ *   - Conservative letter-spacing: ±2% of em
+ *   - Line-height adaptive scaling: more room at higher leading
+ *   - Asymmetric neighbor dampening: lighter touch on expansion
+ *   - Anti-justification guard: backs off when lines get too uniform
+ *
+ * Does NOT change line breaks — only adjusts spacing within existing lines.
+ * Returns a cleanup function.
+ */
+export function shapeRag(element: HTMLElement): void {
+    const text = element.textContent || '';
+    if (!text.trim() || text.length < 60) return;
+
+    const cs = getComputedStyle(element);
+    const containerWidth =
+      element.clientWidth -
+      parseFloat(cs.paddingLeft) -
+      parseFloat(cs.paddingRight);
+
+    if (containerWidth < 250) return;
+
+    // --- Measure font metrics ---
+    const fontSize = parseFloat(cs.fontSize) || 16;
+    const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.5;
+    const lhRatio = lineHeight / fontSize;
+
+    // Line-height adaptive scaling: 1.0 at lh=1.5, ±10% per 0.1 deviation
+    const lhScale = 1.0 + (lhRatio - 1.5);
+
+    // Measure natural space width
+    const measurer = document.createElement('span');
+    measurer.style.cssText =
+      'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
+      'font:inherit;letter-spacing:inherit;word-spacing:inherit;';
+    element.style.position = element.style.position || 'relative';
+    element.appendChild(measurer);
+
+    measurer.innerHTML = 'a b';
+    const abWidth = measurer.getBoundingClientRect().width;
+    measurer.textContent = 'ab';
+    const naturalSpace = abWidth - measurer.getBoundingClientRect().width;
+
+    element.removeChild(measurer);
+
+    if (naturalSpace < 1) return;
+
+    // Tschichold tolerances: 80–133% of natural space
+    const maxTighten = naturalSpace * 0.20 * Math.max(0.5, lhScale);  // tighten by up to 20%
+    const maxExpand = naturalSpace * 0.33 * Math.max(0.5, lhScale);   // expand by up to 33%
+    // Letter-spacing: ±2% of em (very conservative)
+    const maxLS = fontSize * 0.02 * Math.max(0.5, lhScale);
+
+    // --- Detect lines by wrapping words in spans ---
+    // Split on regular spaces only — preserve nbsp bindings
+    const words = text.split(/ +/).filter(Boolean);
+    if (words.length < 4) return;
+
+    element.innerHTML = words
+      .map((w, i) => `<span data-sw="${i}">${w}</span>`)
+      .join(' ');
+
+    const wordSpans = element.querySelectorAll<HTMLElement>('span[data-sw]');
+    const lines: { wordIndices: number[]; width: number }[] = [];
+    let currentTop = -1;
+    let currentLine: number[] = [];
+
+    wordSpans.forEach((span, idx) => {
+      const top = Math.round(span.getBoundingClientRect().top);
+      if (currentTop === -1) {
+        currentTop = top;
+        currentLine = [idx];
+      } else if (Math.abs(top - currentTop) > 3) {
+        if (currentLine.length > 0) {
+          const first = wordSpans[currentLine[0]];
+          const last = wordSpans[currentLine[currentLine.length - 1]];
+          lines.push({
+            wordIndices: [...currentLine],
+            width: last.getBoundingClientRect().right - first.getBoundingClientRect().left,
+          });
+        }
+        currentTop = top;
+        currentLine = [idx];
+      } else {
+        currentLine.push(idx);
+      }
+    });
+    if (currentLine.length > 0) {
+      const first = wordSpans[currentLine[0]];
+      const last = wordSpans[currentLine[currentLine.length - 1]];
+      lines.push({
+        wordIndices: [...currentLine],
+        width: last.getBoundingClientRect().right - first.getBoundingClientRect().left,
+      });
+    }
+
+    if (lines.length < 3) return;
+
+    // --- Compute target: median of non-last line widths ---
+    const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
+    const midIdx = Math.floor(nonLastWidths.length / 2);
+    let target = nonLastWidths.length % 2 === 0
+      ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
+      : nonLastWidths[midIdx];
+
+    // Anti-justification guard: if all non-last fills > 92% AND within 4% of each other,
+    // the text already looks near-justified. Scale back adjustments 50%.
+    const nonLastFills = lines.slice(0, -1).map(l => l.width / containerWidth);
+    const allAbove92 = nonLastFills.every(f => f > 0.92);
+    const fillRange = Math.max(...nonLastFills) - Math.min(...nonLastFills);
+    const nearJustified = allAbove92 && fillRange < 0.04;
+
+    // Near-justified + orphan pattern: pull target down
+    const lastFill = lines[lines.length - 1].width / containerWidth;
+    const avgFill = nonLastFills.reduce((s, f) => s + f, 0) / nonLastFills.length;
+    if (avgFill > 0.88 && lastFill < 0.60 && lines.length > 2) {
+      target = Math.min(target, containerWidth * 0.82);
+    }
+
+    const baseWS = parseFloat(cs.wordSpacing) || 0;
+
+    // --- Compute per-line adjustments ---
+    interface LineAdj { wsPerGap: number; lsPerChar: number; direction: number }
+    const adjustments: LineAdj[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isLast = i === lines.length - 1;
+      const lineWords = line.wordIndices.map(idx => words[idx]);
+      // Count gaps (spaces between words)
+      const gaps = lineWords.length - 1;
+      const totalChars = lineWords.join('').length;
+      const gap = target - line.width;
+
+      if (isLast || gaps === 0) {
+        adjustments.push({ wsPerGap: 0, lsPerChar: 0, direction: 0 });
+        continue;
+      }
+
+      // Primary lever: word-spacing
+      let wsPerGap = gap / gaps;
+      wsPerGap = Math.max(-maxTighten, Math.min(maxExpand, wsPerGap));
+
+      // Secondary lever: letter-spacing for remaining gap
+      const wsGain = wsPerGap * gaps;
+      const remaining = gap - wsGain;
+      let lsPerChar = 0;
+      if (Math.abs(remaining) > 1 && totalChars > 0) {
+        lsPerChar = remaining / totalChars;
+        lsPerChar = Math.max(-maxLS * 0.5, Math.min(maxLS, lsPerChar));
+      }
+
+      const direction = gap > 0 ? 1 : gap < 0 ? -1 : 0;
+      adjustments.push({ wsPerGap, lsPerChar, direction });
+    }
+
+    // --- Asymmetric neighbor dampening ---
+    // When adjacent lines move in opposite directions, dampen to avoid rivers
+    for (let i = 1; i < adjustments.length - 1; i++) {
+      const prev = adjustments[i - 1];
+      const curr = adjustments[i];
+      if (prev.direction !== 0 && curr.direction !== 0 && prev.direction !== curr.direction) {
+        if (curr.direction > 0) {
+          // Expanding: lighter dampening (expansion matters more for readability)
+          curr.wsPerGap *= 0.85;
+          curr.lsPerChar *= 0.85;
+        } else {
+          // Contracting: heavier dampening
+          curr.wsPerGap *= 0.65;
+          curr.lsPerChar *= 0.65;
+        }
+      }
+    }
+
+    // Anti-justification scale-back
+    if (nearJustified) {
+      for (const adj of adjustments) {
+        adj.wsPerGap *= 0.5;
+        adj.lsPerChar *= 0.5;
+      }
+    }
+
+    // --- Build output HTML ---
+    const htmlParts: string[] = [];
+    let anyAdjustment = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineWords = line.wordIndices.map(idx => words[idx]);
+      const lineText = lineWords.join(' ');
+      const adj = adjustments[i];
+
+      if (Math.abs(adj.wsPerGap) > 0.05 || Math.abs(adj.lsPerChar) > 0.01) {
+        const finalWS = baseWS + adj.wsPerGap;
+        let style = `word-spacing:${finalWS.toFixed(2)}px`;
+        if (Math.abs(adj.lsPerChar) > 0.01) {
+          style += `;letter-spacing:${adj.lsPerChar.toFixed(3)}px`;
+        }
+        htmlParts.push(`<span style="${style}">${lineText}</span>`);
+        anyAdjustment = true;
+      } else {
+        htmlParts.push(lineText);
+      }
+    }
+
+    if (!anyAdjustment) return;
+
+    element.style.whiteSpace = 'pre-line';
+    element.innerHTML = htmlParts.join('\n');
 }
 
 export default typeset;
