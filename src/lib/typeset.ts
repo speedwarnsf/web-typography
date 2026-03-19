@@ -54,8 +54,8 @@ type Token = {
 interface FrozenLine {
   text: string;  // exact line content
   tokens: Token[];  // tokens in this line
-  width: number;  // actual line width in pixels
   fill: number;  // 0-1 fill ratio
+  width: number;  // actual line width in pixels
   wordSpacingEm: number;  // spacing adjustment in em units
 }
 
@@ -497,8 +497,8 @@ function composeParagraph(
     return bestComplete.lines.map(line => ({
       text: line.tokens.map(t => t.text).join(' '),
       tokens: line.tokens,
-      width: line.width,
       fill: line.fill,
+      width: line.width,
       wordSpacingEm: 0,
     }));
   }
