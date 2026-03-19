@@ -280,8 +280,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Content area — solid bg so fixed photo doesn't bleed through ── */}
-      <div className="relative bg-black" style={{ zIndex: 2 }}>
+      {/* ── Content area — semi-transparent so fixed photo bleeds through subtly ── */}
+      <div className="relative bg-black/90 backdrop-blur-sm" style={{ zIndex: 2 }}>
 
       {/* ── Typographic Rules ── */}
       <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
