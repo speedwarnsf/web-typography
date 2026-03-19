@@ -123,4 +123,10 @@ p, li, blockquote, figcaption {
   animation: slowZoom 30s ease-in-out infinite alternate;
 }
 
+/* Override opaque backgrounds on subpages so the fixed photo bleeds through */
+main {
+  background-color: rgba(10, 10, 10, 0.92) !important;
+  backdrop-filter: blur(2px);
+}
+
 /* deployed Wed Mar 11 02:19:20 PDT 2026 */

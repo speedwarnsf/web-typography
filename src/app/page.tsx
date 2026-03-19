@@ -2,7 +2,7 @@ import { rules } from "./rules-data";
 import CodeBlock from "@/components/CodeBlock";
 import CopyButton from "@/components/CopyButton";
 import AnimatedHeroHeading from "@/components/AnimatedHeroHeading";
-import HeroParallax from "@/components/HeroParallax";
+
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -234,26 +234,8 @@ export default function Home() {
       {/* Google Fonts for all 36 pairings */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
-      {/* ── Fixed background — locked in place, content scrolls over it ── */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/typography-bg.jpg"
-        alt=""
-        aria-hidden="true"
-        id="hero-bg"
-        className="fixed top-0 left-0 w-full h-[120vh] object-cover opacity-50 pointer-events-none select-none"
-        style={{ zIndex: 0, filter: 'contrast(1.15) brightness(0.85)', willChange: 'transform' }}
-      />
-      {/* Fixed dark overlay */}
-      <div
-        className="fixed top-0 left-0 w-full h-screen bg-gradient-to-b from-black/50 via-black/40 to-black/70 pointer-events-none"
-        style={{ zIndex: 1 }}
-      />
-
-      <HeroParallax />
-
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800" style={{ zIndex: 2 }}>
+      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800">
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
@@ -280,8 +262,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Content area — semi-transparent so fixed photo bleeds through subtly ── */}
-      <div className="relative bg-black/90 backdrop-blur-sm" style={{ zIndex: 2 }}>
+      {/* ── Content area — semi-transparent so fixed photo bleeds through ── */}
+      <div className="relative bg-black/90 backdrop-blur-sm">
 
       {/* ── Typographic Rules ── */}
       <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
