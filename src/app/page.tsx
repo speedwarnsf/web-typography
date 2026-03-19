@@ -235,19 +235,19 @@ export default function Home() {
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
       <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800 overflow-hidden">
-        {/* Background image with parallax */}
+        {/* Background image with parallax — visible but atmospheric */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-10 animate-slowZoom"
+          className="absolute inset-0 bg-cover bg-center opacity-40 animate-slowZoom"
           style={{
             backgroundImage: 'url(/typography-bg.jpg)',
-            backgroundAttachment: 'fixed',
+            backgroundSize: 'cover',
             backgroundPosition: 'center center',
             zIndex: 0,
           }}
         />
         {/* Dark overlay gradient */}
         <div
-          className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/85 to-black/90"
+          className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/85"
           style={{ zIndex: 1 }}
         />
         {/* Content */}
