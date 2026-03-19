@@ -235,18 +235,18 @@ export default function Home() {
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
       <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800 overflow-hidden">
-        {/* Background image — letterpress type, atmospheric */}
+        {/* Background image — letterpress type blocks, Dustin's Alameda flea market macro */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/typography-bg.jpg"
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-30 animate-slowZoom pointer-events-none select-none"
-          style={{ zIndex: 0 }}
+          className="absolute w-full h-[120%] object-cover opacity-40 pointer-events-none select-none animate-slowZoom"
+          style={{ zIndex: 0, top: '-10%', left: 0, filter: 'contrast(1.1) brightness(0.9)' }}
         />
-        {/* Dark overlay gradient */}
+        {/* Dark overlay — subtle enough to let the photo breathe */}
         <div
-          className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-black/80"
+          className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/75"
           style={{ zIndex: 1 }}
         />
         {/* Content */}
