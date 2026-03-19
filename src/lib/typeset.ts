@@ -21,6 +21,49 @@
 
 const NBSP = '\u00A0'; // non-breaking space
 const HAIR = '\u200A'; // hair space (invisible, used as marker)
+const NBHY = '\u2011'; // non-breaking hyphen — keeps compound words like "human-centric" together
+const ZWSP = '\u200B'; // zero-width space for discretionary break opportunities
+
+// WeakMap to store canonical raw text before any processing
+const canonicalText = new WeakMap<HTMLElement, string>();
+
+// Internal write flag for MutationObserver
+let isInternalWrite = false;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOBILE PARAGRAPH COMPOSITOR V2 — Token-aware beam search compositor
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Token types for compositor */
+type TokenKind = "word" | "space" | "openPunct" | "closePunct" | "dash" | "compound" | "longSlug";
+
+/** Token with measurements and stickiness rules */
+type Token = {
+  text: string;
+  kind: TokenKind;
+  width: number;
+  stickyPrev?: boolean;   // must stay with previous token
+  stickyNext?: boolean;   // must stay with next token
+  weakEnd?: boolean;      // penalized at line end (not forbidden)
+  protectedCompound?: boolean;  // e.g., "human-centric" — don't split
+  emergencyBreakParts?: string[];  // for long slugs like ThePaperLanternStore
+  compoundId?: string;             // shared ID for tokens in the same protected compound
+};
+
+/** Frozen line with exact membership and spacing adjustments */
+interface FrozenLine {
+  text: string;  // exact line content
+  tokens: Token[];  // tokens in this line
+  width: number;  // actual line width in pixels
+  fill: number;  // 0-1 fill ratio
+  wordSpacingEm: number;  // spacing adjustment in em units
+}
+
+// Token classification sets
+const WEAK_END_WORDS = new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as"]);
+const OPEN_PUNCT = new Set(["(", "[", "{", "\u201C", "\u2018"]);  // opening quotes/brackets
+const CLOSE_PUNCT = new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);
+const DASHES = new Set(["\u2014", "\u2013"]);  // em-dash, en-dash
 
 /**
  * Options for typesetText
@@ -32,10 +75,588 @@ export interface TypesetOptions {
 }
 
 /**
+ * Safe write wrapper for DOM mutations.
+ * Sets isInternalWrite flag to prevent MutationObserver from reacting to our own changes.
+ */
+export function safeWrite(fn: () => void): void {
+  isInternalWrite = true;
+  fn();
+  requestAnimationFrame(() => { isInternalWrite = false; });
+}
+
+/**
+ * Check if MutationObserver should ignore current mutations.
+ */
+export function shouldIgnoreMutation(): boolean {
+  return isInternalWrite;
+}
+
+/**
  * Detect sentence boundaries
  */
 const isSentenceEnd = (word: string) =>
   /[.!?]$/.test(word) || /[.!?]["'\u201D\u2019]$/.test(word);
+
+// ─── Tokenizer ───
+
+/**
+ * Tokenize text into typed tokens with measurements.
+ * Detects compound words, long slugs, punctuation stickiness, weak-end words.
+ */
+function tokenize(text: string, measurer: (text: string) => number): Token[] {
+  if (!text || text.trim().length === 0) return [];
+
+  // Split on whitespace while preserving the whitespace
+  const parts = text.split(/(\s+)/);
+  const tokens: Token[] = [];
+
+  for (const part of parts) {
+    if (!part) continue;
+
+    // Whitespace token
+    if (/^\s+$/.test(part)) {
+      tokens.push({
+        text: part,
+        kind: "space",
+        width: measurer(part),
+      });
+      continue;
+    }
+
+    // Word/punctuation token
+    const lower = part.toLowerCase();
+    const firstChar = part[0];
+    const lastChar = part[part.length - 1];
+
+    // Classify token kind
+    let kind: TokenKind = "word";
+    let stickyPrev = false;
+    let stickyNext = false;
+    let weakEnd = false;
+    let protectedCompound = false;
+    let emergencyBreakParts: string[] | undefined;
+
+    // Opening punctuation
+    if (OPEN_PUNCT.has(firstChar) && part.length === 1) {
+      kind = "openPunct";
+      stickyNext = true;
+    }
+    // Closing punctuation
+    else if (CLOSE_PUNCT.has(lastChar) && (part.length === 1 || CLOSE_PUNCT.has(part))) {
+      kind = "closePunct";
+      stickyPrev = true;
+    }
+    // Dash
+    else if (DASHES.has(part)) {
+      kind = "dash";
+      stickyPrev = true;
+    }
+    // Compound word (internal hyphen, <=20 chars)
+    else if (part.length <= 20 && part.indexOf('-') > 0 && part.indexOf('-') < part.length - 1) {
+      kind = "compound";
+      protectedCompound = true;
+    }
+    // Long slug (>16 chars, no spaces)
+    else if (part.length > 16 && !/\s/.test(part)) {
+      kind = "longSlug";
+      // Detect camelCase boundaries
+      const camelParts = part.split(/(?<=[a-z])(?=[A-Z])/);
+      if (camelParts.length > 1) {
+        emergencyBreakParts = camelParts;
+      } else {
+        // Try underscore/slash
+        const delimParts = part.split(/[_\/]/);
+        if (delimParts.length > 1) {
+          emergencyBreakParts = delimParts;
+        }
+      }
+    }
+    // Weak-end word
+    else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ''))) {
+      weakEnd = true;
+    }
+
+    tokens.push({
+      text: part,
+      kind,
+      width: measurer(part),
+      stickyPrev,
+      stickyNext,
+      weakEnd,
+      protectedCompound,
+      emergencyBreakParts,
+    });
+  }
+
+  return tokens;
+}
+
+// ─── Compositor (replaces optimizeBreaks) ───
+
+interface CompositorProfile {
+  mainTarget: number;
+  lastTarget: number;
+  weakEndPenalty: number;
+  orphanPenalty: number;
+  flatShelfPenalty: number;
+  snapPenalty: number;
+  maxWordSpacing: number;
+}
+
+/**
+ * Get compositor profile based on measure (character width).
+ */
+function profileForMeasure(measureCh: number): CompositorProfile {
+  if (measureCh < 18) return {
+    mainTarget: 0.85,
+    lastTarget: 0.55,
+    weakEndPenalty: 4800,
+    orphanPenalty: 1e9,
+    flatShelfPenalty: 240,
+    snapPenalty: 180,
+    maxWordSpacing: 0.018,
+  };
+  if (measureCh < 24) return {
+    mainTarget: 0.82,
+    lastTarget: 0.52,
+    weakEndPenalty: 4200,
+    orphanPenalty: 1e9,
+    flatShelfPenalty: 200,
+    snapPenalty: 140,
+    maxWordSpacing: 0.025,
+  };
+  return {
+    mainTarget: 0.80,
+    lastTarget: 0.48,
+    weakEndPenalty: 3400,
+    orphanPenalty: 1e9,
+    flatShelfPenalty: 160,
+    snapPenalty: 100,
+    maxWordSpacing: 0.035,
+  };
+}
+
+/**
+ * Compose paragraph using beam search over exact break candidates.
+ * Returns frozen lines with exact membership, or null if no valid composition.
+ */
+function composeParagraph(
+  tokens: Token[],
+  measurePx: number,
+  measureCh: number
+): FrozenLine[] | null {
+  if (tokens.length === 0) return null;
+
+  const profile = profileForMeasure(measureCh);
+  const BEAM = 48;
+
+  // Filter out pure whitespace tokens for line candidates
+  const contentTokens = tokens.filter(t => t.kind !== "space");
+  if (contentTokens.length < 2) return null;
+
+  interface BeamState {
+    tokenIndex: number;  // next token to place
+    lines: { tokens: Token[]; width: number; fill: number }[];
+    cost: number;
+  }
+
+  // Get space width from the original token list (first space token's width)
+  const spaceToken = tokens.find(t => t.kind === "space");
+  const spaceWidth = spaceToken ? spaceToken.width : 0;
+
+  // Compute line width from content tokens + inter-word spaces
+  const lineWidth = (lineTokens: Token[]): number => {
+    const tokenWidths = lineTokens.reduce((sum, t) => sum + t.width, 0);
+    const gaps = Math.max(0, lineTokens.length - 1);
+    return tokenWidths + gaps * spaceWidth;
+  };
+
+  // --- Lexical helpers for scoring ---
+  const isContent = (t: Token) => t.kind !== "space";
+  const isLexical = (t: Token) =>
+    t.kind === "word" || t.kind === "compound" || t.kind === "longSlug";
+
+  function firstContentToken(toks: Token[]): Token | null {
+    return toks.find(isContent) ?? null;
+  }
+  function lastContentToken(toks: Token[]): Token | null {
+    for (let i = toks.length - 1; i >= 0; i--) {
+      if (isContent(toks[i])) return toks[i];
+    }
+    return null;
+  }
+  function lastLexicalToken(toks: Token[]): Token | null {
+    for (let i = toks.length - 1; i >= 0; i--) {
+      if (isLexical(toks[i])) return toks[i];
+    }
+    return null;
+  }
+  function lexicalWordCount(toks: Token[]): number {
+    let n = 0;
+    for (const t of toks) { if (isLexical(t)) n++; }
+    return n;
+  }
+
+  // Protected compound boundary check
+  // Currently compounds like "human-centric" are single tokens, so this catches
+  // future cases where compound parts might be separate tokens with shared compoundId.
+  function breaksProtectedCompoundAt(breakIndex: number): boolean {
+    if (breakIndex <= 0 || breakIndex >= contentTokens.length) return false;
+    const prev = contentTokens[breakIndex - 1];
+    const next = contentTokens[breakIndex];
+    if (!prev || !next) return false;
+    if (prev.compoundId && next.compoundId && prev.compoundId === next.compoundId) {
+      return true;
+    }
+    // Also check: if the previous token is a protected compound ending with hyphen
+    // and next token could be its continuation (shouldn't happen with current tokenizer, but safety net)
+    if (prev.protectedCompound && prev.text.endsWith('-')) {
+      return true;
+    }
+    return false;
+  }
+
+  // Score a single line using lexical helpers
+  const scoreLine = (
+    lineTokens: Token[],
+    fill: number,
+    isLast: boolean,
+    breakEnd: number
+  ): number => {
+    let penalty = 0;
+
+    const lexCount = lexicalWordCount(lineTokens);
+    const firstContent = firstContentToken(lineTokens);
+    const lastContent = lastContentToken(lineTokens);
+    const lastLexical = lastLexicalToken(lineTokens);
+
+    // Absolute orphan prohibition: one lexical word on final line
+    if (isLast && lexCount === 1) {
+      return profile.orphanPenalty;
+    }
+
+    // One-word non-last line: terrible unless it's a special long-token fallback
+    if (!isLast && lexCount === 1 && fill < 0.85 && lastLexical?.kind !== "longSlug") {
+      penalty += 50000;
+    }
+
+    // Two-word non-last line: bad if visually tiny
+    if (!isLast && lexCount === 2 && fill < 0.50) {
+      penalty += 5000;
+    }
+
+    // Fill deviation from target — strong multiplier so lines far from target get punished
+    const target = isLast ? profile.lastTarget : profile.mainTarget;
+    const deviation = fill - target;
+    penalty += 3000 * deviation * deviation;
+
+    // Very short non-last line
+    // Short non-last lines — progressively harsh penalties
+    if (!isLast && fill < 0.50) {
+      penalty += 8000;
+    } else if (!isLast && fill < 0.60) {
+      penalty += 4000;
+    } else if (!isLast && fill < 0.70) {
+      penalty += 2000;
+    } else if (!isLast && fill < 0.75) {
+      penalty += 800;
+    }
+
+    // Tiny last line that feels quasi-orphaned even if 2 words
+    if (isLast && fill < 0.30 && lexCount <= 2) {
+      penalty += 4000;
+    }
+
+    // Long non-last lines — progressive penalties
+    if (!isLast && fill > 0.93) {
+      penalty += 6000;
+    } else if (!isLast && fill > 0.90) {
+      penalty += 4000;
+    } else if (!isLast && fill > 0.87) {
+      penalty += 2000;
+    } else if (!isLast && fill > 0.84) {
+      penalty += 800;
+    }
+
+    // Illegal line start: closePunct, dash, or stickyPrev
+    if (firstContent && (
+      firstContent.kind === "closePunct" ||
+      firstContent.kind === "dash" ||
+      firstContent.stickyPrev
+    )) {
+      penalty += 1e9;
+    }
+
+    // Illegal line end: openPunct or stickyNext
+    if (lastContent && (
+      lastContent.kind === "openPunct" ||
+      lastContent.stickyNext
+    )) {
+      penalty += 1e9;
+    }
+
+    // Weak lexical word at line end: penalty, not hard fail
+    if (!isLast && lastLexical?.weakEnd) {
+      penalty += profile.weakEndPenalty;
+    }
+
+    // Extra penalty for single-letter lexical endings like "a" / "I"
+    if (!isLast && lastLexical && /^[A-Za-z]$/.test(lastLexical.text)) {
+      penalty += profile.weakEndPenalty * 1.5;
+    }
+
+    // Protected compound boundary break
+    if (breaksProtectedCompoundAt(breakEnd)) {
+      penalty += 7000;
+    }
+
+    return penalty;
+  };
+
+  // Score transition for the NEWEST line only (not full history — that was double-counting)
+  const scoreTransition = (lines: { fill: number }[]): number => {
+    if (lines.length < 2) return 0;
+    let penalty = 0;
+
+    const i = lines.length - 1;
+    const currFill = lines[i].fill;
+    const prevFill = lines[i - 1].fill;
+
+    // Large jump between adjacent lines
+    const jump = Math.abs(currFill - prevFill);
+    if (jump > 0.22) {
+      penalty += profile.snapPenalty * jump * 10;
+    }
+
+    // Flat shelf detection (3 consecutive lines within 5%)
+    if (lines.length >= 3) {
+      const prevPrevFill = lines[i - 2].fill;
+      if (Math.abs(prevPrevFill - prevFill) < 0.05 &&
+          Math.abs(prevFill - currFill) < 0.05 &&
+          Math.abs(prevPrevFill - currFill) < 0.05) {
+        penalty += profile.flatShelfPenalty;
+      }
+    }
+
+    return penalty;
+  };
+
+  // Beam search — collect all complete states and pick the best
+  let beam: BeamState[] = [{ tokenIndex: 0, lines: [], cost: 0 }];
+  let bestComplete: BeamState | null = null;
+  let iterations = 0;
+  const MAX_ITERATIONS = 500;  // Safety valve for very long paragraphs
+
+  while (beam.length > 0 && iterations < MAX_ITERATIONS) {
+    iterations++;
+
+    const newBeam: BeamState[] = [];
+
+    for (const state of beam) {
+      const start = state.tokenIndex;
+
+      // If this state is complete, compare with best
+      if (start >= contentTokens.length) {
+        if (!bestComplete || state.cost < bestComplete.cost) {
+          bestComplete = state;
+        }
+        continue;
+      }
+
+      // Try all legal line candidates from this position
+      for (let end = start + 1; end <= Math.min(start + 25, contentTokens.length); end++) {
+        const lineTokens = contentTokens.slice(start, end);
+        const width = lineWidth(lineTokens);
+        const fill = width / measurePx;
+
+        // Skip overfull lines (but allow slight overflow for last line)
+        const isLast = end === contentTokens.length;
+        // Hard fill cap — no non-last line allowed past 85%
+        if (fill > 0.85 && !isLast) continue;
+        if (fill > 0.95) continue;  // Hard cap even for last line
+
+        const linePenalty = scoreLine(lineTokens, fill, isLast, end);
+        const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
+        const transitionPenalty = scoreTransition(newLines);
+
+        newBeam.push({
+          tokenIndex: end,
+          lines: newLines,
+          cost: state.cost + linePenalty + transitionPenalty,
+        });
+      }
+    }
+
+    // Keep top BEAM states
+    newBeam.sort((a, b) => a.cost - b.cost);
+    beam = newBeam.slice(0, BEAM);
+  }
+
+  // Return the best complete composition
+  if (bestComplete) {
+    return bestComplete.lines.map(line => ({
+      text: line.tokens.map(t => t.text).join(' '),
+      tokens: line.tokens,
+      width: line.width,
+      fill: line.fill,
+      wordSpacingEm: 0,
+    }));
+  }
+
+  // No valid composition found
+  return null;
+}
+
+// ─── Shape Exact Lines (replaces shapeRag) ───
+
+/**
+ * Adjust word-spacing within fixed line membership.
+ * May NOT change which words belong to which line.
+ */
+function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number): FrozenLine[] | null {
+  const profile = profileForMeasure(measureCh);
+  const maxSpacingEm = profile.maxWordSpacing;
+
+  const shapedLines: FrozenLine[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isLast = i === lines.length - 1;
+
+    // Last line: no adjustment
+    if (isLast) {
+      shapedLines.push({ ...line, wordSpacingEm: 0 });
+      continue;
+    }
+
+    // Count word gaps (spaces between word tokens — space tokens were filtered out,
+    // so gaps = number of words minus 1)
+    const wordCount = line.tokens.length;
+    const gaps = Math.max(0, wordCount - 1);
+    if (gaps === 0) {
+      shapedLines.push({ ...line, wordSpacingEm: 0 });
+      continue;
+    }
+
+    // SHORT LINES: expand toward container edge
+    // LONG LINES: contract slightly to create breathing room
+    // Goal: visible rag adjustment, not uniform fill
+    const fill = line.fill;
+    let targetFill: number;
+
+    // Gentle two-way smoothing — pull everything toward 75% fill
+    // Short lines get slightly expanded, long lines get slightly contracted
+    // This creates the coastline wave without blowing text wide
+    targetFill = 0.75;
+
+    const targetWidth = measurePx * targetFill;
+    const delta = targetWidth - line.width;
+
+    // Compute word-spacing adjustment in pixels, per gap
+    const spacingPx = delta / gaps;
+
+    // Convert to em using approximate font size
+    const approxFontSize = measurePx / measureCh;
+    const spacingEm = spacingPx / approxFontSize;
+
+    // Gentle caps — expand less than contract
+    const maxExpand = 0.03;    // subtle expansion on short lines
+    const maxContract = 0.05;  // slightly more contraction on long lines
+
+    if (spacingEm > maxExpand) {
+      shapedLines.push({ ...line, wordSpacingEm: maxExpand });
+    } else if (spacingEm < -maxContract) {
+      shapedLines.push({ ...line, wordSpacingEm: -maxContract });
+    } else {
+      shapedLines.push({ ...line, wordSpacingEm: spacingEm });
+    }
+  }
+
+  return shapedLines;
+}
+
+// ─── Final Validator ───
+
+/**
+ * Validate final composition before rendering.
+ */
+function finalValidate(lines: FrozenLine[], measureCh: number): boolean {
+  if (!lines.length) return false;
+
+  const profile = profileForMeasure(measureCh);
+
+  const isContent = (t: Token) => t.kind !== "space";
+  const isLexical = (t: Token) =>
+    t.kind === "word" || t.kind === "compound" || t.kind === "longSlug";
+
+  for (let i = 0; i < lines.length; i++) {
+    const tokens = lines[i].tokens;
+    const isLast = i === lines.length - 1;
+
+    let lexCount = 0;
+    for (const t of tokens) { if (isLexical(t)) lexCount++; }
+
+    // One-word last line
+    if (isLast && lexCount === 1) return false;
+
+    // Illegal line start
+    const firstContent = tokens.find(isContent) ?? null;
+    if (firstContent && (
+      firstContent.kind === "closePunct" ||
+      firstContent.kind === "dash" ||
+      firstContent.stickyPrev
+    )) {
+      return false;
+    }
+
+    // Illegal line end
+    let lastContent: Token | null = null;
+    for (let j = tokens.length - 1; j >= 0; j--) {
+      if (isContent(tokens[j])) { lastContent = tokens[j]; break; }
+    }
+    if (lastContent && (
+      lastContent.kind === "openPunct" ||
+      lastContent.stickyNext
+    )) {
+      return false;
+    }
+
+    // Spacing exceeds generous threshold
+    if (lines[i].wordSpacingEm > 0.08 || lines[i].wordSpacingEm < -0.04) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ─── Render Frozen Lines as Block Spans ───
+
+/**
+ * Render exact lines as block spans (no pre-line + \n).
+ */
+function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
+  safeWrite(() => {
+    p.innerHTML = "";
+    p.dataset.typesetDone = "1";
+    p.setAttribute("role", "text");
+
+
+    for (const line of lines) {
+      const span = document.createElement("span");
+      span.className = "ts-line";
+      span.style.display = "block";
+      span.style.whiteSpace = "pre";
+
+      if (Math.abs(line.wordSpacingEm) > 0.0005) {
+        span.style.wordSpacing = `${line.wordSpacingEm}em`;
+      }
+
+      span.textContent = line.text;
+      p.appendChild(span);
+    }
+  });
+}
 
 /**
  * Heading mode: semantic-aware line breaks.
@@ -52,7 +673,14 @@ function typesetHeadingText(text: string): string {
 
   const result: string[] = [];
   for (let i = 0; i < words.length; i++) {
-    const word = words[i];
+    let word = words[i];
+
+    // Compound hyphen protection (same as body text)
+    if (word.length <= 20 && word.indexOf('-') > 0 && word.indexOf('-') < word.length - 1) {
+      word = word.replace(/-/g, NBHY);
+      words[i] = word;
+    }
+
     const nextWord = i < words.length - 1 ? words[i + 1] : null;
 
     // Never let an article sit alone at end of line — bind to next word
@@ -98,8 +726,17 @@ export function typesetHeading(text: string): string {
 }
 
 /**
- * Body mode: full typographic rules with orphan prevention,
- * short-word binding, sentence protection.
+ * Body mode: LIGHTENED Phase 1 bindings.
+ *
+ * COMPOSITOR V2 (2026-03-17):
+ * Phase 1 now ONLY handles truly inseparable relationships:
+ *   - Opening quotes/brackets attach to next token
+ *   - Closing punctuation attaches to previous token
+ *   - Percent signs attach to previous token
+ *   - Currency symbols attach to following token
+ *   - One-letter article/pronoun protection (a, I) ONLY when measure >= 45ch
+ *
+ * All weak-word handling is now done by the compositor via penalties.
  */
 function typesetBodyText(text: string, measure?: number): string {
   if (!text || text.length < 10) return text;
@@ -107,98 +744,46 @@ function typesetBodyText(text: string, measure?: number): string {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 3) return text;
 
-  // Tiered binding based on actual column width.
-  //
-  // MOBILE-FIRST PRINCIPLE (2026-03-09):
-  // At narrow widths (<40ch, ~5-7 words per line), each nbsp binding
-  // creates a forced word pair that constrains the browser's line-breaking
-  // algorithm. With 10-15 bindings in a paragraph, the browser has almost
-  // no freedom, and the result is WORSE than default — stranded words,
-  // uneven lines, and orphan-like breaks that wouldn't exist without us.
-  //
-  // At narrow widths, let CSS text-wrap:pretty do the heavy lifting.
-  // JS bindings should only handle what CSS can't: orphan prevention
-  // and keeping numbers with their units.
-  //
-  // The thresholds below were tuned by testing at 375px (iPhone SE)
-  // through 1200px+ desktop. DO NOT lower them without testing mobile.
   const m = measure ?? 65;
-  const doOrphans = m >= 25;                     // almost always — single-word last lines look bad at any width
-  const doNumberBinding = m >= 25;               // "30 years" — always safe, very short atom
-  const doTinyWordBinding = m >= 45;             // 1-2 char words: safe at medium+ widths, harmful at mobile
-  const doSentenceProtection = m >= 50;          // sentence start/end: needs room to work
-  const doMediumWordBinding = m >= 55;           // 3-char words (the, and, but, for)
-  const doFullShortWordBinding = m >= 65;        // full list: wide measures only
-
-  // Build word lists by size tier
-  const tinyWords = new Set(['a', 'i', 'an', 'as', 'at', 'be', 'by', 'do', 'go', 'if', 'in', 'is', 'it', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we']);
-  const mediumWords = new Set(['the', 'and', 'but', 'for', 'nor', 'not', 'yet', 'its', 'our', 'has', 'was', 'are', 'can']);
-
   const result: string[] = [];
 
   for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const prevWord = i > 0 ? words[i - 1] : null;
+    let word = words[i];
+
+    // Compound hyphen protection: replace internal hyphens with non-breaking hyphens
+    // so the browser can't break "human-centric" into "human-" / "centric".
+    if (word.length <= 20 && word.indexOf('-') > 0 && word.indexOf('-') < word.length - 1) {
+      word = word.replace(/-/g, NBHY);
+      words[i] = word;
+    }
+
     const nextWord = i < words.length - 1 ? words[i + 1] : null;
 
-    // Rule 1: Last two words always bound together (no orphans)
-    if (doOrphans && i === words.length - 2) {
+    // Opening punctuation: bind to next word
+    if (nextWord && /^[\(\[\{\u201C\u2018]$/.test(word)) {
       result.push(word + NBSP + words[i + 1]);
-      break;
+      i++;
+      continue;
     }
 
-    // Rule 2: If previous word ends a sentence, bind this word with the next
-    // "invisible. Great" → "invisible. Great\u00A0typography"
-    if (doSentenceProtection && prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
-      // At narrow measures, only bind short sentence-start words (≤5 chars)
-      // to avoid creating oversized atoms. At wider measures, up to 6.
-      const maxLen = m >= 45 ? 6 : 5;
-      if (word.length <= maxLen) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
+    // Closing punctuation at start of word: bind to previous word
+    if (result.length > 0 && /^[\)\]\}\.,;:!?\u201D\u2019%]/.test(word)) {
+      const last = result.pop()!;
+      result.push(last + NBSP + word);
+      continue;
     }
 
-    // Rule 3: If this word ends a sentence/clause and it's short,
-    // bind it with the previous word
-    if (doSentenceProtection) {
-      const hasTrailingPunct = /[.!?,;:]$/.test(word);
-      if (hasTrailingPunct && word.length <= 7 && result.length > 0) {
-        const last = result.pop()!;
-        result.push(last + NBSP + word);
-        continue;
-      }
-
-      // Rule 3b: If the NEXT word has trailing punctuation and is short
-      if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
+    // Currency symbols: bind to following token
+    if (nextWord && /^[\$£€¥]$/.test(word)) {
+      result.push(word + NBSP + words[i + 1]);
+      i++;
+      continue;
     }
 
-    // Tiered short-word binding: numbers first, then tiny words, then medium, then full
-    const lc = word.toLowerCase();
-    if (nextWord && !/[,;:.!?]$/.test(word)) {
-      // Numbers (1-3 digits) always bind forward — "30 years" should never break
-      if (doNumberBinding && /^\d{1,3}$/.test(word)) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
-      if (doTinyWordBinding && tinyWords.has(lc)) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
-      if (doMediumWordBinding && mediumWords.has(lc)) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
-      if (doFullShortWordBinding && lc.length <= 2) {
-        // Catch any remaining 1-2 char words not in the sets above
+    // One-letter article/pronoun protection (only at wider measures)
+    if (m >= 45 && nextWord) {
+      const lc = word.toLowerCase();
+      if (lc === 'a' || lc === 'i') {
         result.push(word + NBSP + words[i + 1]);
         i++;
         continue;
@@ -300,11 +885,15 @@ export function typesetAll(selector: string): void {
   elements.forEach(typeset);
 }
 
-// ─── Post-Render Analysis ───
+// ═══════════════════════════════════════════════════════════════════════════
+// DEPRECATED — POST-RENDER ANALYSIS (replaced by Compositor V2)
+// ═══════════════════════════════════════════════════════════════════════════
 //
-// These functions work by measuring the ACTUAL rendered layout, then applying
-// targeted fixes. Unlike pre-render bindings (typesetText), they can't make
-// things worse — they only intervene when they detect a real problem.
+// The functions below (fixRealOrphans, fixRag, smoothRag, optimizeBreaks, shapeRag)
+// are DEPRECATED as of 2026-03-17. They are replaced by the token-aware compositor.
+//
+// Kept for reference only — DO NOT use in active pipeline.
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface LineInfo {
   indices: number[];
@@ -602,7 +1191,9 @@ export function useTypeset(ref: React.RefObject<HTMLElement | null>, deps: any[]
 }
 
 /**
- * smoothRag v4 — DOM-measured Knuth-Plass optimal line breaking.
+ * DEPRECATED: smoothRag v4 — DOM-measured Knuth-Plass optimal line breaking.
+ *
+ * ⚠️ REPLACED BY composeParagraph() + shapeExactLines() in Compositor V2 (2026-03-17)
  *
  * Uses actual DOM measurement (not canvas) for pixel-accurate word widths,
  * then applies Knuth-Plass dynamic programming to find globally optimal
@@ -1085,7 +1676,9 @@ export function smoothRagSpans(container: HTMLElement): () => void {
 }
 
 /**
- * optimizeBreaks — Production paragraph break optimizer.
+ * DEPRECATED: optimizeBreaks — Production paragraph break optimizer.
+ *
+ * ⚠️ REPLACED BY composeParagraph() in Compositor V2 (2026-03-17)
  *
  * Applies Knuth-Plass dynamic programming with:
  *   - Break quality rules: no stranded prepositions, conjunctions, or articles
@@ -1214,6 +1807,9 @@ export function optimizeBreaks(element: HTMLElement, opts?: OptimizeBreaksOption
       let badness = 0;
 
       if (isLast) {
+        // ORPHAN PREVENTION (built into optimizer):
+        // A one-word last line receives massive penalty
+        if (nw === 1) return 1e6;
         if (nw === 1 && fill < 0.25) return 150;
         if (fill < 0.15) return 100;
         return 0;
@@ -1375,31 +1971,49 @@ export function optimizeBreaks(element: HTMLElement, opts?: OptimizeBreaksOption
 }
 
 /**
- * shapeRag — Pass 2: Rag shaping via per-line word-spacing + letter-spacing.
+ * DEPRECATED: shapeRag — Pass 2: Active rag coastline sculpting via per-line word-spacing + letter-spacing.
+ *
+ * ⚠️ REPLACED BY shapeExactLines() in Compositor V2 (2026-03-17)
+ *
+ * THE KEY DIFFERENTIATOR: This is OFFENSIVE, not defensive. We actively detect
+ * "flat runs" (consecutive lines at similar fill percentages) and CREATE variation
+ * to produce a coastline-like rag, not a fence-like justified appearance.
  *
  * Runs AFTER optimizeBreaks (Pass 1) has set nbsp bindings.
- * Measures actual rendered line widths, then applies bidirectional
- * spacing adjustments with:
- *   - Tschichold tolerances: word-spacing 80–133% of natural space
- *   - Conservative letter-spacing: ±2% of em
- *   - Line-height adaptive scaling: more room at higher leading
- *   - Asymmetric neighbor dampening: lighter touch on expansion
- *   - Anti-justification guard: backs off when lines get too uniform
+ * Measures actual rendered line widths, then:
+ *   1. Detects flat runs (2+ consecutive non-last lines within ~5% fill)
+ *   2. Actively reshapes them with targeted word-spacing adjustments
+ *   3. Creates wave pattern: tighten→expand→tighten or expand→tighten→expand
+ *   4. Respects Tschichold tolerances: word-spacing 80–133% of natural space
+ *   5. Conservative letter-spacing: ±2% of em
+ *   6. Line-height adaptive scaling: more room at higher leading
+ *   7. Narrow column awareness: reduced adjustments at <24ch
  *
  * Does NOT change line breaks — only adjusts spacing within existing lines.
- * Returns a cleanup function.
  */
 export function shapeRag(element: HTMLElement): void {
     const text = element.textContent || '';
     if (!text.trim() || text.length < 60) return;
 
     const cs = getComputedStyle(element);
+    const textAlign = cs.textAlign;
+
+    // Skip centered text (auto-detect)
+    if (textAlign === 'center') return;
+
     const containerWidth =
       element.clientWidth -
       parseFloat(cs.paddingLeft) -
       parseFloat(cs.paddingRight);
 
     if (containerWidth < 250) return;
+
+    // Narrow column detection (using measureCh or estimate)
+    const measure = measureCh(element);
+    const isNarrow = measure < 24;
+
+    // Very narrow containers: skip or heavily reduce shaping
+    if (measure < 15) return;
 
     // --- Measure font metrics ---
     const fontSize = parseFloat(cs.fontSize) || 16;
@@ -1427,10 +2041,12 @@ export function shapeRag(element: HTMLElement): void {
     if (naturalSpace < 1) return;
 
     // Tschichold tolerances: 80–133% of natural space
-    const maxTighten = naturalSpace * 0.20 * Math.max(0.5, lhScale);  // tighten by up to 20%
-    const maxExpand = naturalSpace * 0.33 * Math.max(0.5, lhScale);   // expand by up to 33%
+    // At narrow widths, use smaller adjustments
+    const narrowScale = isNarrow ? 0.5 : 1.0;
+    const maxTighten = naturalSpace * 0.20 * Math.max(0.5, lhScale) * narrowScale;  // tighten by up to 20%
+    const maxExpand = naturalSpace * 0.33 * Math.max(0.5, lhScale) * narrowScale;   // expand by up to 33%
     // Letter-spacing: ±2% of em (very conservative)
-    const maxLS = fontSize * 0.02 * Math.max(0.5, lhScale);
+    const maxLS = fontSize * 0.02 * Math.max(0.5, lhScale) * narrowScale;
 
     // --- Detect lines by wrapping words in spans ---
     // Split on regular spaces only — preserve nbsp bindings
@@ -1477,12 +2093,50 @@ export function shapeRag(element: HTMLElement): void {
 
     if (lines.length < 3) return;
 
+    // --- Compute fills for each line ---
+    const fills = lines.map(l => l.width / containerWidth);
+
+    // --- ACTIVE RAG SCULPTING: Detect flat runs ---
+    // Flat run = 2+ consecutive non-last lines where fills are within 5% of each other
+    interface FlatRun {
+      start: number;
+      end: number;   // exclusive
+      avgFill: number;
+    }
+    const flatRuns: FlatRun[] = [];
+    const FLAT_THRESHOLD = 0.05;
+
+    for (let i = 0; i < lines.length - 2; i++) {  // -2 because we never include last line in flat runs
+      const runStart = i;
+      let runEnd = i + 1;
+      const baseFill = fills[i];
+      if (baseFill === undefined) continue;
+
+      // Extend run while consecutive lines are within threshold
+      while (runEnd < lines.length - 1) {
+        const nextFill = fills[runEnd];
+        if (nextFill === undefined) break;
+        if (Math.abs(nextFill - baseFill) >= FLAT_THRESHOLD) break;
+        runEnd++;
+      }
+
+      if (runEnd - runStart >= 2) {
+        const runFills = fills.slice(runStart, runEnd);
+        const avgFill = runFills.reduce((s, f) => s + f, 0) / runFills.length;
+        flatRuns.push({ start: runStart, end: runEnd, avgFill });
+        i = runEnd - 1;  // Skip to end of this run
+      }
+    }
+
     // --- Compute target: median of non-last line widths ---
     const nonLastWidths = lines.slice(0, -1).map(l => l.width).sort((a, b) => a - b);
     const midIdx = Math.floor(nonLastWidths.length / 2);
+    const targetLeft = nonLastWidths[midIdx - 1];
+    const targetMid = nonLastWidths[midIdx];
+    if (targetLeft === undefined || targetMid === undefined) return;
     let target = nonLastWidths.length % 2 === 0
-      ? (nonLastWidths[midIdx - 1] + nonLastWidths[midIdx]) / 2
-      : nonLastWidths[midIdx];
+      ? (targetLeft + targetMid) / 2
+      : targetMid;
 
     // Anti-justification guard: if all non-last fills > 92% AND within 4% of each other,
     // the text already looks near-justified. Scale back adjustments 50%.
@@ -1492,35 +2146,88 @@ export function shapeRag(element: HTMLElement): void {
     const nearJustified = allAbove92 && fillRange < 0.04;
 
     // Near-justified + orphan pattern: pull target down
-    const lastFill = lines[lines.length - 1].width / containerWidth;
-    const avgFill = nonLastFills.reduce((s, f) => s + f, 0) / nonLastFills.length;
-    if (avgFill > 0.88 && lastFill < 0.60 && lines.length > 2) {
-      target = Math.min(target, containerWidth * 0.82);
+    const lastLine = lines[lines.length - 1];
+    if (lastLine) {
+      const lastFill = lastLine.width / containerWidth;
+      const avgFill = nonLastFills.reduce((s, f) => s + f, 0) / nonLastFills.length;
+      if (avgFill > 0.88 && lastFill < 0.60 && lines.length > 2) {
+        target = Math.min(target, containerWidth * 0.82);
+      }
     }
 
     const baseWS = parseFloat(cs.wordSpacing) || 0;
 
-    // --- Compute per-line adjustments ---
-    interface LineAdj { wsPerGap: number; lsPerChar: number; direction: number }
+    // --- Compute per-line adjustments with ACTIVE RESHAPING for flat runs ---
+    interface LineAdj { wsPerGap: number; lsPerChar: number; direction: number; isFlatRun: boolean }
     const adjustments: LineAdj[] = [];
+
+    // Mark which lines are in flat runs
+    const inFlatRun = new Set<number>();
+    for (const run of flatRuns) {
+      for (let i = run.start; i < run.end; i++) {
+        inFlatRun.add(i);
+      }
+    }
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (!line) continue;
+
       const isLast = i === lines.length - 1;
-      const lineWords = line.wordIndices.map(idx => words[idx]);
+      const lineWords = line.wordIndices.map(idx => words[idx] || '').filter(Boolean);
       // Count gaps (spaces between words)
       const gaps = lineWords.length - 1;
       const totalChars = lineWords.join('').length;
-      const gap = target - line.width;
 
       if (isLast || gaps === 0) {
-        adjustments.push({ wsPerGap: 0, lsPerChar: 0, direction: 0 });
+        adjustments.push({ wsPerGap: 0, lsPerChar: 0, direction: 0, isFlatRun: false });
         continue;
+      }
+
+      // Check if this line is in a flat run
+      const isInFlatRun = inFlatRun.has(i);
+      let gap = target - line.width;
+
+      // ACTIVE RESHAPING: If in a flat run, create wave pattern
+      if (isInFlatRun) {
+        // Find which flat run this belongs to
+        const run = flatRuns.find(r => i >= r.start && i < r.end);
+        if (run) {
+          const posInRun = i - run.start;
+          const runLength = run.end - run.start;
+
+          // Create alternating wave: tighten→expand→tighten or expand→tighten→expand
+          // Pattern depends on whether run starts with high or low fill
+          const shouldTighten = posInRun % 2 === 0 ? run.avgFill > 0.85 : run.avgFill <= 0.85;
+
+          if (shouldTighten) {
+            // Pull to ~82% fill (create visible rag)
+            gap = containerWidth * 0.82 - line.width;
+          } else {
+            // Push to ~92% fill (but not more than 95%)
+            gap = Math.min(containerWidth * 0.92, containerWidth * 0.95) - line.width;
+          }
+        }
       }
 
       // Primary lever: word-spacing
       let wsPerGap = gap / gaps;
       wsPerGap = Math.max(-maxTighten, Math.min(maxExpand, wsPerGap));
+
+      // Constraint: never make line shorter than 60% fill or longer than 95% fill
+      const projectedWidth = line.width + wsPerGap * gaps;
+      const projectedFill = projectedWidth / containerWidth;
+      if (projectedFill < 0.60) {
+        // Recalculate to hit 60% minimum
+        const targetWidth = containerWidth * 0.60;
+        wsPerGap = (targetWidth - line.width) / gaps;
+        wsPerGap = Math.max(-maxTighten, Math.min(maxExpand, wsPerGap));
+      } else if (projectedFill > 0.95) {
+        // Recalculate to hit 95% maximum
+        const targetWidth = containerWidth * 0.95;
+        wsPerGap = (targetWidth - line.width) / gaps;
+        wsPerGap = Math.max(-maxTighten, Math.min(maxExpand, wsPerGap));
+      }
 
       // Secondary lever: letter-spacing for remaining gap
       const wsGain = wsPerGap * gaps;
@@ -1532,7 +2239,7 @@ export function shapeRag(element: HTMLElement): void {
       }
 
       const direction = gap > 0 ? 1 : gap < 0 ? -1 : 0;
-      adjustments.push({ wsPerGap, lsPerChar, direction });
+      adjustments.push({ wsPerGap, lsPerChar, direction, isFlatRun: isInFlatRun });
     }
 
     // --- Asymmetric neighbor dampening ---
@@ -1540,6 +2247,7 @@ export function shapeRag(element: HTMLElement): void {
     for (let i = 1; i < adjustments.length - 1; i++) {
       const prev = adjustments[i - 1];
       const curr = adjustments[i];
+      if (!prev || !curr) continue;
       if (prev.direction !== 0 && curr.direction !== 0 && prev.direction !== curr.direction) {
         if (curr.direction > 0) {
           // Expanding: lighter dampening (expansion matters more for readability)
@@ -1567,9 +2275,11 @@ export function shapeRag(element: HTMLElement): void {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const lineWords = line.wordIndices.map(idx => words[idx]);
-      const lineText = lineWords.join(' ');
       const adj = adjustments[i];
+      if (!line || !adj) continue;
+
+      const lineWords = line.wordIndices.map(idx => words[idx] || '').filter(Boolean);
+      const lineText = lineWords.join(' ');
 
       if (Math.abs(adj.wsPerGap) > 0.05 || Math.abs(adj.lsPerChar) > 0.01) {
         const finalWS = baseWS + adj.wsPerGap;
@@ -1589,5 +2299,9 @@ export function shapeRag(element: HTMLElement): void {
     element.style.whiteSpace = 'pre-line';
     element.innerHTML = htmlParts.join('\n');
 }
+
+// Export compositor functions for GlobalTypeset
+export { tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines };
+export type { Token, FrozenLine };
 
 export default typeset;

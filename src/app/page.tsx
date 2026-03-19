@@ -234,7 +234,24 @@ export default function Home() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
-      <section className="flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800">
+      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800 overflow-hidden">
+        {/* Background image with parallax */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-10 animate-slowZoom"
+          style={{
+            backgroundImage: 'url(/typography-bg.jpg)',
+            backgroundAttachment: 'fixed',
+            backgroundPosition: 'center center',
+            zIndex: 0,
+          }}
+        />
+        {/* Dark overlay gradient */}
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/85 to-black/90"
+          style={{ zIndex: 1 }}
+        />
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
           A resource for designers and developers
         </p>
@@ -255,6 +272,7 @@ export default function Home() {
           <a href="#pairings" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Pairings</a>
           <a href="#tips" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="#utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
+        </div>
         </div>
       </section>
 

@@ -108,4 +108,19 @@ p, li, blockquote, figcaption {
 ::-webkit-scrollbar-thumb {
   background: #333;
 }
+
+/* Hero background parallax animation */
+@keyframes slowZoom {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-slowZoom {
+  animation: slowZoom 30s ease-in-out infinite alternate;
+}
+
 /* deployed Wed Mar 11 02:19:20 PDT 2026 */
