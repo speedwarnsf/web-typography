@@ -2,6 +2,7 @@ import { rules } from "./rules-data";
 import CodeBlock from "@/components/CodeBlock";
 import CopyButton from "@/components/CopyButton";
 import AnimatedHeroHeading from "@/components/AnimatedHeroHeading";
+import HeroParallax from "@/components/HeroParallax";
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -229,26 +230,30 @@ export default function Home() {
   const totalPairings = pairingCategories.reduce((n, c) => n + c.pairings.length, 0);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen relative" style={{ zIndex: 2 }}>
       {/* Google Fonts for all 36 pairings */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
+      {/* ── Fixed background — locked in place, content scrolls over it ── */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/typography-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        id="hero-bg"
+        className="fixed top-0 left-0 w-full h-[120vh] object-cover opacity-50 pointer-events-none select-none"
+        style={{ zIndex: 0, filter: 'contrast(1.15) brightness(0.85)', willChange: 'transform' }}
+      />
+      {/* Fixed dark overlay */}
+      <div
+        className="fixed top-0 left-0 w-full h-screen bg-gradient-to-b from-black/50 via-black/40 to-black/70 pointer-events-none"
+        style={{ zIndex: 1 }}
+      />
+
+      <HeroParallax />
+
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800 overflow-hidden">
-        {/* Background image — letterpress type blocks, Dustin's Alameda flea market macro */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/typography-bg.jpg"
-          alt=""
-          aria-hidden="true"
-          className="absolute w-full h-[120%] object-cover opacity-40 pointer-events-none select-none animate-slowZoom"
-          style={{ zIndex: 0, top: '-10%', left: 0, filter: 'contrast(1.1) brightness(0.9)' }}
-        />
-        {/* Dark overlay — subtle enough to let the photo breathe */}
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/75"
-          style={{ zIndex: 1 }}
-        />
+      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800" style={{ zIndex: 2 }}>
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
@@ -274,6 +279,9 @@ export default function Home() {
         </div>
         </div>
       </section>
+
+      {/* ── Content area — solid bg so fixed photo doesn't bleed through ── */}
+      <div className="relative bg-black" style={{ zIndex: 2 }}>
 
       {/* ── Typographic Rules ── */}
       <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
@@ -483,6 +491,8 @@ export default function Home() {
           Built with care for the craft of typography
         </p>
       </footer>
+
+      </div>{/* end solid bg wrapper */}
     </main>
   );
 }
