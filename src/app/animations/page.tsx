@@ -110,7 +110,7 @@ function AnimationCard({
         </h3>
 
         {/* Live demo */}
-        <div className="p-6 bg-[#0a0a0a] border border-neutral-800 mb-6 min-h-[120px] flex items-center overflow-hidden">
+        <div className="p-6 bg-[#0a0a0a]/85 border border-neutral-800 mb-6 min-h-[120px] flex items-center overflow-hidden">
           <Demo key={replayKey} />
         </div>
 
@@ -396,7 +396,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
       </div>
 
       {/* Preview */}
-      <div className="mt-4 p-4 border border-neutral-800 bg-[#0a0a0a] flex justify-center">
+      <div className="mt-4 p-4 border border-neutral-800 bg-[#0a0a0a]/85 flex justify-center">
         <span style={{
           fontFamily: style.fontFamily,
           fontWeight: style.fontWeight,

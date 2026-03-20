@@ -355,7 +355,7 @@ export default function TypeSpecimenGenerator() {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:',.<>?/~`\"";
   const sampleParagraph = "Typography is the art and technique of arranging type to make written language legible, readable, and appealing when displayed. The arrangement of type involves selecting typefaces, point sizes, line lengths, line-spacing, and letter-spacing, and adjusting the space between pairs of letters.";
 
-  const bgClass = isDarkMode ? "bg-[#0a0a0a]" : "bg-white";
+  const bgClass = isDarkMode ? "bg-[#0a0a0a]/85" : "bg-white";
   const textClass = isDarkMode ? "text-neutral-200" : "text-neutral-900";
   const borderClass = isDarkMode ? "border-neutral-800" : "border-neutral-300";
   const cardBgClass = isDarkMode ? "bg-neutral-950/50" : "bg-neutral-50";

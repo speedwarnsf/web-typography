@@ -204,7 +204,7 @@ export default function PerfectParagraph() {
   const jsCode = generateJS();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 px-4 py-6 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 px-4 py-6 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto min-w-0 overflow-hidden">
         {/* Header */}
         <div className="mb-12">

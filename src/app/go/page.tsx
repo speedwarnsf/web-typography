@@ -29,7 +29,7 @@ export default function GoPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16">
         <div className="mb-8">

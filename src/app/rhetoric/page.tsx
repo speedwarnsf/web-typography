@@ -263,7 +263,7 @@ export default function RhetoricPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
+    <main className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           10 -- Rhetorical Type

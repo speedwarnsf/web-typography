@@ -38,7 +38,7 @@ export default function SupportPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
       <div className="mx-auto max-w-4xl px-6 py-10 sm:py-16 md:py-12 sm:py-24">
         {/* Header */}
         <div className="mb-16">

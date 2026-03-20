@@ -819,7 +819,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 export default function PairingCardsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a]/85" />}>
       <PairingCardBuilder />
     </Suspense>
   );

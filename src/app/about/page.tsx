@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-neutral-200 overflow-x-hidden">
+    <main className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
       {/* Header */}
       <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-24 pb-16 border-b border-neutral-800">
         <p
