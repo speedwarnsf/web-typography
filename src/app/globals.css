@@ -20,7 +20,7 @@ html {
 body {
   overflow-x: hidden;
   max-width: 100vw;
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   padding-top: var(--topbar-h);
   line-height: 1.6;
@@ -123,10 +123,9 @@ p, li, blockquote, figcaption {
   animation: slowZoom 30s ease-in-out infinite alternate;
 }
 
-/* Override opaque backgrounds on subpages so the fixed photo bleeds through */
+/* Let the fixed photo bleed through all content */
 main {
-  background-color: rgba(10, 10, 10, 0.92) !important;
-  backdrop-filter: blur(2px);
+  background-color: transparent !important;
 }
 
 /* deployed Wed Mar 11 02:19:20 PDT 2026 */
