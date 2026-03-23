@@ -85,13 +85,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           alt=""
           aria-hidden="true"
           id="hero-bg"
-          className="fixed top-0 left-0 w-full h-[120vh] object-cover opacity-80 pointer-events-none select-none"
-          style={{ zIndex: 0, filter: 'contrast(1.15) brightness(0.7)', willChange: 'transform' }}
+          className="fixed top-0 left-0 w-full h-[120vh] object-cover pointer-events-none select-none"
+          style={{ zIndex: 0, opacity: 0.35, filter: 'contrast(1.2) brightness(1.1)', willChange: 'transform' }}
         />
-        <div
-          className="fixed top-0 left-0 w-full h-screen bg-gradient-to-b from-black/30 via-black/20 to-black/50 pointer-events-none"
-          style={{ zIndex: 1 }}
-        />
+        {/* No gradient overlay — let the photo breathe */}
         <HeroParallax />
         <div className="relative" style={{ zIndex: 2 }}>
           <TopBar />
