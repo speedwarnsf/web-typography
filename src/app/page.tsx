@@ -285,7 +285,7 @@ export default function Home() {
           {rules.map((rule) => (
             <div
               key={rule.name}
-              className="border border-neutral-800 bg-neutral-950/50"
+              className="border border-neutral-800 bg-neutral-950/30"
               style={{ borderRadius: 0 }}
             >
               <div className="p-4 sm:p-6 lg:p-8 border-b border-neutral-800">
@@ -363,7 +363,7 @@ export default function Home() {
                 {category.pairings.map((pair) => (
                   <div
                     key={`${pair.heading}-${pair.body}`}
-                    className="border border-neutral-800 bg-neutral-950/50"
+                    className="border border-neutral-800 bg-neutral-950/30"
                     style={{ borderRadius: 0 }}
                   >
                     <div className="p-4 sm:p-6 lg:p-8">
@@ -424,7 +424,7 @@ export default function Home() {
             {tips.map((tip) => (
               <div
                 key={tip.title}
-                className="border border-neutral-800 bg-neutral-950/50 min-w-0 overflow-hidden"
+                className="border border-neutral-800 bg-neutral-950/30 min-w-0 overflow-hidden"
                 style={{ borderRadius: 0 }}
               >
                 <div className="p-4 sm:p-6 border-b border-neutral-800 min-w-0">

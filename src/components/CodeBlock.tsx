@@ -46,7 +46,7 @@ export default function CodeBlock({
     : `code.${ext}`;
 
   return (
-    <div className="border border-neutral-800 bg-neutral-950" style={{ borderRadius: 0 }}>
+    <div className="border border-neutral-800 bg-neutral-950/40" style={{ borderRadius: 0 }}>
       <div
         className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 cursor-pointer select-none"
         onClick={() => setIsOpen(!isOpen)}
