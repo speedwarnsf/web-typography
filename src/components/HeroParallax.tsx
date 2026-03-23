@@ -20,10 +20,10 @@ export default function HeroParallax() {
       ticking = true;
       requestAnimationFrame(() => {
         const scrollY = window.scrollY;
-        // Parallax: image moves at 30% of scroll speed (subtle depth)
-        // Scale: starts at 1.05, slowly settles to 1.0 as you scroll
-        const translateY = scrollY * 0.3;
-        const scale = 1.05 - Math.min(scrollY / 5000, 0.05);
+        // Parallax: image moves at 8% of scroll speed (very slow, stays visible on long pages)
+        // Scale: starts at 1.1, slowly settles to 1.0 as you scroll
+        const translateY = scrollY * 0.08;
+        const scale = 1.1 - Math.min(scrollY / 10000, 0.1);
         img.style.transform = `translateY(${translateY}px) scale(${scale})`;
         ticking = false;
       });
@@ -32,7 +32,7 @@ export default function HeroParallax() {
     window.addEventListener('scroll', onScroll, { passive: true });
 
     // Initial subtle scale
-    img.style.transform = 'translateY(0) scale(1.05)';
+    img.style.transform = 'translateY(0) scale(1.1)';
     img.style.transition = 'transform 0.1s ease-out';
 
     return () => {

@@ -86,7 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           aria-hidden="true"
           id="hero-bg"
           className="fixed top-0 left-0 w-full h-[120vh] object-cover pointer-events-none select-none"
-          style={{ zIndex: 0, opacity: 0.5, filter: 'contrast(1.3) brightness(1.2)', willChange: 'transform' }}
+          style={{ zIndex: 0, opacity: 0.2, filter: 'contrast(1.2) brightness(1.0)', willChange: 'transform' }}
         />
         {/* No gradient overlay — let the photo breathe */}
         <HeroParallax />
