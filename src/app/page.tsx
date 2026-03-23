@@ -263,7 +263,7 @@ export default function Home() {
       </section>
 
       {/* ── Content area — semi-transparent so fixed photo bleeds through ── */}
-      <div className="relative bg-black/90 backdrop-blur-sm">
+      <div className="relative bg-black/60 backdrop-blur-sm">
 
       {/* ── Typographic Rules ── */}
       <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">

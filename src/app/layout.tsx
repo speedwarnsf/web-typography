@@ -76,8 +76,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   ].map((f) => f.variable).join(" ");
 
   return (
-    <html lang="en">
-      <body className={`${fontVars} antialiased bg-[#0a0a0a] text-neutral-200`}>
+    <html lang="en" style={{ backgroundColor: '#0a0a0a' }}>
+      <body className={`${fontVars} antialiased bg-transparent text-neutral-200`} style={{ backgroundColor: 'transparent' }}>
         {/* Fixed background — letterpress photo visible across all pages */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
