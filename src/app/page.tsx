@@ -235,7 +235,7 @@ export default function Home() {
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center border-b border-neutral-800">
+      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center mb-4 bg-black/75 backdrop-blur-sm">
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
@@ -262,11 +262,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Content area — semi-transparent so fixed photo bleeds through ── */}
-      <div className="relative bg-black/60 backdrop-blur-sm">
+      {/* ── Content area — transparent wrapper, each section gets its own dark box ── */}
+      <div className="relative">
 
       {/* ── Typographic Rules ── */}
-      <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
+      <section id="rules" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24 my-4 bg-black/75 backdrop-blur-sm">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
           01 -- Typographic Rules
         </p>
@@ -338,7 +338,7 @@ export default function Home() {
       </section>
 
       {/* ── Font Pairings ── */}
-      <section id="pairings" className="border-t border-neutral-800">
+      <section id="pairings" className="my-4 bg-black/75 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             02 -- Font Pairings
@@ -404,7 +404,7 @@ export default function Home() {
       </section>
 
       {/* ── Typography Tips ── */}
-      <section id="tips" className="border-t border-neutral-800">
+      <section id="tips" className="my-4 bg-black/75 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             03 -- Typography Tips
@@ -446,7 +446,7 @@ export default function Home() {
       </section>
 
       {/* ── Full Utility ── */}
-      <section id="utility" className="border-t border-neutral-800">
+      <section id="utility" className="my-4 bg-black/75 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             04 -- The Utility
@@ -468,7 +468,7 @@ export default function Home() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-neutral-800 py-12 text-center">
+      <footer className="my-4 bg-black/75 backdrop-blur-sm py-12 text-center">
         <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
           Built with care for the craft of typography
         </p>
