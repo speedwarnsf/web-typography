@@ -4,13 +4,13 @@ import { useState } from 'react';
 
 // Replace PLACEHOLDER URLs with actual Stripe Payment Links
 const STRIPE_LINKS = {
-  coffee_once: "https://donate.stripe.com/PLACEHOLDER",
-  craft_once: "https://donate.stripe.com/PLACEHOLDER",
-  patron_once: "https://donate.stripe.com/PLACEHOLDER",
-  coffee_monthly: "https://donate.stripe.com/PLACEHOLDER",
-  craft_monthly: "https://donate.stripe.com/PLACEHOLDER",
-  patron_monthly: "https://donate.stripe.com/PLACEHOLDER",
-  custom: "https://donate.stripe.com/PLACEHOLDER",
+  coffee_once: "https://buy.stripe.com/eVq9AU8TCecfeEXeMCfbq02",
+  craft_once: "https://buy.stripe.com/3cI14o7Py3xB40jcEufbq03",
+  patron_once: "https://buy.stripe.com/4gM9AU1ra4BF2WfcEufbq04",
+  coffee_monthly: "https://buy.stripe.com/7sY4gA7Py1ptbsL9sifbq05",
+  craft_monthly: "https://buy.stripe.com/fZu7sM1ra3xBgN55c2fbq06",
+  patron_monthly: "https://buy.stripe.com/aFaaEYc5Ofgj0O747Yfbq07",
+  custom: "https://buy.stripe.com/eVq28sc5O3xB1SbgUKfbq08",
 };
 
 export default function SupportPage() {
