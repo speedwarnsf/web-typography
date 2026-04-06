@@ -568,7 +568,7 @@ export default function VariableFontsPage() {
   );
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#0a0a0a' }}>
       {/* ── Hero ── */}
       <section className="flex flex-col items-center justify-center min-h-[50vh] px-4 sm:px-6 text-center border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">

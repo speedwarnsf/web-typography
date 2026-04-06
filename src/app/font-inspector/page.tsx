@@ -301,7 +301,7 @@ export default function FontInspector() {
   }, []);
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen overflow-x-hidden relative" style={{ backgroundColor: '#0a0a0a' }}>
       {/* Header */}
       <section className="border-b border-neutral-800 px-4 sm:px-6 py-6 sm:py-8">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">

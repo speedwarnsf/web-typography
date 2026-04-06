@@ -2893,7 +2893,7 @@ function FontClash({ text = "${textVal}" }) {
 
 export default function AnimationsPage() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen" style={{ backgroundColor: '#0a0a0a' }}>
       {/* ── Header ── */}
       <header className="border-b border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">

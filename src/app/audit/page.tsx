@@ -689,7 +689,7 @@ export default function TypographicAudit() {
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#0a0a0a' }}>
       {/* Header */}
       <section className="border-b border-neutral-800 px-4 py-6 sm:px-6 sm:py-8">
         <div className="max-w-5xl mx-auto flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
