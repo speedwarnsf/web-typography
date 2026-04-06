@@ -22,7 +22,8 @@ export default function AboutPage() {
             src="/dustin-york.jpg"
             srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
             alt="Dustin York"
-            className="w-16 h-16 object-cover shrink-0 rounded-full"
+            className="w-16 h-16 object-cover shrink-0"
+            style={{ borderRadius: '50%' }}
           />
           <div>
             <h1

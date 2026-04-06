@@ -91,7 +91,7 @@ export default function SupportPage() {
               className={`px-6 py-3 font-source-sans transition-colors ${
                 !isMonthly
                   ? 'bg-[#B8963E] text-[#0a0a0a]'
-                  : 'text-neutral-400 hover:text-neutral-200'
+                  : 'text-neutral-200 hover:text-white'
               }`}
             >
               One-time
@@ -101,7 +101,7 @@ export default function SupportPage() {
               className={`px-6 py-3 font-source-sans transition-colors ${
                 isMonthly
                   ? 'bg-[#B8963E] text-[#0a0a0a]'
-                  : 'text-neutral-400 hover:text-neutral-200'
+                  : 'text-neutral-200 hover:text-white'
               }`}
             >
               Monthly
