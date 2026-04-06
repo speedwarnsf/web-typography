@@ -11,6 +11,10 @@
   border-radius: 0 !important;
 }
 
+.circle {
+  border-radius: 50% !important;
+}
+
 html {
   overflow-x: hidden;
   /* Prevent horizontal scroll and diagonal scrolling on mobile */
