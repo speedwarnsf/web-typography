@@ -302,7 +302,7 @@ export default function RhetoricPage() {
           Hover any point to see the font and sample&nbsp;text.
         </p>
 
-        <div className="relative w-full max-w-2xl mx-auto mb-16">
+        <div className="relative w-full max-w-2xl mx-auto mb-16" style={{ backgroundColor: '#0a0a0a' }}>
           <svg
             viewBox="0 0 600 520"
             className="w-full h-auto"
