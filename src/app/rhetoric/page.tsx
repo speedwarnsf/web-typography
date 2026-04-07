@@ -308,11 +308,12 @@ export default function RhetoricPage() {
             className="w-full h-auto"
             style={{ maxHeight: "520px" }}
           >
+            <rect x="0" y="0" width="600" height="520" fill="#0a0a0a" />
             <polygon
               points="300,40 100,460 500,460"
               fill="none"
-              stroke="#333"
-              strokeWidth="1"
+              stroke="#444"
+              strokeWidth="1.5"
             />
 
             <text
@@ -320,7 +321,7 @@ export default function RhetoricPage() {
               y="20"
               textAnchor="middle"
               fill="#B8963E"
-              fontSize="14"
+              fontSize="16"
               fontFamily="monospace"
               className="uppercase tracking-wider"
             >
@@ -331,7 +332,7 @@ export default function RhetoricPage() {
               y="490"
               textAnchor="middle"
               fill="#B8963E"
-              fontSize="14"
+              fontSize="16"
               fontFamily="monospace"
               className="uppercase tracking-wider"
             >
@@ -342,7 +343,7 @@ export default function RhetoricPage() {
               y="490"
               textAnchor="middle"
               fill="#B8963E"
-              fontSize="14"
+              fontSize="16"
               fontFamily="monospace"
               className="uppercase tracking-wider"
             >
