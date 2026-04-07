@@ -18,12 +18,12 @@ export default function AboutPage() {
           About
         </p>
         <div className="flex items-center gap-5">
-          <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
             <img
               src="/dustin-york.jpg"
               srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
               alt="Dustin York"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150%', height: '150%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
             />
           </div>
           <div>
