@@ -7,16 +7,14 @@
   --topbar-h: 52px;
 }
 
-* {
+*:not(#dustin-photo):not(.circle) {
   border-radius: 0 !important;
 }
 
-.circle {
-  border-radius: 50% !important;
-}
-
+.circle,
 #dustin-photo {
   border-radius: 50% !important;
+  overflow: hidden !important;
 }
 
 html {
