@@ -302,23 +302,23 @@ export default function RhetoricPage() {
           Hover any point to see the font and sample&nbsp;text.
         </p>
 
-        <div className="relative w-full max-w-2xl mx-auto mb-16" style={{ backgroundColor: '#0a0a0a' }}>
+        <div className="relative w-full max-w-2xl mx-auto mb-16">
           <svg
-            viewBox="0 0 600 520"
+            viewBox="0 0 600 560"
             className="w-full h-auto"
-            style={{ maxHeight: "520px" }}
+            style={{ maxHeight: "560px" }}
           >
-            <rect x="0" y="0" width="600" height="520" fill="#0a0a0a" />
+            <rect x="0" y="0" width="600" height="560" fill="rgba(10,10,10,0.65)" />
             <polygon
-              points="300,40 100,460 500,460"
+              points="300,80 100,500 500,500"
               fill="none"
-              stroke="#444"
+              stroke="#555"
               strokeWidth="1.5"
             />
 
             <text
               x="300"
-              y="20"
+              y="40"
               textAnchor="middle"
               fill="#B8963E"
               fontSize="16"
@@ -329,7 +329,7 @@ export default function RhetoricPage() {
             </text>
             <text
               x="80"
-              y="490"
+              y="530"
               textAnchor="middle"
               fill="#B8963E"
               fontSize="16"
@@ -340,7 +340,7 @@ export default function RhetoricPage() {
             </text>
             <text
               x="520"
-              y="490"
+              y="530"
               textAnchor="middle"
               fill="#B8963E"
               fontSize="16"
@@ -357,7 +357,7 @@ export default function RhetoricPage() {
               const normLogos = font.logos / total;
 
               const x = 300 + (normLogos - normPathos) * 200;
-              const y = 460 - normEthos * 420;
+              const y = 500 - normEthos * 420;
 
               return (
                 <g key={font.name}>
