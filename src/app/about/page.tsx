@@ -18,13 +18,14 @@ export default function AboutPage() {
           About
         </p>
         <div className="flex items-center gap-5">
-          <img
-            src="/dustin-york.jpg"
-            srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
-            alt="Dustin York"
-            id="dustin-photo"
-            className="w-16 h-16 object-cover shrink-0"
-          />
+          <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+            <img
+              src="/dustin-york.jpg"
+              srcSet="/dustin-york.jpg 1x, /dustin-york@2x.jpg 2x"
+              alt="Dustin York"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
           <div>
             <h1
               className="text-2xl sm:text-3xl font-bold tracking-tight"
