@@ -35,7 +35,7 @@ export default function AboutPage() {
               Dustin York, <span className="font-normal">BDes</span>
             </h1>
             <p
-              className="text-lg text-neutral-400 mt-1"
+              className="text-lg text-neutral-200 mt-1"
               style={{ fontFamily: "var(--font-source-sans)" }}
             >
               Communication Designer
