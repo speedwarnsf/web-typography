@@ -544,10 +544,15 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     const fill = line.fill;
     let targetFill: number;
 
-    // Gentle two-way smoothing — pull everything toward 75% fill
-    // Short lines get slightly expanded, long lines get slightly contracted
-    // This creates the coastline wave without blowing text wide
-    targetFill = 0.75;
+    // Target the median fill of non-last lines to smooth the rag dynamically
+    const nonLastFills = lines.slice(0, -1).map(l => l.fill).sort((a, b) => a - b);
+    const mid = Math.floor(nonLastFills.length / 2);
+    targetFill = nonLastFills.length % 2 === 0 
+      ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 
+      : nonLastFills[mid];
+      
+    // Prevent target from being too wide (justification) or too narrow
+    targetFill = Math.max(0.70, Math.min(0.85, targetFill));
 
     const targetWidth = measurePx * targetFill;
     const delta = targetWidth - line.width;
@@ -559,7 +564,7 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     const approxFontSize = measurePx / measureCh;
     const spacingEm = spacingPx / approxFontSize;
 
-    // Gentle caps — expand less than contract
+    // Gentle caps - revert to subtle
     const maxExpand = 0.03;    // subtle expansion on short lines
     const maxContract = 0.05;  // slightly more contraction on long lines
 
