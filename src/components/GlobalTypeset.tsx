@@ -112,8 +112,13 @@ export default function GlobalTypeset() {
         try {
           const text = canonicalText.get(p) || p.textContent || '';
 
-          if (text.length < 30) {
-            // Too short for compositor — mark done
+          // Compositor V2 strictly replaces innerHTML with text nodes.
+          // It destroys inline HTML like <strong>, <a>, and dropcap <span>.
+          // If the paragraph has ANY child elements, skip compositor and leave Phase 1 bindings only.
+          const hasInlineHtml = Array.from(p.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
+          
+          if (hasInlineHtml || text.length < 30) {
+            // Unsafe or too short for compositor — mark done
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
             });
