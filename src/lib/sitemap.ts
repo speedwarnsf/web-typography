@@ -92,10 +92,22 @@ export const sections: SiteSection[] = [
     fontVar: "var(--font-source-sans)",
     pages: [
       {
+        slug: "/utility",
+        name: "The Utility",
+        shortName: "Utility",
+        description: "typeset.ts universal enhancement script",
+      },
+      {
         slug: "/perfect-paragraph",
         name: "Perfect Paragraph",
         shortName: "Paragraph",
         description: "Tune every parameter of body text",
+      },
+      {
+        slug: "/silver-bullet",
+        name: "The Silver Bullet",
+        shortName: "Silver Bullet",
+        description: "Scale-agnostic typographic list styling",
       },
       {
         slug: "/reading-lab",
@@ -115,11 +127,7 @@ export const sections: SiteSection[] = [
         shortName: "Builder",
         description: "Create and export font pairing cards",
       },
-      {
-        slug: "/go",
-        name: "go.js",
-        description: "Universal typographic enhancement script",
-      },
+      
     ],
   },
 ];

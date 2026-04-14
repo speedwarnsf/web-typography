@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Typeset.ts List Comparison</title>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 40px;
+      line-height: 1.6;
+      margin: 0;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .column {
+      background: #111;
+      padding: 30px;
+      border: 1px solid #333;
+    }
+    h2 {
+      color: #B8963E;
+      margin-top: 0;
+      font-size: 1.2rem;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+    
+    /* LEFT COLUMN: Default styles (unfixed) */
+    .unfixed-list {
+      padding-left: 20px;
+    }
+    
+    /* RIGHT COLUMN: New typeset styles */
+    ul.ts-styled {
+      list-style: none !important;
+      padding-left: 1.5em !important;
+    }
+    ul.ts-styled > li {
+      position: relative;
+      margin-bottom: 1em !important;
+      line-height: 1.35 !important;
+    }
+    ul.ts-styled > li:last-child {
+      margin-bottom: 0 !important;
+    }
+    ul.ts-styled > li::before {
+      content: "•";
+      position: absolute;
+      left: -1.75em;
+      width: 1.5em;
+      text-align: center;
+      font-size: 0.75em;
+      /* Align smaller bullet higher up to match text x-height */
+      transform: translateY(0.4em);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="column">
+      <h2>Before (Standard List)</h2>
+      <ul class="unfixed-list">
+        <li>We use industry-standard encryption to protect your data both in transit and at rest, ensuring your information remains secure from unauthorized access and potential breaches at all times.</li>
+        <li>Our platform is built with redundant systems and regular automated backups, guaranteeing that your work is always safe, accessible, and recoverable in the event of an unexpected failure.</li>
+        <li>Continuous monitoring and regular third-party security audits are conducted to identify and mitigate vulnerabilities before they can be exploited by malicious actors.</li>
+      </ul>
+    </div>
+    <div class="column">
+      <h2>After (typeset.ts ts-styled)</h2>
+      <ul class="ts-styled">
+        <li>We use industry-standard encryption to protect your data both in transit and at rest, ensuring your information remains secure from unauthorized access and potential breaches at all times.</li>
+        <li>Our platform is built with redundant systems and regular automated backups, guaranteeing that your work is always safe, accessible, and recoverable in the event of an unexpected failure.</li>
+        <li>Continuous monitoring and regular third-party security audits are conducted to identify and mitigate vulnerabilities before they can be exploited by malicious actors.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
