@@ -32,14 +32,14 @@ export default function EssayModal() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="text-[#B8963E] border-b border-[#B8963E]/30 hover:border-[#B8963E] transition-colors pb-0.5 cursor-pointer text-left inline-flex items-center gap-2"
+        className="relative z-50 pointer-events-auto text-[#B8963E] border-b border-[#B8963E]/30 hover:border-[#B8963E] transition-colors pb-0.5 cursor-pointer text-left inline-flex items-center gap-2"
       >
         Read our essay on its development
         <span className="text-xs tracking-widest uppercase opacity-60">→</span>
       </button>
 
       {isOpen && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div 
             className="relative w-full max-w-4xl bg-[#111] border border-neutral-800 shadow-2xl my-auto"
             onClick={(e) => e.stopPropagation()}
@@ -136,7 +136,7 @@ export default function EssayModal() {
                   
                   <p className="mb-6">
                     <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>I</span>
-                    have been an art director for most of my professional life. The work I am proudest of is in public health: HIV prevention campaigns, vaccination outreach, harm reduction communications. Work that had to be legible under difficult conditions, in environments where distraction is high and attention is scarce, where the difference between a message received and a message abandoned can be consequential. Typography matters in this work more than it does in almost any other context.
+                    &nbsp;have been an art director for most of my professional life. The work I am proudest of is in public health: HIV prevention campaigns, vaccination outreach, harm reduction communications. Work that had to be legible under difficult conditions, in environments where distraction is high and attention is scarce, where the difference between a message received and a message abandoned can be consequential. Typography matters in this work more than it does in almost any other context.
                   </p>
                   <p className="mb-6">
                     The problem I have lived with across this career is simple to state and difficult to solve: the web does not know how to break lines. The browser sets text using a greedy algorithm — fill the line until the next word won't fit, then break. This is fast. At wide measures it works well enough. At narrow measures, it produces bad breaks: prepositions stranded at line ends, articles orphaned, sentences split mid-thought. It produces staircases: consecutive lines that differ dramatically in length. It produces orphans. And it does all of this without any awareness that the paragraph is a unit — that the rag of a left-aligned paragraph is a shape that should be gentle and organic, not mechanical and jagged.
