@@ -163,7 +163,6 @@ export function getPageInfo(pathname: string): PageInfo | null {
 
 /** Pages not in the main sections (shown separately in menu) */
 export const metaPages: SitePage[] = [
-  { slug: "/essay", name: "The Essay", description: "A practitioner's account of web typography" },
   { slug: "/about", name: "About", description: "About the author" },
   { slug: "/support", name: "Support", description: "Support this project" },
 ];

@@ -1,7 +1,7 @@
 import CodeBlock from "@/components/CodeBlock";
 import { readFileSync } from "fs";
 import path from "path";
-import ComingSoonLink from "./ComingSoonLink";
+import EssayModal from "./EssayModal";
 
 const typesetFullCode = (() => {
   try {
@@ -33,7 +33,7 @@ export default function UtilityPage() {
             <strong>typeset.ts</strong> is a universal typographic enhancement script that fixes all of this dynamically. You drop it into your project, feed it an HTML element, and it applies professional typesetting rules—binding orphans, balancing rags, injecting exact typographic measurements, and bringing structural elegance to your web typography without requiring manual CSS overrides.
           </p>
           <p>
-            <ComingSoonLink />
+            <EssayModal />
           </p>
         </div>
 
