@@ -257,7 +257,7 @@ export default function Home() {
           <a href="#rules" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Rules</a>
           <a href="#pairings" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Pairings</a>
           <a href="#tips" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Tips</a>
-          <a href="#utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
+          <a href="/utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
         </div>
         </div>
       </section>
@@ -445,27 +445,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Full Utility ── */}
-      <section id="utility" className="my-4 bg-black/65 backdrop-blur-sm mx-3 sm:mx-6 lg:mx-12">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
-            04 -- The Utility
-          </p>
-          <h2
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
-            style={{ fontFamily: "var(--font-playfair)" }}
-          >
-            typeset.ts
-          </h2>
-          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
-            Drop this file into any TypeScript project. Call{" "}
-            <code className="font-mono text-[#B8963E]">typeset(text)</code> to
-            apply all five rules at once, or use each function on its&nbsp;own.
-          </p>
-
-          <CodeBlock code={typesetFullCode} title="typeset.ts" />
-        </div>
-      </section>
+      
 
       {/* ── Footer ── */}
       <footer className="my-4 bg-black/65 backdrop-blur-sm mx-3 sm:mx-6 lg:mx-12 py-12 text-center">
