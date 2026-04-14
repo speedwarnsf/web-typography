@@ -851,6 +851,48 @@ export function measureCh(element: HTMLElement): number {
 export function typeset(element: HTMLElement): void {
   if (!element) return;
 
+
+  // Inject global styles once for typeset list refinements
+  if (typeof document !== 'undefined' && !document.getElementById('ts-list-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ts-list-styles';
+    style.textContent = `
+      ul.ts-styled {
+        list-style: none !important;
+        padding-left: 1.25em !important;
+      }
+      ul.ts-styled > li {
+        position: relative;
+        margin-bottom: 1em !important;
+        line-height: inherit !important;
+      }
+      ul.ts-styled > li:last-child {
+        margin-bottom: 0 !important;
+      }
+      ul.ts-styled > li::before {
+        content: "•";
+        position: absolute;
+        left: -1.25em;
+        width: 1.25em;
+        /* Right-align the bullet within its box so it sits close to the text */
+        text-align: right;
+        padding-right: 0.28em; 
+        box-sizing: border-box;
+        font-size: 1.25em;
+        /* Lock line-height so the larger font doesn't stretch the baseline down */
+        line-height: 1;
+        /* Push it down slightly from the top of the li box to align with x-height */
+        top: 0.05em;
+        opacity: 0.8;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Find ul elements and apply the refinement class
+  if (element.tagName === 'UL') element.classList.add('ts-styled');
+  element.querySelectorAll('ul').forEach(ul => ul.classList.add('ts-styled'));
+
   // Measure once for the whole element
   const measure = measureCh(element);
 
