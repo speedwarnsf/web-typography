@@ -69,7 +69,7 @@ export default function EssayModal() {
             </button>
 
             {/* Modal Content - The Essay */}
-            <div ref={modalRef} className="p-8 sm:p-12 lg:py-16 lg:pl-16 lg:pr-11 max-h-[85vh] overflow-y-auto overscroll-contain">
+            <div ref={modalRef} className="py-8 pl-8 pr-4 sm:py-12 sm:pl-12 sm:pr-8 lg:py-16 lg:pl-16 lg:pr-8 max-h-[85vh] overflow-y-auto overscroll-contain">
               
               {/* Header */}
               <header className="mb-16 text-center">
