@@ -2,9 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import typeset from "@/lib/typeset";
+import { useRef } from "react";
 
 export default function EssayModal() {
+    const modalRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -16,10 +24,14 @@ export default function EssayModal() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  // Prevent background scrolling when open
+  // Prevent background scrolling when open & apply typeset.ts
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // We need a tiny timeout so the portal DOM nodes actually exist before typeset.ts tries to walk them
+      setTimeout(() => {
+        if (modalRef.current) typeset(modalRef.current);
+      }, 50);
     } else {
       document.body.style.overflow = "";
     }
@@ -38,7 +50,7 @@ export default function EssayModal() {
         <span className="text-xs tracking-widest uppercase opacity-60">→</span>
       </button>
 
-      {isOpen && typeof document !== "undefined" && createPortal(
+      {isOpen && mounted && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div 
             className="relative w-full max-w-4xl bg-[#111] border border-neutral-800 shadow-2xl my-auto"
@@ -57,7 +69,7 @@ export default function EssayModal() {
             </button>
 
             {/* Modal Content - The Essay */}
-            <div className="p-8 sm:p-12 lg:p-16 max-h-[85vh] overflow-y-auto overscroll-contain">
+            <div ref={modalRef} className="p-8 sm:p-12 lg:p-16 max-h-[85vh] overflow-y-auto overscroll-contain">
               
               {/* Header */}
               <header className="mb-16 text-center">
