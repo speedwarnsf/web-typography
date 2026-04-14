@@ -32,9 +32,9 @@ export default function UtilityPage() {
           <p>
             <strong>typeset.ts</strong> is a universal typographic enhancement script that fixes all of this dynamically. You drop it into your project, feed it an HTML element, and it applies professional typesetting rules—binding orphans, balancing rags, injecting exact typographic measurements, and bringing structural elegance to your web typography without requiring manual CSS overrides.
           </p>
-          <p>
+          <div className="relative z-50 isolate mt-4">
             <EssayModal />
-          </p>
+          </div>
         </div>
 
         <CodeBlock code={typesetFullCode} title="typeset.ts" />
