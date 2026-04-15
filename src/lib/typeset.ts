@@ -471,9 +471,9 @@ function composeParagraph(
 
         // Skip overfull lines (but allow slight overflow for last line)
         const isLast = end === contentTokens.length;
-        // Hard fill cap — no non-last line allowed past 85%
-        if (fill > 0.85 && !isLast) continue;
-        if (fill > 0.95) continue;  // Hard cap even for last line
+        // Hard fill cap — NO line is allowed past 85% fill, period.
+        // This forces long last lines to wrap instead of blowing past the rag boundary.
+        if (fill > 0.85) continue;
 
         const linePenalty = scoreLine(lineTokens, fill, isLast, end);
         const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
