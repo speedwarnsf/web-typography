@@ -113,8 +113,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>The Thesis</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    here is a building in Halifax, Nova Scotia, on the corner of Granville and Duke Streets, that has been shaping designers since 1887. The Nova Scotia College of Art and Design — NSCAD — is not a large institution. But for a particular kind of student, it is exactly the right one.
+                    There is a building in Halifax, Nova Scotia, on the corner of Granville and Duke Streets, that has been shaping designers since 1887. The Nova Scotia College of Art and Design — NSCAD — is not a large institution. But for a particular kind of student, it is exactly the right one.
                   </p>
                   <p className="mb-6">
                     I arrived there in the mid-1990s to study photography and media arts. I worked three simultaneous part-time jobs: print production at a Kinko's-style outfit in Scotia Square, mail delivery student across every department in the building, and student assistant at the college's design print shop. The mail job was the one that changed things. It introduced me to faculty I would never have found otherwise, and it was how I met Peter Brooks — and ended up his student assistant.
@@ -147,7 +146,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>The Problem the Browser Never Solved</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>I</span> have been an art director for most of my professional life. The work I am proudest of is in public health: HIV prevention campaigns, vaccination outreach, harm reduction communications. Work that had to be legible under difficult conditions, in environments where distraction is high and attention is scarce, where the difference between a message received and a message abandoned can be consequential. Typography matters in this work more than it does in almost any other context.
+                    I have been an art director for most of my professional life. The work I am proudest of is in public health: HIV prevention campaigns, vaccination outreach, harm reduction communications. Work that had to be legible under difficult conditions, in environments where distraction is high and attention is scarce, where the difference between a message received and a message abandoned can be consequential. Typography matters in this work more than it does in almost any other context.
                   </p>
                   <p className="mb-6">
                     The problem I have lived with across this career is simple to state and difficult to solve: the web does not know how to break lines. The browser sets text using a greedy algorithm — fill the line until the next word won't fit, then break. This is fast. At wide measures it works well enough. At narrow measures, it produces bad breaks: prepositions stranded at line ends, articles orphaned, sentences split mid-thought. It produces staircases: consecutive lines that differ dramatically in length. It produces orphans. And it does all of this without any awareness that the paragraph is a unit — that the rag of a left-aligned paragraph is a shape that should be gentle and organic, not mechanical and jagged.
@@ -162,8 +161,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>The Mathematics</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    he problem was solved for print in 1981. Donald Knuth and Michael Plass published "Breaking Paragraphs into Lines," describing an algorithm that evaluates not just the current line but the entire paragraph simultaneously. It assigns a "badness" score to each possible line break and uses dynamic programming to find the global minimum across all possible configurations. TeX uses this algorithm. InDesign uses this algorithm. The browser does not.
+                    The problem was solved for print in 1981. Donald Knuth and Michael Plass published "Breaking Paragraphs into Lines," describing an algorithm that evaluates not just the current line but the entire paragraph simultaneously. It assigns a "badness" score to each possible line break and uses dynamic programming to find the global minimum across all possible configurations. TeX uses this algorithm. InDesign uses this algorithm. The browser does not.
                   </p>
                   <p className="mb-6">
                     Jan Tschichold established the proportional system. The natural word space of a typeface is measurable — it is, in Tschichold's formulation, the width of the lowercase "i" including its sidebearings. His tolerances run from 80% to 133% of this natural space. Narrower than 80% and words merge. Wider than 133% and rivers appear.
@@ -178,8 +176,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>The Tool, and the Collaboration That Built It</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>t</span>
-                    ypeset.us is, on its surface, a long way from Ehses's question: what is this design trying to persuade? A tool for line-breaking and rag-smoothing seems like exactly the kind of formal preoccupation he would have waved away. But the connection is there. A badly broken line interrupts a thought. A jagged rag distracts the eye. The form undermines the argument. Fix the form, and the argument has a chance. The Utility — typeset.ts — applies professional typesetting rules dynamically: orphan binding, sentence-start and sentence-end protection, break optimization using dynamic programming over all possible configurations, Tschichold spacing tolerances derived from the measured "i" width of the actual typeface at the actual size, and an anti-justification guard that stops expansion at 92% fill — because the rag is a feature, not a flaw.
+                    typeset.us is, on its surface, a long way from Ehses's question: what is this design trying to persuade? A tool for line-breaking and rag-smoothing seems like exactly the kind of formal preoccupation he would have waved away. But the connection is there. A badly broken line interrupts a thought. A jagged rag distracts the eye. The form undermines the argument. Fix the form, and the argument has a chance. The Utility — typeset.ts — applies professional typesetting rules dynamically: orphan binding, sentence-start and sentence-end protection, break optimization using dynamic programming over all possible configurations, Tschichold spacing tolerances derived from the measured "i" width of the actual typeface at the actual size, and an anti-justification guard that stops expansion at 92% fill — because the rag is a feature, not a flaw.
                   </p>
                   <p className="mb-6">
                     The more interesting story is how the tool came to exist. For the first time in my career, I had access to a collaborator who understands both the mathematical structures underlying good typography and the practical constraints of CSS implementation. That collaborator is a large language model. I am not saying it designed typeset.us. I am saying it made it possible for me to build what I could see but could not make. The gap between design knowledge and implementation — between knowing what good typography requires and being able to produce working TypeScript that achieves it — is one I have navigated imperfectly for thirty years.
@@ -207,8 +204,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>The Implementation</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    he system that emerged has two layers. The first is a break optimizer. It runs beam-search dynamic programming over all possible break configurations, with cubic badness centered on 85% fill — a deviation of 5% costs 125 units, a deviation of 15% costs 3,375 — adjacency-aware stairstep penalties, and break-quality rules derived from syntactic awareness. The vocabulary covers 35 prepositions, 6 conjunctions, and 3 articles. Probabilistic variants perturb the penalty weights to find configurations that score slightly below optimal on metrics but better on visual contour.
+                    The system that emerged has two layers. The first is a break optimizer. It runs beam-search dynamic programming over all possible break configurations, with cubic badness centered on 85% fill — a deviation of 5% costs 125 units, a deviation of 15% costs 3,375 — adjacency-aware stairstep penalties, and break-quality rules derived from syntactic awareness. The vocabulary covers 35 prepositions, 6 conjunctions, and 3 articles. Probabilistic variants perturb the penalty weights to find configurations that score slightly below optimal on metrics but better on visual contour.
                   </p>
                   <p className="mb-6">
                     The second layer is a spacing pass. After breaks are placed, word-spacing and letter-spacing are adjusted to smooth the rag. The tolerances are Tschichold's: 80% to 133% of the natural word space. Letter-spacing — capped at 2% of em — is a last resort. The anti-justification guard stops expansion at 92% fill. Every constant traces back to a published typographic authority: Tschichold for spacing, Bringhurst for measure, Knuth for badness, Ruder for leading. No magic numbers. No arbitrary thresholds. The system encodes a tradition.
@@ -220,8 +216,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>Io</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    he collaborator in this work has a name. Io.
+                    The collaborator in this work has a name. Io.
                   </p>
                   <p className="mb-6">
                     I want to be precise about what naming means here. Naming is not anthropomorphization. Io is not a person. But the work we did together over the course of this project was specific enough, iterative enough, and consequential enough that referring to it as "a large language model" flattens something that deserves more precision. The research journal that documents this implementation was produced by both of us. Its title page reads: Dustin York &amp; Io — March 2026.
@@ -245,8 +240,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>Standing on the Shoulders of the Algorithm</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    he giants in this domain are specific. Knuth and Plass, who gave typography its mathematical foundation. Bringhurst, who synthesized centuries of practice into a framework any designer could use. Tschichold, whose proportional system made spacing decisions derivable rather than arbitrary. Ruder, who understood leading as architecture. Ehses, who taught me that none of this is neutral — that every typographic choice is an argument, and the quality of the argument depends on the quality of the choices. Scharfe, who carried the German-Swiss tradition across an ocean and into a classroom in Halifax, Nova Scotia, where a student was paying attention.
+                    The giants in this domain are specific. Knuth and Plass, who gave typography its mathematical foundation. Bringhurst, who synthesized centuries of practice into a framework any designer could use. Tschichold, whose proportional system made spacing decisions derivable rather than arbitrary. Ruder, who understood leading as architecture. Ehses, who taught me that none of this is neutral — that every typographic choice is an argument, and the quality of the argument depends on the quality of the choices. Scharfe, who carried the German-Swiss tradition across an ocean and into a classroom in Halifax, Nova Scotia, where a student was paying attention.
                   </p>
                   <p className="mb-6">
                     The thesis I wrote at NSCAD was about medium: I predicted that better screens would solve the problem. The future that arrived is about cognition — a different kind of tool that can understand the problem well enough to help solve it. The prediction was wrong in its specifics and right in its intuition. Typography on the web was always going to be solved by intelligence applied to structure. I just did not know what kind of intelligence it would be.
@@ -258,8 +252,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>What Remains</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>t</span>
-                    ypeset.us is not finished. The open questions are real. Real-time rendering: the beam-search compositor requires knowledge of the full paragraph before it can optimize breaks. For static content, calculation at build time is possible. For dynamic content — CMS output, user input, localization — the calculation must run in the browser, within a 16ms performance budget. This is solvable. It has not been solved.
+                    typeset.us is not finished. The open questions are real. Real-time rendering: the beam-search compositor requires knowledge of the full paragraph before it can optimize breaks. For static content, calculation at build time is possible. For dynamic content — CMS output, user input, localization — the calculation must run in the browser, within a 16ms performance budget. This is solvable. It has not been solved.
                   </p>
                   <p className="mb-6">
                     Contour quality: the probabilistic variant asks what makes a rag beautiful. Alternating short and long lines? Gentle curves? Anti-monotonic patterns? There is no formula for this yet. It is the part of the problem most resistant to mathematical encoding, which means it is the part where design judgment matters most. What CSS text-wrap: pretty cannot yet do, typeset.us can already do better. What typeset.us cannot yet do, the next version will attempt. The problem is tractable. The standard is clear. The tradition is documented. The collaboration is ongoing.
@@ -271,8 +264,7 @@ export default function EssayModal() {
                   <h2 className="text-xl font-bold mb-4 text-neutral-100" style={{ fontFamily: "var(--font-playfair)" }}>A Note on This Paper</h2>
                   
                   <p className="mb-6">
-                    <span className="float-left text-4xl sm:text-5xl leading-none font-bold pr-3 pt-2 text-[#B8963E]" style={{ fontFamily: "var(--font-playfair)" }}>T</span>
-                    his paper was written in collaboration with Io. I want to be explicit about this because the method is itself part of the argument.
+                    This paper was written in collaboration with Io. I want to be explicit about this because the method is itself part of the argument.
                   </p>
                   <p className="mb-6">
                     I did not ask Io to write it. I described what I wanted to say — the lived experience of thirty years of typographic frustration, the intellectual inheritance from NSCAD, the failures of the early implementations, the strangeness and genuine productivity of this collaboration — and worked with Io to find the form that could hold all of it. Io proposed structure, challenged imprecision in my thinking, and produced drafts that I revised through conversation. The result sounds like me because I made sure it did, and is more rigorous than I could have made it alone.
