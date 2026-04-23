@@ -795,11 +795,35 @@ function typesetBodyText(text: string, measure?: number): string {
       }
     }
 
+    // Weak-end-word binding — orphan prevention for paragraphs the compositor
+    // skips (because they contain inline HTML like <strong>, <a>, <em>). Binds
+    // short function words and linking verbs to the next word with NBSP so they
+    // can't land alone at line end. Responsive: browser still picks break points,
+    // it just can't break on the NBSP.
+    if (nextWord) {
+      const lc = word.toLowerCase().replace(/[.,;:!?]+$/, '');
+      const nextIsPunctOnly = /^[\)\]\}\.,;:!?\u201D\u2019%]+$/.test(nextWord);
+      if (!nextIsPunctOnly && PHASE1_BIND_END_WORDS.has(lc)) {
+        result.push(word + NBSP + words[i + 1]);
+        i++;
+        continue;
+      }
+    }
+
     result.push(word);
   }
 
   return result.join(' ');
 }
+
+// Short function words + linking verbs bound to the next token in Phase 1
+// so they can't hang alone at line end in paragraphs the compositor skips.
+const PHASE1_BIND_END_WORDS = new Set([
+  "a", "an", "the",
+  "of", "to", "in", "on", "at", "by", "for", "from", "with",
+  "and", "or", "but", "nor", "so", "as",
+  "is", "are", "was", "were", "be", "been"
+]);
 
 /**
  * Measure an element's width in `ch` units using Canvas (no DOM mutation).

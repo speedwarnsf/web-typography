@@ -105,7 +105,8 @@ export default function GlobalTypeset() {
     const runPhase2 = () => {
       // Select paragraphs eligible for composition
       const paragraphs = document.querySelectorAll<HTMLElement>(
-        'p:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done])'
+        'p:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done]), ' +
+        'li:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done])'
       );
 
       paragraphs.forEach((p) => {
