@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>go.js drop-in test</title>
+<style>
+  body { background: #111; color: #ddd; font-family: Georgia, serif; font-size: 18px; line-height: 1.65; margin: 2rem; }
+  .col { border-right: 1px dashed #444; margin-bottom: 2rem; }
+  .narrow { width: 340px; }
+  .mid { width: 480px; }
+  h2 { font-size: 24px; width: 340px; }
+</style>
+</head>
+<body>
+  <h2>The web does not know how to break lines. This script teaches it.</h2>
+
+  <div class="col narrow">
+    <p>The problem I have lived with across this career is simple to state and difficult to solve: the web does not know how to break lines. The browser sets text using a greedy algorithm -- fill the line until the next word won't fit, then break. This is fast. At wide measures it works well enough.</p>
+  </div>
+
+  <div class="col mid">
+    <p>"Typography is the craft of endowing human language with a durable visual form," Bringhurst wrote. The rag is a feature, not a flaw -- the irregular right edge gives the eye a lattice of landmarks to track its position in the paragraph.</p>
+  </div>
+
+  <div class="col narrow">
+    <p data-no-typeset>This control paragraph opts out with data-no-typeset and must keep raw browser wrapping, straight "quotes" and a double hyphen -- untouched.</p>
+  </div>
+
+  <script src="/go.js" defer></script>
+</body>
+</html>

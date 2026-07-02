@@ -1,539 +1,65 @@
-/**
- * typeset.us/go.js v2.0.0
- * Universal typography drop-in script
- * https://typeset.us
- *
- * Measure-first approach: reads the actual rendered layout, then applies
- * targeted fixes. Bindings scale with container width so mobile doesn't
- * get worse than browser defaults.
- */
-(function() {
-  'use strict';
+/* typeset.us go.js v3.0.0 — generated from src/lib/typeset.ts by scripts/build-dist.mjs; do not edit by hand. https://typeset.us */
+"use strict";(()=>{var Tt=new WeakMap,rt=!1,It=new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as"]),$t=new Set(["is","are","was","were","be","been","am","being","has","have","had"]),zt=new Set(["(","[","{","\u201C","\u2018"]),Mt=new Set([")","]","}",".",",",";",":","!","?","\u201D","\u2019","%"]),Ot=new Set(["\u2014","\u2013"]),Dt=new Set(["\u201C","\u2018",'"',"'","(","[","{","\xAB","\xBF","\xA1"]),_t={T:.06,V:.06,W:.05,Y:.06,A:.04,J:.03,O:.03,C:.03,G:.03,Q:.03,o:.02,c:.02};function jt(t,e,a){let f=t.charAt(0);if(!f)return 0;if(Dt.has(f))return e(f);let n=_t[f];return n?a*n:0}function Lt(t){rt=!0,t(),requestAnimationFrame(()=>{rt=!1})}function Et(){return rt}var J=t=>/[.!?]$/.test(t)||/[.!?]["'\u201D\u2019]$/.test(t);function at(t,e){if(!t||t.trim().length===0)return[];let a=t.split(/(\s+)/),f=[];for(let n of a){if(!n)continue;if(/^\s+$/.test(n)){f.push({text:n,kind:"space",width:e(n)});continue}let s=n.toLowerCase(),r=n[0],i=n[n.length-1],w="word",x=!1,c=!1,h=!1,y=!1,p;if(zt.has(r)&&n.length===1)w="openPunct",c=!0;else if(Mt.has(i)&&(n.length===1||Mt.has(n)))w="closePunct",x=!0;else if(Ot.has(n))w="dash",x=!0;else if(n.length<=20&&n.indexOf("-")>0&&n.indexOf("-")<n.length-1)w="compound",y=!0;else if(n.length>16&&!/\s/.test(n)){w="longSlug";let b=n.split(/(?<=[a-z])(?=[A-Z])/);if(b.length>1)p=b;else{let T=n.split(/[_\/]/);T.length>1&&(p=T)}}else It.has(s.replace(/[.,;:!?'"\u201D\u2019]+$/,""))&&(h=!0);f.push({text:n,kind:w,width:e(n),stickyPrev:x,stickyNext:c,weakEnd:h,protectedCompound:y,emergencyBreakParts:p})}return f}function lt(t){return t<18?{mainTarget:.85,lastTarget:.55,weakEndPenalty:4800,orphanPenalty:1e9,flatShelfPenalty:240,snapPenalty:180,maxWordSpacing:.018}:t<24?{mainTarget:.82,lastTarget:.52,weakEndPenalty:4200,orphanPenalty:1e9,flatShelfPenalty:200,snapPenalty:140,maxWordSpacing:.025}:{mainTarget:.85,lastTarget:.48,weakEndPenalty:3400,orphanPenalty:1e9,flatShelfPenalty:160,snapPenalty:100,maxWordSpacing:.035}}function ct(t,e,a,f={}){if(t.length===0)return null;let n=lt(a),s=48,r=f.isHeading===!0,i=1300,w=2600,x=1600,c=t.filter(o=>o.kind!=="space");if(c.length<2)return null;let h=o=>o.toLowerCase().replace(/[^a-z0-9]/g,""),y=o=>o.kind==="word"||o.kind==="compound"||o.kind==="longSlug",p="";if(r){let o=c.filter(y),l=o[o.length-1];if(l&&J(l.text)){let u=h(l.text);for(let F=0;F<o.length-1;F++)if(J(o[F].text)&&h(o[F].text)===u){p=u;break}}}let b=t.find(o=>o.kind==="space"),T=b?b.width:0,C=o=>{let l=o.reduce((F,m)=>F+m.width,0),u=Math.max(0,o.length-1);return l+u*T},L=o=>o.kind!=="space",v=o=>o.kind==="word"||o.kind==="compound"||o.kind==="longSlug";function k(o){var l;return(l=o.find(L))!=null?l:null}function g(o){for(let l=o.length-1;l>=0;l--)if(L(o[l]))return o[l];return null}function P(o){for(let l=o.length-1;l>=0;l--)if(v(o[l]))return o[l];return null}function H(o){let l=0;for(let u of o)v(u)&&l++;return l}function $(o){if(o<=0||o>=c.length)return!1;let l=c[o-1],u=c[o];return!l||!u?!1:!!(l.compoundId&&u.compoundId&&l.compoundId===u.compoundId||l.protectedCompound&&l.text.endsWith("-"))}let q=(o,l,u,F)=>{let m=0,z=H(o),W=k(o),_=g(o),d=P(o);if(u&&z===1)if(p&&d&&h(d.text)===p)m+=200;else if(r)m+=6e4;else return n.orphanPenalty;if(!u&&z===1&&l<.85&&(d==null?void 0:d.kind)!=="longSlug"){let G=!!p&&!!d&&h(d.text)===p;m+=G?200:5e4}!u&&z===2&&l<.5&&(m+=5e3);let E=u?n.lastTarget:n.mainTarget,A=l-E;if(m+=(A<0?3e3:1200)*A*A,!u&&l<.5?m+=8e3:!u&&l<.6?m+=4e3:!u&&l<.7?m+=2e3:!u&&l<.75&&(m+=800),u&&l<.3&&z<=2&&(m+=4e3),!u&&l>.955?m+=4e3:!u&&l>.93&&(m+=1200),W&&(W.kind==="closePunct"||W.kind==="dash"||W.stickyPrev)&&(m+=1e9),_&&(_.kind==="openPunct"||_.stickyNext)&&(m+=1e9),!u&&(d!=null&&d.weakEnd)&&(m+=n.weakEndPenalty),!u&&d&&$t.has(d.text.toLowerCase().replace(/[.,;:!?’'"”]+$/,""))&&(m+=x),!u&&d&&/^[A-Za-z]$/.test(d.text)&&(m+=n.weakEndPenalty*1.5),$(F)&&(m+=7e3),!u&&_&&!J(_.text)){let G=!1;for(let O of o){if(O===_)break;if(O.kind!=="space"&&J(O.text)){G=!0;break}}if(G){let O=_.text.replace(/[^A-Za-z0-9]/g,"").length;m+=O<=4?7e3:w}}return r&&_&&J(_.text)&&(m-=i),m},D=o=>{if(o.length<2)return 0;let l=0,u=o.length-1,F=o[u].fill,m=o[u-1].fill,z=Math.abs(F-m);if(z>.22&&(l+=n.snapPenalty*z*10),o.length>=3){let W=o[u-2].fill;Math.abs(W-m)<.05&&Math.abs(m-F)<.05&&Math.abs(W-F)<.05&&(l+=n.flatShelfPenalty)}return l},j=[{tokenIndex:0,lines:[],cost:0}],I=[],R=0,B=500;for(;j.length>0&&R<B;){R++;let o=[];for(let l of j){let u=l.tokenIndex;if(u>=c.length){I.length<200&&I.push(l);continue}for(let F=u+1;F<=Math.min(u+25,c.length);F++){let m=c.slice(u,F),z=C(m),W=z/e,_=F===c.length;if(W>.97)continue;let d=q(m,W,_,F),E=[...l.lines,{tokens:m,width:z,fill:W}],A=D(E);o.push({tokenIndex:F,lines:E,cost:l.cost+d+A})}}o.sort((l,u)=>l.cost-u.cost),j=o.slice(0,s)}if(I.length===0)return null;I.sort((o,l)=>o.cost-l.cost);let M=I[0],N=M.cost*.15+600,S=I.filter(o=>o.cost<=M.cost+N);if(S.length>1){let o=l=>{let u=l.lines.slice(0,-1).map(W=>W.fill);if(u.length<2)return 0;let F=Math.max(...u)-Math.min(...u),m=0;for(let W=1;W<u.length;W++)m=Math.max(m,Math.abs(u[W]-u[W-1]));let z=0;if(u.length>=4){let W=Math.ceil(u.length/2),_=d=>d.reduce((E,A)=>E+A,0)/d.length;z=Math.abs(_(u.slice(0,W))-_(u.slice(W)))}return 2*F+1.5*m+1.5*z};M=S.reduce((l,u)=>o(u)<o(l)?u:l,S[0])}return M.lines.map(o=>({text:o.tokens.map(l=>l.text).join(" "),tokens:o.tokens,fill:o.fill,width:o.width,wordSpacingEm:0}))}function ut(t,e,a){let n=lt(e).maxWordSpacing,s=[];for(let r=0;r<t.length;r++){let i=t[r];if(r===t.length-1){s.push({...i,wordSpacingEm:0});continue}let x=i.tokens.length,c=Math.max(0,x-1);if(c===0){s.push({...i,wordSpacingEm:0});continue}let h=i.fill,y,p=t.slice(0,-1).map(H=>H.fill).sort((H,$)=>H-$),b=Math.floor(p.length/2);y=p.length%2===0?(p[b-1]+p[b])/2:p[b],y=Math.max(.7,Math.min(.93,y));let L=(a*y-i.width)/c,v=a/e,k=L/v,g=.03,P=.04;k>g?s.push({...i,wordSpacingEm:g}):k<-P?s.push({...i,wordSpacingEm:-P}):s.push({...i,wordSpacingEm:k})}return s}function dt(t,e,a=!1){var r;if(!t.length)return!1;let f=lt(e),n=i=>i.kind!=="space",s=i=>i.kind==="word"||i.kind==="compound"||i.kind==="longSlug";for(let i=0;i<t.length;i++){let w=t[i].tokens,x=i===t.length-1,c=0;for(let p of w)s(p)&&c++;if(x&&c===1&&!a)return!1;let h=(r=w.find(n))!=null?r:null;if(h&&(h.kind==="closePunct"||h.kind==="dash"||h.stickyPrev))return!1;let y=null;for(let p=w.length-1;p>=0;p--)if(n(w[p])){y=w[p];break}if(y&&(y.kind==="openPunct"||y.stickyNext)||t[i].wordSpacingEm>.08||t[i].wordSpacingEm<-.04)return!1}return!0}function ft(t,e){let a=getComputedStyle(t),f=parseFloat(a.fontSize)||16,n=kt(t);Lt(()=>{t.innerHTML="",t.dataset.typesetDone="1",t.setAttribute("role","text");for(let s of e){let r=document.createElement("span");r.className="ts-line",r.style.display="block",r.style.whiteSpace="pre",Math.abs(s.wordSpacingEm)>5e-4&&(r.style.wordSpacing=`${s.wordSpacingEm}em`);let i=jt(s.text,n,f);i>.25&&(r.style.textIndent=`-${i.toFixed(2)}px`),r.textContent=s.text,t.appendChild(r)}})}function qt(t){if(!t||t.length<5)return t;let e=t.split(/\s+/).filter(Boolean);if(e.length<3)return t;let a=new Set(["a","an","the"]),f=new Set(["to","in","on","of","at","by","for","with","from"]),n=[];for(let s=0;s<e.length;s++){let r=e[s];r.length<=20&&r.indexOf("-")>0&&r.indexOf("-")<r.length-1&&(r=r.replace(/-/g,"\u2011"),e[s]=r);let i=s<e.length-1?e[s+1]:null;if(a.has(r.toLowerCase())&&i){n.push(r+"\xA0"+e[s+1]),s++;continue}if(f.has(r.toLowerCase())&&i){n.push(r+"\xA0"+e[s+1]),s++;continue}n.push(r)}return n.join(" ")}function nt(t,e){var n;let a=(n=e==null?void 0:e.mode)!=null?n:"body",f=Ct(t);return a==="heading"?qt(f):Gt(f,e==null?void 0:e.measure)}function ht(t){return nt(t,{mode:"heading"})}function Gt(t,e){if(!t||t.length<10)return t;let a=t.split(/\s+/).filter(Boolean);if(a.length<3)return t;let f=e!=null?e:65,n=[];for(let s=0;s<a.length;s++){let r=a[s];r.length<=20&&r.indexOf("-")>0&&r.indexOf("-")<r.length-1&&(r=r.replace(/-/g,"\u2011"),a[s]=r);let i=s<a.length-1?a[s+1]:null;if(i&&/^[\(\[\{\u201C\u2018]$/.test(r)){n.push(r+"\xA0"+a[s+1]),s++;continue}if(n.length>0&&/^[\)\]\}\.,;:!?\u201D\u2019%]/.test(r)){let w=n.pop();n.push(w+"\xA0"+r);continue}if(i&&/^[\$£€¥]$/.test(r)){n.push(r+"\xA0"+a[s+1]),s++;continue}if(f>=45&&i){let w=r.toLowerCase();if(w==="a"||w==="i"){n.push(r+"\xA0"+a[s+1]),s++;continue}}if(i){let w=r.toLowerCase().replace(/[.,;:!?]+$/,"");if(!/^[\)\]\}\.,;:!?\u201D\u2019%]+$/.test(i)&&Xt.has(w)){n.push(r+"\xA0"+a[s+1]),s++;continue}}n.push(r)}return n.join(" ")}var Xt=new Set(["a","an","the","of","to","in","on","at","by","for","from","with","and","or","but","nor","so","as","is","are","was","were","be","been"]),st=new WeakMap,K=null;function ot(t){let e=st.get(t),a=t.clientWidth;if(e&&e.width===a)return e.ch;let f=getComputedStyle(t),n=a-parseFloat(f.paddingLeft)-parseFloat(f.paddingRight);if(n<=0)return 65;if(K||(K=document.createElement("canvas").getContext("2d")),K){K.font=`${f.fontSize} ${f.fontFamily}`;let i=K.measureText("0").width;if(i>0){let w=Math.floor(n/i);return st.set(t,{width:a,ch:w}),w}}let s=parseFloat(f.fontSize)||16,r=Math.floor(n/(s*.6));return st.set(t,{width:a,ch:r}),r}function Ct(t){if(!t)return t;let e=t;return e=e.replace(/\s+--\s+/g," \u2014 "),e=e.replace(/--/g,"\u2014"),e=e.replace(/\.\.\./g,"\u2026"),e=e.replace(/(^|[\s([{—–])"/g,"$1\u201C"),e=e.replace(/"/g,"\u201D"),e=e.replace(/'(?=\d)/g,"\u2019"),e=e.replace(/(^|[\s([{—–])'(?=[A-Za-z])/g,"$1\u2018"),e=e.replace(/([A-Za-z0-9])'(?=[A-Za-z])/g,"$1\u2019"),e=e.replace(/'/g,"\u2019"),e}function kt(t){let e=getComputedStyle(t);K||(K=document.createElement("canvas").getContext("2d"));let a=K,f=`${e.fontStyle} ${e.fontWeight} ${e.fontSize} ${e.fontFamily}`,n=(parseFloat(e.fontSize)||16)*.5;return s=>a?(a.font=f,a.measureText(s).width):s.length*n}function Ut(t){let e=getComputedStyle(t);return t.clientWidth-parseFloat(e.paddingLeft)-parseFloat(e.paddingRight)}function Zt(t){let e=t.tagName;if(e==="UL"||e==="OL"||e==="LI")return!1;for(let a of Array.from(t.childNodes)){if(a.nodeType!==1)continue;let f=a;if(!(f.classList&&f.classList.contains("ts-line"))&&f.tagName!=="BR")return!1}return!0}function it(t,e){return Lt(()=>{t.textContent=e}),!1}function Kt(t,e=.75){let a=getComputedStyle(t),f=t.getBoundingClientRect().right-parseFloat(a.paddingRight);for(let n of Array.from(t.querySelectorAll(".ts-line"))){let s=document.createRange();if(s.selectNodeContents(n),s.getBoundingClientRect().right-f>e)return!0}return!1}function Yt(t,e){var x,c,h;let a=(c=(x=t.dataset.tsRaw)!=null?x:Tt.get(t))!=null?c:t.textContent||"";if(a=Ct(a.trim()),a.length<10)return!1;Tt.set(t,a);let f=Ut(t);if(f<=0)return!1;let n=kt(t),s=at(a,n),r=/^H[1-6]$/.test(t.tagName),i=ct(s,f,e,{isHeading:r});if(!i)return it(t,a);let w=(h=ut(i,e,f))!=null?h:i;return!dt(w,e,r)||(ft(t,w),Kt(t))?it(t,a):!0}function Q(t){var s,r;if(!t)return;if(typeof document!="undefined"&&!document.getElementById("ts-list-styles")){let i=document.createElement("style");i.id="ts-list-styles",i.textContent=`
+      /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+         SILVER BULLET \u2014 hung list markers with optical left alignment.
+         Add class="ts-styled" to any <ul> (typeset() also adds it for you).
 
-  var script = document.currentScript;
-  var config = {
-    selector: (script && script.getAttribute('data-typeset-selector')) ||
-      'p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6, td, th, dd, dt, label',
-    disabled: ((script && script.getAttribute('data-typeset-disable')) || '')
-      .split(',').map(function(s) { return s.trim(); }).filter(Boolean)
-  };
+         CUSTOMIZE THE BULLET by setting CSS variables on the list, a wrapper,
+         or :root \u2014 no need to edit this file. All are optional; the defaults
+         reproduce the classic hung "\u2022".
 
-  var skipTags = { PRE: 1, CODE: 1, TEXTAREA: 1, INPUT: 1, SCRIPT: 1, STYLE: 1 };
-  var NBSP = '\u00A0';
-  var SHY = '\u00AD';
+           --ts-bullet-content   the marker glyph        (default: "\u2022")
+           --ts-bullet-color     marker color            (default: currentColor)
+           --ts-bullet-size      marker font-size        (default: 1.25em)
+           --ts-bullet-opacity   marker opacity          (default: 0.8)
+           --ts-bullet-top       vertical nudge          (default: 0.05em)
 
-  // Word lists for binding tiers
-  var tinyWords = { a:1, i:1, an:1, as:1, at:1, be:1, by:1, 'do':1, go:1,
-    'if':1, 'in':1, is:1, it:1, my:1, no:1, of:1, on:1, or:1, so:1, to:1,
-    up:1, we:1 };
-  var mediumWords = { the:1, and:1, but:1, 'for':1, nor:1, not:1, yet:1,
-    its:1, our:1, has:1, was:1, are:1, can:1 };
+         EXAMPLES
+           Dash:    ul.notes        { --ts-bullet-content: "\u2013"; }
+           Arrow:   ul.steps        { --ts-bullet-content: "\u2023"; --ts-bullet-color: #1D9E75; }
+           Square:  ul.brand        { --ts-bullet-content: "\\25AA"; --ts-bullet-color: #1D9E75; }
+           Hollow:  ul.subtle       { --ts-bullet-content: "\\25E6"; --ts-bullet-opacity: 1; }
 
-  // ─── Measurement ───
-
-  var _canvas = null;
-
-  /**
-   * Measure element width in ch units using Canvas (no DOM mutation).
-   */
-  function measureCh(el) {
-    var cs = getComputedStyle(el);
-    var containerPx = el.clientWidth
-      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    if (containerPx <= 0) return 65;
-
-    if (!_canvas) {
-      var c = document.createElement('canvas');
-      _canvas = c.getContext('2d');
-    }
-    if (_canvas) {
-      _canvas.font = cs.fontSize + ' ' + cs.fontFamily;
-      var chPx = _canvas.measureText('0').width;
-      if (chPx > 0) return Math.floor(containerPx / chPx);
-    }
-
-    // Fallback
-    var fsPx = parseFloat(cs.fontSize) || 16;
-    return Math.floor(containerPx / (fsPx * 0.6));
-  }
-
-  // ─── Sentence detection ───
-
-  function isSentenceEnd(word) {
-    return /[.!?]$/.test(word) || /[.!?]["'\u201D\u2019]$/.test(word);
-  }
-
-  // ─── Text processing (measure-aware) ───
-
-  /**
-   * Apply typographic bindings scaled to container width.
-   * At narrow widths, only orphan prevention + numbers.
-   * At wide widths, full rules.
-   */
-  function typesetText(text, measure) {
-    if (!text || text.length < 10) return text;
-    var words = text.split(/\s+/).filter(Boolean);
-    if (words.length < 3) return text;
-
-    var m = measure || 65;
-    var doOrphans = m >= 25 && !config.disabled.includes('orphans');
-    var doNumbers = m >= 25;
-    var doTinyBinding = m >= 45 && !config.disabled.includes('short-words');
-    var doSentence = m >= 50 && !config.disabled.includes('sentence-start') &&
-                     !config.disabled.includes('sentence-end');
-    var doMediumBinding = m >= 55 && !config.disabled.includes('short-words');
-    var doFullBinding = m >= 65 && !config.disabled.includes('short-words');
-
-    var result = [];
-
-    for (var i = 0; i < words.length; i++) {
-      var word = words[i];
-      var prevWord = i > 0 ? words[i - 1] : null;
-      var nextWord = i < words.length - 1 ? words[i + 1] : null;
-
-      // Orphan prevention: bind last two words
-      if (doOrphans && i === words.length - 2) {
-        result.push(word + NBSP + words[i + 1]);
-        break;
+         For a pixel-crisp box (rather than a glyph square), override the
+         ::before in your own stylesheet:
+           ul.brand > li::before {
+             content: "" !important; background: #1D9E75 !important;
+             width: .5em !important; height: .5em !important;
+             font-size: inherit !important; top: .55em !important; left: -1.1em !important;
+           }
+         \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+      ul.ts-styled {
+        list-style: none !important;
+        padding-left: 1.25em !important;
       }
-
-      // Sentence-start protection
-      if (doSentence && prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
-        var maxLen = m >= 45 ? 6 : 5;
-        if (word.length <= maxLen) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
+      ul.ts-styled > li {
+        position: relative;
+        margin-bottom: 1em !important;
+        line-height: inherit !important;
       }
-
-      // Sentence-end protection
-      if (doSentence) {
-        if (/[.!?,;:]$/.test(word) && word.length <= 7 && result.length > 0) {
-          var last = result.pop();
-          result.push(last + NBSP + word);
-          continue;
-        }
-        if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
+      ul.ts-styled > li:last-child {
+        margin-bottom: 0 !important;
       }
-
-      // Tiered word binding
-      var lc = word.toLowerCase();
-      if (nextWord && !/[,;:.!?]$/.test(word)) {
-        // Numbers always bind forward
-        if (doNumbers && /^\d{1,3}$/.test(word)) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
-        if (doTinyBinding && tinyWords[lc]) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
-        if (doMediumBinding && mediumWords[lc]) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
-        if (doFullBinding && lc.length <= 2) {
-          result.push(word + NBSP + words[i + 1]);
-          i++;
-          continue;
-        }
+      ul.ts-styled > li::before {
+        content: var(--ts-bullet-content, "\u2022");
+        position: absolute;
+        left: -1.25em;
+        width: 1.25em;
+        /* Right-align the bullet within its box so it sits close to the text */
+        text-align: right;
+        padding-right: 0.28em;
+        box-sizing: border-box;
+        font-size: var(--ts-bullet-size, 1.25em);
+        color: var(--ts-bullet-color, currentColor);
+        /* Lock line-height so the larger font doesn't stretch the baseline down */
+        line-height: 1;
+        /* Push it down slightly from the top of the li box to align with x-height */
+        top: var(--ts-bullet-top, 0.05em);
+        opacity: var(--ts-bullet-opacity, 0.8);
       }
-
-      result.push(word);
-    }
-
-    return result.join(' ');
-  }
-
-  /**
-   * Heading mode: bind articles and prepositions to next word.
-   */
-  function typesetHeading(text) {
-    if (!text || text.length < 5) return text;
-    var words = text.split(/\s+/).filter(Boolean);
-    if (words.length < 3) return text;
-
-    var result = [];
-    for (var i = 0; i < words.length; i++) {
-      var lc = words[i].toLowerCase();
-      var next = words[i + 1];
-      if (next && (tinyWords[lc] || mediumWords[lc])) {
-        result.push(words[i] + NBSP + next);
-        i++;
-      } else {
-        result.push(words[i]);
-      }
-    }
-    return result.join(' ');
-  }
-
-  // ─── Post-render analysis ───
-
-  /**
-   * Detect actual rendered lines by wrapping words in spans and
-   * grouping by vertical position. Returns array of line objects.
-   */
-  function detectLines(el) {
-    var text = el.textContent || '';
-    if (!text.trim() || text.length < 20) return null;
-
-    var words = text.split(/ +/).filter(Boolean);
-    if (words.length < 3) return null;
-
-    // Wrap words in measurement spans
-    var originalHTML = el.innerHTML;
-    el.innerHTML = words.map(function(w, i) {
-      return '<span data-gw="' + i + '">' + w + '</span>';
-    }).join(' ');
-
-    var spans = el.querySelectorAll('span[data-gw]');
-    var lines = [];
-    var currentTop = -1;
-    var currentLine = [];
-
-    for (var i = 0; i < spans.length; i++) {
-      var top = Math.round(spans[i].getBoundingClientRect().top);
-      if (currentTop === -1) {
-        currentTop = top;
-        currentLine = [i];
-      } else if (Math.abs(top - currentTop) > 3) {
-        lines.push({ indices: currentLine, words: currentLine.map(function(idx) { return words[idx]; }) });
-        currentTop = top;
-        currentLine = [i];
-      } else {
-        currentLine.push(i);
-      }
-    }
-    if (currentLine.length > 0) {
-      lines.push({ indices: currentLine, words: currentLine.map(function(idx) { return words[idx]; }) });
-    }
-
-    // Measure line widths
-    var containerWidth = el.clientWidth - parseFloat(getComputedStyle(el).paddingLeft) - parseFloat(getComputedStyle(el).paddingRight);
-    for (var j = 0; j < lines.length; j++) {
-      var first = spans[lines[j].indices[0]];
-      var last = spans[lines[j].indices[lines[j].indices.length - 1]];
-      lines[j].width = last.getBoundingClientRect().right - first.getBoundingClientRect().left;
-      lines[j].fill = lines[j].width / containerWidth;
-    }
-
-    // Restore original
-    el.innerHTML = originalHTML;
-
-    return { lines: lines, words: words, containerWidth: containerWidth };
-  }
-
-  /**
-   * Fix stranded sentence-start words: detect when the last word on a line
-   * is a sentence-start word (preceded by . ! ? punctuation), then bind it
-   * to the next word so they move to the next line together.
-   */
-  function fixStrandedSentenceStarts(el) {
-    var analysis = detectLines(el);
-    if (!analysis || analysis.lines.length < 2) return false;
-
-    var sentenceEndPattern = /[.!?]["'\u201D\u2019]?$/;
-    var modified = false;
-    var text = el.textContent || '';
-    var newText = text;
-
-    // Check each line except the last
-    for (var i = 0; i < analysis.lines.length - 1; i++) {
-      var line = analysis.lines[i];
-      if (line.words.length === 0) continue;
-
-      var lastWord = line.words[line.words.length - 1];
-
-      // Check if this word itself ends with sentence-ending punctuation
-      var wordEndsSentence = sentenceEndPattern.test(lastWord);
-
-      // Or check if the previous word ended a sentence
-      var prevWord = line.words.length > 1 ? line.words[line.words.length - 2] : null;
-      var prevEndsSentence = prevWord && sentenceEndPattern.test(prevWord);
-
-      if (wordEndsSentence || prevEndsSentence) {
-        // This is a sentence-start word stranded at line end
-        var nextLine = analysis.lines[i + 1];
-        if (nextLine && nextLine.words.length > 0) {
-          var nextWord = nextLine.words[0];
-
-          // Bind lastWord to nextWord with nbsp
-          var pattern = new RegExp(
-            escapeRegex(lastWord) + '\\s+' + escapeRegex(nextWord),
-            'g'
-          );
-          var replacement = lastWord + NBSP + nextWord;
-
-          var before = newText;
-          newText = newText.replace(pattern, replacement);
-          if (newText !== before) modified = true;
-        }
-      }
-    }
-
-    if (modified) {
-      setTextContent(el, newText);
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Post-render orphan fix: only bind last two words if the last line
-   * actually contains a single word in the rendered layout.
-   */
-  function fixRealOrphans(el) {
-    var analysis = detectLines(el);
-    if (!analysis || analysis.lines.length < 2) return;
-
-    var lastLine = analysis.lines[analysis.lines.length - 1];
-
-    // Only intervene if last line has exactly 1 word (a true orphan)
-    if (lastLine.words.length === 1) {
-      var prevLine = analysis.lines[analysis.lines.length - 2];
-      if (prevLine.words.length >= 2) {
-        // Pull the last word of the previous line down
-        var pullWord = prevLine.words[prevLine.words.length - 1];
-        var orphanWord = lastLine.words[0];
-
-        var text = el.textContent || '';
-        // Find the last occurrence of "pullWord orphanWord" and bind
-        var pattern = new RegExp(
-          escapeRegex(pullWord) + '\\s+' + escapeRegex(orphanWord) + '\\s*$'
-        );
-        var newText = text.replace(pattern, pullWord + NBSP + orphanWord);
-        if (newText !== text) {
-          // Apply via text nodes to preserve any existing structure
-          setTextContent(el, newText);
-        }
-      }
-    }
-  }
-
-  /**
-   * Post-render rag analysis: detect lines that are significantly
-   * shorter or longer than their neighbors and apply micro word-spacing.
-   */
-  function smoothRagLight(el) {
-    var analysis = detectLines(el);
-    if (!analysis || analysis.lines.length < 3) return;
-
-    var lines = analysis.lines;
-    var containerWidth = analysis.containerWidth;
-    var isNarrow = containerWidth < 350;
-
-    // Compute median width of non-last lines
-    var nonLastWidths = lines.slice(0, -1).map(function(l) { return l.width; }).sort(function(a, b) { return a - b; });
-    var mid = Math.floor(nonLastWidths.length / 2);
-    var target = nonLastWidths.length % 2 === 0
-      ? (nonLastWidths[mid - 1] + nonLastWidths[mid]) / 2
-      : nonLastWidths[mid];
-
-    var MAX_EXPAND = isNarrow ? 0.6 : 2.0;
-    var MAX_TIGHTEN = isNarrow ? 0.4 : 1.2;
-
-    var baseWS = parseFloat(getComputedStyle(el).wordSpacing) || 0;
-
-    // Build per-line HTML with word-spacing adjustments
-    var htmlParts = [];
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      var lineText = line.words.join(' ');
-      var isLast = i === lines.length - 1;
-      var spaces = line.words.length - 1;
-      var gap = target - line.width;
-
-      if (!isLast && spaces > 0 && Math.abs(gap) > 1) {
-        var rawDelta = gap / spaces;
-        var wsDelta = rawDelta > 0
-          ? Math.min(MAX_EXPAND, rawDelta * 0.8)
-          : Math.max(-MAX_TIGHTEN, rawDelta * 0.6);
-        if (Math.abs(wsDelta) > 0.05) {
-          var finalWS = baseWS + wsDelta;
-          htmlParts.push('<span style="word-spacing:' + finalWS.toFixed(2) + 'px">' + lineText + '</span>');
-          continue;
-        }
-      }
-      htmlParts.push(lineText);
-    }
-
-    el.style.whiteSpace = 'pre-line';
-    el.innerHTML = htmlParts.join('\n');
-  }
-
-  // ─── Helpers ───
-
-  function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  function shouldSkip(el) {
-    if (!el || el.nodeType !== 1) return true;
-    if (el.hasAttribute('data-no-typeset')) return true;
-    if (skipTags[el.tagName]) return true;
-    var parent = el.parentElement;
-    while (parent) {
-      if (parent.hasAttribute('data-no-typeset')) return true;
-      if (skipTags[parent.tagName]) return true;
-      parent = parent.parentElement;
-    }
-    return false;
-  }
-
-  function isHeading(el) {
-    return /^H[1-6]$/.test(el.tagName);
-  }
-
-  function setTextContent(el, text) {
-    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    var nodes = [];
-    var node;
-    while (node = walker.nextNode()) nodes.push(node);
-    if (nodes.length === 1) {
-      nodes[0].textContent = text;
-    } else {
-      // Multiple text nodes — replace all with single
-      el.textContent = text;
-    }
-  }
-
-  // ─── Processing pipeline ───
-
-  function applyCSS(el) {
-    if (shouldSkip(el)) return;
-    var isH = isHeading(el);
-
-    if (!config.disabled.includes('text-wrap')) {
-      el.style.textWrap = isH ? 'balance' : 'pretty';
-    }
-    if (!config.disabled.includes('hanging-punctuation') && el.tagName === 'P') {
-      el.style.hangingPunctuation = 'first last';
-    }
-    if (!config.disabled.includes('font-features')) {
-      el.style.fontFeatureSettings = '"liga" 1, "calt" 1, "kern" 1';
-    }
-  }
-
-  function processElement(el) {
-    if (shouldSkip(el)) return;
-
-    // Phase 1: CSS enhancements
-    applyCSS(el);
-
-    // Phase 2: Measure-aware text bindings
-    var measure = measureCh(el);
-    var isH = isHeading(el);
-
-    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    var textNodes = [];
-    var node;
-    while (node = walker.nextNode()) textNodes.push(node);
-
-    for (var i = 0; i < textNodes.length; i++) {
-      var original = textNodes[i].textContent;
-      if (!original || original.trim().length < 10) continue;
-      var leading = (original.match(/^\s*/) || [''])[0];
-      var trailing = (original.match(/\s*$/) || [''])[0];
-      var processed = isH
-        ? typesetHeading(original.trim())
-        : typesetText(original.trim(), measure);
-      textNodes[i].textContent = leading + processed + trailing;
-    }
-
-    // Phase 3: Post-render analysis (paragraphs with enough text)
-    if (!isH && (el.textContent || '').length >= 80) {
-      // Fix stranded sentence-start words
-      fixStrandedSentenceStarts(el);
-      // Real-line orphan detection — only fix actual orphans
-      fixRealOrphans(el);
-
-      // Rag smoothing — subtle word-spacing per line
-      if (!config.disabled.includes('rag-smoothing') && measure >= 25) {
-        smoothRagLight(el);
-      }
-    }
-  }
-
-  function run(root) {
-    root = root || document.body;
-    if (!root) return;
-    try {
-      var elements = root.querySelectorAll(config.selector);
-      for (var i = 0; i < elements.length; i++) {
-        processElement(elements[i]);
-      }
-    } catch (e) {
-      if (typeof console !== 'undefined') console.error('typeset.us:', e);
-    }
-  }
-
-  // ─── Observer (careful, no double-processing) ───
-
-  var observerPaused = false;
-
-  function initObserver() {
-    var observer = new MutationObserver(function(mutations) {
-      if (observerPaused) return;
-      observerPaused = true;
-
-      var processed = new Set();
-      mutations.forEach(function(mutation) {
-        mutation.addedNodes.forEach(function(node) {
-          if (node.nodeType !== 1) return;
-          if (processed.has(node)) return;
-
-          // Process the node itself if it matches
-          if (node.matches && node.matches(config.selector)) {
-            processElement(node);
-            processed.add(node);
-          }
-
-          // Process matching children (but not ones already handled)
-          var children = node.querySelectorAll ? node.querySelectorAll(config.selector) : [];
-          for (var i = 0; i < children.length; i++) {
-            if (!processed.has(children[i])) {
-              processElement(children[i]);
-              processed.add(children[i]);
-            }
-          }
-        });
-      });
-
-      requestAnimationFrame(function() { observerPaused = false; });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  // ─── Init ───
-
-  function init() {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        run();
-        initObserver();
-      });
-    } else {
-      run();
-      initObserver();
-    }
-  }
-
-  // Public API
-  window.typeset = {
-    run: run,
-    text: function(str, measure) { return typesetText(str, measure || 65); },
-    version: '2.0.0'
-  };
-
-  init();
-})();
+    `,document.head.appendChild(i)}t.tagName==="UL"&&t.classList.add("ts-styled"),t.querySelectorAll("ul").forEach(i=>i.classList.add("ts-styled"));let e=ot(t);if(Zt(t)&&Yt(t,e))return;let a=document.createTreeWalker(t,NodeFilter.SHOW_TEXT,null),f=[],n;for(;n=a.nextNode();)f.push(n);for(let i of f){let w=i.textContent;if(!w||w.trim().length<10)continue;let x=((s=w.match(/^\s*/))==null?void 0:s[0])||"",c=((r=w.match(/\s*$/))==null?void 0:r[0])||"",h=nt(w.trim(),{measure:e});i.textContent=x+h+c}}function Pt(t){document.querySelectorAll(t).forEach(Q)}function pt(t){let e=t.textContent||"";if(!e.trim()||e.length<20)return null;let a=e.split(/ +/).filter(Boolean);if(a.length<3)return null;let f=t.innerHTML,n=t.style.whiteSpace;t.innerHTML=a.map((h,y)=>`<span data-lw="${y}">${h}</span>`).join(" ");let s=t.querySelectorAll("span[data-lw]"),r=getComputedStyle(t),i=t.clientWidth-parseFloat(r.paddingLeft)-parseFloat(r.paddingRight),w=[],x=-1,c=[];if(s.forEach((h,y)=>{let p=Math.round(h.getBoundingClientRect().top);if(x===-1)x=p,c=[y];else if(Math.abs(p-x)>3){if(c.length>0){let b=s[c[0]],C=s[c[c.length-1]].getBoundingClientRect().right-b.getBoundingClientRect().left;w.push({indices:c,words:c.map(L=>a[L]),width:C,fill:C/i})}x=p,c=[y]}else c.push(y)}),c.length>0){let h=s[c[0]],p=s[c[c.length-1]].getBoundingClientRect().right-h.getBoundingClientRect().left;w.push({indices:c,words:c.map(b=>a[b]),width:p,fill:p/i})}return t.innerHTML=f,t.style.whiteSpace=n,{lines:w,words:a,containerWidth:i}}function gt(t){let e=pt(t);if(!e||e.lines.length<2)return!1;let a=e.lines[e.lines.length-1];if(a.words.length!==1)return!1;let f=e.lines[e.lines.length-2];if(f.words.length<2)return!1;let n=f.words[f.words.length-1],s=a.words[0],r=t.textContent||"",i=c=>c.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),w=new RegExp(i(n)+"\\s+"+i(s)+"\\s*$"),x=r.replace(w,n+"\xA0"+s);return x!==r?(t.textContent=x,!0):!1}function mt(t){let e=pt(t);if(!e||e.lines.length<3)return null;let{lines:a,words:f,containerWidth:n}=e,s=n<350,r=a.slice(0,-1).map(C=>C.width).sort((C,L)=>C-L),i=Math.floor(r.length/2),w=r.length%2===0?(r[i-1]+r[i])/2:r[i],x=s?.5:1.8,c=s?.3:1,h=parseFloat(getComputedStyle(t).wordSpacing)||0,y=[],p=!1;for(let C=0;C<a.length;C++){let L=a[C],v=L.words.join(" "),k=C===a.length-1,g=L.words.length-1,P=w-L.width;if(!k&&g>0&&Math.abs(P)>1){let H=P/g,$=H>0?Math.min(x,H*.7):Math.max(-c,H*.5);if(Math.abs($)>.05){let q=h+$;y.push(`<span style="word-spacing:${q.toFixed(2)}px">${v}</span>`),p=!0;continue}}y.push(v)}if(!p)return null;let b=t.innerHTML,T=t.style.whiteSpace;return t.style.whiteSpace="pre-line",t.innerHTML=y.join(`
+`),()=>{t.innerHTML=b,t.style.whiteSpace=T}}function wt(t){let e=pt(t);if(!e||e.lines.length<2)return!1;let a=/[.!?]["'\u201D\u2019]?$/,f=!1,s=t.textContent||"";for(let r=0;r<e.lines.length-1;r++){let i=e.lines[r];if(i.words.length===0)continue;let w=i.words[i.words.length-1],x=a.test(w),c=i.words.length>1?i.words[i.words.length-2]:null,h=c&&a.test(c);if(x||h){let y=e.lines[r+1];if(y&&y.words.length>0){let p=y.words[0],b=v=>v.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),T=new RegExp(b(w)+"\\s+"+b(p),"g"),C=w+"\xA0"+p,L=s;s=s.replace(T,C),s!==L&&(f=!0)}}}return f?(t.textContent=s,!0):!1}function At(t){return!t||(t.textContent||"").length<40?null:(wt(t),gt(t),mt(t))}function bt(t,e){let a=t.innerHTML,f=t.style.whiteSpace,n=null;function s(x,c){let h=x.textContent||"";if(!h.trim()||h.length<40)return;let y=parseFloat(getComputedStyle(x).wordSpacing)||0,p=h.split(/ +/).filter(Boolean);if(p.length<4)return;x.innerHTML=p.map((R,B)=>`<span data-w="${B}">${R}</span>`).join(" ");let b=x.querySelectorAll("span[data-w]"),T=[],C=-1,L=[];if(b.forEach((R,B)=>{let M=Math.round(R.getBoundingClientRect().top);if(C===-1)C=M,L=[B];else if(Math.abs(M-C)>3){if(L.length>0){let N=b[L[0]],o=b[L[L.length-1]].getBoundingClientRect().right-N.getBoundingClientRect().left;T.push({wordIndices:L,width:o})}C=M,L=[B]}else L.push(B)}),L.length>0){let R=b[L[0]],M=b[L[L.length-1]].getBoundingClientRect().right-R.getBoundingClientRect().left;T.push({wordIndices:L,width:M})}if(T.length<2){x.innerHTML=p.join(" ");return}let v=T.slice(0,-1).map(R=>R.width).sort((R,B)=>R-B),k=Math.floor(v.length/2),g=v.length%2===0?(v[k-1]+v[k])/2:v[k],P=T[T.length-1].width,H=v.reduce((R,B)=>R+B,0)/v.length/c,$=P/c;H>.88&&$<.6&&T.length>2&&(g=Math.min(g,c*.82));let q=c<350,D=q?.6:2.5,j=q?.4:1.5,I=[];for(let R=0;R<T.length;R++){let B=T[R],M=R===T.length-1,S=B.wordIndices.map(u=>p[u]).join(" "),o=(S.match(/[\s\u00A0]/g)||[]).length,l=g-B.width;if(!M&&o>0&&Math.abs(l)>1){let u=l/o,F=u>0?Math.min(D,u*.8):Math.max(-j,u*.6);if(Math.abs(F)>.05){let m=y+F;I.push(`<span style="word-spacing:${m.toFixed(2)}px">${S}</span>`);continue}}I.push(S)}x.style.whiteSpace="pre-line",x.innerHTML=I.join(`
+`)}function r(){t.innerHTML=a;let x=t.textContent||"";if(!x.trim()||x.length<40)return;let c=getComputedStyle(t),h=t.clientWidth-parseFloat(c.paddingLeft)-parseFloat(c.paddingRight);if(h<=0)return;let y=h<400;if(h<250)return;if(y||e!=null&&e.preserveBreaks){s(t,h);return}let p=document.createElement("span");p.style.cssText="position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;font:inherit;letter-spacing:inherit;word-spacing:inherit;",t.style.position=t.style.position||"relative",t.appendChild(p);let b=M=>(p.textContent=M,p.getBoundingClientRect().width),T=b("\xA0"),C=parseFloat(c.wordSpacing)||0,L=x.split(/ +/).filter(Boolean);if(L.length<3){t.removeChild(p);return}let v=L.map(M=>b(M));t.removeChild(p);let k=i(v,T,h);if(k.length<2)return;let g=[];for(let M=0;M<k.length-1;M++){let N=k[M],S=k[M+1],o=L.slice(N,S),l=o.reduce((u,F,m)=>u+v[N+m]+(m<o.length-1?T:0),0);g.push({words:o,width:l})}if(g.length<2)return;let P=g.slice(0,-1).map(M=>M.width).sort((M,N)=>M-N),H=Math.floor(P.length/2),$=P.length%2===0?(P[H-1]+P[H])/2:P[H],q=g[g.length-1].width,D=P.reduce((M,N)=>M+N,0)/P.length/h,j=q/h;D>.88&&j<.6&&g.length>2&&($=Math.min($,h*.82));let I=2.5,R=1.5,B=[];for(let M=0;M<g.length;M++){let N=g[M],S=N.words.join(" ").replace(/\u00A0/g," "),o=M===g.length-1,l=N.words.length-1,u=$-N.width;if(!o&&l>0&&Math.abs(u)>1){let F=u/l,m=F>0?Math.min(I,F*.8):Math.max(-R,F*.6);if(Math.abs(m)>.05){let z=C+m;B.push(`<span style="word-spacing:${z.toFixed(2)}px">${S}</span>`);continue}}B.push(S)}t.style.whiteSpace="pre-line",t.innerHTML=B.join(`
+`)}function i(x,c,h){let y=x.length,p=1e10,b=new Array(y+1).fill(p),T=new Array(y+1).fill(-1),C=new Array(y+1).fill(0);b[0]=0;for(let k=1;k<=y;k++){let g=0;for(let P=k;P>=1&&(g+=x[P-1]+(P<k?c:0),!(g>h*1.05&&P<k));P--){if(b[P-1]>=p)continue;let H=h-g,$=H/h,q=k===y,D;if(H<-h*.03)D=Math.pow(Math.abs($),2)*1e3;else if(q){let I=g/h;if(I<.35)D=Math.pow(.35-I,2)*300;else if(I<.55){let R=0,B=0;for(let N=1;N<k;N++)C[N]>0&&(R+=C[N]/h,B++);let M=B>0?R/B:.8;M>.88?D=Math.pow(M-I,2)*150:D=$>.5?Math.pow($-.5,2)*20:0}else D=0}else{let I=h*.85,R=Math.abs(g-I)/h;D=Math.pow(R,2)*100,g<h*.65&&(D+=Math.pow((h*.65-g)/h,2)*200)}if(P>1&&C[P-1]>0){let I=C[P-1],R=Math.abs(g-I)/h;D+=Math.pow(R,2)*30}let j=b[P-1]+D;j<b[k]&&(b[k]=j,T[k]=P-1,C[k]=g)}}let L=[],v=y;for(;v>0;)L.unshift(T[v]),v=T[v];return L.push(y),L}r();let w=new ResizeObserver(()=>{n&&clearTimeout(n),n=setTimeout(()=>requestAnimationFrame(r),150)});return w.observe(t),()=>{w.disconnect(),n&&clearTimeout(n),t.innerHTML=a,t.style.whiteSpace=f}}function Ht(t){let e=t.querySelectorAll("span[data-w]");if(e.length<4)return()=>{};let a=t.clientWidth;if(a<250)return()=>{};let f=[],n=-1,s=[];if(e.forEach(b=>{let T=Math.round(b.getBoundingClientRect().top);n===-1?(n=T,s=[b]):Math.abs(T-n)>3?(s.length>0&&f.push(s),n=T,s=[b]):s.push(b)}),s.length>0&&f.push(s),f.length<2)return()=>{};let r=f.map(b=>{let T=b[0].getBoundingClientRect();return b[b.length-1].getBoundingClientRect().right-T.left}),i=r.slice(0,-1).sort((b,T)=>b-T),w=Math.floor(i.length/2),x=i.length%2===0?(i[w-1]+i[w])/2:i[w],c=a<350,h=c?1.5:2.5,y=c?.75:1.5,p=[];return f.forEach((b,T)=>{let C=T===f.length-1,L=b.length-1,v=x-r[T];if(!C&&L>0&&Math.abs(v)>1){let k=v/L,g=k>0?Math.min(h,k*.8):Math.max(-y,k*.6);Math.abs(g)>.05&&b.forEach(P=>{P.style.wordSpacing=`${g.toFixed(2)}px`,p.push(P)})}}),()=>{p.forEach(b=>{b.style.wordSpacing=""})}}var Vt=new Set("a an the of in to at by on or is it if no so as we do be".split(" "));function vt(t,e){let a=t.innerHTML,f=null,n=-1;function s(){var N;t.innerHTML=a;let i=t.textContent||"";if(!i.trim()||i.length<40)return;let w=getComputedStyle(t),x=t.clientWidth-parseFloat(w.paddingLeft)-parseFloat(w.paddingRight);if(x<200||Math.abs(x-n)<2)return;n=x;let c=document.createElement("span");c.style.cssText="position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;font:inherit;letter-spacing:inherit;word-spacing:inherit;",t.style.position=t.style.position||"relative",t.appendChild(c);let h=S=>(c.textContent=S,c.getBoundingClientRect().width),y=i.split(/ +/).filter(Boolean);if(y.length<3){t.removeChild(c);return}let p=y.map(S=>h(S)),b=(()=>{c.innerHTML="a b";let S=c.getBoundingClientRect().width;return c.textContent="ab",S-c.getBoundingClientRect().width})();t.removeChild(c);let T=y.length,C=x,L=new Set;for(let S=0;S<T-1;S++){let o=y[S].toLowerCase().replace(/[.,;:!?'"\u201D\u2019]+$/,"");Vt.has(o)&&L.add(S)}function v(S,o){let l=0;for(let u=S;u<o;u++)l+=p[u];return l+(o-S-1)*b}function k(S,o,l,u){let F=v(S,o);if(F>C*1.005)return 1e9;let m=F/C,z=o-S,W=0;if(l)return z===1?1e6:z===1&&m<.25?150:m<.15?100:0;let _=Math.abs(m-.85);if(W+=Math.pow(_/.15,3)*100,u!==null){let d=Math.abs(m-u);d>.15?W+=200:d>.1&&(W+=80)}return L.has(o-1)&&(W+=500),z<=2&&m<.55&&(W+=150),m<.4&&(W+=300),W}let g=new Array(T+1).fill(null);g[0]={cost:0,prev:-1,fill:null};for(let S=1;S<=T;S++){let o={cost:1e9,prev:-1,fill:0};for(let l=Math.max(0,S-25);l<S;l++){if(!g[l]||g[l].cost>=1e9)continue;let u=S===T,m=v(l,S)/C,z=g[l].cost+k(l,S,u,g[l].fill);z<o.cost&&(o={cost:z,prev:l,fill:m})}g[S]=o}let P=new Set;P.add(0);let H=T,$=[];for(;H>0;)$.push(g[H].prev),H=g[H].prev;$.reverse();for(let S of $)P.add(S);let q=new Set,D=0;for(let S of $){if(S===0){D=0;continue}D=S}for(let S of L)S<T-1&&q.add(S);let j=a,I=0,R=!1,B=!1,M="";for(let S=0;S<j.length;S++){let o=j[S];if(o==="<"){R=!0,M+=o;continue}if(o===">"){R=!1,M+=o;continue}if(R){M+=o;continue}o===" "||o===`
+`||o==="\r"||o==="	"?(B&&(I++,B=!1),q.has(I-1)?M+="\xA0":M+=" "):o==="\xA0"?M+="\xA0":(B||(B=!0),M+=o)}t.innerHTML=M,(N=e==null?void 0:e.onApplied)==null||N.call(e)}s();let r=new ResizeObserver(()=>{f&&clearTimeout(f),f=setTimeout(()=>{n=-1,requestAnimationFrame(s)},250)});return r.observe(t),()=>{r.disconnect(),f&&clearTimeout(f),t.innerHTML=a}}function Rt(t){let e=t.textContent||"";if(!e.trim()||e.length<60)return;let a=getComputedStyle(t);if(a.textAlign==="center")return;let n=t.clientWidth-parseFloat(a.paddingLeft)-parseFloat(a.paddingRight);if(n<250)return;let s=ot(t),r=s<24;if(s<15)return;let i=parseFloat(a.fontSize)||16,c=1+((parseFloat(a.lineHeight)||i*1.5)/i-1.5),h=document.createElement("span");h.style.cssText="position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;font:inherit;letter-spacing:inherit;word-spacing:inherit;",t.style.position=t.style.position||"relative",t.appendChild(h),h.innerHTML="a b";let y=h.getBoundingClientRect().width;h.textContent="ab";let p=y-h.getBoundingClientRect().width;if(t.removeChild(h),p<1)return;let b=r?.5:1,T=p*.2*Math.max(.5,c)*b,C=p*.33*Math.max(.5,c)*b,L=i*.02*Math.max(.5,c)*b,v=e.split(/ +/).filter(Boolean);if(v.length<4)return;t.innerHTML=v.map((d,E)=>`<span data-sw="${E}">${d}</span>`).join(" ");let k=t.querySelectorAll("span[data-sw]"),g=[],P=-1,H=[];if(k.forEach((d,E)=>{let A=Math.round(d.getBoundingClientRect().top);if(P===-1)P=A,H=[E];else if(Math.abs(A-P)>3){if(H.length>0){let G=k[H[0]],O=k[H[H.length-1]];g.push({wordIndices:[...H],width:O.getBoundingClientRect().right-G.getBoundingClientRect().left})}P=A,H=[E]}else H.push(E)}),H.length>0){let d=k[H[0]],E=k[H[H.length-1]];g.push({wordIndices:[...H],width:E.getBoundingClientRect().right-d.getBoundingClientRect().left})}if(g.length<3)return;let $=g.map(d=>d.width/n),q=[],D=.05;for(let d=0;d<g.length-2;d++){let E=d,A=d+1,G=$[d];if(G!==void 0){for(;A<g.length-1;){let O=$[A];if(O===void 0||Math.abs(O-G)>=D)break;A++}if(A-E>=2){let O=$.slice(E,A),Y=O.reduce((V,Z)=>V+Z,0)/O.length;q.push({start:E,end:A,avgFill:Y}),d=A-1}}}let j=g.slice(0,-1).map(d=>d.width).sort((d,E)=>d-E),I=Math.floor(j.length/2),R=j[I-1],B=j[I];if(R===void 0||B===void 0)return;let M=j.length%2===0?(R+B)/2:B,N=g.slice(0,-1).map(d=>d.width/n),S=N.every(d=>d>.92),o=Math.max(...N)-Math.min(...N),l=S&&o<.04,u=g[g.length-1];if(u){let d=u.width/n;N.reduce((A,G)=>A+G,0)/N.length>.88&&d<.6&&g.length>2&&(M=Math.min(M,n*.82))}let F=parseFloat(a.wordSpacing)||0,m=[],z=new Set;for(let d of q)for(let E=d.start;E<d.end;E++)z.add(E);for(let d=0;d<g.length;d++){let E=g[d];if(!E)continue;let A=d===g.length-1,G=E.wordIndices.map(U=>v[U]||"").filter(Boolean),O=G.length-1,Y=G.join("").length;if(A||O===0){m.push({wsPerGap:0,lsPerChar:0,direction:0,isFlatRun:!1});continue}let V=z.has(d),Z=M-E.width;if(V){let U=q.find(et=>d>=et.start&&d<et.end);if(U){let et=d-U.start,te=U.end-U.start;(et%2===0?U.avgFill>.85:U.avgFill<=.85)?Z=n*.82-E.width:Z=Math.min(n*.92,n*.95)-E.width}}let X=Z/O;X=Math.max(-T,Math.min(C,X));let xt=(E.width+X*O)/n;xt<.6?(X=(n*.6-E.width)/O,X=Math.max(-T,Math.min(C,X))):xt>.95&&(X=(n*.95-E.width)/O,X=Math.max(-T,Math.min(C,X)));let Bt=X*O,St=Z-Bt,tt=0;Math.abs(St)>1&&Y>0&&(tt=St/Y,tt=Math.max(-L*.5,Math.min(L,tt)));let Nt=Z>0?1:Z<0?-1:0;m.push({wsPerGap:X,lsPerChar:tt,direction:Nt,isFlatRun:V})}for(let d=1;d<m.length-1;d++){let E=m[d-1],A=m[d];!E||!A||E.direction!==0&&A.direction!==0&&E.direction!==A.direction&&(A.direction>0?(A.wsPerGap*=.85,A.lsPerChar*=.85):(A.wsPerGap*=.65,A.lsPerChar*=.65))}if(l)for(let d of m)d.wsPerGap*=.5,d.lsPerChar*=.5;let W=[],_=!1;for(let d=0;d<g.length;d++){let E=g[d],A=m[d];if(!E||!A)continue;let O=E.wordIndices.map(Y=>v[Y]||"").filter(Boolean).join(" ");if(Math.abs(A.wsPerGap)>.05||Math.abs(A.lsPerChar)>.01){let V=`word-spacing:${(F+A.wsPerGap).toFixed(2)}px`;Math.abs(A.lsPerChar)>.01&&(V+=`;letter-spacing:${A.lsPerChar.toFixed(3)}px`),W.push(`<span style="${V}">${O}</span>`),_=!0}else W.push(O)}_&&(t.style.whiteSpace="pre-line",t.innerHTML=W.join(`
+`))}var Ft={run:Q,all:Pt,text:nt,heading:ht,smoothRag:bt,smoothRagSpans:Ht,optimizeBreaks:vt,shapeRag:Rt,fixOrphans:gt,fixRag:mt,fixStrandedSentenceStarts:wt,postRenderFix:At,measureCh:ot,compose(t="p"){let e=s=>!(s.hasAttribute("data-no-typeset")||(s.textContent||"").length<30||s.closest("[data-no-typeset], pre, code, .demo")||getComputedStyle(s).textAlign==="center"),a=s=>{try{e(s)&&Q(s)}catch{}},f=()=>{document.querySelectorAll(t).forEach(s=>{s.hasAttribute("data-typeset-done")||a(s)})},n=()=>{var s,r;if(document.fonts.ready.then(f).catch(()=>setTimeout(f,1e3)),(r=(s=document.fonts).addEventListener)==null||r.call(s,"loadingdone",()=>{setTimeout(()=>{document.querySelectorAll(t).forEach(i=>{i.hasAttribute("data-typeset-done")&&(i.removeAttribute("data-typeset-done"),a(i))})},50)}),typeof ResizeObserver!="undefined"){let i=new WeakMap,w=new ResizeObserver(x=>{var c;if(!Et())for(let h of x){let y=h.target,p=h.contentRect.width,b=(c=i.get(y))!=null?c:-1;Math.abs(p-b)<2||(i.set(y,p),y.hasAttribute("data-typeset-done")&&(y.removeAttribute("data-typeset-done"),a(y)))}});document.querySelectorAll(t).forEach(x=>w.observe(x))}};document.readyState==="loading"?document.addEventListener("DOMContentLoaded",n):n()},auto(){let t=()=>{document.querySelectorAll("[data-typeset]").forEach(e=>{Q(e)}),document.querySelectorAll("[data-typeset-smooth]").forEach(e=>{bt(e)}),document.querySelectorAll("[data-typeset-heading]").forEach(e=>{e.innerHTML=ht(e.textContent||"")})};document.readyState==="loading"?document.addEventListener("DOMContentLoaded",t):t()},_tokenize:at,_composeParagraph:ct,_shapeExactLines:ut,_finalValidate:dt,_renderFrozenLines:ft};window.Typeset=Ft;var Wt=Ft;var yt=typeof document!="undefined"?document.currentScript:null,Jt=(yt==null?void 0:yt.getAttribute("data-typeset-selector"))||"p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6, td, th, dd, dt";Wt.compose(Jt);})();

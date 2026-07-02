@@ -37,7 +37,54 @@ export default function UtilityPage() {
           </div>
         </div>
 
-        <CodeBlock code={typesetFullCode} title="typeset.ts" />
+        <section className="mb-16">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
+            01 — The drop-in
+          </p>
+          <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            One script tag. No configuration, no build step, no framework. It
+            composes paragraphs, list items, and headings with the same engine
+            that sets this site: beam-search line breaking with contour
+            re-ranking, Tschichold spacing, hanging punctuation, smart quotes,
+            and self-checks that fall back to browser rendering rather than
+            ever make your text worse. Opt any element out with{" "}
+            <code className="text-neutral-300">data-no-typeset</code>.
+          </p>
+          <CodeBlock
+            code={`<script src="https://typeset.us/go.js" defer></script>`}
+            title="go.js — anywhere HTML runs"
+          />
+        </section>
+
+        <section className="mb-16">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
+            02 — The library
+          </p>
+          <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            The same engine as a <code className="text-neutral-300">window.Typeset</code>{" "}
+            global, for when you want to decide what gets composed and when.
+          </p>
+          <CodeBlock
+            code={`<script src="https://typeset.us/typeset.min.js"></script>
+<script>
+  Typeset.compose('article p, article li');  // full compositor
+  Typeset.run(document.querySelector('#intro'));  // one element
+  const clean = Typeset.text('No orphans in this string.');  // strings
+</script>`}
+            title="typeset.min.js — window.Typeset"
+          />
+        </section>
+
+        <section>
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
+            03 — The source
+          </p>
+          <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            TypeScript, dependency-free. Both scripts above are generated from
+            this file — what you read here is exactly what runs.
+          </p>
+          <CodeBlock code={typesetFullCode} title="typeset.ts" />
+        </section>
       </div>
     </main>
   );

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "build:dist": "node scripts/build-dist.mjs"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.0",
@@ -20,6 +21,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.1",
     "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "typescript": "^5"

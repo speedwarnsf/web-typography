@@ -80,65 +80,78 @@ const Typeset = {
 
   /**
    * Compositor V2 — beam-search paragraph compositor.
-   * Runs the full pipeline: tokenize → composeParagraph → shapeExactLines → validate → render.
-   * This is the highest-quality typesetting mode.
-   * 
+   * Routes each eligible element through the full engine pipeline via
+   * typeset(): quote education, composition with contour re-ranking, spacing
+   * pass, post-render overflow self-check, graceful binding fallback.
+   *
+   * Runs after fonts are ready — directly, never inside requestAnimationFrame,
+   * which does not fire in hidden/background tabs. Re-typesets when webfonts
+   * finish loading late and when an element's width changes.
+   *
    * @param selector CSS selector for elements to compose (default: 'p')
    */
   compose(selector: string = 'p') {
+    const eligible = (p: HTMLElement): boolean => {
+      if (p.hasAttribute('data-no-typeset')) return false;
+      if ((p.textContent || '').length < 30) return false;
+      if (p.closest('[data-no-typeset], pre, code, .demo')) return false;
+      if (getComputedStyle(p).textAlign === 'center') return false;
+      return true;
+    };
+
+    const runOne = (p: HTMLElement) => {
+      try {
+        if (eligible(p)) typeset(p);
+      } catch {}
+    };
+
     const run = () => {
       document.querySelectorAll<HTMLElement>(selector).forEach((p) => {
-        if (p.hasAttribute('data-typeset-done') || p.hasAttribute('data-no-typeset')) return;
-
-        const text = p.textContent || '';
-        if (text.length < 30) return;
-        if (p.closest('[data-no-typeset], pre, code, .demo')) return;
-
-        const textAlign = getComputedStyle(p).textAlign;
-        if (textAlign === 'center') return;
-
-        const measureChars = measureCh(p);
-        const cs = getComputedStyle(p);
-        let measurePx = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        if (cs.fontStyle === 'italic') measurePx *= 0.92;
-        if (measurePx <= 0) return;
-
-        const measurer = document.createElement('span');
-        measurer.style.cssText =
-          'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
-          'font:inherit;letter-spacing:inherit;word-spacing:inherit;';
-        p.style.position = p.style.position || 'relative';
-        p.appendChild(measurer);
-
-        const measureText = (txt: string): number => {
-          measurer.textContent = txt;
-          return measurer.getBoundingClientRect().width;
-        };
-
-        try {
-          const tokens = tokenize(text, measureText);
-          const composition = composeParagraph(tokens, measurePx, measureChars);
-          p.removeChild(measurer);
-
-          if (!composition) return;
-
-          const shaped = shapeExactLines(composition, measureChars, measurePx);
-          if (!shaped) return;
-
-          finalValidate(shaped, measureChars);
-          renderFrozenLines(p, shaped);
-        } catch {
-          try { p.removeChild(measurer); } catch {}
-        }
+        if (p.hasAttribute('data-typeset-done')) return;
+        runOne(p);
       });
     };
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        document.fonts.ready.then(() => requestAnimationFrame(run)).catch(() => setTimeout(run, 1000));
+    const start = () => {
+      document.fonts.ready.then(run).catch(() => setTimeout(run, 1000));
+
+      // Late-loading webfonts: compositions measured against fallback metrics
+      // render wrong once the real font arrives — recompose with true metrics.
+      document.fonts.addEventListener?.('loadingdone', () => {
+        setTimeout(() => {
+          document.querySelectorAll<HTMLElement>(selector).forEach((p) => {
+            if (!p.hasAttribute('data-typeset-done')) return;
+            p.removeAttribute('data-typeset-done');
+            runOne(p);
+          });
+        }, 50);
       });
+
+      // Width changes (rotation, window resize): recompose to the new measure.
+      if (typeof ResizeObserver !== 'undefined') {
+        const widths = new WeakMap<Element, number>();
+        const ro = new ResizeObserver((entries) => {
+          if (shouldIgnoreMutation()) return;
+          for (const entry of entries) {
+            const el = entry.target as HTMLElement;
+            const w = entry.contentRect.width;
+            const prev = widths.get(el) ?? -1;
+            if (Math.abs(w - prev) < 2) continue;
+            widths.set(el, w);
+            if (el.hasAttribute('data-typeset-done')) {
+              el.removeAttribute('data-typeset-done');
+              runOne(el);
+            }
+          }
+        });
+        document.querySelectorAll<HTMLElement>(selector).forEach((p) => ro.observe(p));
+      }
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start);
     } else {
-      document.fonts.ready.then(() => requestAnimationFrame(run)).catch(() => setTimeout(run, 1000));
+      start();
     }
   },
 
