@@ -176,30 +176,47 @@ function GlyphField({ reduced }: { reduced: boolean }) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const CHARS = ['a', 'e', 'g', 'k', 'R', 'Q', '&', 'fi', '.', ',', ';', ':', '?', '“', '”', '’', '—', '¶', '§', '*'];
+    // The field is loose type tumbling in space. Wherever the pointer goes —
+    // and wherever the autonomous composition wave passes — glyphs stop
+    // tumbling, settle upright onto invisible baselines, and brighten like
+    // set ink. Leave, and they decay back into drift. Chaos resolving into
+    // order, continuously: the site's whole argument, running as texture.
+    const CHARS = ['a', 'e', 'g', 'k', 'x', 'R', 'Q', 'W', '&', 'fi', 'ff', '.', ',', ';', ':', '?', '!', '“', '”', '’', '—', '¶', '§', '*'];
+    const LINE = 38; // the invisible baseline grid glyphs settle onto
     let w = 0;
     let h = 0;
     let dpr = 1;
     let raf = 0;
     let px = 0.5;
     let py = 0.5;
+    let curX = -9999;
+    let curY = -9999;
 
-    interface Glyph { x: number; y: number; size: number; char: string; depth: number; vy: number; sway: number; phase: number; gold: boolean; serif: boolean }
+    interface Glyph {
+      x: number; y: number; z: number; // z: 0 near … 1 far
+      size: number; char: string;
+      rot: number; vrot: number;
+      vx: number; vy: number;
+      gold: boolean; serif: boolean;
+      order: number; // 0 tumbling … 1 fully set
+    }
     let glyphs: Glyph[] = [];
 
     const seed = () => {
-      const count = Math.min(70, Math.floor(w / 22));
+      const count = Math.min(110, Math.max(42, Math.floor(w / 13)));
       glyphs = Array.from({ length: count }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
-        size: 16 + Math.random() * 74,
+        z: Math.random(),
+        size: 22 + Math.random() * 96,
         char: CHARS[Math.floor(Math.random() * CHARS.length)],
-        depth: 0.25 + Math.random() * 0.75,
-        vy: 0.05 + Math.random() * 0.22,
-        sway: 6 + Math.random() * 22,
-        phase: Math.random() * Math.PI * 2,
-        gold: Math.random() < 0.14,
-        serif: Math.random() < 0.7,
+        rot: (Math.random() - 0.5) * 1.7,
+        vrot: (Math.random() - 0.5) * 0.004,
+        vx: (Math.random() - 0.5) * 0.14,
+        vy: -(0.05 + Math.random() * 0.22),
+        gold: Math.random() < 0.16,
+        serif: Math.random() < 0.72,
+        order: 0,
       }));
     };
 
@@ -210,30 +227,79 @@ function GlyphField({ reduced }: { reduced: boolean }) {
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#050505';
+      ctx.fillRect(0, 0, w, h);
       if (!glyphs.length) seed();
     };
 
+    // Autonomous organizer: a slow lissajous sweep so the field composes
+    // itself even with no pointer (touch devices, idle viewers).
+    const waveAt = (t: number) => {
+      const k = (t % 17000) / 17000;
+      return {
+        x: w * (0.5 + 0.38 * Math.sin(k * Math.PI * 2)),
+        y: h * (0.5 + 0.34 * Math.sin(k * Math.PI * 4 + 1.3)),
+        r: Math.min(w, h) * 0.36,
+        s: 0.85,
+      };
+    };
+
     const draw = (t: number) => {
-      ctx.clearRect(0, 0, w, h);
+      // Translucent fill instead of clear: motion trails, ink-in-water.
+      ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+      ctx.fillRect(0, 0, w, h);
+      const wave = reduced ? null : waveAt(t);
+
       for (const g of glyphs) {
-        const alpha = 0.035 + g.depth * 0.075;
-        ctx.fillStyle = g.gold
-          ? `rgba(184, 150, 62, ${alpha})`
-          : `rgba(214, 214, 214, ${alpha * 0.9})`;
-        ctx.font = `${g.serif ? 'italic ' : ''}${g.size}px ${g.serif ? 'var(--font-playfair), Georgia, serif' : 'Georgia, serif'}`;
-        const ox = (px - 0.5) * g.depth * 46;
-        const oy = (py - 0.5) * g.depth * 26;
-        const sway = reduced ? 0 : Math.sin(t / 4200 + g.phase) * g.sway * 0.4;
-        ctx.fillText(g.char, g.x + ox + sway, g.y + oy);
-      }
-      if (!reduced) {
-        for (const g of glyphs) {
-          g.y -= g.vy * g.depth;
-          if (g.y < -100) {
-            g.y = h + 80;
-            g.x = Math.random() * w;
-          }
+        const depth = 1 - g.z;
+        const scale = 0.45 + depth * 0.95;
+        const ox = (px - 0.5) * depth * 72;
+        const oy = (py - 0.5) * depth * 42;
+        const sx = g.x + ox;
+        const sy = g.y + oy;
+
+        // Influence: pointer first, wave second — order follows the hand.
+        let inf = 0;
+        const dCur = Math.hypot(sx - curX, sy - curY);
+        const rCur = 230 + depth * 130;
+        if (dCur < rCur) inf = 1 - dCur / rCur;
+        if (wave) {
+          const dW = Math.hypot(sx - wave.x, sy - wave.y);
+          if (dW < wave.r) inf = Math.max(inf, (1 - dW / wave.r) * wave.s);
         }
+        const target = inf * inf;
+        // Snap to order quickly, decay back into drift slowly.
+        g.order += (target - g.order) * (target > g.order ? 0.16 : 0.022);
+
+        if (!reduced) {
+          const free = 1 - g.order;
+          g.x += g.vx * free;
+          g.y += g.vy * depth * free;
+          g.rot += g.vrot * free;
+          if (g.y < -160) { g.y = h + 130; g.x = Math.random() * w; }
+          if (g.x < -160) g.x = w + 130;
+          else if (g.x > w + 160) g.x = -130;
+        }
+
+        // Set type: upright on the nearest baseline, slightly refined in size.
+        const baseline = Math.round(sy / LINE) * LINE;
+        const drawY = sy + (baseline - sy) * g.order;
+        const rot = g.rot * (1 - g.order);
+        const size = g.size * scale * (1 - g.order * 0.22);
+        const alpha = Math.min(0.34, (0.05 + depth * 0.095) * (1 + g.order * 2.6));
+
+        if (g.gold) {
+          ctx.fillStyle = `rgba(184, 150, 62, ${alpha})`;
+        } else {
+          const tone = Math.round(200 + g.order * 46);
+          ctx.fillStyle = `rgba(${tone}, ${tone}, ${tone - Math.round(g.order * 26)}, ${alpha})`;
+        }
+        ctx.save();
+        ctx.translate(sx, drawY);
+        ctx.rotate(rot);
+        ctx.font = `${g.serif ? 'italic ' : ''}${size.toFixed(1)}px ${g.serif ? 'var(--font-playfair), Georgia, serif' : 'Georgia, serif'}`;
+        ctx.fillText(g.char, 0, 0);
+        ctx.restore();
       }
     };
 
@@ -245,11 +311,19 @@ function GlyphField({ reduced }: { reduced: boolean }) {
     const onPointer = (e: PointerEvent) => {
       px = e.clientX / Math.max(1, w);
       py = e.clientY / Math.max(1, h);
+      curX = e.clientX;
+      curY = e.clientY;
+    };
+    const onLeave = () => {
+      curX = -9999;
+      curY = -9999;
     };
 
     resize();
     window.addEventListener('resize', resize);
     window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('pointerdown', onPointer, { passive: true });
+    document.documentElement.addEventListener('pointerleave', onLeave);
     if (reduced) {
       draw(0);
     } else {
@@ -265,6 +339,8 @@ function GlyphField({ reduced }: { reduced: boolean }) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', onPointer);
+      window.removeEventListener('pointerdown', onPointer);
+      document.documentElement.removeEventListener('pointerleave', onLeave);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [reduced]);
@@ -828,6 +904,9 @@ body:has(.v2-root) header.fixed { display: none; }
   margin: 0 auto;
   padding: 110px 24px;
   border-top: 1px solid #1c1c1c;
+  /* Soft veil over the glyph field behind reading text — no hard edges,
+     the field stays alive in the margins. */
+  background: radial-gradient(ellipse 115% 100% at 50% 50%, rgba(5,5,5,.78) 52%, rgba(5,5,5,0) 100%);
 }
 .v2-label {
   font-family: var(--font-mono), monospace;
