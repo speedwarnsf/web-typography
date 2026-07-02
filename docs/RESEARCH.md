@@ -420,6 +420,19 @@ Remaining, sharpened by the instrument: rag range on packed openings (the
 two-register contour — full first lines, loose tail), and contour quality
 generally (open question #1). The instrument to evaluate answers now exists.
 
+**Addendum, same day — contour re-ranking landed.** Part V's insight (the
+optimal-by-badness solution is not always the most beautiful) turned out not
+to need Monte Carlo reruns: the beam search already finishes holding up to
+200 complete compositions. Among candidates within 15% of optimal badness —
+where break-quality rules are already satisfied, because violations cost far
+more than the slack — the winner is now the best rag *shape*: lowest
+weighted sum of spread (2.0), largest neighbor step (1.5), and two-register
+drift (1.5, the mean-fill gap between the paragraph's first and second
+half). Measured on the same essay paragraph at 375px: lines 11→10, rag range
+21%→17%, stairsteps 2→1, and the composition now ends three sentences
+exactly at line ends. Zero additional composition cost — the candidates were
+already computed and previously discarded.
+
 ---
 
 *This document is a living record. It will grow as the system evolves.*

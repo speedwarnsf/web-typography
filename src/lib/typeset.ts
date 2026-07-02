@@ -570,7 +570,7 @@ function composeParagraph(
 
   // Beam search — collect all complete states and pick the best
   let beam: BeamState[] = [{ tokenIndex: 0, lines: [], cost: 0 }];
-  let bestComplete: BeamState | null = null;
+  const completes: BeamState[] = [];
   let iterations = 0;
   const MAX_ITERATIONS = 500;  // Safety valve for very long paragraphs
 
@@ -582,11 +582,9 @@ function composeParagraph(
     for (const state of beam) {
       const start = state.tokenIndex;
 
-      // If this state is complete, compare with best
+      // If this state is complete, keep it for contour re-ranking
       if (start >= contentTokens.length) {
-        if (!bestComplete || state.cost < bestComplete.cost) {
-          bestComplete = state;
-        }
+        if (completes.length < 200) completes.push(state);
         continue;
       }
 
@@ -623,19 +621,51 @@ function composeParagraph(
     beam = newBeam.slice(0, BEAM);
   }
 
-  // Return the best complete composition
-  if (bestComplete) {
-    return bestComplete.lines.map(line => ({
-      text: line.tokens.map(t => t.text).join(' '),
-      tokens: line.tokens,
-      fill: line.fill,
-      width: line.width,
-      wordSpacingEm: 0,
-    }));
+  // No valid composition found
+  if (completes.length === 0) return null;
+
+  // Contour re-ranking (the journal's Part V insight, applied to the beam
+  // instead of Monte Carlo reruns): the cheapest composition by badness is not
+  // always the most beautiful. Among compositions within a small slack of
+  // optimal — where break-quality rules are already satisfied, since
+  // violations carry penalties far larger than the slack — prefer the rag
+  // with the best shape: low spread, no cliffs between neighbors, and no
+  // "two-register" drift where the opening sets full and the tail sets loose.
+  completes.sort((a, b) => a.cost - b.cost);
+  let winner = completes[0];
+  const slack = winner.cost * 0.15 + 600;
+  const nearOptimal = completes.filter(s => s.cost <= winner.cost + slack);
+
+  if (nearOptimal.length > 1) {
+    const contourScore = (s: BeamState): number => {
+      const fills = s.lines.slice(0, -1).map(l => l.fill);
+      if (fills.length < 2) return 0;
+      const spread = Math.max(...fills) - Math.min(...fills);
+      let maxStep = 0;
+      for (let i = 1; i < fills.length; i++) {
+        maxStep = Math.max(maxStep, Math.abs(fills[i] - fills[i - 1]));
+      }
+      let registerShift = 0;
+      if (fills.length >= 4) {
+        const half = Math.ceil(fills.length / 2);
+        const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+        registerShift = Math.abs(mean(fills.slice(0, half)) - mean(fills.slice(half)));
+      }
+      return 2.0 * spread + 1.5 * maxStep + 1.5 * registerShift;
+    };
+    winner = nearOptimal.reduce(
+      (best, s) => (contourScore(s) < contourScore(best) ? s : best),
+      nearOptimal[0]
+    );
   }
 
-  // No valid composition found
-  return null;
+  return winner.lines.map(line => ({
+    text: line.tokens.map(t => t.text).join(' '),
+    tokens: line.tokens,
+    fill: line.fill,
+    width: line.width,
+    wordSpacingEm: 0,
+  }));
 }
 
 // ─── Shape Exact Lines (replaces shapeRag) ───
