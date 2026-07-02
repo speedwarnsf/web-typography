@@ -61,9 +61,43 @@ interface FrozenLine {
 
 // Token classification sets
 const WEAK_END_WORDS = new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as"]);
+// Copula / auxiliary verbs that read poorly when stranded at a line end
+// ("…Advertising is"). Penalized gently (below weakEndPenalty) so they're only
+// bumped to the next line when the shortened line stays full — "where width allows."
+const LINKING_END_WORDS = new Set([
+  "is","are","was","were","be","been","am","being","has","have","had",
+]);
 const OPEN_PUNCT = new Set(["(", "[", "{", "\u201C", "\u2018"]);  // opening quotes/brackets
 const CLOSE_PUNCT = new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);
 const DASHES = new Set(["\u2014", "\u2013"]);  // em-dash, en-dash
+
+// \u2500\u2500\u2500 Optical margin alignment (hanging punctuation) \u2500\u2500\u2500
+// Characters whose full advance hangs into the left margin when they begin a
+// line, so the optical left edge aligns with the lines above/below.
+const HANG_OPEN = new Set(["\u201C", "\u2018", '"', "'", "(", "[", "{", "\u00AB", "\u00BF", "\u00A1"]);
+// Capitals with visible left sidebearing \u2014 pulled left by a small fraction of
+// the font size (em). Values mirror the project's original optical CSS.
+const PULL_LETTERS: Record<string, number> = {
+  T: 0.06, V: 0.06, W: 0.05, Y: 0.06, A: 0.04, J: 0.03,
+  O: 0.03, C: 0.03, G: 0.03, Q: 0.03, o: 0.02, c: 0.02,
+};
+
+/**
+ * Leading optical indent (px) for a composed line: full-glyph hang for opening
+ * punctuation, a sidebearing pull for optical capitals, otherwise none.
+ */
+function leadingOpticalIndentPx(
+  text: string,
+  measurer: (t: string) => number,
+  fontSizePx: number,
+): number {
+  const ch = text.charAt(0);
+  if (!ch) return 0;
+  if (HANG_OPEN.has(ch)) return measurer(ch);          // hang the whole glyph
+  const pull = PULL_LETTERS[ch];
+  if (pull) return fontSizePx * pull;                  // optical sidebearing pull
+  return 0;
+}
 
 /**
  * Options for typesetText
@@ -226,7 +260,11 @@ function profileForMeasure(measureCh: number): CompositorProfile {
     maxWordSpacing: 0.025,
   };
   return {
-    mainTarget: 0.80,
+    // 0.85 is the documented design center (RESEARCH.md: "cubic badness
+    // centered on 85% fill — the sweet spot for ragged-right"). At 0.80 the
+    // compositor set ~20% looser than the browser and cost 2-3 extra lines
+    // per paragraph at 375px with no rag improvement (measured on /proof).
+    mainTarget: 0.85,
     lastTarget: 0.48,
     weakEndPenalty: 3400,
     orphanPenalty: 1e9,
@@ -243,16 +281,50 @@ function profileForMeasure(measureCh: number): CompositorProfile {
 function composeParagraph(
   tokens: Token[],
   measurePx: number,
-  measureCh: number
+  measureCh: number,
+  opts: { isHeading?: boolean } = {}
 ): FrozenLine[] | null {
   if (tokens.length === 0) return null;
 
   const profile = profileForMeasure(measureCh);
   const BEAM = 48;
+  const isHeading = opts.isHeading === true;
+  // Heading-only sentence-boundary preference. Weighted far below orphanPenalty
+  // (1e9) so widow prevention always wins — sentence breaks happen only "where
+  // width allows." Rewards ending a line at a sentence boundary; penalizes a
+  // line that crosses a boundary and leaves a sentence-start word dangling.
+  const SENTENCE_END_BONUS = 1300;
+  const DANGLING_START_PENALTY = 2600;
+  // Gentle nudge against copula/auxiliary verbs at a line end (below the fill
+  // penalty for a sub-0.70 line, so it only bumps when the line stays full).
+  const LINKING_END_PENALTY = 1600;
 
   // Filter out pure whitespace tokens for line candidates
   const contentTokens = tokens.filter(t => t.kind !== "space");
   if (contentTokens.length < 2) return null;
+
+  // Epistrophe detection — does the final word repeat a word that also closes an
+  // earlier sentence ("…together. … together.")? In a heading that is a
+  // deliberate rhetorical figure (parallel clauses), not a widow: a lone
+  // repeated closer on the last line is intentional, so it's allowed instead of
+  // prohibited. Body text keeps the hard one-word-last-line ban.
+  const normWord = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const isLexicalKind = (t: Token) =>
+    t.kind === "word" || t.kind === "compound" || t.kind === "longSlug";
+  let parallelCloser = "";
+  if (isHeading) {
+    const lex = contentTokens.filter(isLexicalKind);
+    const lastLex = lex[lex.length - 1];
+    if (lastLex && isSentenceEnd(lastLex.text)) {
+      const lastNorm = normWord(lastLex.text);
+      for (let i = 0; i < lex.length - 1; i++) {
+        if (isSentenceEnd(lex[i].text) && normWord(lex[i].text) === lastNorm) {
+          parallelCloser = lastNorm;
+          break;
+        }
+      }
+    }
+  }
 
   interface BeamState {
     tokenIndex: number;  // next token to place
@@ -330,14 +402,27 @@ function composeParagraph(
     const lastContent = lastContentToken(lineTokens);
     const lastLexical = lastLexicalToken(lineTokens);
 
-    // Absolute orphan prohibition: one lexical word on final line
+    // One lexical word on the final line. A lone repeated closer that completes
+    // an epistrophe is intentional rhythm, not a widow — allow it (tiny cost).
+    // Otherwise: a hard prohibition in body; a strong-but-finite deterrent in
+    // headings, so display type only falls back to it when nothing else fits.
     if (isLast && lexCount === 1) {
-      return profile.orphanPenalty;
+      if (parallelCloser && lastLexical && normWord(lastLexical.text) === parallelCloser) {
+        penalty += 200;
+      } else if (isHeading) {
+        penalty += 60000;
+      } else {
+        return profile.orphanPenalty;
+      }
     }
 
-    // One-word non-last line: terrible unless it's a special long-token fallback
+    // One-word non-last line: terrible — unless it's a parallel closer completing
+    // an epistrophe (then a lone repeated word is intentional rhythm, like the
+    // last line) or a special long-token fallback.
     if (!isLast && lexCount === 1 && fill < 0.85 && lastLexical?.kind !== "longSlug") {
-      penalty += 50000;
+      const isParallelCloser =
+        !!parallelCloser && !!lastLexical && normWord(lastLexical.text) === parallelCloser;
+      penalty += isParallelCloser ? 200 : 50000;
     }
 
     // Two-word non-last line: bad if visually tiny
@@ -345,10 +430,14 @@ function composeParagraph(
       penalty += 5000;
     }
 
-    // Fill deviation from target — strong multiplier so lines far from target get punished
+    // Fill deviation from target. Asymmetric: a line SHORTER than target wastes
+    // measure and frays the rag, so it pays the full quadratic cost. A line
+    // FULLER than target is typographically fine in ragged-right (TeX sets at
+    // natural spacing) — it pays a soft cost only, and the justification guard
+    // below handles the "every line full" failure mode at the paragraph level.
     const target = isLast ? profile.lastTarget : profile.mainTarget;
     const deviation = fill - target;
-    penalty += 3000 * deviation * deviation;
+    penalty += (deviation < 0 ? 3000 : 1200) * deviation * deviation;
 
     // Very short non-last line
     // Short non-last lines — progressively harsh penalties
@@ -367,15 +456,16 @@ function composeParagraph(
       penalty += 4000;
     }
 
-    // Long non-last lines — progressive penalties
-    if (!isLast && fill > 0.93) {
-      penalty += 6000;
-    } else if (!isLast && fill > 0.90) {
+    // Long non-last lines. This ladder used to start charging at >0.84, which
+    // (with nothing charged below target) centered the feasible band at ~0.79
+    // and cost 2-3 extra lines per paragraph at 375px vs the browser — measured
+    // on /proof. Full-ish lines are legitimate ragged-right; only genuinely
+    // overfull ones pay, and the anti-justification transition scoring guards
+    // against runs of them.
+    if (!isLast && fill > 0.955) {
       penalty += 4000;
-    } else if (!isLast && fill > 0.87) {
-      penalty += 2000;
-    } else if (!isLast && fill > 0.84) {
-      penalty += 800;
+    } else if (!isLast && fill > 0.93) {
+      penalty += 1200;
     }
 
     // Illegal line start: closePunct, dash, or stickyPrev
@@ -400,6 +490,13 @@ function composeParagraph(
       penalty += profile.weakEndPenalty;
     }
 
+    // Gentle: copula/auxiliary verb stranded at a line end ("…Advertising is").
+    if (!isLast && lastLexical && LINKING_END_WORDS.has(
+      lastLexical.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, "")
+    )) {
+      penalty += LINKING_END_PENALTY;
+    }
+
     // Extra penalty for single-letter lexical endings like "a" / "I"
     if (!isLast && lastLexical && /^[A-Za-z]$/.test(lastLexical.text)) {
       penalty += profile.weakEndPenalty * 1.5;
@@ -408,6 +505,36 @@ function composeParagraph(
     // Protected compound boundary break
     if (breaksProtectedCompoundAt(breakEnd)) {
       penalty += 7000;
+    }
+
+    // Sentence-start dangling — BOTH modes. Penalize a non-last line that
+    // crosses a sentence boundary and ends on the first word(s) of the next
+    // sentence (e.g. "…public good. That"). The bump-down alternative wins
+    // whenever the shortened previous line's fill penalty stays under this, so
+    // it only fires "where width allows" and never overrides orphanPenalty.
+    if (!isLast && lastContent && !isSentenceEnd(lastContent.text)) {
+      let crossesBoundary = false;
+      for (const t of lineTokens) {
+        if (t === lastContent) break;
+        if (t.kind !== "space" && isSentenceEnd(t.text)) {
+          crossesBoundary = true;
+          break;
+        }
+      }
+      if (crossesBoundary) {
+        // A SHORT opener stranded at a line end ("…justice. He") is the worst
+        // case — penalize it hard enough to beat all but the most extreme
+        // short-line cost, so the engine breaks before it. Longer openers get
+        // the milder base penalty.
+        const openerLen = lastContent.text.replace(/[^A-Za-z0-9]/g, "").length;
+        penalty += openerLen <= 4 ? 7000 : DANGLING_START_PENALTY;
+      }
+    }
+
+    // Heading-only: additionally reward a line that ends exactly at a sentence
+    // boundary, so headlines break into clean parallel clauses when they fit.
+    if (isHeading && lastContent && isSentenceEnd(lastContent.text)) {
+      penalty -= SENTENCE_END_BONUS;
     }
 
     return penalty;
@@ -471,9 +598,13 @@ function composeParagraph(
 
         // Skip overfull lines (but allow slight overflow for last line)
         const isLast = end === contentTokens.length;
-        // Hard fill cap — NO line is allowed past 85% fill, period.
-        // This forces long last lines to wrap instead of blowing past the rag boundary.
-        if (fill > 0.85) continue;
+        // Hard admissibility cap. This was 0.85, which made browser-quality
+        // fills (87-99%) inadmissible by construction — every paragraph set
+        // ~15% looser than the browser and cost 2-3 extra lines at 375px
+        // (measured on /proof). Full-ish lines must be POSSIBLE; the long-line
+        // penalty ladder and the anti-justification guard decide how many are
+        // wise. 0.97 leaves headroom so word-spacing contraction never overflows.
+        if (fill > 0.97) continue;
 
         const linePenalty = scoreLine(lineTokens, fill, isLast, end);
         const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
@@ -551,8 +682,10 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
       ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 
       : nonLastFills[mid];
       
-    // Prevent target from being too wide (justification) or too narrow
-    targetFill = Math.max(0.70, Math.min(0.85, targetFill));
+    // Prevent target from being too wide (justification) or too narrow.
+    // Upper clamp tracks the compositor's fuller admissible band (was 0.85,
+    // which forced contraction on every composition fuller than that).
+    targetFill = Math.max(0.70, Math.min(0.93, targetFill));
 
     const targetWidth = measurePx * targetFill;
     const delta = targetWidth - line.width;
@@ -564,9 +697,13 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     const approxFontSize = measurePx / measureCh;
     const spacingEm = spacingPx / approxFontSize;
 
-    // Gentle caps - revert to subtle
+    // Gentle caps - revert to subtle.
+    // NOTE: maxContract must stay within finalValidate()'s accepted range
+    // (it rejects wordSpacingEm < -0.04). Previously 0.05, which caused every
+    // line needing contraction to be composed and then rejected by the
+    // validator — so longer paragraphs silently fell back to browser wrapping.
     const maxExpand = 0.03;    // subtle expansion on short lines
-    const maxContract = 0.05;  // slightly more contraction on long lines
+    const maxContract = 0.04;  // contraction cap, aligned with finalValidate
 
     if (spacingEm > maxExpand) {
       shapedLines.push({ ...line, wordSpacingEm: maxExpand });
@@ -585,7 +722,7 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
 /**
  * Validate final composition before rendering.
  */
-function finalValidate(lines: FrozenLine[], measureCh: number): boolean {
+function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false): boolean {
   if (!lines.length) return false;
 
   const profile = profileForMeasure(measureCh);
@@ -602,7 +739,7 @@ function finalValidate(lines: FrozenLine[], measureCh: number): boolean {
     for (const t of tokens) { if (isLexical(t)) lexCount++; }
 
     // One-word last line
-    if (isLast && lexCount === 1) return false;
+    if (isLast && lexCount === 1 && !isHeading) return false;
 
     // Illegal line start
     const firstContent = tokens.find(isContent) ?? null;
@@ -641,6 +778,9 @@ function finalValidate(lines: FrozenLine[], measureCh: number): boolean {
  * Render exact lines as block spans (no pre-line + \n).
  */
 function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
+  const cs = getComputedStyle(p);
+  const fontSizePx = parseFloat(cs.fontSize) || 16;
+  const measurer = makeMeasurer(p);
   safeWrite(() => {
     p.innerHTML = "";
     p.dataset.typesetDone = "1";
@@ -655,6 +795,13 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
 
       if (Math.abs(line.wordSpacingEm) > 0.0005) {
         span.style.wordSpacing = `${line.wordSpacingEm}em`;
+      }
+
+      // Optical margin alignment: hang leading punctuation / pull optical
+      // capitals into the left margin so each line's optical left edge aligns.
+      const indentPx = leadingOpticalIndentPx(line.text, measurer, fontSizePx);
+      if (indentPx > 0.25) {
+        span.style.textIndent = `-${indentPx.toFixed(2)}px`;
       }
 
       span.textContent = line.text;
@@ -717,10 +864,13 @@ function typesetHeadingText(text: string): string {
  */
 export function typesetText(text: string, options?: TypesetOptions): string {
   const mode = options?.mode ?? 'body';
+  // Educate quotes/dashes first so both the SSR string and the rendered glyphs
+  // match what the client-side compositor measures. Idempotent.
+  const educated = educateQuotes(text);
   if (mode === 'heading') {
-    return typesetHeadingText(text);
+    return typesetHeadingText(educated);
   }
-  return typesetBodyText(text, options?.measure);
+  return typesetBodyText(educated, options?.measure);
 }
 
 /**
@@ -869,6 +1019,144 @@ export function measureCh(element: HTMLElement): number {
   return ch;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPOSITOR WIRING (2026-05-22) — connects the V2 beam-search compositor to
+// the public `typeset()` entry point. Additive: the existing Phase-1 per-text-
+// node path is preserved as the fallback for inline-markup blocks and for any
+// element where no valid full composition exists.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Educate quotes & dashes: straight quotes → curly, "--" → em dash,
+ * "..." → ellipsis. Conservative and idempotent — already-curly characters and
+ * single hyphens (compounds like "human-centric") are left untouched. Runs
+ * BEFORE line-breaking so the compositor measures the glyphs that actually render.
+ */
+function educateQuotes(text: string): string {
+  if (!text) return text;
+  let s = text;
+  // Em dash from a double hyphen. Preserve the author's spacing style:
+  // "word -- word" → "word — word" (spaced em dash, the site's house style),
+  // "word--word" → "word—word" (closed em dash).
+  s = s.replace(/\s+--\s+/g, ' — ');
+  s = s.replace(/--/g, '—');
+  // Ellipsis.
+  s = s.replace(/\.\.\./g, '…');
+  // Opening double quote: at start, or after whitespace / opening bracket / dash.
+  s = s.replace(/(^|[\s([{—–])"/g, '$1“');
+  // Any remaining double quote → closing.
+  s = s.replace(/"/g, '”');
+  // Apostrophe before a digit (decade/elision, e.g. '90s) → right single quote.
+  s = s.replace(/'(?=\d)/g, '’');
+  // Genuine opening single quote: after start/space/bracket, before a letter.
+  s = s.replace(/(^|[\s([{—–])'(?=[A-Za-z])/g, '$1‘');
+  // Contraction / possessive: letter|digit ' letter → right single quote.
+  s = s.replace(/([A-Za-z0-9])'(?=[A-Za-z])/g, '$1’');
+  // Anything left (e.g. plural possessive "workers'") → right single quote.
+  s = s.replace(/'/g, '’');
+  return s;
+}
+
+/**
+ * Build a font-accurate canvas text measurer for an element. Zero DOM mutation.
+ */
+function makeMeasurer(element: HTMLElement): (text: string) => number {
+  const cs = getComputedStyle(element);
+  if (!_canvas) {
+    const c = document.createElement('canvas');
+    _canvas = c.getContext('2d');
+  }
+  const ctx = _canvas;
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
+  return (text: string) => {
+    if (!ctx) return text.length * fallbackCh;
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  };
+}
+
+/** Content-box width of an element in px (clientWidth minus horizontal padding). */
+function containerPxOf(element: HTMLElement): number {
+  const cs = getComputedStyle(element);
+  return element.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+}
+
+/**
+ * True when an element holds only text (or our own previously-rendered
+ * `.ts-line` spans / `<br>`), so the compositor can safely reflow it. Elements
+ * containing real inline markup (<strong>, <a>, <em>, …) or list structure are
+ * left to the Phase-1 text-node path.
+ */
+function canCompose(element: HTMLElement): boolean {
+  const tag = element.tagName;
+  if (tag === 'UL' || tag === 'OL' || tag === 'LI') return false;
+  for (const child of Array.from(element.childNodes)) {
+    if (child.nodeType !== 1 /* ELEMENT_NODE */) continue;
+    const el = child as HTMLElement;
+    if (el.classList && el.classList.contains('ts-line')) continue; // our own prior render
+    if (el.tagName === 'BR') continue;
+    return false; // real inline markup — defer to Phase-1
+  }
+  return true;
+}
+
+/** Restore plain (educated) text so the Phase-1 fallback can bind it. */
+function restorePlain(element: HTMLElement, raw: string): boolean {
+  safeWrite(() => { element.textContent = raw; });
+  return false;
+}
+
+/**
+ * Post-render self-check: does any frozen line's actual rendered ink exceed
+ * the paragraph's content box? Composition math and browser rendering can
+ * disagree — most often when a webfont finished loading after measurement —
+ * and a composed line that overflows the measure is worse than no composition
+ * at all. Callers should restore plain text (or re-typeset) when this is true.
+ */
+export function linesOverflow(element: HTMLElement, tolerancePx = 0.75): boolean {
+  const cs = getComputedStyle(element);
+  const rightEdge = element.getBoundingClientRect().right - parseFloat(cs.paddingRight);
+  for (const span of Array.from(element.querySelectorAll<HTMLElement>('.ts-line'))) {
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    if (range.getBoundingClientRect().right - rightEdge > tolerancePx) return true;
+  }
+  return false;
+}
+
+/**
+ * Full V2 line composition for a pure-text block. Sources the canonical raw
+ * text (wrapper-provided `data-ts-raw`, then cache, then the live DOM), educates
+ * quotes, runs the beam-search compositor, and renders frozen lines. Idempotent
+ * across resize because the canonical text is cached and reused. Returns false
+ * (after restoring plain text) when no valid composition exists.
+ */
+function composeElement(element: HTMLElement, measure: number): boolean {
+  let raw = element.dataset.tsRaw
+    ?? canonicalText.get(element)
+    ?? (element.textContent || '');
+  raw = educateQuotes(raw.trim());
+  if (raw.length < 10) return false;
+  canonicalText.set(element, raw);
+
+  const measurePx = containerPxOf(element);
+  if (measurePx <= 0) return false;
+
+  const measurer = makeMeasurer(element);
+  const tokens = tokenize(raw, measurer);
+  const isHeading = /^H[1-6]$/.test(element.tagName);
+  const composed = composeParagraph(tokens, measurePx, measure, { isHeading });
+  if (!composed) return restorePlain(element, raw);
+
+  const shaped = shapeExactLines(composed, measure, measurePx) ?? composed;
+  if (!finalValidate(shaped, measure, isHeading)) return restorePlain(element, raw);
+
+  renderFrozenLines(element, shaped);
+  if (linesOverflow(element)) return restorePlain(element, raw);
+  return true;
+}
+
 /**
  * Apply typographic rules to a DOM element's text content.
  * Processes text nodes recursively.
@@ -886,6 +1174,34 @@ export function typeset(element: HTMLElement): void {
     const style = document.createElement('style');
     style.id = 'ts-list-styles';
     style.textContent = `
+      /* ════════════════════════════════════════════════════════════════════
+         SILVER BULLET — hung list markers with optical left alignment.
+         Add class="ts-styled" to any <ul> (typeset() also adds it for you).
+
+         CUSTOMIZE THE BULLET by setting CSS variables on the list, a wrapper,
+         or :root — no need to edit this file. All are optional; the defaults
+         reproduce the classic hung "•".
+
+           --ts-bullet-content   the marker glyph        (default: "•")
+           --ts-bullet-color     marker color            (default: currentColor)
+           --ts-bullet-size      marker font-size        (default: 1.25em)
+           --ts-bullet-opacity   marker opacity          (default: 0.8)
+           --ts-bullet-top       vertical nudge          (default: 0.05em)
+
+         EXAMPLES
+           Dash:    ul.notes        { --ts-bullet-content: "–"; }
+           Arrow:   ul.steps        { --ts-bullet-content: "‣"; --ts-bullet-color: #1D9E75; }
+           Square:  ul.brand        { --ts-bullet-content: "\\25AA"; --ts-bullet-color: #1D9E75; }
+           Hollow:  ul.subtle       { --ts-bullet-content: "\\25E6"; --ts-bullet-opacity: 1; }
+
+         For a pixel-crisp box (rather than a glyph square), override the
+         ::before in your own stylesheet:
+           ul.brand > li::before {
+             content: "" !important; background: #1D9E75 !important;
+             width: .5em !important; height: .5em !important;
+             font-size: inherit !important; top: .55em !important; left: -1.1em !important;
+           }
+         ════════════════════════════════════════════════════════════════════ */
       ul.ts-styled {
         list-style: none !important;
         padding-left: 1.25em !important;
@@ -899,20 +1215,21 @@ export function typeset(element: HTMLElement): void {
         margin-bottom: 0 !important;
       }
       ul.ts-styled > li::before {
-        content: "•";
+        content: var(--ts-bullet-content, "•");
         position: absolute;
         left: -1.25em;
         width: 1.25em;
         /* Right-align the bullet within its box so it sits close to the text */
         text-align: right;
-        padding-right: 0.28em; 
+        padding-right: 0.28em;
         box-sizing: border-box;
-        font-size: 1.25em;
+        font-size: var(--ts-bullet-size, 1.25em);
+        color: var(--ts-bullet-color, currentColor);
         /* Lock line-height so the larger font doesn't stretch the baseline down */
         line-height: 1;
         /* Push it down slightly from the top of the li box to align with x-height */
-        top: 0.05em;
-        opacity: 0.8;
+        top: var(--ts-bullet-top, 0.05em);
+        opacity: var(--ts-bullet-opacity, 0.8);
       }
     `;
     document.head.appendChild(style);
@@ -924,6 +1241,14 @@ export function typeset(element: HTMLElement): void {
 
   // Measure once for the whole element
   const measure = measureCh(element);
+
+  // V2 compositor: full width-aware line shaping for pure-text blocks (headings
+  // and simple paragraphs). Prevents orphans/widows by construction via the
+  // beam search's orphan penalty. On success it renders frozen `.ts-line` spans
+  // and we're done; otherwise fall through to the Phase-1 text-node path below.
+  if (canCompose(element)) {
+    if (composeElement(element, measure)) return;
+  }
 
   const walker = document.createTreeWalker(
     element,
@@ -1243,9 +1568,11 @@ export function postRenderFix(element: HTMLElement): (() => void) | null {
 }
 
 /**
- * React hook: apply typeset to a ref on mount/update
+ * React hook: apply typeset to a ref on mount/update.
+ * The ref is typed structurally ({ current }) so this file stays dependency-free
+ * — a React RefObject satisfies it, but no `react` import is required to compile.
  */
-export function useTypeset(ref: React.RefObject<HTMLElement | null>, deps: any[] = []) {
+export function useTypeset(ref: { readonly current: HTMLElement | null }, deps: any[] = []) {
   if (typeof window === 'undefined') return;
 
   // Use requestAnimationFrame to run after render

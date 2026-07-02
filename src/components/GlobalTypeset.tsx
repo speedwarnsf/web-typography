@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { typesetText, typesetHeading, measureCh, shouldIgnoreMutation, safeWrite, tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines } from '@/lib/typeset';
+import { typesetText, typesetHeading, measureCh, shouldIgnoreMutation, safeWrite, tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines, linesOverflow } from '@/lib/typeset';
 
 /**
  * GlobalTypeset — Single-owner pipeline architecture.
@@ -220,6 +220,18 @@ export default function GlobalTypeset() {
           // Step 5: Render frozen lines
           renderFrozenLines(p, shaped);
 
+          // Step 6: Self-check. If any rendered line's ink exceeds the content
+          // box (composition math vs rendering disagreed — usually a webfont
+          // that finished loading after measurement), a composed overflow is
+          // worse than browser wrapping. Restore the canonical text and let
+          // the fonts.loadingdone re-run recompose with true metrics.
+          if (linesOverflow(p)) {
+            safeWrite(() => {
+              p.textContent = text;
+              p.setAttribute('data-typeset-done', '');
+            });
+          }
+
         } catch (e) {
           // Silently skip on error — mark done to avoid retry loops
           safeWrite(() => {
@@ -234,18 +246,18 @@ export default function GlobalTypeset() {
       // Phase 1: Pre-render bindings (can run immediately)
       runPhase1();
 
-      // Phase 2: Wait for fonts, then optimize + sculpt
+      // Phase 2: Wait for fonts, then optimize + sculpt. Run directly — NOT
+      // inside requestAnimationFrame: rAF never fires in hidden/background
+      // tabs, so pages opened in a background tab would stay un-typeset and
+      // visibly jump the moment the reader focused them. Running while hidden
+      // means the text is already set before anyone looks at it.
       try {
         await document.fonts.ready;
-        requestAnimationFrame(() => {
-          runPhase2();
-        });
+        runPhase2();
       } catch (e) {
         // Fallback if fonts.ready fails
         setTimeout(() => {
-          requestAnimationFrame(() => {
-            runPhase2();
-          });
+          runPhase2();
         }, 1000);
       }
     };
@@ -292,9 +304,10 @@ export default function GlobalTypeset() {
       }
 
       if (hasNewContent) {
-        requestAnimationFrame(() => {
+        // setTimeout, not rAF — rAF never fires in hidden tabs (see runPipeline)
+        setTimeout(() => {
           runPipeline();
-        });
+        }, 0);
       }
     });
 
@@ -326,9 +339,9 @@ export default function GlobalTypeset() {
             }
           });
 
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             runPipeline();
-          });
+          }, 0);
         }
       }
     });
@@ -352,6 +365,26 @@ export default function GlobalTypeset() {
     // Re-observe after mutations (for dynamically added content)
     const reObserveTimer = setInterval(observeElements, 5000);
 
+    // --- Re-typeset when webfonts finish loading ---
+    // document.fonts.ready can resolve before late-triggered font loads start,
+    // so a paragraph composed against fallback metrics renders wrong once the
+    // real font arrives. When loading settles, restore canonical text and
+    // recompose with true metrics.
+    const onFontsLoadingDone = () => {
+      setTimeout(() => {
+        document.querySelectorAll<HTMLElement>('[data-typeset-done]').forEach((el) => {
+          const original = canonicalText.get(el);
+          if (!original) return;
+          safeWrite(() => {
+            el.removeAttribute('data-typeset-done');
+            el.textContent = original;
+          });
+        });
+        runPipeline();
+      }, 50);
+    };
+    document.fonts?.addEventListener?.('loadingdone', onFontsLoadingDone);
+
     // --- Cleanup ---
     return () => {
       observer.disconnect();
@@ -360,6 +393,7 @@ export default function GlobalTypeset() {
       }
       clearInterval(reObserveTimer);
       delayedRuns.forEach(clearTimeout);
+      document.fonts?.removeEventListener?.('loadingdone', onFontsLoadingDone);
     };
   }, []);
 
