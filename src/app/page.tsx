@@ -258,6 +258,7 @@ export default function Home() {
           <a href="#pairings" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Pairings</a>
           <a href="#tips" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Tips</a>
           <a href="/utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
+          <a href="/proof" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Proof</a>
         </div>
         </div>
       </section>

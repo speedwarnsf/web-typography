@@ -98,6 +98,12 @@ export const sections: SiteSection[] = [
         description: "typeset.ts universal enhancement script",
       },
       {
+        slug: "/proof",
+        name: "The Proof",
+        shortName: "Proof",
+        description: "Live before/after on your own text",
+      },
+      {
         slug: "/perfect-paragraph",
         name: "Perfect Paragraph",
         shortName: "Paragraph",

@@ -370,6 +370,58 @@ The full system is now deployed with correct Tschichold tolerances (80-133% of n
 
 ---
 
+## Part XII: The Proof, and What It Immediately Taught Us (2026-07-01)
+
+Open question #4 — "if we have to keep using fake examples doesn't that mean our
+tool doesn't work?" — is now answered by **/proof**: paste any text, pick a real
+column width (375px first), and compare browser rendering against the engine,
+side by side, both actually rendered. Every metric (weak line-endings, stranded
+sentence openers, orphans, rag range, stairsteps) is measured from the rendered
+lines, never precomputed.
+
+Building the instrument immediately found three things the eye had missed:
+
+1. **The fill band was centered at ~0.79, not the designed 0.85.** A hard
+   admissibility cap at 0.85 fill plus a long-line penalty ladder that started
+   charging at >0.84 made browser-quality lines (87–99% fill) impossible by
+   construction. Cost: 2–3 extra lines per paragraph at 375px — 20–30% more
+   vertical space on mobile — with no rag benefit. Fixed: cap raised to 0.97,
+   deviation cost made asymmetric (short lines pay full quadratic, full lines
+   pay soft), ladder now charges only genuinely overfull lines (>0.93). The
+   rag-is-a-feature principle lives at the paragraph level (anti-justification
+   guard, transition scoring), not inside every line.
+
+2. **Compositions could overflow the measure.** The old 15% slack masked a
+   webfont race: `document.fonts.ready` can resolve before late-triggered font
+   loads, so paragraphs composed against fallback metrics rendered up to ~5px
+   past the content box once the real font arrived. Fixed twice over: a
+   post-render self-check (`linesOverflow`) restores plain text rather than
+   ship an overflowing composition, and a `fonts.loadingdone` listener
+   re-typesets with true metrics.
+
+3. **Hidden tabs never typeset.** Phase 2 ran inside `requestAnimationFrame`,
+   which never fires in background tabs — so articles opened in a background
+   tab stayed raw and visibly jumped when focused. Phase 2 now runs directly
+   after `fonts.ready`; text is already set before anyone looks at it.
+
+Also landed: the May compositor wiring (V2 beam search behind `typeset()`),
+optical margin alignment (hanging punctuation — tool #4 of the five the web
+lost), quote/dash education that preserves the author's dash spacing style,
+linking-verb end protection, and heading mode with epistrophe detection.
+
+Measured at 375px Georgia 18px on real text (the essay's own paragraph):
+weak line-endings 1→0, stranded openers 1→0, lines 12→11 after the rebalance.
+At 650px: weak endings 3→0, and the browser's accidental near-justification
+(4% rag range) becomes an intentional 12% rag. The engine now trades roughly
+one line of vertical space for zero break violations — a defensible trade,
+where before it traded three for the same.
+
+Remaining, sharpened by the instrument: rag range on packed openings (the
+two-register contour — full first lines, loose tail), and contour quality
+generally (open question #1). The instrument to evaluate answers now exists.
+
+---
+
 *This document is a living record. It will grow as the system evolves.*
 
 *"The details are not the details. They make the design." — Charles Eames*
