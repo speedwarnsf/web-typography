@@ -103,10 +103,15 @@ export default function GlobalTypeset() {
 
     // --- Phase 2: Compositor V2 — token-aware beam search (measurement required) ---
     const runPhase2 = () => {
-      // Select paragraphs eligible for composition
+      // Select blocks eligible for composition. Headings compose too (the
+      // engine's heading mode: sentence-boundary breaks, epistrophe-aware
+      // widow rules) — parity with the go.js drop-in. Inline-markup and
+      // centered blocks are guarded below, so decorated headings like the
+      // animated hero are untouched.
       const paragraphs = document.querySelectorAll<HTMLElement>(
-        'p:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done]), ' +
-        'li:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done])'
+        ['p', 'li', 'blockquote', 'figcaption', 'h1', 'h2', 'h3', 'h4']
+          .map((t) => `${t}:not([data-no-typeset]):not([data-no-smooth]):not([data-typeset-done])`)
+          .join(', ')
       );
 
       paragraphs.forEach((p) => {
@@ -186,7 +191,8 @@ export default function GlobalTypeset() {
           const tokens = tokenize(text, measureText);
 
           // Step 2: Compose paragraph (beam search for exact lines)
-          const composition = composeParagraph(tokens, measurePx, measureChars);
+          const isHeading = /^H[1-6]$/.test(p.tagName);
+          const composition = composeParagraph(tokens, measurePx, measureChars, { isHeading });
 
           // Remove measurer
           p.removeChild(measurer);
@@ -213,7 +219,7 @@ export default function GlobalTypeset() {
           // Step 4: Final validation — if it fails, still render the composition
           // (compositor scoring already prevents the worst outcomes,
           // falling back to browser is worse than a slightly imperfect composition)
-          if (!finalValidate(shaped, measureChars)) {
+          if (!finalValidate(shaped, measureChars, isHeading)) {
             // Try rendering anyway — compositor output is still better than browser
           }
 
@@ -349,9 +355,9 @@ export default function GlobalTypeset() {
     // Observe all paragraphs
     const observeElements = () => {
       const elements = document.querySelectorAll<HTMLElement>(
-        'p:not([data-no-typeset]), ' +
-        'li:not([data-no-typeset]), ' +
-        'blockquote:not([data-no-typeset])'
+        ['p', 'li', 'blockquote', 'figcaption', 'h1', 'h2', 'h3', 'h4']
+          .map((t) => `${t}:not([data-no-typeset])`)
+          .join(', ')
       );
       elements.forEach((el) => {
         if (resizeObserver) {
