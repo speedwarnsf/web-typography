@@ -502,13 +502,49 @@ function Hero({ reduced }: { reduced: boolean }) {
 
 // ─── The Proof, center stage ────────────────────────────────────────────────
 
-function ProofStage() {
+/**
+ * Mark the browser panel's actual violations so BROWSER mode is visibly
+ * flawed, not just subtly different: dotted underlines on weak words at
+ * line ends and on stranded sentence openers, found from the rendering.
+ */
+function annotateBrowserFlaws(p: HTMLElement) {
+  const spans = Array.from(p.querySelectorAll<HTMLElement>('span[data-w]'));
+  spans.forEach((s) => s.classList.remove('v2-flaw'));
+  if (!spans.length) return;
+  const rows: { spans: HTMLElement[]; top: number }[] = [];
+  for (const s of spans) {
+    const r = s.getBoundingClientRect();
+    const cur = rows[rows.length - 1];
+    if (!cur || Math.abs(r.top - cur.top) > 4) rows.push({ spans: [s], top: r.top });
+    else cur.spans.push(s);
+  }
+  rows.forEach((row, i) => {
+    const lastSpan = row.spans[row.spans.length - 1];
+    const word = (lastSpan.textContent || '')
+      .replace(/[^A-Za-z0-9’']+$/g, '')
+      .replace(/^[^A-Za-z0-9]+/g, '')
+      .toLowerCase();
+    const isLastRow = i === rows.length - 1;
+    if (!isLastRow && WEAK.has(word)) lastSpan.classList.add('v2-flaw');
+    if (!isLastRow) {
+      const lineText = row.spans.map((s) => s.textContent).join(' ');
+      if (OPENER.test(lineText.trim())) lastSpan.classList.add('v2-flaw');
+    }
+    if (isLastRow && rows.length > 1 && row.spans.filter((s) => /[A-Za-z0-9]/.test(s.textContent || '')).length === 1) {
+      lastSpan.classList.add('v2-flaw');
+    }
+  });
+}
+
+function ProofStage({ reduced }: { reduced: boolean }) {
   const [mode, setMode] = useState<'typeset' | 'browser'>('typeset');
   const [width, setWidth] = useState(340);
   const [stats, setStats] = useState<{ b: PanelStats; t: PanelStats } | null>(null);
   const browserRef = useRef<HTMLParagraphElement>(null);
   const typesetRef = useRef<HTMLParagraphElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
+  const userTouched = useRef(false);
+  const demoed = useRef(false);
 
   useEffect(() => {
     const update = () => setWidth(Math.min(340, Math.max(250, window.innerWidth - 72)));
@@ -533,6 +569,7 @@ function ProofStage() {
       delete t.dataset.typesetDone;
       typeset(t);
       setStats({ b: panelStats(b, width), t: panelStats(t, width) });
+      annotateBrowserFlaws(b);
       if (stackRef.current) {
         stackRef.current.style.minHeight = `${Math.max(b.offsetHeight, t.offsetHeight)}px`;
       }
@@ -541,6 +578,45 @@ function ProofStage() {
       cancelled = true;
     };
   }, [width]);
+
+  // Auto-demo: the first time the stage scrolls into view, flip to the
+  // browser version and back so the comparison performs itself — a tap on a
+  // phone shouldn't be required to see that there IS a difference.
+  useEffect(() => {
+    if (reduced) return;
+    const stack = stackRef.current;
+    if (!stack) return;
+    let t1 = 0;
+    let t2 = 0;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && !demoed.current && !userTouched.current) {
+            demoed.current = true;
+            t1 = window.setTimeout(() => {
+              if (!userTouched.current) setMode('browser');
+            }, 600);
+            t2 = window.setTimeout(() => {
+              if (!userTouched.current) setMode('typeset');
+            }, 2300);
+            io.disconnect();
+          }
+        }
+      },
+      { threshold: 0.65 }
+    );
+    io.observe(stack);
+    return () => {
+      io.disconnect();
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [reduced]);
+
+  const pick = (m: 'typeset' | 'browser') => {
+    userTouched.current = true;
+    setMode(m);
+  };
 
   const rows: { label: string; b: string; t: string; better: boolean }[] = stats
     ? [
@@ -581,7 +657,7 @@ function ProofStage() {
             role="tab"
             aria-selected={mode === 'browser'}
             className={mode === 'browser' ? 'v2-tab v2-tab-on' : 'v2-tab'}
-            onClick={() => setMode('browser')}
+            onClick={() => pick('browser')}
           >
             Browser
           </button>
@@ -589,11 +665,17 @@ function ProofStage() {
             role="tab"
             aria-selected={mode === 'typeset'}
             className={mode === 'typeset' ? 'v2-tab v2-tab-on' : 'v2-tab'}
-            onClick={() => setMode('typeset')}
+            onClick={() => pick('typeset')}
           >
             Typeset
           </button>
         </div>
+
+        <p className="v2-stage-caption" aria-live="polite">
+          {mode === 'browser'
+            ? 'Greedy wrapping — the dotted words are stranded at line ends.'
+            : 'Composed — the quote hangs in the margin; lines end on meaning.'}
+        </p>
 
         <div ref={stackRef} className="v2-stack" style={{ width: `${width}px` }}>
           <p
@@ -752,7 +834,7 @@ export default function V2Page() {
       <ScrollHairline />
       <BloomMenu />
       <Hero reduced={reduced} />
-      <ProofStage />
+      <ProofStage reduced={reduced} />
       <Manifesto />
       <CraftGrid />
       <Closing />
@@ -935,10 +1017,16 @@ body:has(.v2-root) header.fixed { display: none; }
   font-family: var(--font-mono), monospace;
   font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
   background: none; border: 0; cursor: pointer;
-  color: #8f8f8f; padding: 12px 22px;
+  color: #8f8f8f; padding: 15px 24px; min-height: 46px;
+  touch-action: manipulation;
   transition: color .3s, background .3s;
 }
 .v2-tab-on { color: #0a0a0a; background: ${GOLD}; }
+.v2-stage-caption {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  color: #a3a3a3; margin: 0 0 22px; min-height: 2.6em; max-width: 52ch;
+}
 .v2-stack { position: relative; perspective: 900px; }
 .v2-panel {
   grid-area: 1/1;
@@ -946,13 +1034,18 @@ body:has(.v2-root) header.fixed { display: none; }
   margin: 0; padding: 0;
   font-family: Georgia, serif;
   font-size: 17px; line-height: 1.68; color: #d6d6d6;
-  transition: opacity .55s ease, transform .6s cubic-bezier(.2,.7,.2,1);
+  transition: opacity .34s ease, transform .38s cubic-bezier(.2,.7,.2,1);
   backface-visibility: hidden;
 }
 .v2-panel-off {
   opacity: 0;
-  transform: rotateY(7deg) translateZ(-30px);
+  transform: translateX(18px) rotateY(6deg);
   pointer-events: none;
+}
+.v2-flaw {
+  text-decoration: underline dotted rgba(224, 110, 90, .95);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 .v2-edge {
   position: absolute; top: 0; bottom: 0; right: -1px;
