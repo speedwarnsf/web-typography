@@ -1,8 +1,6 @@
 /**
- * Site structure: sections, pages, and their typographic identities.
- *
- * Each section has a distinct typeface that serves as wayfinding —
- * you know where you are by the type itself.
+ * Site structure: sections and pages.
+ * One typographic voice everywhere — the type system IS the wayfinding.
  */
 
 export type SitePage = {
@@ -15,8 +13,6 @@ export type SitePage = {
 export type SiteSection = {
   id: string;
   name: string;
-  font: string;        // CSS font-family value
-  fontVar: string;     // CSS variable (--font-*)
   pages: SitePage[];
 };
 
@@ -24,8 +20,6 @@ export const sections: SiteSection[] = [
   {
     id: "learn",
     name: "Learn",
-    font: "'Playfair Display', serif",
-    fontVar: "var(--font-playfair)",
     pages: [
       {
         slug: "/library",
@@ -50,8 +44,6 @@ export const sections: SiteSection[] = [
   {
     id: "analyze",
     name: "Analyze",
-    font: "'JetBrains Mono', monospace",
-    fontVar: "var(--font-mono)",
     pages: [
       {
         slug: "/font-inspector",
@@ -88,8 +80,6 @@ export const sections: SiteSection[] = [
   {
     id: "build",
     name: "Build",
-    font: "'Source Sans 3', sans-serif",
-    fontVar: "var(--font-source-sans)",
     pages: [
       {
         slug: "/utility",

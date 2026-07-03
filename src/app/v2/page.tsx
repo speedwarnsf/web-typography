@@ -752,13 +752,13 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 .v2-cta-row { display: flex; flex-wrap: wrap; gap: 28px; }
 .v2-cta {
   font-family: var(--font-mono), monospace;
-  font-size: 12px; letter-spacing: .26em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .25em; text-transform: uppercase;
   color: ${GOLD}; text-decoration: none;
   border-bottom: 1px solid ${GOLD};
   padding-bottom: 5px;
   transition: color .3s, border-color .3s, letter-spacing .4s;
 }
-.v2-cta:hover { letter-spacing: .34em; }
+.v2-cta:hover { letter-spacing: .3em; }
 .v2-cta-dim { color: #a3a3a3; border-color: #3f3f3f; }
 .v2-cta-dim:hover { color: #d6d6d6; border-color: #a3a3a3; }
 .v2-live-note {
@@ -782,7 +782,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 }
 .v2-label {
   font-family: var(--font-mono), monospace;
-  font-size: 11px; letter-spacing: .34em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .3em; text-transform: uppercase;
   color: ${GOLD}; margin-bottom: 20px;
 }
 .v2-h2 {
@@ -820,27 +820,33 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 .v2-controls-width input[type="range"] {
   flex: 1; min-width: 100px;
   appearance: none; -webkit-appearance: none;
-  height: 2px; background: #2a2a2a; outline: none;
-  accent-color: ${GOLD};
+  height: 28px; background: transparent; outline: none;
+}
+.v2-controls-width input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px; background: #2a2a2a;
 }
 .v2-controls-width input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 20px; height: 20px; background: ${GOLD};
+  width: 22px; height: 22px; background: ${GOLD};
   cursor: ew-resize; border: 0;
+  margin-top: -10px; /* center the thumb on the 2px track */
+}
+.v2-controls-width input[type="range"]::-moz-range-track {
+  height: 2px; background: #2a2a2a;
 }
 .v2-controls-width input[type="range"]::-moz-range-thumb {
-  width: 20px; height: 20px; background: ${GOLD};
+  width: 22px; height: 22px; background: ${GOLD};
   cursor: ew-resize; border: 0; border-radius: 0;
 }
 .v2-controls-px {
   font-family: var(--font-mono), monospace;
-  font-size: 10px; letter-spacing: .18em; color: ${GOLD};
+  font-size: 10px; letter-spacing: .2em; color: ${GOLD};
   min-width: 46px; text-align: right;
 }
 .v2-toggle { display: flex; gap: 0; border: 1px solid #2a2a2a; width: max-content; }
 .v2-tab {
   font-family: var(--font-mono), monospace;
-  font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
   background: none; border: 0; cursor: pointer;
   color: #8f8f8f; padding: 15px 24px; min-height: 46px;
   touch-action: manipulation;
@@ -879,7 +885,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   border-left: 2px solid rgba(224, 110, 90, .95);
   background: rgba(5, 5, 5, .95);
   font-family: var(--font-mono), monospace;
-  font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 9px; letter-spacing: .2em; text-transform: uppercase;
   line-height: 1.7; color: #c9c9c9;
   z-index: 3;
   animation: v2-callout-in .5s cubic-bezier(.2,.7,.2,1);
@@ -922,7 +928,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   display: flex; justify-content: space-between; gap: 16px;
   padding: 12px 16px; border-bottom: 1px solid #232323;
   font-family: var(--font-mono), monospace;
-  font-size: 9px; letter-spacing: .24em; text-transform: uppercase;
+  font-size: 9px; letter-spacing: .2em; text-transform: uppercase;
   color: #a3a3a3;
 }
 .v2-stats-cols em { font-style: normal; }
@@ -1004,7 +1010,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 }
 .v2-copy {
   font-family: var(--font-mono), monospace;
-  font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
   background: ${GOLD}; color: #0a0a0a; border: 0; cursor: pointer;
   padding: 0 22px;
   transition: background .3s;
@@ -1013,7 +1019,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 .v2-links { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 48px; }
 .v2-links a {
   font-family: var(--font-mono), monospace;
-  font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
   color: #a3a3a3; text-decoration: none;
   border-bottom: 1px solid #3f3f3f; padding-bottom: 4px;
   transition: color .3s, border-color .3s;

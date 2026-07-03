@@ -313,7 +313,7 @@ export default function FontInspector() {
               Web Typography
             </a>
             <h1
-              className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mt-2"
+              className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mt-2"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
               Font Inspector

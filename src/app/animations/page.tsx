@@ -2918,7 +2918,7 @@ export default function AnimationsPage() {
           Typography Animations
         </p>
         <h1
-          className="text-4xl sm:text-6xl font-bold tracking-tight mb-4"
+          className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
           style={{ fontFamily: "var(--font-playfair)" }}
         >
           Motion with Purpose

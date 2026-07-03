@@ -83,7 +83,7 @@ export default function SilverBulletPage() {
           The Silver Bullet
         </p>
         <h1
-          className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-8"
+          className="text-4xl sm:text-5xl font-bold tracking-tight mb-8"
           style={{ fontFamily: "var(--font-playfair)" }}
         >
           Lists, hung like a book hangs them.

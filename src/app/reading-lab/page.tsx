@@ -193,7 +193,7 @@ const cleanup = smoothRag(element);
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             06 -- Reading Comfort Lab
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-playfair mb-4">
+          <h1 className="text-3xl sm:text-4xl sm:text-5xl font-playfair mb-4">
             Evidence-Based Typography
           </h1>
           <p className="text-base sm:text-lg text-neutral-400 max-w-3xl font-source-sans" style={{ textWrap: "pretty" }}>

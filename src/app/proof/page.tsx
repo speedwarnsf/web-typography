@@ -208,7 +208,7 @@ export default function ProofPage() {
           The Proof
         </p>
         <h1
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-6"
+          className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mb-6"
           style={{ fontFamily: 'var(--font-playfair)', textWrap: 'balance' }}
         >
           Your Text. Real Rendering.

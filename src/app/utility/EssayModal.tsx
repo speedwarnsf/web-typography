@@ -77,7 +77,7 @@ export default function EssayModal() {
                   Essay — March 2026
                 </p>
                 <h1 
-                  className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-6 leading-tight"
+                  className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mb-6 leading-tight"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
                   The Invisible Infrastructure

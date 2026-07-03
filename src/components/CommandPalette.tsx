@@ -6,7 +6,6 @@ import { sections, metaPages, getAllPages, type SitePage } from '@/lib/sitemap';
 
 type SearchResult = SitePage & {
   sectionName?: string;
-  sectionFont?: string;
 };
 
 export default function CommandPalette() {
@@ -24,7 +23,6 @@ export default function CommandPalette() {
         results.push({
           ...page,
           sectionName: section.name,
-          sectionFont: section.font,
         });
       }
     }
@@ -163,7 +161,7 @@ export default function CommandPalette() {
                     index === selectedIndex ? 'text-white' : 'text-neutral-300'
                   }`}
                   style={{
-                    fontFamily: result.sectionFont ?? "'Source Sans 3', sans-serif",
+                    fontFamily: "var(--font-source-sans), 'Source Sans 3', sans-serif",
                   }}
                 >
                   {result.name}
@@ -175,7 +173,6 @@ export default function CommandPalette() {
               {result.sectionName && (
                 <span
                   className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 shrink-0 ml-4"
-                  style={{ fontFamily: result.sectionFont }}
                 >
                   {result.sectionName}
                 </span>

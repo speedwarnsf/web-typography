@@ -242,7 +242,7 @@ export default function Home() {
       {/* ── Hero — the new-era idiom: left-aligned, engine-composed, quiet.
              Resolution is the resting state (see docs/DESIGN-REVIEW-V2.md). ── */}
       <section className="relative flex flex-col justify-center min-h-[78vh] px-6 sm:px-8 pt-28 pb-16 max-w-5xl mx-auto">
-        <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-9">
+        <p className="font-mono text-xs uppercase tracking-[0.38em] text-[#B8963E] mb-9">
           A resource for designers and developers
         </p>
         <h1
@@ -277,7 +277,7 @@ export default function Home() {
           01 -- Typographic Rules
         </p>
         <h2
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+          className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mb-4"
           style={{ fontFamily: "var(--font-playfair)" }}
         >
           Clean Text, Automatically
@@ -350,7 +350,7 @@ export default function Home() {
             02 -- Font Pairings
           </p>
           <h2
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+            className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mb-4"
             style={{ fontFamily: "'Playfair Display', serif" }}
           >
             Curated Combinations
@@ -416,7 +416,7 @@ export default function Home() {
             03 -- Typography Tips
           </p>
           <h2
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+            className="text-3xl sm:text-4xl sm:text-5xl font-bold tracking-tight mb-4"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             The Details That Matter

@@ -165,7 +165,7 @@ export default function AboutPage() {
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Education
-                </span>
+                </span>{' '}
                 <span className="text-neutral-400">
                   NSCAD — Communication Design Honors
                 </span>
@@ -173,13 +173,13 @@ export default function AboutPage() {
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Practice
-                </span>
+                </span>{' '}
                 <span className="text-neutral-400">20+ years professional</span>
               </li>
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Position
-                </span>
+                </span>{' '}
                 <span className="text-neutral-400">
                   Art Director, Better World Advertising
                 </span>
@@ -187,7 +187,7 @@ export default function AboutPage() {
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Specialization
-                </span>
+                </span>{' '}
                 <span className="text-neutral-400">
                   Social marketing, public health, human rights campaigns
                 </span>

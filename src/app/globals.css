@@ -211,7 +211,7 @@ html { background: #050505; }
   display: flex; align-items: baseline; gap: 12px;
   padding: 10px 18px 10px 20px;
   font-family: var(--font-mono), monospace;
-  font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
   color: #d6d6d6; text-decoration: none;
   background: rgba(5,5,5,.94);
   border: 0; cursor: pointer; text-align: left;
@@ -235,6 +235,15 @@ html { background: #050505; }
 .site-menu-more { color: #efefef; }
 .site-menu-arrow { font-size: 10px; color: #8f8f8f; margin-left: 6px; }
 .site-menu-items { display: flex; flex-direction: column; }
+
+/* ── Range inputs: real touch targets, always ──
+   Styling a track by shrinking the INPUT makes a 2px-tall touch target
+   (the /v2 squeeze slider bug). And body's touch-action: pan-y eats
+   horizontal drags unless the control claims them. */
+input[type="range"] {
+  touch-action: none; /* the drag belongs to the control, not the page scroll */
+  min-height: 28px;
+}
 
 /* ── Contrast floor (WCAG AA on #050505) ──
    Legacy pages use neutral-600/500 for meant-to-be-read microcopy;

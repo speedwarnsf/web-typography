@@ -23,8 +23,7 @@ export default function SectionFooter() {
     <section className="border-t border-neutral-800">
       <div className="max-w-5xl mx-auto px-6 py-16">
         <p
-          className="text-[11px] uppercase tracking-[0.3em] text-neutral-600 mb-8"
-          style={{ fontFamily: section.font }}
+          className="font-mono text-[11px] uppercase tracking-[0.3em] text-neutral-500 mb-8"
         >
           Also in {section.name}
         </p>
@@ -38,7 +37,6 @@ export default function SectionFooter() {
             >
               <span
                 className="text-base text-neutral-300 group-hover:text-white transition-colors block"
-                style={{ fontFamily: section.font }}
               >
                 {page.name}
               </span>

@@ -30,7 +30,6 @@ export default function PrevNextStrip() {
             </svg>
             <span
               className="text-sm"
-              style={{ fontFamily: section.font }}
             >
               {prev.shortName ?? prev.name}
             </span>
@@ -46,7 +45,6 @@ export default function PrevNextStrip() {
           >
             <span
               className="text-sm"
-              style={{ fontFamily: section.font }}
             >
               {next.shortName ?? next.name}
             </span>

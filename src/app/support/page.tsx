@@ -45,7 +45,7 @@ export default function SupportPage() {
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
             Support
           </div>
-          <h1 className="font-playfair text-4xl md:text-5xl mb-6 text-neutral-100">
+          <h1 className="font-playfair text-4xl sm:text-5xl mb-6 text-neutral-100">
             Help Us Build Better Tools
           </h1>
           <p className="font-source-sans text-base sm:text-lg text-neutral-400 leading-relaxed max-w-2xl" style={{ textWrap: "pretty" }}>

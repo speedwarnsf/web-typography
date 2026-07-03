@@ -153,7 +153,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-[#B8963E] h-1"
+        className="w-full accent-[#B8963E]"
       />
     </div>
   );
