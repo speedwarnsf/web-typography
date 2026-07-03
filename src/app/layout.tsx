@@ -30,11 +30,12 @@ import {
 import "./globals.css";
 import GlobalTypeset from "@/components/GlobalTypeset";
 import BackToTop from "@/components/BackToTop";
-import TopBar from "@/components/TopBar";
 import CommandPalette from "@/components/CommandPalette";
 import SectionFooter from "@/components/SectionFooter";
 import PrevNextStrip from "@/components/PrevNextStrip";
-import HeroParallax from "@/components/HeroParallax";
+import GlyphField from "@/components/chrome/GlyphField";
+import ScrollHairline from "@/components/chrome/ScrollHairline";
+import BloomMenu from "@/components/chrome/BloomMenu";
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans", display: "swap" });
@@ -77,23 +78,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   ].map((f) => f.variable).join(" ");
 
   return (
-    <html lang="en" style={{ backgroundColor: '#0a0a0a' }}>
+    <html lang="en" style={{ backgroundColor: '#050505' }}>
       <body className={`${fontVars} antialiased bg-transparent text-neutral-200`} style={{ backgroundColor: 'transparent' }}>
         <NtfyTracker />
-        {/* Fixed background — letterpress photo visible across all pages */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/typography-bg.jpg"
-          alt=""
-          aria-hidden="true"
-          id="hero-bg"
-          className="fixed top-0 left-0 w-full h-[120vh] object-cover pointer-events-none select-none"
-          style={{ zIndex: 0, opacity: 0.35, filter: 'contrast(1.2) brightness(0.4)', willChange: 'transform' }}
-        />
-        {/* No gradient overlay — let the photo breathe */}
-        <HeroParallax />
+        {/* The new-era chrome: glyph-field texture drawn from the engine's
+            own alphabet (replaces the letterpress photo), gold reading
+            hairline, and the bloom menu — on every page. */}
+        <GlyphField />
+        <ScrollHairline />
+        <BloomMenu />
         <div className="relative" style={{ zIndex: 2 }}>
-          <TopBar />
           <CommandPalette />
           {children}
           <PrevNextStrip />

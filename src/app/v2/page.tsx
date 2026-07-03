@@ -52,16 +52,6 @@ const CRAFT = [
 
 const INSTALL_LINE = '<script src="https://typeset.us/go.js" defer></script>';
 
-const MENU_ITEMS: { label: string; href: string; external?: boolean }[] = [
-  { label: 'The Proof', href: '#proof' },
-  { label: 'The Manifesto', href: '#manifesto' },
-  { label: 'The Craft', href: '#craft' },
-  { label: 'Install', href: '#install' },
-  { label: 'Full instrument', href: '/proof', external: true },
-  { label: 'The essay', href: '/utility', external: true },
-  { label: 'Classic site', href: '/', external: true },
-];
-
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
 function useReducedMotion(): boolean {
@@ -169,267 +159,6 @@ function panelStats(p: HTMLElement, width: number): PanelStats {
     orphan: lines.length > 1 && lastWords.length === 1,
     lines: lines.length,
   };
-}
-
-// ─── Glyph field (organic canvas texture, drawn from the engine's alphabet) ──
-
-function GlyphField({ reduced }: { reduced: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // The field is loose type tumbling in space. Wherever the pointer goes —
-    // and wherever the autonomous composition wave passes — glyphs stop
-    // tumbling, settle upright onto invisible baselines, and brighten like
-    // set ink. Leave, and they decay back into drift. Chaos resolving into
-    // order, continuously: the site's whole argument, running as texture.
-    const CHARS = ['a', 'e', 'g', 'k', 'x', 'R', 'Q', 'W', '&', 'fi', 'ff', '.', ',', ';', ':', '?', '!', '“', '”', '’', '—', '¶', '§', '*'];
-    const LINE = 38; // the invisible baseline grid glyphs settle onto
-    let w = 0;
-    let h = 0;
-    let dpr = 1;
-    let raf = 0;
-    let px = 0.5;
-    let py = 0.5;
-    let curX = -9999;
-    let curY = -9999;
-
-    interface Glyph {
-      x: number; y: number; z: number; // z: 0 near … 1 far
-      size: number; char: string;
-      rot: number; vrot: number;
-      vx: number; vy: number;
-      gold: boolean; serif: boolean;
-      order: number; // 0 tumbling … 1 fully set
-    }
-    let glyphs: Glyph[] = [];
-
-    const seed = () => {
-      const count = Math.min(110, Math.max(42, Math.floor(w / 13)));
-      glyphs = Array.from({ length: count }, () => ({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        z: Math.random(),
-        size: 22 + Math.random() * 96,
-        char: CHARS[Math.floor(Math.random() * CHARS.length)],
-        rot: (Math.random() - 0.5) * 1.7,
-        vrot: (Math.random() - 0.5) * 0.004,
-        vx: (Math.random() - 0.5) * 0.14,
-        vy: -(0.05 + Math.random() * 0.22),
-        gold: Math.random() < 0.16,
-        serif: Math.random() < 0.72,
-        order: 0,
-      }));
-    };
-
-    const resize = () => {
-      dpr = Math.min(2, window.devicePixelRatio || 1);
-      w = window.innerWidth;
-      h = window.innerHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = '#050505';
-      ctx.fillRect(0, 0, w, h);
-      if (!glyphs.length) seed();
-    };
-
-    // Autonomous organizer: a slow lissajous sweep so the field composes
-    // itself even with no pointer (touch devices, idle viewers).
-    const waveAt = (t: number) => {
-      const k = (t % 17000) / 17000;
-      return {
-        x: w * (0.5 + 0.38 * Math.sin(k * Math.PI * 2)),
-        y: h * (0.5 + 0.34 * Math.sin(k * Math.PI * 4 + 1.3)),
-        r: Math.min(w, h) * 0.36,
-        s: 0.85,
-      };
-    };
-
-    const draw = (t: number) => {
-      // Translucent fill instead of clear: motion trails, ink-in-water.
-      ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
-      ctx.fillRect(0, 0, w, h);
-      const wave = reduced ? null : waveAt(t);
-
-      for (const g of glyphs) {
-        const depth = 1 - g.z;
-        const scale = 0.45 + depth * 0.95;
-        const ox = (px - 0.5) * depth * 72;
-        const oy = (py - 0.5) * depth * 42;
-        const sx = g.x + ox;
-        const sy = g.y + oy;
-
-        // Influence: pointer first, wave second — order follows the hand.
-        let inf = 0;
-        const dCur = Math.hypot(sx - curX, sy - curY);
-        const rCur = 230 + depth * 130;
-        if (dCur < rCur) inf = 1 - dCur / rCur;
-        if (wave) {
-          const dW = Math.hypot(sx - wave.x, sy - wave.y);
-          if (dW < wave.r) inf = Math.max(inf, (1 - dW / wave.r) * wave.s);
-        }
-        const target = inf * inf;
-        // Snap to order quickly, decay back into drift slowly.
-        g.order += (target - g.order) * (target > g.order ? 0.16 : 0.022);
-
-        if (!reduced) {
-          const free = 1 - g.order;
-          g.x += g.vx * free;
-          g.y += g.vy * depth * free;
-          g.rot += g.vrot * free;
-          if (g.y < -160) { g.y = h + 130; g.x = Math.random() * w; }
-          if (g.x < -160) g.x = w + 130;
-          else if (g.x > w + 160) g.x = -130;
-        }
-
-        // Set type: upright on the nearest baseline, slightly refined in size.
-        const baseline = Math.round(sy / LINE) * LINE;
-        const drawY = sy + (baseline - sy) * g.order;
-        const rot = g.rot * (1 - g.order);
-        const size = g.size * scale * (1 - g.order * 0.22);
-        const alpha = Math.min(0.34, (0.05 + depth * 0.095) * (1 + g.order * 2.6));
-
-        if (g.gold) {
-          ctx.fillStyle = `rgba(184, 150, 62, ${alpha})`;
-        } else {
-          const tone = Math.round(200 + g.order * 46);
-          ctx.fillStyle = `rgba(${tone}, ${tone}, ${tone - Math.round(g.order * 26)}, ${alpha})`;
-        }
-        ctx.save();
-        ctx.translate(sx, drawY);
-        ctx.rotate(rot);
-        ctx.font = `${g.serif ? 'italic ' : ''}${size.toFixed(1)}px ${g.serif ? 'var(--font-playfair), Georgia, serif' : 'Georgia, serif'}`;
-        ctx.fillText(g.char, 0, 0);
-        ctx.restore();
-      }
-    };
-
-    const loop = (t: number) => {
-      draw(t);
-      raf = requestAnimationFrame(loop);
-    };
-
-    const onPointer = (e: PointerEvent) => {
-      px = e.clientX / Math.max(1, w);
-      py = e.clientY / Math.max(1, h);
-      curX = e.clientX;
-      curY = e.clientY;
-    };
-    const onLeave = () => {
-      curX = -9999;
-      curY = -9999;
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-    window.addEventListener('pointermove', onPointer, { passive: true });
-    window.addEventListener('pointerdown', onPointer, { passive: true });
-    document.documentElement.addEventListener('pointerleave', onLeave);
-    if (reduced) {
-      draw(0);
-    } else {
-      raf = requestAnimationFrame(loop);
-    }
-    const onVis = () => {
-      cancelAnimationFrame(raf);
-      if (!document.hidden && !reduced) raf = requestAnimationFrame(loop);
-    };
-    document.addEventListener('visibilitychange', onVis);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('pointermove', onPointer);
-      window.removeEventListener('pointerdown', onPointer);
-      document.documentElement.removeEventListener('pointerleave', onLeave);
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [reduced]);
-
-  return <canvas ref={canvasRef} className="v2-field" aria-hidden="true" />;
-}
-
-// ─── Menu that grows from a single gold point ───────────────────────────────
-
-function BloomMenu() {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    const onClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('mousedown', onClick);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('mousedown', onClick);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className={`v2-menu ${open ? 'v2-menu-open' : ''}`}>
-      <button
-        className="v2-menu-seed"
-        aria-expanded={open}
-        aria-label={open ? 'Close menu' : 'Open menu'}
-        onClick={() => setOpen(!open)}
-      >
-        <span className="v2-menu-dot" />
-        <span className="v2-menu-word">{open ? 'CLOSE' : 'MENU'}</span>
-      </button>
-      <nav className="v2-menu-bloom" aria-hidden={!open}>
-        <span className="v2-menu-stem" />
-        {MENU_ITEMS.map((item, i) => (
-          <a
-            key={item.label}
-            href={item.href}
-            tabIndex={open ? 0 : -1}
-            className={`v2-menu-item ${item.external ? 'v2-menu-ext' : ''}`}
-            style={{ transitionDelay: open ? `${70 + i * 45}ms` : `${(MENU_ITEMS.length - i) * 22}ms` }}
-            onClick={() => setOpen(false)}
-          >
-            <span className="v2-menu-n">{String(i + 1).padStart(2, '0')}</span>
-            {item.label}
-          </a>
-        ))}
-      </nav>
-    </div>
-  );
-}
-
-// ─── Scroll progress hairline ───────────────────────────────────────────────
-
-function ScrollHairline() {
-  const barRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const el = barRef.current;
-        if (!el) return;
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        el.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
-      });
-    };
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-  return <div ref={barRef} className="v2-hairline" aria-hidden="true" />;
 }
 
 // ─── Hero ───────────────────────────────────────────────────────────────────
@@ -939,9 +668,6 @@ export default function V2Page() {
   return (
     <main className="v2-root">
       <style dangerouslySetInnerHTML={{ __html: V2_CSS }} />
-      <GlyphField reduced={reduced} />
-      <ScrollHairline />
-      <BloomMenu />
       <Hero reduced={reduced} />
       <ProofStage reduced={reduced} />
       <Manifesto />
@@ -956,8 +682,6 @@ export default function V2Page() {
 const V2_CSS = `
 /* Takeover: /v2 owns the viewport. */
 html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
-body:has(.v2-root) #hero-bg { display: none; }
-body:has(.v2-root) header.fixed { display: none; }
 
 .v2-root {
   position: relative;
@@ -968,12 +692,6 @@ body:has(.v2-root) header.fixed { display: none; }
 }
 .v2-root * { border-radius: 0 !important; }
 
-.v2-field {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
 
 .v2-hairline {
   position: fixed;
@@ -984,57 +702,6 @@ body:has(.v2-root) header.fixed { display: none; }
   transform-origin: 0 50%;
   z-index: 90;
 }
-
-/* ── Menu that grows from a point ── */
-.v2-menu { position: fixed; top: 22px; left: 22px; z-index: 100; }
-.v2-menu-seed {
-  display: flex; align-items: center; gap: 10px;
-  background: none; border: 0; cursor: pointer; padding: 8px;
-  margin: -8px;
-}
-.v2-menu-dot {
-  width: 11px; height: 11px; background: ${GOLD};
-  transition: transform .5s cubic-bezier(.2,.8,.2,1);
-}
-.v2-menu-open .v2-menu-dot { transform: rotate(135deg) scale(.9); }
-.v2-menu-word {
-  font-family: var(--font-mono), monospace;
-  font-size: 10px; letter-spacing: .3em; color: #a3a3a3;
-  transition: color .3s;
-}
-.v2-menu-seed:hover .v2-menu-word { color: ${GOLD}; }
-.v2-menu-bloom {
-  position: absolute; top: 30px; left: 5px;
-  /* CRITICAL: the closed nav is invisible but its box is ~230x300px fixed
-     at the viewport's top-left — with default pointer-events it silently
-     ate every real tap in that region (menu items opting out wasn't
-     enough; the container itself hit-tests). Programmatic .click() in
-     tests bypasses hit-testing, which is how this shipped. */
-  pointer-events: none;
-}
-.v2-menu-stem {
-  position: absolute; top: 0; left: 0; width: 1px; height: 100%;
-  background: linear-gradient(${GOLD}, transparent);
-  transform: scaleY(0); transform-origin: 0 0;
-  transition: transform .55s cubic-bezier(.2,.8,.2,1);
-}
-.v2-menu-open .v2-menu-stem { transform: scaleY(1); }
-.v2-menu-item {
-  display: flex; align-items: baseline; gap: 12px;
-  padding: 9px 18px 9px 20px;
-  font-family: var(--font-mono), monospace;
-  font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
-  color: #d6d6d6; text-decoration: none;
-  background: rgba(5,5,5,.92);
-  opacity: 0; transform: translateX(-10px);
-  pointer-events: none;
-  transition: opacity .4s, transform .5s cubic-bezier(.2,.8,.2,1), color .25s;
-  white-space: nowrap;
-}
-.v2-menu-open .v2-menu-item { opacity: 1; transform: none; pointer-events: auto; }
-.v2-menu-item:hover { color: ${GOLD}; }
-.v2-menu-n { font-size: 9px; color: ${GOLD}; opacity: .85; }
-.v2-menu-ext { color: #8f8f8f; }
 
 /* ── Hero ── */
 .v2-hero {
@@ -1346,7 +1013,7 @@ body:has(.v2-root) header.fixed { display: none; }
   html:has(.v2-root) { scroll-behavior: auto; }
   .v2-line { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
   .v2-tilt { transform: none !important; }
-  .v2-panel, .v2-card, .v2-menu-item, .v2-menu-stem, .v2-menu-dot, .v2-cta { transition: none !important; }
+  .v2-panel, .v2-card, .v2-cta { transition: none !important; }
 }
 
 @media (max-width: 640px) {

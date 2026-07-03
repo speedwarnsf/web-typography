@@ -135,3 +135,103 @@ main {
 }
 
 /* deployed Wed Mar 11 02:19:20 PDT 2026 */
+
+/* ════════════════════════════════════════════════════════════════════
+   THE NEW ERA — global chrome (2026-07-02)
+   Pure black, glyph-field texture, bloom menu, reading hairline.
+   ════════════════════════════════════════════════════════════════════ */
+
+html { background: #050505; }
+
+.site-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.site-hairline {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: #B8963E;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  z-index: 90;
+}
+
+/* ── Bloom menu ── */
+.site-menu { position: fixed; top: 22px; left: 22px; z-index: 100; }
+.site-menu-seed {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; cursor: pointer; padding: 10px;
+  margin: -10px;
+}
+.site-menu-dot {
+  width: 11px; height: 11px; background: #B8963E;
+  transition: transform .5s cubic-bezier(.2,.8,.2,1);
+}
+.site-menu-open .site-menu-dot { transform: rotate(135deg) scale(.9); }
+.site-menu-word {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .3em; color: #a3a3a3;
+  transition: color .3s;
+}
+.site-menu-seed:hover .site-menu-word { color: #B8963E; }
+.site-menu-bloom {
+  position: absolute; top: 32px; left: 5px;
+  /* Load-bearing: the closed nav's invisible box must never eat taps. */
+  pointer-events: none;
+}
+.site-menu-stem {
+  position: absolute; top: 0; left: 0; width: 1px; height: 100%;
+  background: linear-gradient(#B8963E, transparent);
+  transform: scaleY(0); transform-origin: 0 0;
+  transition: transform .55s cubic-bezier(.2,.8,.2,1);
+}
+.site-menu-open .site-menu-stem { transform: scaleY(1); }
+.site-menu-item {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 10px 18px 10px 20px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  color: #d6d6d6; text-decoration: none;
+  background: rgba(5,5,5,.94);
+  border: 0; cursor: pointer; text-align: left;
+  opacity: 0;
+  transition: opacity .18s ease, color .25s;
+  white-space: nowrap;
+  width: 100%;
+}
+.site-menu-open .site-menu-item {
+  opacity: 1;
+  pointer-events: auto;
+  animation: site-bloom-in .45s cubic-bezier(.2,.8,.2,1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes site-bloom-in {
+  from { opacity: 0; transform: translateX(-10px); }
+}
+.site-menu-item:hover { color: #B8963E; }
+.site-menu-n { font-size: 9px; color: #B8963E; opacity: .85; min-width: 18px; }
+.site-menu-current { color: #B8963E; }
+.site-menu-more { color: #efefef; }
+.site-menu-arrow { font-size: 10px; color: #8f8f8f; margin-left: 6px; }
+.site-menu-items { display: flex; flex-direction: column; }
+
+/* ── Contrast floor (WCAG AA on #050505) ──
+   Legacy pages use neutral-600/500 for meant-to-be-read microcopy;
+   lift them to a legible floor without touching every page. */
+.text-neutral-600 { color: #8f8f8f !important; }
+.text-neutral-500 { color: #a3a3a3 !important; }
+
+/* Content sits above the field */
+body > div { position: relative; z-index: 2; }
+
+@media (max-width: 640px) {
+  .site-menu { top: 16px; left: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-menu-item, .site-menu-stem, .site-menu-dot { transition: none !important; animation: none !important; }
+}
