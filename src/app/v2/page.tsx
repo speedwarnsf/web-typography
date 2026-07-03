@@ -17,10 +17,10 @@ const HERO_TEXT = 'The web finally knows how to break lines.';
 const HERO_SUB =
   'Forty years after print solved it, the browser catches up. Knuth’s mathematics, Tschichold’s tolerances, Bringhurst’s measures — running live on every paragraph of this page.';
 
-// Chosen empirically FOR THE SITE'S BODY FACE (Source Sans 1.0625rem/1.7):
-// across 250-334px the browser strands an article at 7 of 8 widths on this
-// paragraph; the engine never does, and the line counts TIE from 262-298px
-// — same words, same space. The text argues its own case in civilian words.
+// Chosen empirically FOR THE SITE'S BODY FACE (Source Sans 1.0625rem/1.7),
+// re-measured after the rag retune: at 262-298px the browser strands 2-4
+// words per composition against the engine's 1 — and the engine does it in
+// FEWER lines (8 vs 7). The text argues its own case in civilian words.
 const PROOF_TEXT =
   'Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 
@@ -300,10 +300,9 @@ const FLAW_CAPTIONS: Record<WorstFlaw['kind'], (w: string) => string> = {
 
 function ProofStage({ reduced }: { reduced: boolean }) {
   const [mode, setMode] = useState<'typeset' | 'browser'>('typeset');
-  // 286 default: measured sweet spot in the body face — the book uses the
-  // SAME number of lines as the browser here, and the browser strands a
-  // word anyway.
-  const [width, setWidth] = useState(286);
+  // 274 default: measured sweet spot — the book beats the browser on BOTH
+  // axes here: fewer hung words (1 vs 3) in fewer lines (7 vs 8).
+  const [width, setWidth] = useState(274);
   const [maxWidth, setMaxWidth] = useState(340);
   const [stats, setStats] = useState<{ b: PanelStats; t: PanelStats } | null>(null);
   const [callout, setCallout] = useState<{ top: number; left: number; text: string } | null>(null);

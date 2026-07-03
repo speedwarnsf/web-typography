@@ -250,7 +250,7 @@ function profileForMeasure(measureCh: number): CompositorProfile {
   if (measureCh < 18) return {
     mainTarget: 0.85,
     lastTarget: 0.55,
-    weakEndPenalty: 4800,
+    weakEndPenalty: 8200,
     orphanPenalty: 1e9,
     flatShelfPenalty: 240,
     snapPenalty: 180,
@@ -259,7 +259,7 @@ function profileForMeasure(measureCh: number): CompositorProfile {
   if (measureCh < 24) return {
     mainTarget: 0.82,
     lastTarget: 0.52,
-    weakEndPenalty: 4200,
+    weakEndPenalty: 7600,
     orphanPenalty: 1e9,
     flatShelfPenalty: 200,
     snapPenalty: 140,
@@ -272,7 +272,7 @@ function profileForMeasure(measureCh: number): CompositorProfile {
     // per paragraph at 375px with no rag improvement (measured on /proof).
     mainTarget: 0.85,
     lastTarget: 0.48,
-    weakEndPenalty: 3400,
+    weakEndPenalty: 7000,
     orphanPenalty: 1e9,
     flatShelfPenalty: 160,
     snapPenalty: 100,
@@ -293,7 +293,9 @@ function composeParagraph(
   if (tokens.length === 0) return null;
 
   const profile = profileForMeasure(measureCh);
-  const BEAM = 48;
+  // Long paragraphs need a wider beam: at 48, contour-diverse candidates
+  // get pruned before the re-rank can consider them.
+  const BEAM = tokens.length > 120 ? 80 : 48;
   const isHeading = opts.isHeading === true;
   // Heading-only sentence-boundary preference. Weighted far below orphanPenalty
   // (1e9) so widow prevention always wins — sentence breaks happen only "where
@@ -547,26 +549,35 @@ function composeParagraph(
   };
 
   // Score transition for the NEWEST line only (not full history — that was double-counting)
-  const scoreTransition = (lines: { fill: number }[]): number => {
-    if (lines.length < 2) return 0;
-    let penalty = 0;
+  const scoreTransition = (lines: { fill: number }[], isLast: boolean): number => {
+    if (lines.length < 2 || isLast) return 0; // the last line is short by design
 
+    let penalty = 0;
     const i = lines.length - 1;
     const currFill = lines[i].fill;
     const prevFill = lines[i - 1].fill;
 
-    // Large jump between adjacent lines
+    // Graduated cliff cost with REAL teeth. This used to charge nothing
+    // below a 22% jump — cliffs were free while the fill ladder charged
+    // thousands, so the optimizer bought stairsteps to save pennies (the
+    // choppy-rag bug). Quadratic from 6%: 10% ≈ 400, 14% ≈ 1600,
+    // 18% ≈ 3600 — a cliff now costs as much as the flaw it "avoids".
     const jump = Math.abs(currFill - prevFill);
-    if (jump > 0.22) {
-      penalty += profile.snapPenalty * jump * 10;
+    if (jump > 0.06) {
+      // Capped BELOW the weak-end penalty (3400): shape must never outbid
+      // meaning — a cliff is ugly, a stranded "of" is a broken promise.
+      penalty += Math.min(1800, 250000 * (jump - 0.06) * (jump - 0.06));
     }
 
-    // Flat shelf detection (3 consecutive lines within 5%)
+    // Flat-shelf applies ONLY to the justified look (three matched FULL
+    // lines). Three even lines at reading fills are book-normal — the old
+    // rule punished smoothness itself.
     if (lines.length >= 3) {
       const prevPrevFill = lines[i - 2].fill;
-      if (Math.abs(prevPrevFill - prevFill) < 0.05 &&
-          Math.abs(prevFill - currFill) < 0.05 &&
-          Math.abs(prevPrevFill - currFill) < 0.05) {
+      const avg = (currFill + prevFill + prevPrevFill) / 3;
+      if (avg > 0.9 &&
+          Math.abs(prevPrevFill - prevFill) < 0.04 &&
+          Math.abs(prevFill - currFill) < 0.04) {
         penalty += profile.flatShelfPenalty;
       }
     }
@@ -588,11 +599,12 @@ function composeParagraph(
     for (const state of beam) {
       const start = state.tokenIndex;
 
-      // If this state is complete, keep it for contour re-ranking
+      // If this state is complete, keep it for contour re-ranking.
       if (start >= contentTokens.length) {
         if (completes.length < 200) completes.push(state);
         continue;
       }
+
 
       // Try all legal line candidates from this position
       for (let end = start + 1; end <= Math.min(start + 25, contentTokens.length); end++) {
@@ -612,7 +624,7 @@ function composeParagraph(
 
         const linePenalty = scoreLine(lineTokens, fill, isLast, end);
         const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
-        const transitionPenalty = scoreTransition(newLines);
+        const transitionPenalty = scoreTransition(newLines, isLast);
 
         newBeam.push({
           tokenIndex: end,
@@ -639,7 +651,14 @@ function composeParagraph(
   // "two-register" drift where the opening sets full and the tail sets loose.
   completes.sort((a, b) => a.cost - b.cost);
   let winner = completes[0];
-  const slack = winner.cost * 0.15 + 600;
+  const isLong = winner.lines.length >= 10;
+  // Slack capped below the weak-end penalty: the contour re-rank may trade
+  // fill economics for shape, but can never adopt a candidate carrying a
+  // violation the cheapest one avoided.
+  const slack = Math.min(
+    winner.cost * (isLong ? 0.2 : 0.15) + (isLong ? 1200 : 600),
+    3200
+  );
   const nearOptimal = completes.filter(s => s.cost <= winner.cost + slack);
 
   if (nearOptimal.length > 1) {
@@ -657,7 +676,7 @@ function composeParagraph(
         const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
         registerShift = Math.abs(mean(fills.slice(0, half)) - mean(fills.slice(half)));
       }
-      return 2.0 * spread + 1.5 * maxStep + 1.5 * registerShift;
+      return 2.0 * spread + 3.0 * maxStep + 1.5 * registerShift;
     };
     winner = nearOptimal.reduce(
       (best, s) => (contourScore(s) < contourScore(best) ? s : best),
