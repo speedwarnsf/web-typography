@@ -849,6 +849,7 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
       p.appendChild(span);
     });
   });
+  measurer.cleanup?.();
 }
 
 /**
@@ -1061,8 +1062,9 @@ export function measureCh(element: HTMLElement): number {
     _canvas = c.getContext('2d');
   }
   if (_canvas) {
-    _canvas.font = `${cs.fontSize} ${cs.fontFamily}`;
-    const chPx = _canvas.measureText('0').width;
+    _canvas.font = '7px serif'; // clear sticky state
+    _canvas.font = canvasFontString(cs);
+    const chPx = _canvas.font.includes(cs.fontSize) ? _canvas.measureText('0').width : 0;
     if (chPx > 0) {
       const ch = Math.floor(containerPx / chPx);
       _chCache.set(element, { width: elWidth, ch });
@@ -1116,30 +1118,81 @@ function educateQuotes(text: string): string {
 }
 
 /**
- * Build a font-accurate canvas text measurer for an element. Zero DOM mutation.
+ * Serialize a computed font for canvas with every family name QUOTED.
+ * next/font's internal names ("__Source_Sans_3_abc123") are invalid in the
+ * canvas font shorthand unless quoted — Safari rejects the string and
+ * silently KEEPS THE PREVIOUS FONT, so a paragraph measured right after a
+ * Playfair headline gets headline-sized metrics and composes starved
+ * stanza lines (the iOS short-column bug).
  */
-function makeMeasurer(element: HTMLElement): (text: string) => number {
+function canvasFontString(cs: CSSStyleDeclaration): string {
+  const generic = /^(serif|sans-serif|monospace|cursive|fantasy|math|emoji|fangsong|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded)$/i;
+  const fams = cs.fontFamily
+    .split(',')
+    .map((f) => {
+      const t = f.trim();
+      if (generic.test(t) || /^['"]/.test(t)) return t;
+      return '"' + t.replace(/"/g, '') + '"';
+    })
+    .join(', ');
+  return `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${fams}`;
+}
+
+/**
+ * Build a font-accurate text measurer for an element. Canvas-first (zero DOM
+ * mutation); if the canvas refuses the font string, falls back to a hidden
+ * in-element span that inherits the REAL rendered font. Call .cleanup()
+ * after measuring.
+ */
+type Measurer = ((text: string) => number) & { cleanup?: () => void };
+
+function makeMeasurer(element: HTMLElement): Measurer {
   const cs = getComputedStyle(element);
   if (!_canvas) {
     const c = document.createElement('canvas');
     _canvas = c.getContext('2d');
   }
   const ctx = _canvas;
-  const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  // ctx.font ignores letter-spacing; modern Chromium exposes ctx.letterSpacing.
-  // Without it, tracked-out text measures narrower than it renders and the
-  // composed fills drift by a few percent (dogfood #10).
+  const font = canvasFontString(cs);
   const letterSpacing =
     cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '';
   const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
-  return (text: string) => {
-    if (!ctx) return text.length * fallbackCh;
+
+  // Verify the canvas actually accepted the font: reset to a sentinel, set,
+  // and require the requested size to appear in the serialized result.
+  let canvasOk = false;
+  if (ctx) {
+    ctx.font = '7px serif'; // sentinel — clears any sticky previous font
     ctx.font = font;
-    if ('letterSpacing' in ctx) {
-      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = letterSpacing;
-    }
-    return ctx.measureText(text).width;
+    canvasOk = ctx.font.includes(cs.fontSize);
+  }
+
+  if (ctx && canvasOk) {
+    const m: Measurer = (text: string) => {
+      ctx.font = font;
+      if ('letterSpacing' in ctx) {
+        (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = letterSpacing;
+      }
+      return ctx.measureText(text).width;
+    };
+    return m;
+  }
+
+  // DOM fallback: inherits the element's true font — correct on every engine.
+  const probe = document.createElement('span');
+  probe.style.cssText =
+    'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
+    'font:inherit;letter-spacing:inherit;word-spacing:inherit;';
+  element.appendChild(probe);
+  const m: Measurer = (text: string) => {
+    if (!probe.isConnected) return text.length * fallbackCh;
+    probe.textContent = text;
+    return probe.getBoundingClientRect().width;
   };
+  m.cleanup = () => {
+    if (probe.parentNode) probe.parentNode.removeChild(probe);
+  };
+  return m;
 }
 
 /** Content-box width of an element in px (clientWidth minus horizontal padding). */
@@ -1259,6 +1312,31 @@ export function audit(
 }
 
 /**
+ * The inverse of linesOverflow: were the composed lines rendered STARVED —
+ * median non-last fill far below anything the compositor would choose on
+ * purpose? Happens when the measurer overstated widths (e.g. a canvas that
+ * silently kept a headline-sized font). Only meaningful with 3+ measured
+ * lines; heading mode is exempt (display lines run loose by design).
+ */
+export function linesStarved(element: HTMLElement, medianFloor = 0.62): boolean {
+  const cs = getComputedStyle(element);
+  const left = element.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
+  const width = element.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (width <= 0) return false;
+  const spans = Array.from(element.querySelectorAll<HTMLElement>('.ts-line'));
+  if (spans.length < 4) return false;
+  const fills: number[] = [];
+  for (let i = 0; i < spans.length - 1; i++) {
+    const r = document.createRange();
+    r.selectNodeContents(spans[i]);
+    fills.push((r.getBoundingClientRect().right - left) / width);
+  }
+  fills.sort((a, b) => a - b);
+  const median = fills[Math.floor(fills.length / 2)];
+  return median < medianFloor;
+}
+
+/**
  * Full V2 line composition for a pure-text block. Sources the canonical raw
  * text (wrapper-provided `data-ts-raw`, then cache, then the live DOM), educates
  * quotes, runs the beam-search compositor, and renders frozen lines. Idempotent
@@ -1285,6 +1363,7 @@ function composeElement(element: HTMLElement, measure: number): boolean {
 
   const measurer = makeMeasurer(element);
   const tokens = tokenize(raw, measurer);
+  measurer.cleanup?.();
   // Heading detection must survive the linked-headline pattern (h4 > a, the
   // most common listing markup on the web): an anchor composed in body mode
   // hits the absolute orphan ban and can have NO legal composition at narrow
@@ -1307,6 +1386,14 @@ function composeElement(element: HTMLElement, measure: number): boolean {
   renderFrozenLines(element, shaped);
   if (linesOverflow(element)) {
     element.dataset.tsOutcome = 'fallback:overflow';
+    return restorePlain(element, raw);
+  }
+  // Symmetric self-check: overstated metrics produce STARVED lines (the
+  // iOS canvas-font bug composed ~60% stanza columns). The compositor
+  // never intends a median body fill below ~0.62 — if the render says
+  // otherwise, the measurements were wrong; browser wrapping is better.
+  if (!isHeading && linesStarved(element)) {
+    element.dataset.tsOutcome = 'fallback:starved';
     return restorePlain(element, raw);
   }
   element.dataset.tsOutcome = 'composed';
