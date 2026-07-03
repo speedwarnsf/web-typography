@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { typesetText, typesetHeading, measureCh, shouldIgnoreMutation, safeWrite, tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines, linesOverflow } from '@/lib/typeset';
+import typesetEngine, { typesetText, typesetHeading, measureCh, shouldIgnoreMutation, safeWrite } from '@/lib/typeset';
 
 /**
  * GlobalTypeset — Single-owner pipeline architecture.
@@ -118,23 +118,16 @@ export default function GlobalTypeset() {
         try {
           const text = canonicalText.get(p) || p.textContent || '';
 
-          // Compositor V2 strictly replaces innerHTML with text nodes.
-          // It destroys inline HTML like <strong>, <a>, and dropcap <span>.
-          // If the paragraph has ANY child elements, skip compositor and leave Phase 1 bindings only.
-          // Compositor V2 strictly replaces innerHTML with text nodes.
-          // It destroys inline HTML like <strong>, <a>, and dropcap <span>.
-          // We use querySelector('*') to guarantee we detect ANY child element.
-          const hasInlineHtml = p.querySelector('*') !== null;
-          
-          if (hasInlineHtml || text.length < 30) {
-            // Unsafe or too short for compositor — mark done
+          // The compositor strictly replaces content with text nodes; blocks
+          // with real inline markup (<strong>, <a>, dropcaps) keep Phase 1
+          // bindings only. Short blocks compose poorly — skip those too.
+          if (p.querySelector('*') !== null || text.length < 30) {
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
             });
             return;
           }
 
-          // Skip if inside excluded containers
           if (p.closest('[data-no-typeset], [data-no-smooth], pre, code, .demo, [role="tabpanel"]')) {
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
@@ -142,104 +135,36 @@ export default function GlobalTypeset() {
             return;
           }
 
-          // Skip centered text (auto-detect)
-          const textAlign = getComputedStyle(p).textAlign;
-          if (textAlign === 'center') {
+          if (getComputedStyle(p).textAlign === 'center') {
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
             });
             return;
           }
 
-          // Store canonical text if not already stored
           if (!canonicalText.has(p)) {
             canonicalText.set(p, text);
           }
 
-          // Measure paragraph dimensions
-          const measureChars = measureCh(p);
-          const cs = getComputedStyle(p);
-          let measurePx = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+          // ONE engine, ONE path. This used to be a hand-rolled parallel
+          // wiring (own span measurer, direct composeParagraph/finalValidate/
+          // renderFrozenLines calls) that failed in ways the real path
+          // doesn't — the /library headline fell back to browser wrapping
+          // and orphaned. typeset() carries the whole battle-tested
+          // pipeline: quote education, heading mode, contour re-ranking,
+          // spacing, overflow self-check, outcome reporting.
+          p.dataset.tsRaw = text;
+          typesetEngine(p);
 
-          // Safety margin for italic text — italic overhang causes tokens
-          // to render ~5% wider than the measurer calculates
-          if (cs.fontStyle === 'italic') {
-            measurePx *= 0.92;
-          }
-
-          if (measurePx <= 0) {
+          // typeset() marks success itself (data-typeset-done="1"). If it
+          // fell back, mark done so we don't retry every pipeline pass —
+          // the fonts.loadingdone reset un-marks when metrics change.
+          if (!p.hasAttribute('data-typeset-done')) {
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
             });
-            return;
           }
-
-          // Create hidden measurer for token widths
-          const measurer = document.createElement('span');
-          measurer.style.cssText =
-            'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;' +
-            'font:inherit;letter-spacing:inherit;word-spacing:inherit;';
-          p.style.position = p.style.position || 'relative';
-          p.appendChild(measurer);
-
-          const measureText = (txt: string): number => {
-            measurer.textContent = txt;
-            return measurer.getBoundingClientRect().width;
-          };
-
-          // Step 1: Tokenize
-          const tokens = tokenize(text, measureText);
-
-          // Step 2: Compose paragraph (beam search for exact lines)
-          const isHeading = /^H[1-6]$/.test(p.tagName);
-          const composition = composeParagraph(tokens, measurePx, measureChars, { isHeading });
-
-          // Remove measurer
-          p.removeChild(measurer);
-
-          if (!composition) {
-            // No valid composition — fall back to browser default
-            safeWrite(() => {
-              p.setAttribute('data-typeset-done', '');
-            });
-            return;
-          }
-
-          // Step 3: Shape exact lines (adjust word-spacing within fixed membership)
-          const shaped = shapeExactLines(composition, measureChars, measurePx);
-
-          if (!shaped) {
-            // Shaping failed — fall back to browser default
-            safeWrite(() => {
-              p.setAttribute('data-typeset-done', '');
-            });
-            return;
-          }
-
-          // Step 4: Final validation — if it fails, still render the composition
-          // (compositor scoring already prevents the worst outcomes,
-          // falling back to browser is worse than a slightly imperfect composition)
-          if (!finalValidate(shaped, measureChars, isHeading)) {
-            // Try rendering anyway — compositor output is still better than browser
-          }
-
-          // Step 5: Render frozen lines
-          renderFrozenLines(p, shaped);
-
-          // Step 6: Self-check. If any rendered line's ink exceeds the content
-          // box (composition math vs rendering disagreed — usually a webfont
-          // that finished loading after measurement), a composed overflow is
-          // worse than browser wrapping. Restore the canonical text and let
-          // the fonts.loadingdone re-run recompose with true metrics.
-          if (linesOverflow(p)) {
-            safeWrite(() => {
-              p.textContent = text;
-              p.setAttribute('data-typeset-done', '');
-            });
-          }
-
-        } catch (e) {
-          // Silently skip on error — mark done to avoid retry loops
+        } catch {
           safeWrite(() => {
             p.setAttribute('data-typeset-done', '');
           });
@@ -273,11 +198,11 @@ export default function GlobalTypeset() {
       runPipeline();
     }, 100);
 
-    // Delayed re-runs to catch dynamically loaded content (Supabase data, etc.)
-    const delayedRuns = [
-      setTimeout(() => runPipeline(), 1500),
-      setTimeout(() => runPipeline(), 4000),
-    ];
+    // No blanket delayed re-runs: the MutationObserver catches dynamically
+    // added content, and the surgical fonts.loadingdone pass handles late
+    // webfonts. The old 1.5s/4s full-page re-runs recomposed pages while
+    // people were already reading them — the "visible redraw" on /support.
+    const delayedRuns: ReturnType<typeof setTimeout>[] = [];
 
     // --- MutationObserver for dynamic content ---
     const observer = new MutationObserver((mutations) => {
@@ -339,8 +264,10 @@ export default function GlobalTypeset() {
           safeWrite(() => {
             el.removeAttribute('data-typeset-done');
 
+            // Composed-only restore — see the loadingdone handler. Never
+            // flatten real markup with a textContent write.
             const original = canonicalText.get(el);
-            if (original) {
+            if (original && el.querySelector(':scope > .ts-line')) {
               el.textContent = original;
             }
           });
@@ -403,10 +330,15 @@ export default function GlobalTypeset() {
           if (!original) return;
           const fam = getComputedStyle(el).fontFamily.toLowerCase();
           if (!families.some((f) => fam.includes(f))) return;
+          // Only restore textContent for blocks WE composed (.ts-line
+          // children). For anything still carrying real markup, textContent
+          // restore would FLATTEN it and weld words together (the About
+          // credentials bug: two flex spans became "EducationNSCAD").
+          const composed = !!el.querySelector(':scope > .ts-line');
           touched++;
           safeWrite(() => {
             el.removeAttribute('data-typeset-done');
-            el.textContent = original;
+            if (composed) el.textContent = original;
           });
         });
         if (!touched) return;

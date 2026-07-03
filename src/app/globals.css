@@ -189,6 +189,16 @@ html { background: #050505; }
   position: absolute; top: 32px; left: 5px;
   /* Load-bearing: the closed nav's invisible box must never eat taps. */
   pointer-events: none;
+  /* And it must be UNPAINTABLE when closed — iOS Safari can leave a
+     ghost compositor layer of fading fixed-position content on screen
+     after the retract animation. visibility removes it from compositing
+     entirely (delayed so the close fade can play). */
+  visibility: hidden;
+  transition: visibility 0s linear .3s;
+}
+.site-menu-open .site-menu-bloom {
+  visibility: visible;
+  transition-delay: 0s;
 }
 .site-menu-stem {
   position: absolute; top: 0; left: 0; width: 1px; height: 100%;
