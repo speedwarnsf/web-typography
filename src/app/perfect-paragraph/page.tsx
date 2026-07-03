@@ -213,14 +213,14 @@ export default function PerfectParagraph() {
             <div className="flex gap-2">
               <button
                 onClick={handleEnableAll}
-                className="font-mono text-xs uppercase tracking-wider text-neutral-400 hover:text-[#B8963E] transition-colors"
+                className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-400 hover:text-[#B8963E] transition-colors"
               >
                 Enable All
               </button>
               <span className="text-neutral-700">|</span>
               <button
                 onClick={handleDisableAll}
-                className="font-mono text-xs uppercase tracking-wider text-neutral-400 hover:text-[#B8963E] transition-colors"
+                className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-400 hover:text-[#B8963E] transition-colors"
               >
                 Disable All
               </button>

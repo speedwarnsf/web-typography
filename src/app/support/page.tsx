@@ -38,14 +38,41 @@ export default function SupportPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
-      <div className="mx-auto max-w-4xl px-6 py-10 sm:py-16 md:py-12 sm:py-24">
+    <main className="min-h-screen overflow-x-clip">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        /* Hung gold dashes that share the line box — baseline-aligned by
+           construction, never nudged by eye. */
+        .support-funds { list-style: none; padding-left: 1.6em; }
+        .support-funds li { position: relative; margin-bottom: 0.9em; }
+        .support-funds li:last-child { margin-bottom: 0; }
+        .support-funds li::before {
+          content: "—";
+          position: absolute;
+          left: -1.6em;
+          color: #B8963E;
+        }
+        /* Superior currency: the $ rides at cap height, ~55% of the figure
+           size — how books have set prices for a century. */
+        .support-cur {
+          font-size: 0.55em;
+          line-height: 0;
+          vertical-align: baseline;
+          position: relative;
+          top: -0.52em;
+          margin-right: 0.05em;
+        }
+      `,
+        }}
+      />
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-32 pb-24">
         {/* Header */}
         <div className="mb-16">
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
             Support
           </div>
-          <h1 className="font-playfair text-4xl sm:text-5xl mb-6 text-neutral-100">
+          <h1 className="text-4xl sm:text-5xl mb-8">
             Help Us Build Better Tools
           </h1>
           <p className="font-source-sans text-base sm:text-lg text-neutral-400 leading-relaxed max-w-2xl" style={{ textWrap: "pretty" }}>
@@ -56,31 +83,16 @@ export default function SupportPage() {
 
         {/* What Your Support Funds */}
         <div className="mb-16">
-          <h2 className="font-playfair text-2xl mb-8 text-neutral-100">
+          <h2 className="text-2xl sm:text-3xl mb-8">
             What Your Support Funds
           </h2>
-          <div className="space-y-4 font-source-sans text-neutral-300 leading-relaxed">
-            <div className="flex gap-4">
-              <span className="text-[#B8963E] mt-1">—</span>
-              <span>New typographic tools and refinements</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="text-[#B8963E] mt-1">—</span>
-              <span>Research into web typography standards</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="text-[#B8963E] mt-1">—</span>
-              <span>Keeping all tools free and accessible</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="text-[#B8963E] mt-1">—</span>
-              <span>Server costs and infrastructure</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="text-[#B8963E] mt-1">—</span>
-              <span>Font licensing for expanded specimen libraries</span>
-            </div>
-          </div>
+          <ul className="support-funds font-source-sans text-neutral-300 leading-relaxed">
+            <li>New typographic tools and refinements</li>
+            <li>Research into web typography standards</li>
+            <li>Keeping all tools free and accessible</li>
+            <li>Server costs and infrastructure</li>
+            <li>Font licensing for expanded specimen libraries</li>
+          </ul>
         </div>
 
         {/* One-time vs Monthly Toggle */}
@@ -116,12 +128,13 @@ export default function SupportPage() {
               key={tier.id}
               className="border border-neutral-800 bg-neutral-950/50 p-4 sm:p-6 lg:p-8 flex flex-col"
             >
-              <h3 className="font-playfair text-2xl mb-3 text-neutral-100">
+              <h3 className="text-2xl mb-3">
                 {tier.name}
               </h3>
               <div className="mb-4">
                 <span className="text-4xl font-playfair text-[#B8963E]">
-                  ${tier.amount}
+                  <sup className="support-cur">$</sup>
+                  {tier.amount}
                 </span>
                 {isMonthly && (
                   <span className="text-neutral-400 font-source-sans ml-1">
@@ -177,6 +190,6 @@ export default function SupportPage() {
           </a>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -327,7 +327,7 @@ export default function FontInspector() {
           </div>
           <a
             href="/"
-            className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors w-full sm:w-auto text-center shrink-0"
+            className="px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors w-full sm:w-auto text-center shrink-0"
           >
             Back
           </a>
@@ -348,10 +348,10 @@ export default function FontInspector() {
             dragOver ? "border-[#B8963E] bg-[#B8963E]/5" : "border-neutral-700"
           } p-4 sm:p-6 lg:p-8 sm:p-12 text-center cursor-pointer transition-colors hover:border-neutral-500`}
         >
-          <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-neutral-500 mb-2">
+          <p className="font-mono text-xs sm:text-sm uppercase tracking-[0.2em] text-neutral-500 mb-2">
             Drop a font file here
           </p>
-          <p className="text-[10px] sm:text-xs text-neutral-600">
+          <p className="text-sm text-neutral-400">
             .ttf, .otf, .woff, .woff2 -- or click to browse
           </p>
           <input
@@ -392,7 +392,7 @@ export default function FontInspector() {
                     key={label}
                     className="border border-neutral-800 bg-neutral-950/50 p-3 sm:p-4"
                   >
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-600 mb-1">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-600 mb-1">
                       {label}
                     </p>
                     <p className="text-xs sm:text-sm text-neutral-200 font-mono truncate">{value}</p>
@@ -433,7 +433,7 @@ export default function FontInspector() {
               </h2>
               <div className="border border-neutral-800 bg-neutral-950/50">
                 <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 border-b border-neutral-800">
-                  <label className="text-xs font-mono uppercase tracking-widest text-neutral-600 shrink-0">
+                  <label className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-600 shrink-0">
                     Size
                   </label>
                   <input
@@ -546,7 +546,7 @@ export default function FontInspector() {
                       </div>
                       <button
                         onClick={() => updateAxis(a.tag, a.default)}
-                        className="text-[10px] font-mono uppercase tracking-wider text-neutral-600 hover:text-[#B8963E] mt-1 transition-colors"
+                        className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] mt-1 transition-colors"
                       >
                         Reset to {a.default}
                       </button>
@@ -587,7 +587,7 @@ export default function FontInspector() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

@@ -73,7 +73,17 @@ pre {
 
 h1, h2, h3, h4 {
   font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  /* Weight and tracking are canon, not per-page opt-ins: a Playfair 400
+     heading beside a Playfair 700 heading reads as two different faces. */
+  font-weight: 700;
   text-wrap: balance;
+}
+h1, h2 {
+  letter-spacing: -0.02em; /* display sizes want the tight track */
+  color: #f2f2f2;
+}
+h3, h4 {
+  color: #ededed;
 }
 
 /* The class forms pages already use — real utilities now, mapped to the

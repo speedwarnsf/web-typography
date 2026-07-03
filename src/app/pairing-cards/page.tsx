@@ -463,7 +463,7 @@ h1, h2, h3 {
           <button
             onClick={generateBoth}
             disabled={generating}
-            className="border border-[#B8963E] bg-[#B8963E]/10 px-4 sm:px-6 py-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors disabled:opacity-50"
+            className="border border-[#B8963E] bg-[#B8963E]/10 px-4 sm:px-6 py-2 text-[10px] sm:text-xs font-mono uppercase tracking-[0.2em] text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors disabled:opacity-50"
           >
             {generating ? "Generating..." : "Generate Cards"}
           </button>
@@ -476,7 +476,7 @@ h1, h2, h3 {
           <FontSearch label="Heading Font" value={heading} onChange={setHeading} />
           <FontSearch label="Body Font" value={body} onChange={setBody} />
 
-          <div className="flex gap-3 text-[10px] font-mono uppercase tracking-widest">
+          <div className="flex gap-3 text-[10px] font-mono uppercase tracking-[0.2em]">
             <a
               href={googleFontsUrl(heading)}
               target="_blank"
@@ -511,7 +511,7 @@ h1, h2, h3 {
               <button
                 type="button"
                 onClick={() => { setHColor(""); setBColor(""); }}
-                className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] transition-colors"
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] transition-colors"
               >
                 Reset to unified color
               </button>
@@ -531,7 +531,7 @@ h1, h2, h3 {
               <button
                 type="button"
                 onClick={() => setUseCustomText(!useCustomText)}
-                className="font-mono text-[10px] uppercase tracking-widest text-[#B8963E] hover:underline"
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#B8963E] hover:underline"
               >
                 {useCustomText ? "Use Default" : "Custom Text"}
               </button>
@@ -614,7 +614,7 @@ h1, h2, h3 {
               style={{ borderColor: `#${fg}22` }}
             >
               <p
-                className="font-mono uppercase tracking-widest"
+                className="font-mono uppercase tracking-[0.2em]"
                 style={{ fontSize: "10px", color: `#${fg}44` }}
               >
                 {heading} {hSize}px / {body} {bSize}px / Leading {leading}
@@ -639,13 +639,13 @@ h1, h2, h3 {
                     <div className="flex gap-2">
                       <button
                         onClick={() => downloadImage(img.dataUrl, img.label)}
-                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
                       >
                         Download
                       </button>
                       <button
                         onClick={() => shareImage(img.dataUrl, img.label)}
-                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                        className="border border-neutral-700 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
                       >
                         Share
                       </button>
@@ -672,7 +672,7 @@ h1, h2, h3 {
                   </p>
                   <button
                     onClick={() => setShowCode(!showCode)}
-                    className="font-mono text-[10px] uppercase tracking-widest text-[#B8963E] hover:underline"
+                    className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#B8963E] hover:underline"
                   >
                     {showCode ? "Hide Code" : "Show Code"}
                   </button>
@@ -709,7 +709,7 @@ h1, h2, h3 {
                         setCopiedField("all");
                         setTimeout(() => setCopiedField(""), 2000);
                       }}
-                      className="w-full border border-[#B8963E] bg-[#B8963E]/10 px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors"
+                      className="w-full border border-[#B8963E] bg-[#B8963E]/10 px-4 py-2.5 text-[10px] font-mono uppercase tracking-[0.2em] text-[#B8963E] hover:bg-[#B8963E]/20 transition-colors"
                     >
                       {copiedField === "all" ? "Copied to clipboard" : "Share All Code"}
                     </button>

@@ -93,7 +93,7 @@ function CopyBtn({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="px-3 sm:px-4 py-2 text-xs font-mono tracking-wider uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200 shrink-0"
+      className="px-3 sm:px-4 py-2 text-xs font-mono tracking-[0.2em] uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200 shrink-0"
     >
       {copied ? "Copied" : "Copy CSS"}
     </button>
@@ -206,7 +206,7 @@ export default function ClampPage() {
             <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setScaleMode(true)}
-                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${
+                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border transition-colors ${
                   scaleMode
                     ? "border-[#B8963E] text-[#B8963E] bg-[#B8963E]/10"
                     : "border-neutral-700 text-neutral-500 hover:border-neutral-500"
@@ -216,7 +216,7 @@ export default function ClampPage() {
               </button>
               <button
                 onClick={() => setScaleMode(false)}
-                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-widest border transition-colors ${
+                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border transition-colors ${
                   !scaleMode
                     ? "border-[#B8963E] text-[#B8963E] bg-[#B8963E]/10"
                     : "border-neutral-700 text-neutral-500 hover:border-neutral-500"
@@ -245,7 +245,7 @@ export default function ClampPage() {
               <div className="flex gap-4 mb-6 flex-wrap">
                 <button
                   onClick={() => setUnit("px")}
-                  className={`px-3 py-1 text-xs font-mono uppercase tracking-widest border transition-colors ${
+                  className={`px-3 py-1 text-xs font-mono uppercase tracking-[0.2em] border transition-colors ${
                     unit === "px"
                       ? "border-[#B8963E] text-[#B8963E]"
                       : "border-neutral-700 text-neutral-500"
@@ -255,7 +255,7 @@ export default function ClampPage() {
                 </button>
                 <button
                   onClick={() => setUnit("rem")}
-                  className={`px-3 py-1 text-xs font-mono uppercase tracking-widest border transition-colors ${
+                  className={`px-3 py-1 text-xs font-mono uppercase tracking-[0.2em] border transition-colors ${
                     unit === "rem"
                       ? "border-[#B8963E] text-[#B8963E]"
                       : "border-neutral-700 text-neutral-500"
@@ -413,7 +413,7 @@ export default function ClampPage() {
                   return (
                     <div key={s.label} className="border-b border-neutral-800/50 pb-4 last:border-0 last:pb-0">
                       <div className="flex items-baseline gap-3 mb-1">
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 w-12 shrink-0">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 w-12 shrink-0">
                           {s.label}
                         </span>
                         <span className="font-mono text-[10px] text-neutral-700">
@@ -532,7 +532,7 @@ export default function ClampPage() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

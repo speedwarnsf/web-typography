@@ -248,7 +248,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   16px minimum for body text on screens (WCAG 2.1)
                 </p>
               </div>
@@ -274,7 +274,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   1.5-1.7 optimal for body text (Ling & van Schaik, 2007)
                 </p>
               </div>
@@ -300,7 +300,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   45-75 characters per line optimal (Bringhurst, Elements of
                   Typographic Style)
                 </p>
@@ -327,7 +327,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   Slight positive tracking improves readability at small sizes
                   (Arditi & Cho, 2005)
                 </p>
@@ -354,7 +354,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   Increased word spacing aids readers with dyslexia (Zorzi et
                   al., 2012)
                 </p>
@@ -381,7 +381,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   Regular weight (400) optimal for extended reading
                 </p>
               </div>
@@ -410,7 +410,7 @@ const cleanup = smoothRag(element);
                   }
                   className="w-full accent-[#B8963E]"
                 />
-                <p className="text-xs text-neutral-500 mt-2 font-source-sans">
+                <p className="text-sm text-neutral-400 mt-2 font-source-sans">
                   Adequate paragraph spacing improves text navigation
                 </p>
               </div>
@@ -474,6 +474,7 @@ const cleanup = smoothRag(element);
               >
                 <div
                   ref={previewRef}
+          data-type-demo
                   style={{
                     fontSize: `${settings.fontSize}px`,
                     lineHeight: settings.lineHeight,

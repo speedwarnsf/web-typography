@@ -385,14 +385,14 @@ export default function TypeSpecimenGenerator() {
           <div className="flex gap-2">
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`px-4 py-2 text-xs font-mono uppercase tracking-wider border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors`}
+              className={`px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors`}
               style={{ borderRadius: 0 }}
             >
               {isDarkMode ? "Light" : "Dark"}
             </button>
             <a
               href="/"
-              className={`px-4 py-2 text-xs font-mono uppercase tracking-wider border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors text-center`}
+              className={`px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors text-center`}
               style={{ borderRadius: 0 }}
             >
               Back
@@ -417,10 +417,10 @@ export default function TypeSpecimenGenerator() {
             } p-4 sm:p-6 lg:p-8 sm:p-12 text-center cursor-pointer transition-colors ${isDarkMode ? "hover:border-neutral-500" : "hover:border-neutral-400"}`}
             style={{ borderRadius: 0 }}
           >
-            <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-[#B8963E] mb-2">
+            <p className="font-mono text-xs sm:text-sm uppercase tracking-[0.2em] text-[#B8963E] mb-2">
               Drop a font file here
             </p>
-            <p className={`text-[10px] sm:text-xs ${isDarkMode ? "text-neutral-600" : "text-neutral-500"}`}>
+            <p className={`text-sm ${isDarkMode ? "text-neutral-400" : "text-neutral-500"}`}>
               .ttf, .otf, .woff, .woff2 -- or click to browse
             </p>
             <input
@@ -435,7 +435,7 @@ export default function TypeSpecimenGenerator() {
           <div className="text-center">
             <button
               onClick={() => setShowGoogleFonts(!showGoogleFonts)}
-              className={`px-4 py-2 text-xs font-mono uppercase tracking-wider border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors`}
+              className={`px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border ${borderClass} ${isDarkMode ? "text-neutral-400" : "text-neutral-600"} hover:border-[#B8963E] hover:text-[#B8963E] transition-colors`}
               style={{ borderRadius: 0 }}
             >
               {showGoogleFonts ? "Hide" : "Select"} Google Fonts
@@ -479,16 +479,16 @@ export default function TypeSpecimenGenerator() {
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-1">Designer</p>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Designer</p>
                     <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.designer}</p>
                   </div>
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-1">Version</p>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Version</p>
                     <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.version}</p>
                   </div>
                   {fontData.meta.glyphCount > 0 && (
                     <div>
-                      <p className="font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-1">Glyphs</p>
+                      <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Glyphs</p>
                       <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.glyphCount}</p>
                     </div>
                   )}
@@ -557,7 +557,7 @@ export default function TypeSpecimenGenerator() {
               <div className="space-y-6">
                 {[14, 16, 18].map((size) => (
                   <div key={size} className={`border ${borderClass} ${cardBgClass} p-4 sm:p-6 sm:p-8`} style={{ borderRadius: 0 }}>
-                    <div className={`font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-4`}>
+                    <div className={`font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-4`}>
                       {size}px / {Math.round(size * 1.6)}px leading
                     </div>
                     <p
@@ -683,7 +683,7 @@ export default function TypeSpecimenGenerator() {
               <div className="flex justify-center">
                 <button
                   onClick={exportHTML}
-                  className="px-6 py-3 text-sm font-mono uppercase tracking-wider bg-[#B8963E] text-[#0a0a0a] hover:bg-[#d4aa47] transition-colors"
+                  className="px-6 py-3 text-sm font-mono uppercase tracking-[0.2em] bg-[#B8963E] text-[#0a0a0a] hover:bg-[#d4aa47] transition-colors"
                   style={{ borderRadius: 0 }}
                 >
                   Export as HTML
@@ -713,7 +713,7 @@ export default function TypeSpecimenGenerator() {
 
       {/* Footer */}
       <footer className={`border-t ${borderClass} py-12 text-center mt-16`}>
-        <p className={`font-mono text-xs uppercase tracking-widest ${isDarkMode ? "text-neutral-600" : "text-neutral-500"}`}>
+        <p className={`font-mono text-xs uppercase tracking-[0.2em] ${isDarkMode ? "text-neutral-600" : "text-neutral-500"}`}>
           Built with care for the craft of typography
         </p>
       </footer>

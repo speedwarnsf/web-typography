@@ -490,7 +490,7 @@ export default function DNAPage() {
           <div className="flex gap-0 border border-neutral-800 w-fit">
             <button
               onClick={() => setInputMode('url')}
-              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors border-r border-neutral-800 ${
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-[0.2em] transition-colors border-r border-neutral-800 ${
                 inputMode === 'url'
                   ? 'bg-[#B8963E]/10 text-[#B8963E]'
                   : 'text-neutral-500 hover:text-neutral-300'
@@ -500,7 +500,7 @@ export default function DNAPage() {
             </button>
             <button
               onClick={() => setInputMode('html')}
-              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-[0.2em] transition-colors ${
                 inputMode === 'html'
                   ? 'bg-[#B8963E]/10 text-[#B8963E]'
                   : 'text-neutral-500 hover:text-neutral-300'

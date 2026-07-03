@@ -179,7 +179,7 @@ function CopyBtn({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="px-3 py-1 text-xs font-mono tracking-wider uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200 shrink-0"
+      className="px-3 py-1 text-xs font-mono tracking-[0.2em] uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200 shrink-0"
     >
       {copied ? "Copied" : "Copy"}
     </button>
@@ -355,7 +355,7 @@ function FontPanel({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsAnimating(!isAnimating)}
-              className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono tracking-wider uppercase border transition-colors duration-200 ${
+              className={`flex-1 sm:flex-none px-4 py-2 text-xs font-mono tracking-[0.2em] uppercase border transition-colors duration-200 ${
                 isAnimating
                   ? "border-[#B8963E] bg-[#B8963E] text-black"
                   : "border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E]"
@@ -365,7 +365,7 @@ function FontPanel({
             </button>
             <button
               onClick={resetAxes}
-              className="flex-1 sm:flex-none px-4 py-2 text-xs font-mono tracking-wider uppercase border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors duration-200"
+              className="flex-1 sm:flex-none px-4 py-2 text-xs font-mono tracking-[0.2em] uppercase border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors duration-200"
             >
               Reset
             </button>
@@ -376,7 +376,7 @@ function FontPanel({
       <div className="flex flex-col lg:flex-row">
         {/* Axis Controls */}
         <div className="w-full lg:w-[360px] shrink-0 border-b lg:border-b-0 lg:border-r border-neutral-800 p-4 sm:p-6 overflow-y-auto max-h-[400px] lg:max-h-[600px]">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 mb-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 mb-4">
             Variation Axes
           </p>
           {font.axes.map((axis) => (
@@ -415,7 +415,7 @@ function FontPanel({
               <button
                 key={mode}
                 onClick={() => setPreviewMode(mode)}
-                className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${
+                className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] transition-colors ${
                   previewMode === mode
                     ? "bg-[#B8963E] text-black"
                     : "text-neutral-500 hover:text-neutral-300"
@@ -587,7 +587,7 @@ export default function VariableFontsPage() {
           Manipulate variation axes in{"\u00A0"}real time. Animate between{"\u00A0"}extremes.
           Compare{"\u00A0"}configurations. Generate production-ready{"\u00A0"}CSS.
         </p>
-        <div className="mt-12 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+        <div className="mt-12 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-600">
           <a href="/" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Home</a>
           <a href="/pairing-cards" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Builder</a>
           <a href="/clamp" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Clamp</a>
@@ -611,7 +611,7 @@ export default function VariableFontsPage() {
           </div>
           <button
             onClick={() => setShowComparison(!showComparison)}
-            className={`px-4 py-2 text-xs font-mono tracking-wider uppercase border transition-colors duration-200 w-full sm:w-auto ${
+            className={`px-4 py-2 text-xs font-mono tracking-[0.2em] uppercase border transition-colors duration-200 w-full sm:w-auto ${
               showComparison
                 ? "border-[#B8963E] bg-[#B8963E] text-black"
                 : "border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E]"
@@ -748,7 +748,7 @@ export default function VariableFontsPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-neutral-800 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

@@ -17,7 +17,7 @@ function DownloadButton({ code, filename }: { code: string; filename: string }) 
   return (
     <button
       onClick={handleDownload}
-      className="px-3 py-1 text-xs font-mono tracking-wider uppercase border border-neutral-700 text-neutral-500 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors duration-200"
+      className="px-3 py-1 text-xs font-mono tracking-[0.2em] uppercase border border-neutral-700 text-neutral-500 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors duration-200"
       style={{ borderRadius: 0 }}
     >
       Download
@@ -59,7 +59,7 @@ export default function CodeBlock({
           >
             <path d="M4 1l5 5-5 5V1z" />
           </svg>
-          <span className="text-xs font-mono uppercase tracking-widest text-neutral-500">
+          <span className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-500">
             {title || "Code"}
           </span>
         </div>

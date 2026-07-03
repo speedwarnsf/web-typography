@@ -16,7 +16,7 @@ function CopyBtn({ text, label = "Copy" }: { text: string; label?: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="px-3 py-1 text-xs font-mono tracking-wider uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200"
+      className="px-3 py-1 text-xs font-mono tracking-[0.2em] uppercase border border-[#B8963E] text-[#B8963E] hover:bg-[#B8963E] hover:text-black transition-colors duration-200"
       style={{ borderRadius: 0 }}
     >
       {copied ? "Copied" : label}
@@ -92,12 +92,12 @@ function AnimationCard({
     <div className="border border-neutral-800 bg-neutral-950/50" style={{ borderRadius: 0 }}>
       <div className="p-6 sm:p-8 border-b border-neutral-800">
         <div className="flex items-start justify-between mb-1">
-          <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
             {category}
           </p>
           <button
             onClick={() => setReplayKey(k => k + 1)}
-            className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] transition-colors border border-neutral-800 px-2 py-1 hover:border-[#B8963E]"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] transition-colors border border-neutral-800 px-2 py-1 hover:border-[#B8963E]"
           >
             Replay
           </button>
@@ -117,11 +117,11 @@ function AnimationCard({
         {/* Taste guidance */}
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <div className="p-3 bg-neutral-900 border border-neutral-800">
-            <p className="font-mono text-xs uppercase tracking-widest text-[#B8963E] mb-1">When to use</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">When to use</p>
             <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)", hyphens: "none", overflowWrap: "break-word" } as React.CSSProperties}>{when}</p>
           </div>
           <div className="p-3 bg-neutral-900 border border-neutral-800">
-            <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-1">When not to</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600 mb-1">When not to</p>
             <p className="text-neutral-400" style={{ fontFamily: "var(--font-source-sans)", hyphens: "none", overflowWrap: "break-word" } as React.CSSProperties}>{whenNot}</p>
           </div>
         </div>
@@ -141,13 +141,13 @@ function AnimationCard({
             >
               <path d="M4 1l5 5-5 5V1z" />
             </svg>
-            <span className="text-xs font-mono uppercase tracking-widest text-neutral-500">Code</span>
+            <span className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-500">Code</span>
           </div>
           {codeOpen && (
             <div className="flex ml-auto" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setTab("css")}
-                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] transition-colors ${
                   tab === "css" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
                 }`}
               >
@@ -155,7 +155,7 @@ function AnimationCard({
               </button>
               <button
                 onClick={() => setTab("react")}
-                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors ${
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] transition-colors ${
                   tab === "react" ? "text-[#B8963E] border-b border-[#B8963E]" : "text-neutral-600 hover:text-neutral-400"
                 }`}
               >
@@ -293,13 +293,13 @@ const FONT_OPTIONS = [
 function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange: (s: ResolvedStyle) => void }) {
   return (
     <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
-      <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-4">
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600 mb-4">
         Target Style (resolved form)
       </p>
 
       {/* Text input */}
       <div className="flex items-center gap-4 mb-4">
-        <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Text</label>
+        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Text</label>
         <input
           type="text"
           value={style.text}
@@ -314,7 +314,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Font family */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Font</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Font</label>
           <FontSelect
             options={FONT_OPTIONS.map(f => ({
               label: f.label,
@@ -332,7 +332,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
 
         {/* Weight */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Weight</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Weight</label>
           <input
             type="range" min={100} max={900} step={100} value={style.fontWeight}
             onChange={(e) => onChange({ ...style, fontWeight: parseInt(e.target.value) })}
@@ -343,7 +343,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
 
         {/* Size */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Size</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Size</label>
           <input
             type="range" min={14} max={72} value={style.fontSize}
             onChange={(e) => onChange({ ...style, fontSize: parseInt(e.target.value) })}
@@ -354,7 +354,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
 
         {/* Color */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Color</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Color</label>
           <input
             type="color" value={style.color}
             onChange={(e) => onChange({ ...style, color: e.target.value })}
@@ -366,13 +366,13 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
 
         {/* Case */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Case</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Case</label>
           <div className="flex gap-2">
             {(["none", "uppercase", "lowercase"] as const).map(tt => (
               <button
                 key={tt}
                 onClick={() => onChange({ ...style, textTransform: tt })}
-                className={`px-2 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${
+                className={`px-2 py-1 text-[10px] font-mono uppercase tracking-[0.2em] border transition-colors ${
                   style.textTransform === tt ? "border-[#B8963E] text-[#B8963E]" : "border-neutral-800 text-neutral-600 hover:text-neutral-400"
                 }`}
                 style={{ borderRadius: 0 }}
@@ -385,7 +385,7 @@ function TargetStylePicker({ style, onChange }: { style: ResolvedStyle; onChange
 
         {/* Letter spacing */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20 shrink-0">Spacing</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20 shrink-0">Spacing</label>
           <input
             type="range" min={-2} max={20} value={style.letterSpacing}
             onChange={(e) => onChange({ ...style, letterSpacing: parseInt(e.target.value) })}
@@ -422,13 +422,13 @@ function ChaosControlsPanel({ speed, onSpeedChange, regularity, onRegularityChan
   const speedLabels = ["", "Glacial", "Slow", "Gentle", "Easy", "Medium", "Quick", "Fast", "Rapid", "Frantic", "Insane"];
   return (
     <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
-      <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-4">
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600 mb-4">
         Chaos Controls
       </p>
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Speed */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-24 shrink-0">Speed</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-24 shrink-0">Speed</label>
           <input
             type="range" min={1} max={10} value={speed}
             onChange={(e) => onSpeedChange(parseInt(e.target.value))}
@@ -439,7 +439,7 @@ function ChaosControlsPanel({ speed, onSpeedChange, regularity, onRegularityChan
 
         {/* Regularity */}
         <div className="flex items-center gap-3">
-          <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-24 shrink-0">Regularity</label>
+          <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-24 shrink-0">Regularity</label>
           <input
             type="range" min={0} max={100} value={regularity}
             onChange={(e) => onRegularityChange(parseInt(e.target.value))}
@@ -458,7 +458,7 @@ function ChaosControlsPanel({ speed, onSpeedChange, regularity, onRegularityChan
         {lockedCount > 0 && (
           <button
             onClick={onUnlockAll}
-            className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
             style={{ borderRadius: 0 }}
           >
             Unlock all
@@ -501,13 +501,13 @@ function ColorPaletteBuilder({ colors, onChange }: { colors: string[]; onChange:
   return (
     <div className="mb-12 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <div className="flex items-center justify-between mb-4">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Color Palette ({colors.length} color{colors.length !== 1 ? "s" : ""})
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => { setMode("mono"); handleMono(baseColor, shadeCount); }}
-            className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${
+            className={`px-3 py-1 text-[10px] font-mono uppercase tracking-[0.2em] border transition-colors ${
               mode === "mono" ? "border-[#B8963E] text-[#B8963E]" : "border-neutral-800 text-neutral-600 hover:text-neutral-400"
             }`}
             style={{ borderRadius: 0 }}
@@ -516,7 +516,7 @@ function ColorPaletteBuilder({ colors, onChange }: { colors: string[]; onChange:
           </button>
           <button
             onClick={() => { setMode("custom"); if (colors.length < 2) onChange(DEFAULT_COLORS); }}
-            className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${
+            className={`px-3 py-1 text-[10px] font-mono uppercase tracking-[0.2em] border transition-colors ${
               mode === "custom" ? "border-[#B8963E] text-[#B8963E]" : "border-neutral-800 text-neutral-600 hover:text-neutral-400"
             }`}
             style={{ borderRadius: 0 }}
@@ -529,7 +529,7 @@ function ColorPaletteBuilder({ colors, onChange }: { colors: string[]; onChange:
       {mode === "mono" ? (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20">Base</label>
+            <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20">Base</label>
             <input
               type="color"
               value={baseColor}
@@ -546,7 +546,7 @@ function ColorPaletteBuilder({ colors, onChange }: { colors: string[]; onChange:
             />
           </div>
           <div className="flex items-center gap-4">
-            <label className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20">Shades</label>
+            <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 w-20">Shades</label>
             <input
               type="range"
               min={1}
@@ -803,7 +803,7 @@ function LetterSpacingDemo() {
   return (
     <div className="w-full">
       <p
-        className="text-2xl font-bold uppercase tracking-[0.05em] cursor-pointer select-none"
+        className="text-2xl font-bold uppercase tracking-[0.2em] cursor-pointer select-none"
         style={{
           fontFamily: "var(--font-space-grotesk)",
           transition: "letter-spacing 0.6s ease",
@@ -1434,20 +1434,20 @@ function FontClashPicker({ selected, onChange }: {
   return (
     <div className="mb-6 p-4 sm:p-6 border border-neutral-800 bg-neutral-950/50">
       <div className="flex items-center justify-between mb-4">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Font Mix ({selected.length} selected — min 2)
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => onChange(GOOGLE_FONTS_CLASH.map(f => f.family))}
-            className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
             style={{ borderRadius: 0 }}
           >
             All
           </button>
           <button
             onClick={() => onChange(GOOGLE_FONTS_CLASH.filter(f => f.isSystem).slice(0, 3).map(f => f.family))}
-            className="font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-[#B8963E] border border-neutral-800 hover:border-[#B8963E] px-2 py-0.5 transition-colors"
             style={{ borderRadius: 0 }}
           >
             Reset
@@ -2816,7 +2816,7 @@ function FontClash({ text = "${textVal}" }) {
   return (
     <PaletteContext.Provider value={{ colors }}>
     <ChaosContext.Provider value={chaosControls}>
-      <section id="experimental" className="border-t border-neutral-800">
+      <section id="experimental" data-type-demo className="border-t border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             05 -- Experimental
@@ -2904,7 +2904,7 @@ export default function AnimationsPage() {
           >
             Web Typography
           </a>
-          <nav className="hidden sm:flex gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+          <nav className="hidden sm:flex gap-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-600">
             <a href="/" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Home</a>
             <a href="/pairing-cards" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Builder</a>
             <a href="/animations" className="border border-[#B8963E] px-4 py-2 text-[#B8963E]">Animations</a>
@@ -2930,7 +2930,7 @@ export default function AnimationsPage() {
           17 typography animations -- from tasteful entrances to pure
           combinatorial chaos. Each one outputs copy-paste code.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
+        <div className="mt-8 flex flex-wrap gap-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-600">
           <a href="#entrances" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Entrances</a>
           <a href="#emphasis" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Emphasis</a>
           <a href="#transitions" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Transitions</a>
@@ -2940,7 +2940,7 @@ export default function AnimationsPage() {
       </section>
 
       {/* ── Entrances ── */}
-      <section id="entrances" className="border-t border-neutral-800">
+      <section id="entrances" data-type-demo className="border-t border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             01 -- Entrances
@@ -2994,7 +2994,7 @@ export default function AnimationsPage() {
       </section>
 
       {/* ── Emphasis ── */}
-      <section id="emphasis" className="border-t border-neutral-800">
+      <section id="emphasis" data-type-demo className="border-t border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             02 -- Emphasis
@@ -3048,7 +3048,7 @@ export default function AnimationsPage() {
       </section>
 
       {/* ── Transitions ── */}
-      <section id="transitions" className="border-t border-neutral-800">
+      <section id="transitions" data-type-demo className="border-t border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             03 -- Transitions
@@ -3093,7 +3093,7 @@ export default function AnimationsPage() {
       </section>
 
       {/* ── Scrolling ── */}
-      <section id="scrolling" className="border-t border-neutral-800">
+      <section id="scrolling" data-type-demo className="border-t border-neutral-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-4">
             04 -- Scrolling
@@ -3142,7 +3142,7 @@ export default function AnimationsPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-neutral-800 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

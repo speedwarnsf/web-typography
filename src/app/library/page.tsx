@@ -309,7 +309,7 @@ export default function Home() {
 
                 <div className="space-y-4 mb-8">
                   <div className="border border-red-900/40 bg-red-950/10 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/50 px-6 pt-5 pb-1">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-red-400/50 px-6 pt-5 pb-1">
                       Default
                     </p>
                     <div className="px-6 py-6">
@@ -322,7 +322,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="border border-emerald-900/40 bg-emerald-950/10 overflow-hidden">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400/50 px-6 pt-5 pb-1">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-400/50 px-6 pt-5 pb-1">
                       With typeset
                     </p>
                     <div className="px-6 py-6">
@@ -375,13 +375,13 @@ export default function Home() {
                     <div className="p-4 sm:p-6 lg:p-8">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
                         <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-600">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-600">
                             {category.name}
                           </p>
                           <p className="text-sm text-neutral-300 mt-1">
                             {pair.heading} + {pair.body}
                           </p>
-                          <p className="text-xs text-neutral-500 mt-1 italic">
+                          <p className="text-sm text-neutral-400 mt-1 italic">
                             {pair.description}
                           </p>
                         </div>
@@ -455,7 +455,7 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className="my-4 bg-black/65 backdrop-blur-sm mx-3 sm:mx-6 lg:mx-12 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

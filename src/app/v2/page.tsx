@@ -17,12 +17,12 @@ const HERO_TEXT = 'The web finally knows how to break lines.';
 const HERO_SUB =
   'Forty years after print solved it, the browser catches up. Knuth’s mathematics, Tschichold’s tolerances, Bringhurst’s measures — running live on every paragraph of this page.';
 
-// Chosen empirically: across 250-345px, the browser strands a word or
-// abandons an orphan at 12 of 16 widths on this paragraph; the engine
-// never does, and uses equal-or-fewer lines at half of them. The text
-// also argues its own case in civilian language.
+// Chosen empirically FOR THE SITE'S BODY FACE (Source Sans 1.0625rem/1.7):
+// across 250-334px the browser strands an article at 7 of 8 widths on this
+// paragraph; the engine never does, and the line counts TIE from 262-298px
+// — same words, same space. The text argues its own case in civilian words.
 const PROOF_TEXT =
-  'The rag is a feature, not a flaw. The irregular right edge gives the eye a lattice of landmarks to hold its place. But a lattice is built, not left to chance -- and chance is all the browser has ever offered your reader.';
+  'Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 
 const MANIFESTO_TEXT =
   'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing -- visible in a glance, impossible to fake.';
@@ -300,9 +300,10 @@ const FLAW_CAPTIONS: Record<WorstFlaw['kind'], (w: string) => string> = {
 
 function ProofStage({ reduced }: { reduced: boolean }) {
   const [mode, setMode] = useState<'typeset' | 'browser'>('typeset');
-  // 274 default: measured sweet spot — the book uses the SAME number of
-  // lines as the browser here, and the browser strands a word anyway.
-  const [width, setWidth] = useState(274);
+  // 286 default: measured sweet spot in the body face — the book uses the
+  // SAME number of lines as the browser here, and the browser strands a
+  // word anyway.
+  const [width, setWidth] = useState(286);
   const [maxWidth, setMaxWidth] = useState(340);
   const [stats, setStats] = useState<{ b: PanelStats; t: PanelStats } | null>(null);
   const [callout, setCallout] = useState<{ top: number; left: number; text: string } | null>(null);
@@ -863,8 +864,10 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   grid-area: 1/1;
   position: absolute; top: 0; left: 0;
   margin: 0; padding: 0;
-  font-family: Georgia, serif;
-  font-size: 17px; line-height: 1.68; color: #d6d6d6;
+  /* The site's own body voice — the comparison is OUR reading text,
+     browser-wrapped vs engine-composed. No foreign faces in the chrome. */
+  font-family: var(--font-source-sans), 'Source Sans 3', sans-serif;
+  font-size: 1.0625rem; line-height: 1.7; color: #c9c9c9;
   transition: opacity .34s ease, transform .38s cubic-bezier(.2,.7,.2,1);
   backface-visibility: hidden;
 }
@@ -949,12 +952,13 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 
 /* ── Manifesto ── */
 .v2-manifesto {
-  font-family: var(--font-playfair), Georgia, serif;
-  font-size: clamp(1.25rem, 2.6vw, 1.8rem);
-  line-height: 1.66;
-  letter-spacing: .015em;
-  color: #dcdcdc;
-  max-width: 34ch;
+  /* Body voice, per the audit (and Dustin's eye): the manifesto is
+     reading text, not display — one register up from body, same face. */
+  font-family: var(--font-source-sans), 'Source Sans 3', sans-serif;
+  font-size: clamp(1.15rem, 2vw, 1.3rem);
+  line-height: 1.75;
+  color: #c9c9c9;
+  max-width: 52ch;
   margin: 26px 0 0;
 }
 /* Display type breathes: the engine's word-spacing contraction is tuned

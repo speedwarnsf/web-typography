@@ -396,7 +396,7 @@ export default function RhetoricPage() {
               fill="#B8963E"
               fontSize="16"
               fontFamily="monospace"
-              className="uppercase tracking-wider"
+              className="uppercase tracking-[0.2em]"
             >
               ETHOS
             </text>
@@ -407,7 +407,7 @@ export default function RhetoricPage() {
               fill="#B8963E"
               fontSize="16"
               fontFamily="monospace"
-              className="uppercase tracking-wider"
+              className="uppercase tracking-[0.2em]"
             >
               PATHOS
             </text>
@@ -418,7 +418,7 @@ export default function RhetoricPage() {
               fill="#B8963E"
               fontSize="16"
               fontFamily="monospace"
-              className="uppercase tracking-wider"
+              className="uppercase tracking-[0.2em]"
             >
               LOGOS
             </text>
@@ -492,7 +492,7 @@ export default function RhetoricPage() {
           </h3>
           <div className="grid sm:grid-cols-3 gap-6 text-sm leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
             <div>
-              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-wider mb-2">
+              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-[0.2em] mb-2">
                 Ethos (Credibility)
               </p>
               <p className="text-neutral-400">
@@ -501,7 +501,7 @@ export default function RhetoricPage() {
               </p>
             </div>
             <div>
-              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-wider mb-2">
+              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-[0.2em] mb-2">
                 Pathos (Emotion)
               </p>
               <p className="text-neutral-400">
@@ -510,7 +510,7 @@ export default function RhetoricPage() {
               </p>
             </div>
             <div>
-              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-wider mb-2">
+              <p className="text-[#B8963E] font-mono uppercase text-xs tracking-[0.2em] mb-2">
                 Logos (Logic)
               </p>
               <p className="text-neutral-400">
@@ -563,7 +563,7 @@ export default function RhetoricPage() {
               <div className="space-y-2 mb-4">
                 <div>
                   <div className="flex justify-between text-xs text-neutral-500 mb-1">
-                    <span className="font-mono uppercase tracking-wider">Ethos</span>
+                    <span className="font-mono uppercase tracking-[0.2em]">Ethos</span>
                     <span>{font.ethos}</span>
                   </div>
                   <div className="w-full bg-neutral-800 h-1">
@@ -575,7 +575,7 @@ export default function RhetoricPage() {
                 </div>
                 <div>
                   <div className="flex justify-between text-xs text-neutral-500 mb-1">
-                    <span className="font-mono uppercase tracking-wider">Pathos</span>
+                    <span className="font-mono uppercase tracking-[0.2em]">Pathos</span>
                     <span>{font.pathos}</span>
                   </div>
                   <div className="w-full bg-neutral-800 h-1">
@@ -587,7 +587,7 @@ export default function RhetoricPage() {
                 </div>
                 <div>
                   <div className="flex justify-between text-xs text-neutral-500 mb-1">
-                    <span className="font-mono uppercase tracking-wider">Logos</span>
+                    <span className="font-mono uppercase tracking-[0.2em]">Logos</span>
                     <span>{font.logos}</span>
                   </div>
                   <div className="w-full bg-neutral-800 h-1">
@@ -603,14 +603,14 @@ export default function RhetoricPage() {
                 {font.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[9px] font-mono uppercase tracking-wider px-2 py-1 bg-neutral-900 text-neutral-500 border border-neutral-800"
+                    className="text-[9px] font-mono uppercase tracking-[0.2em] px-2 py-1 bg-neutral-900 text-neutral-500 border border-neutral-800"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
 
-              <p className="text-xs text-neutral-500 italic">{font.bestFor}</p>
+              <p className="text-sm text-neutral-400 italic">{font.bestFor}</p>
             </div>
           ))}
         </div>
@@ -627,7 +627,7 @@ export default function RhetoricPage() {
             </h2>
             <button
               onClick={() => setSelectedFonts([])}
-              className="text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+              className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-500 hover:text-[#B8963E] transition-colors"
             >
               Clear Selection
             </button>
@@ -650,19 +650,19 @@ export default function RhetoricPage() {
                 </p>
                 <div className="grid grid-cols-3 gap-4 text-xs">
                   <div>
-                    <span className="text-neutral-500 font-mono uppercase tracking-wider">
+                    <span className="text-neutral-500 font-mono uppercase tracking-[0.2em]">
                       Ethos:
                     </span>{" "}
                     <span className="text-neutral-300">{font.ethos}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-500 font-mono uppercase tracking-wider">
+                    <span className="text-neutral-500 font-mono uppercase tracking-[0.2em]">
                       Pathos:
                     </span>{" "}
                     <span className="text-neutral-300">{font.pathos}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-500 font-mono uppercase tracking-wider">
+                    <span className="text-neutral-500 font-mono uppercase tracking-[0.2em]">
                       Logos:
                     </span>{" "}
                     <span className="text-neutral-300">{font.logos}</span>
@@ -799,7 +799,7 @@ export default function RhetoricPage() {
               </div>
               <button
                 onClick={() => setWizardStep(0)}
-                className="mt-4 text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+                className="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-neutral-500 hover:text-[#B8963E] transition-colors"
               >
                 ← Back
               </button>
@@ -837,7 +837,7 @@ export default function RhetoricPage() {
               </div>
               <button
                 onClick={() => setWizardStep(1)}
-                className="mt-4 text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+                className="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-neutral-500 hover:text-[#B8963E] transition-colors"
               >
                 ← Back
               </button>
@@ -855,7 +855,7 @@ export default function RhetoricPage() {
                 </h3>
                 <button
                   onClick={resetWizard}
-                  className="text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+                  className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-500 hover:text-[#B8963E] transition-colors"
                 >
                   Start Over
                 </button>
@@ -868,7 +868,7 @@ export default function RhetoricPage() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="text-xs font-mono text-[#B8963E] uppercase tracking-wider mb-1">
+                        <p className="text-xs font-mono text-[#B8963E] uppercase tracking-[0.2em] mb-1">
                           #{idx + 1} Recommendation
                         </p>
                         <h4
@@ -906,7 +906,7 @@ export default function RhetoricPage() {
                       {font.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="text-[9px] font-mono uppercase tracking-wider px-2 py-1 bg-neutral-800 text-neutral-400"
+                          className="text-[9px] font-mono uppercase tracking-[0.2em] px-2 py-1 bg-neutral-800 text-neutral-400"
                         >
                           {tag}
                         </span>
@@ -989,15 +989,15 @@ export default function RhetoricPage() {
               </p>
               <div className="mt-4 flex gap-8 text-xs text-neutral-500">
                 <div>
-                  <span className="font-mono uppercase tracking-wider">Ethos:</span>{" "}
+                  <span className="font-mono uppercase tracking-[0.2em]">Ethos:</span>{" "}
                   {font.ethos}
                 </div>
                 <div>
-                  <span className="font-mono uppercase tracking-wider">Pathos:</span>{" "}
+                  <span className="font-mono uppercase tracking-[0.2em]">Pathos:</span>{" "}
                   {font.pathos}
                 </div>
                 <div>
-                  <span className="font-mono uppercase tracking-wider">Logos:</span>{" "}
+                  <span className="font-mono uppercase tracking-[0.2em]">Logos:</span>{" "}
                   {font.logos}
                 </div>
               </div>
@@ -1038,7 +1038,7 @@ export default function RhetoricPage() {
       </section>
 
       <footer className="border-t border-neutral-800 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           typeset.us
         </p>
       </footer>

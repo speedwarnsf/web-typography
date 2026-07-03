@@ -217,7 +217,7 @@ export default function AboutPage() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 mt-24 py-12 text-center">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>

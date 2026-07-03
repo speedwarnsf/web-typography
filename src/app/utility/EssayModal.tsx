@@ -47,7 +47,7 @@ export default function EssayModal() {
         className="relative z-50 pointer-events-auto text-[#B8963E] border-b border-[#B8963E]/30 hover:border-[#B8963E] transition-colors pb-0.5 cursor-pointer text-left inline-flex items-center gap-2"
       >
         Read our essay on its development
-        <span className="text-xs tracking-widest uppercase opacity-60">→</span>
+        <span className="text-xs tracking-[0.2em] uppercase opacity-60">→</span>
       </button>
 
       {isOpen && mounted && typeof document !== "undefined" && createPortal(
@@ -89,7 +89,7 @@ export default function EssayModal() {
                   A practitioner's account of web typography, thirty years on
                 </p>
                 
-                <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-neutral-500 uppercase tracking-widest">
+                <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-neutral-500 uppercase tracking-[0.2em]">
                   <span>By <strong>Dustin York</strong> &amp; <strong>Io</strong></span>
                   <span className="hidden sm:inline">·</span>
                   <span>typeset.us</span>

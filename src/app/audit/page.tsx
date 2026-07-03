@@ -712,7 +712,7 @@ export default function TypographicAudit() {
           </div>
           <a
             href="/"
-            className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors w-full text-center sm:w-auto shrink-0"
+            className="px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors w-full text-center sm:w-auto shrink-0"
           >
             Back
           </a>
@@ -726,7 +726,7 @@ export default function TypographicAudit() {
           <div className="flex gap-0 border border-neutral-800 w-fit">
             <button
               onClick={() => setInputMode("url")}
-              className={`px-3 py-2 font-mono text-xs uppercase tracking-wider transition-colors sm:px-4 ${
+              className={`px-3 py-2 font-mono text-xs uppercase tracking-[0.2em] transition-colors sm:px-4 ${
                 inputMode === "url"
                   ? "bg-[#B8963E]/10 text-[#B8963E] border-r border-neutral-800"
                   : "text-neutral-500 hover:text-neutral-300 border-r border-neutral-800"
@@ -736,7 +736,7 @@ export default function TypographicAudit() {
             </button>
             <button
               onClick={() => setInputMode("html")}
-              className={`px-3 py-2 font-mono text-xs uppercase tracking-wider transition-colors sm:px-4 ${
+              className={`px-3 py-2 font-mono text-xs uppercase tracking-[0.2em] transition-colors sm:px-4 ${
                 inputMode === "html"
                   ? "bg-[#B8963E]/10 text-[#B8963E]"
                   : "text-neutral-500 hover:text-neutral-300"
@@ -774,7 +774,7 @@ export default function TypographicAudit() {
                   </span>
                   <button
                     onClick={loadSample}
-                    className="text-xs font-mono uppercase tracking-wider text-neutral-500 hover:text-[#B8963E] transition-colors"
+                    className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-500 hover:text-[#B8963E] transition-colors"
                   >
                     Load Example
                   </button>
@@ -797,7 +797,7 @@ export default function TypographicAudit() {
             <button
               onClick={handleAnalyze}
               disabled={(inputMode === "url" ? !urlInput.trim() : !input.trim()) || analyzing}
-              className="flex-1 px-4 py-3 border border-[#B8963E] text-[#B8963E] font-mono text-sm uppercase tracking-wider hover:bg-[#B8963E] hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed sm:px-6"
+              className="flex-1 px-4 py-3 border border-[#B8963E] text-[#B8963E] font-mono text-sm uppercase tracking-[0.2em] hover:bg-[#B8963E] hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed sm:px-6"
             >
               {analyzing ? "Fetching & Analyzing\u2026" : "Analyze"}
             </button>
@@ -866,7 +866,7 @@ export default function TypographicAudit() {
               </div>
               <button
                 onClick={exportJSON}
-                className="mt-6 px-4 py-2 text-xs font-mono uppercase tracking-wider border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
+                className="mt-6 px-4 py-2 text-xs font-mono uppercase tracking-[0.2em] border border-neutral-700 text-neutral-400 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors"
               >
                 Export as JSON
               </button>
@@ -910,7 +910,7 @@ export default function TypographicAudit() {
 
                     <div className="p-4 space-y-3">
                       <div>
-                        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-2">Findings</p>
+                        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600 mb-2">Findings</p>
                         <ul className="space-y-1">
                           {check.findings.map((finding, fidx) => (
                             <li key={fidx} className="text-xs text-neutral-400 font-mono break-words sm:text-sm">
@@ -922,7 +922,7 @@ export default function TypographicAudit() {
 
                       {check.fix && (
                         <div>
-                          <p className="font-mono text-xs uppercase tracking-widest text-neutral-600 mb-2">
+                          <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600 mb-2">
                             How to Fix
                           </p>
                           <CodeBlock code={check.fix} />
@@ -939,7 +939,7 @@ export default function TypographicAudit() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 py-8 text-center mt-12 sm:py-12 sm:mt-16">
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-600">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-neutral-600">
           Built with care for the craft of typography
         </p>
       </footer>
