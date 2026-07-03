@@ -18,17 +18,19 @@
 }
 
 html {
-  overflow-x: hidden;
+  /* clip, NOT hidden — hidden makes html/body scroll containers, which
+     silently kills position: sticky site-wide (ARCHITECTURE.md's own
+     CSS-spec gotcha, rediscovered on the /v2 sticky control bar). */
+  overflow-x: clip;
   /* Prevent horizontal scroll and diagonal scrolling on mobile */
   overscroll-behavior-x: none;
 }
 
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100vw;
   background: transparent;
   color: var(--fg);
-  padding-top: var(--topbar-h);
   line-height: 1.6;
   font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
   /* Lock scroll to vertical only on touch devices */
@@ -52,7 +54,7 @@ body {
 
 main {
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip; /* clip, not hidden — see html rule above */
 }
 
 pre, code {
@@ -129,8 +131,13 @@ p, li, blockquote, figcaption {
   animation: slowZoom 30s ease-in-out infinite alternate;
 }
 
-/* Let the fixed photo bleed through all content */
+/* Veil the glyph field behind reading pages — text never competes with
+   texture. The /v2 flagship manages its own veils per-section, so its
+   main stays transparent and the field performs at full strength there. */
 main {
+  background-color: rgba(7, 7, 7, 0.62) !important;
+}
+main.v2-root {
   background-color: transparent !important;
 }
 

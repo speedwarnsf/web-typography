@@ -149,6 +149,7 @@ export default function ProofPage() {
   const [width, setWidth] = useState(375);
   const [fontCss, setFontCss] = useState(FONTS[0].css);
   const [pretty, setPretty] = useState(false);
+  const [mobileView, setMobileView] = useState<'browser' | 'typeset'>('typeset');
   const [before, setBefore] = useState<PanelMetrics | null>(null);
   const [after, setAfter] = useState<PanelMetrics | null>(null);
 
@@ -200,7 +201,7 @@ export default function ProofPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-hidden">
+    <main className="min-h-screen bg-[#0a0a0a]/85 text-neutral-200 overflow-x-clip">
       {/* Header */}
       <header className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-12 border-b border-neutral-800">
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
@@ -307,10 +308,39 @@ export default function ProofPage() {
           </label>
         </div>
 
+        {/* Mobile view toggle — stacked panels two screens apart are not a
+            comparison. Below lg, one panel shows at a time behind a sticky
+            switch; at lg+ both panels sit side by side and the switch hides. */}
+        <div className="lg:hidden sticky top-2 z-10 mt-10 flex border border-neutral-700 bg-[#050505]/95 w-max" style={{ borderRadius: 0 }}>
+          <button
+            onClick={() => setMobileView('browser')}
+            className={`font-mono text-[11px] uppercase tracking-[0.2em] px-5 py-3 min-h-[44px] transition-colors ${
+              mobileView === 'browser' ? 'bg-[#B8963E] text-[#0a0a0a]' : 'text-neutral-400'
+            }`}
+            style={{ borderRadius: 0, touchAction: 'manipulation' }}
+          >
+            Browser
+          </button>
+          <button
+            onClick={() => setMobileView('typeset')}
+            className={`font-mono text-[11px] uppercase tracking-[0.2em] px-5 py-3 min-h-[44px] transition-colors ${
+              mobileView === 'typeset' ? 'bg-[#B8963E] text-[#0a0a0a]' : 'text-neutral-400'
+            }`}
+            style={{ borderRadius: 0, touchAction: 'manipulation' }}
+          >
+            Typeset
+          </button>
+        </div>
+
         {/* Panels */}
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="mt-4 lg:mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Browser */}
-          <div className="border border-neutral-800 bg-neutral-950/40" style={{ borderRadius: 0 }}>
+          <div
+            className={`border border-neutral-800 bg-neutral-950/40 ${
+              mobileView === 'browser' ? 'block' : 'hidden'
+            } lg:block`}
+            style={{ borderRadius: 0 }}
+          >
             <div className="px-4 py-3 border-b border-neutral-800 flex items-baseline justify-between">
               <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-400">
                 Browser{pretty ? ' + text-wrap: pretty' : ' default'}
@@ -329,7 +359,12 @@ export default function ProofPage() {
           </div>
 
           {/* Typeset */}
-          <div className="border border-[#B8963E]/40 bg-neutral-950/40" style={{ borderRadius: 0 }}>
+          <div
+            className={`border border-[#B8963E]/40 bg-neutral-950/40 ${
+              mobileView === 'typeset' ? 'block' : 'hidden'
+            } lg:block`}
+            style={{ borderRadius: 0 }}
+          >
             <div className="px-4 py-3 border-b border-neutral-800 flex items-baseline justify-between">
               <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#B8963E]">
                 Typeset engine

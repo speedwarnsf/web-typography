@@ -445,33 +445,54 @@ function ProofStage({ reduced }: { reduced: boolean }) {
       </p>
 
       <div className="v2-stage">
-        <div className="v2-toggle" role="tablist" aria-label="Rendering mode">
-          <button
-            role="tab"
-            aria-selected={mode === 'browser'}
-            className={mode === 'browser' ? 'v2-tab v2-tab-on' : 'v2-tab'}
-            onClick={() => pick('browser')}
-          >
-            Your browser
-          </button>
-          <button
-            role="tab"
-            aria-selected={mode === 'typeset'}
-            className={mode === 'typeset' ? 'v2-tab v2-tab-on' : 'v2-tab'}
-            onClick={() => pick('typeset')}
-          >
-            A good book
-          </button>
+        {/* Sticky control bar: on a phone the comparison must stay visible
+            while you flip modes and squeeze the column — controls that
+            scroll away from the thing they control are operated blind. */}
+        <div className="v2-controls">
+          <div className="v2-controls-row">
+            <div className="v2-toggle" role="tablist" aria-label="Rendering mode">
+              <button
+                role="tab"
+                aria-selected={mode === 'browser'}
+                className={mode === 'browser' ? 'v2-tab v2-tab-on' : 'v2-tab'}
+                onClick={() => pick('browser')}
+              >
+                Your browser
+              </button>
+              <button
+                role="tab"
+                aria-selected={mode === 'typeset'}
+                className={mode === 'typeset' ? 'v2-tab v2-tab-on' : 'v2-tab'}
+                onClick={() => pick('typeset')}
+              >
+                A good book
+              </button>
+            </div>
+            <div className="v2-controls-width">
+              <input
+                id="v2-squeeze-input"
+                type="range"
+                min={250}
+                max={maxWidth}
+                value={width}
+                onChange={(e) => {
+                  userTouched.current = true;
+                  setWidth(Number(e.target.value));
+                }}
+                aria-label="Squeeze the column width"
+              />
+              <span className="v2-controls-px">{width}px</span>
+            </div>
+          </div>
+          {/* data-no-typeset is load-bearing: without it the global pipeline
+              composes this into frozen spans, destroying React's text node —
+              the caption then never updates when the mode flips. */}
+          <p data-no-typeset className="v2-stage-caption" aria-live="polite">
+            {mode === 'browser'
+              ? 'Lines break wherever the words run out — by chance.'
+              : 'Every line ends where it should — by intention. This is Typeset, live.'}
+          </p>
         </div>
-
-        {/* data-no-typeset is load-bearing: without it the global pipeline
-            composes this into frozen spans, destroying React's text node —
-            the caption then never updates when the mode flips. */}
-        <p data-no-typeset className="v2-stage-caption" aria-live="polite">
-          {mode === 'browser'
-            ? 'Lines break wherever the words run out — by chance.'
-            : 'Every line ends where it should — by intention. This is Typeset, live in your browser.'}
-        </p>
 
         <div ref={stackRef} className="v2-stack" style={{ width: `${width}px` }}>
           <p
@@ -497,27 +518,10 @@ function ProofStage({ reduced }: { reduced: boolean }) {
           )}
         </div>
 
-        <div className="v2-squeeze">
-          <label className="v2-squeeze-label" htmlFor="v2-squeeze-input">
-            Squeeze the column — {width}px
-          </label>
-          <input
-            id="v2-squeeze-input"
-            type="range"
-            min={250}
-            max={maxWidth}
-            value={width}
-            onChange={(e) => {
-              userTouched.current = true;
-              setWidth(Number(e.target.value));
-            }}
-            aria-label="Column width"
-          />
-          <p data-no-typeset className="v2-squeeze-note">
-            Somewhere in there, your browser abandons a word. The book version
-            never does — at any width.
-          </p>
-        </div>
+        <p data-no-typeset className="v2-squeeze-note">
+          Drag the slider: somewhere in there, your browser abandons a word.
+          The book version never does — at any width.
+        </p>
 
         {stats && (
           <div className="v2-stats">
@@ -685,7 +689,9 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 
 .v2-root {
   position: relative;
-  background: #050505;
+  /* transparent so the glyph field shows at full strength — the global
+     main veil exempts .v2-root; sections carry their own radial veils */
+  background: transparent;
   color: #d6d6d6;
   min-height: 100vh;
   overflow-x: clip;
@@ -796,7 +802,42 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 
 /* ── Proof stage ── */
 .v2-stage { margin-top: 48px; }
-.v2-toggle { display: flex; gap: 0; margin-bottom: 28px; border: 1px solid #2a2a2a; width: max-content; }
+.v2-controls {
+  position: sticky; top: 10px; z-index: 6;
+  background: rgba(5,5,5,.97);
+  border: 1px solid #232323;
+  padding: 12px 14px;
+  margin-bottom: 26px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.v2-controls-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.v2-controls-width {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; min-width: 150px;
+}
+.v2-controls-width input[type="range"] {
+  flex: 1; min-width: 100px;
+  appearance: none; -webkit-appearance: none;
+  height: 2px; background: #2a2a2a; outline: none;
+  accent-color: ${GOLD};
+}
+.v2-controls-width input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px; background: ${GOLD};
+  cursor: ew-resize; border: 0;
+}
+.v2-controls-width input[type="range"]::-moz-range-thumb {
+  width: 20px; height: 20px; background: ${GOLD};
+  cursor: ew-resize; border: 0; border-radius: 0;
+}
+.v2-controls-px {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .18em; color: ${GOLD};
+  min-width: 46px; text-align: right;
+}
+.v2-toggle { display: flex; gap: 0; border: 1px solid #2a2a2a; width: max-content; }
 .v2-tab {
   font-family: var(--font-mono), monospace;
   font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
@@ -808,8 +849,8 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
 .v2-tab-on { color: #0a0a0a; background: ${GOLD}; }
 .v2-stage-caption {
   font-family: var(--font-mono), monospace;
-  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
-  color: #a3a3a3; margin: 0 0 22px; min-height: 2.6em; max-width: 52ch;
+  font-size: 9px; letter-spacing: .2em; text-transform: uppercase;
+  color: #a3a3a3; margin: 0; max-width: 60ch; line-height: 1.7;
 }
 .v2-stack { position: relative; perspective: 900px; }
 .v2-panel {
@@ -847,30 +888,8 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.v2-squeeze { margin-top: 34px; max-width: 480px; }
-.v2-squeeze-label {
-  display: block;
-  font-family: var(--font-mono), monospace;
-  font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
-  color: ${GOLD}; margin-bottom: 12px;
-}
-.v2-squeeze input[type="range"] {
-  width: 100%; max-width: 340px;
-  appearance: none; -webkit-appearance: none;
-  height: 2px; background: #2a2a2a; outline: none;
-  accent-color: ${GOLD};
-}
-.v2-squeeze input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px; height: 22px; background: ${GOLD};
-  cursor: ew-resize; border: 0;
-}
-.v2-squeeze input[type="range"]::-moz-range-thumb {
-  width: 22px; height: 22px; background: ${GOLD};
-  cursor: ew-resize; border: 0; border-radius: 0;
-}
 .v2-squeeze-note {
-  margin: 12px 0 0;
+  margin: 30px 0 0; max-width: 52ch;
   font-family: var(--font-source-sans), sans-serif;
   font-size: .85rem; line-height: 1.6; color: #a3a3a3;
   text-wrap: pretty;
