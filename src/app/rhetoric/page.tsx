@@ -13,6 +13,52 @@ type RhetoricalFont = {
 };
 
 const fonts: RhetoricalFont[] = [
+  // ── The corners ──
+  // Most working typefaces blend all three appeals, which is why the middle
+  // of the triangle is crowded. These four are chosen because they DON'T
+  // blend: each is nearly a pure appeal, and together they stake out the
+  // triangle's corners so the concept is visible at a glance.
+  {
+    name: "Cinzel",
+    variable: "var(--font-cinzel)",
+    ethos: 95,
+    pathos: 12,
+    logos: 10,
+    tags: ["incised", "imperial", "monumental", "lapidary"],
+    bestFor:
+      "Pure ethos: Roman inscriptional capitals — the letterforms of law courts and monuments. Authority with no warmth and no argument; it does not persuade, it decrees.",
+  },
+  {
+    name: "Permanent Marker",
+    variable: "var(--font-permanent-marker)",
+    ethos: 8,
+    pathos: 95,
+    logos: 5,
+    tags: ["urgent", "handmade", "protest", "raw"],
+    bestFor:
+      "Pure pathos: a shout with a marker pen. No institution behind it, no system inside it — only feeling. Protest signs, emergencies, zines.",
+  },
+  {
+    name: "JetBrains Mono",
+    variable: "var(--font-mono)",
+    ethos: 12,
+    pathos: 4,
+    logos: 96,
+    tags: ["monospaced", "mechanical", "exact", "indifferent"],
+    bestFor:
+      "Pure logos: the voice of the machine itself. Every character the same width, feeling not included. Code, terminals, raw data.",
+  },
+  {
+    name: "Caveat",
+    variable: "var(--font-caveat)",
+    ethos: 25,
+    pathos: 90,
+    logos: 6,
+    tags: ["handwritten", "intimate", "personal", "unguarded"],
+    bestFor:
+      "Warm pathos: a note in a familiar hand. Where Permanent Marker shouts, Caveat confides — sympathy cards, marginalia, the human voice at whisper volume.",
+  },
+  // ── The working middle ──
   {
     name: "Playfair Display",
     variable: "var(--font-playfair)",

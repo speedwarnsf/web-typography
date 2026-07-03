@@ -26,6 +26,9 @@ import {
   Roboto,
   Poppins,
   Montserrat,
+  Cinzel,
+  Permanent_Marker,
+  Caveat,
 } from "next/font/google";
 import "./globals.css";
 import GlobalTypeset from "@/components/GlobalTypeset";
@@ -62,6 +65,9 @@ const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: "400", variable: "--f
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-roboto", weight: ["400", "700"], display: "swap" });
 const poppins = Poppins({ subsets: ["latin"], variable: "--font-poppins", weight: ["400", "600"], display: "swap" });
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", display: "swap" });
+const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel", display: "swap" });
+const permanentMarker = Permanent_Marker({ subsets: ["latin"], weight: "400", variable: "--font-permanent-marker", display: "swap" });
+const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Typeset — A New Era in Web Typography",
@@ -80,7 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     playfair, sourceSans, jetbrains, inter, lora, spaceGrotesk, crimsonPro,
     dmSerif, dmSans, cormorant, firaSans, sora, merriweather, libreBaskerville,
     nunitoSans, oswald, ebGaramond, raleway, bitter, workSans, spectral,
-    bebasNeue, roboto, poppins, montserrat,
+    bebasNeue, roboto, poppins, montserrat, cinzel, permanentMarker, caveat,
   ].map((f) => f.variable).join(" ");
 
   return (
