@@ -741,7 +741,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
         <p data-no-typeset className="v2-stage-caption" aria-live="polite">
           {mode === 'browser'
             ? 'Lines break wherever the words run out — by chance.'
-            : 'Every line ends where it should — by intention. Same words, same space.'}
+            : 'Every line ends where it should — by intention. This is Typeset, live in your browser.'}
         </p>
 
         <div ref={stackRef} className="v2-stack" style={{ width: `${width}px` }}>
@@ -813,9 +813,18 @@ function ProofStage({ reduced }: { reduced: boolean }) {
         )}
       </div>
 
-      <a href="/proof" className="v2-cta v2-cta-dim v2-mt">
-        Open the full instrument — paste your own text
-      </a>
+      <p data-no-typeset className="v2-reveal">
+        The book isn&rsquo;t a book. It&rsquo;s your browser running{' '}
+        <strong>Typeset</strong> — the one-line script at the bottom of this
+        page. Every paragraph you&rsquo;ve read here was set the same way.
+      </p>
+
+      <div className="v2-cta-row" style={{ marginTop: '40px' }}>
+        <a href="#install" className="v2-cta">Install Typeset</a>
+        <a href="/proof" className="v2-cta v2-cta-dim">
+          Try it on your own text
+        </a>
+      </div>
     </section>
   );
 }
@@ -1203,6 +1212,16 @@ body:has(.v2-root) header.fixed { display: none; }
   display: block;
   font-size: .76rem; color: #8f8f8f;
 }
+.v2-reveal {
+  margin: 40px 0 0;
+  max-width: 52ch;
+  font-family: var(--font-source-sans), sans-serif;
+  font-size: 1.05rem; line-height: 1.7; color: #c9c9c9;
+  border-left: 2px solid ${GOLD};
+  padding-left: 16px;
+  text-wrap: pretty;
+}
+.v2-reveal strong { color: ${GOLD}; font-weight: 600; }
 .v2-even { color: #d6d6d6; }
 .v2-edge {
   position: absolute; top: 0; bottom: 0; right: -1px;
