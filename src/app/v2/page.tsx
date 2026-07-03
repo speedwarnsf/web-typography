@@ -894,7 +894,15 @@ body:has(.v2-root) header.fixed { display: none; }
   transition: color .3s;
 }
 .v2-menu-seed:hover .v2-menu-word { color: ${GOLD}; }
-.v2-menu-bloom { position: absolute; top: 30px; left: 5px; }
+.v2-menu-bloom {
+  position: absolute; top: 30px; left: 5px;
+  /* CRITICAL: the closed nav is invisible but its box is ~230x300px fixed
+     at the viewport's top-left — with default pointer-events it silently
+     ate every real tap in that region (menu items opting out wasn't
+     enough; the container itself hit-tests). Programmatic .click() in
+     tests bypasses hit-testing, which is how this shipped. */
+  pointer-events: none;
+}
 .v2-menu-stem {
   position: absolute; top: 0; left: 0; width: 1px; height: 100%;
   background: linear-gradient(${GOLD}, transparent);
