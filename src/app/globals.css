@@ -31,6 +31,12 @@ body {
   max-width: 100vw;
   background: transparent;
   color: var(--fg);
+  /* THE SYSTEM IS THE DEFAULT. Reading text is Source Sans, display is
+     Playfair, machine voice is JetBrains Mono — by inheritance, so no
+     page can fall out of the system by forgetting an inline style.
+     (The old failure mode: className="font-playfair" compiles to nothing
+     in Tailwind v4, and the heading silently rendered system sans.) */
+  font-family: var(--font-source-sans), 'Source Sans 3', system-ui, sans-serif;
   line-height: 1.6;
   font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
   /* Lock scroll to vertical only on touch devices */
@@ -66,8 +72,15 @@ pre {
 }
 
 h1, h2, h3, h4 {
+  font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
   text-wrap: balance;
 }
+
+/* The class forms pages already use — real utilities now, mapped to the
+   loaded faces. (font-mono already resolves to JetBrains via the body-level
+   variable, so it needs no mapping.) */
+.font-playfair { font-family: var(--font-playfair), 'Playfair Display', Georgia, serif; }
+.font-source-sans { font-family: var(--font-source-sans), 'Source Sans 3', system-ui, sans-serif; }
 
 p, li, blockquote, figcaption {
   text-wrap: pretty;
