@@ -655,7 +655,7 @@ function Closing() {
       <nav className="v2-links">
         <a href="/proof">The instrument</a>
         <a href="/utility">The essay &amp; source</a>
-        <a href="/">The classic site</a>
+        <a href="/library">The library</a>
       </nav>
       <p className="v2-colophon">
         Set live by its own engine. View source — it&rsquo;s the same code.

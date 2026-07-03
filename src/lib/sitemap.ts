@@ -28,9 +28,9 @@ export const sections: SiteSection[] = [
     fontVar: "var(--font-playfair)",
     pages: [
       {
-        slug: "/",
-        name: "Rules & Pairings",
-        shortName: "Home",
+        slug: "/library",
+        name: "The Library",
+        shortName: "Library",
         description: "Typographic rules, font pairings, and tips",
       },
       {

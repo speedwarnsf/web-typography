@@ -64,8 +64,9 @@ const poppins = Poppins({ subsets: ["latin"], variable: "--font-poppins", weight
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Web Typography -- A Resource for Designers",
-  description: "Typographic rules, font pairings, and practical tips for beautiful web text.",
+  title: "Typeset — A New Era in Web Typography",
+  description:
+    "The web finally knows how to break lines. Watch the proof, live: beam-search composition, hanging punctuation, and Tschichold spacing — set by its own engine, in your browser.",
 };
 
 export const viewport = {

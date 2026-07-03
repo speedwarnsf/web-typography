@@ -72,13 +72,13 @@ export default function BloomMenu() {
         })),
       ]
     : [
+        { kind: 'link' as const, href: '/', label: 'Home', n: '01' },
         ...sections.map((s, i) => ({
           kind: 'section' as const,
           id: s.id,
           label: s.name,
-          n: String(i + 1).padStart(2, '0'),
+          n: String(i + 2).padStart(2, '0'),
         })),
-        { kind: 'link' as const, href: '/v2', label: 'The New Era', n: '04' },
         ...metaPages.map((p, i) => ({
           kind: 'link' as const,
           href: p.slug,
