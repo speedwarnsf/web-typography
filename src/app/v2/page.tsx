@@ -17,8 +17,12 @@ const HERO_TEXT = 'The web finally knows how to break lines.';
 const HERO_SUB =
   'Forty years after print solved it, the browser catches up. Knuth’s mathematics, Tschichold’s tolerances, Bringhurst’s measures — running live on every paragraph of this page.';
 
+// Chosen empirically: across 250-345px, the browser strands a word or
+// abandons an orphan at 12 of 16 widths on this paragraph; the engine
+// never does, and uses equal-or-fewer lines at half of them. The text
+// also argues its own case in civilian language.
 const PROOF_TEXT =
-  '"Typography is the craft of endowing human language with a durable visual form," Bringhurst wrote. The rag is a feature, not a flaw -- the irregular right edge gives the eye a lattice of landmarks. Watch the opening quote hang into the margin, and every line end where the meaning allows it to.';
+  'The rag is a feature, not a flaw. The irregular right edge gives the eye a lattice of landmarks to hold its place. But a lattice is built, not left to chance -- and chance is all the browser has ever offered your reader.';
 
 const MANIFESTO_TEXT =
   'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing -- visible in a glance, impossible to fake.';
@@ -92,10 +96,11 @@ interface PanelStats {
   openers: number;
   rag: number;
   orphan: boolean;
+  lines: number;
 }
 
 const WEAK = new Set([
-  'a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'and', 'or',
+  'a', 'i', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'and', 'or',
   'but', 'nor', 'so', 'as', 'is', 'are', 'was', 'were', 'has', 'have', 'had',
 ]);
 const OPENER = /[.!?]["'”’)\]]*\s+["'“‘(\[]*[A-Z][A-Za-z’']*$/;
@@ -162,6 +167,7 @@ function panelStats(p: HTMLElement, width: number): PanelStats {
     openers,
     rag: nf.length > 1 ? Math.round((Math.max(...nf) - Math.min(...nf)) * 100) : 0,
     orphan: lines.length > 1 && lastWords.length === 1,
+    lines: lines.length,
   };
 }
 
@@ -502,15 +508,22 @@ function Hero({ reduced }: { reduced: boolean }) {
 
 // ─── The Proof, center stage ────────────────────────────────────────────────
 
+interface WorstFlaw {
+  span: HTMLElement;
+  kind: 'orphan' | 'stranded' | 'weak';
+  word: string;
+}
+
 /**
  * Mark the browser panel's actual violations so BROWSER mode is visibly
  * flawed, not just subtly different: dotted underlines on weak words at
  * line ends and on stranded sentence openers, found from the rendering.
+ * Returns the single worst flaw so a plain-language callout can point at it.
  */
-function annotateBrowserFlaws(p: HTMLElement) {
+function annotateBrowserFlaws(p: HTMLElement): WorstFlaw | null {
   const spans = Array.from(p.querySelectorAll<HTMLElement>('span[data-w]'));
   spans.forEach((s) => s.classList.remove('v2-flaw'));
-  if (!spans.length) return;
+  if (!spans.length) return null;
   const rows: { spans: HTMLElement[]; top: number }[] = [];
   for (const s of spans) {
     const r = s.getBoundingClientRect();
@@ -518,28 +531,52 @@ function annotateBrowserFlaws(p: HTMLElement) {
     if (!cur || Math.abs(r.top - cur.top) > 4) rows.push({ spans: [s], top: r.top });
     else cur.spans.push(s);
   }
+  let worst: WorstFlaw | null = null;
+  const consider = (f: WorstFlaw) => {
+    const rank = { orphan: 3, stranded: 2, weak: 1 };
+    if (!worst || rank[f.kind] > rank[worst.kind]) worst = f;
+  };
   rows.forEach((row, i) => {
     const lastSpan = row.spans[row.spans.length - 1];
-    const word = (lastSpan.textContent || '')
+    const raw = (lastSpan.textContent || '').trim();
+    const word = raw
       .replace(/[^A-Za-z0-9’']+$/g, '')
       .replace(/^[^A-Za-z0-9]+/g, '')
       .toLowerCase();
     const isLastRow = i === rows.length - 1;
-    if (!isLastRow && WEAK.has(word)) lastSpan.classList.add('v2-flaw');
+    if (!isLastRow && WEAK.has(word)) {
+      lastSpan.classList.add('v2-flaw');
+      consider({ span: lastSpan, kind: word.length <= 2 ? 'stranded' : 'weak', word: raw });
+    }
     if (!isLastRow) {
       const lineText = row.spans.map((s) => s.textContent).join(' ');
-      if (OPENER.test(lineText.trim())) lastSpan.classList.add('v2-flaw');
+      if (OPENER.test(lineText.trim())) {
+        lastSpan.classList.add('v2-flaw');
+        consider({ span: lastSpan, kind: 'weak', word: raw });
+      }
     }
     if (isLastRow && rows.length > 1 && row.spans.filter((s) => /[A-Za-z0-9]/.test(s.textContent || '')).length === 1) {
       lastSpan.classList.add('v2-flaw');
+      consider({ span: lastSpan, kind: 'orphan', word: raw });
     }
   });
+  return worst;
 }
+
+const FLAW_CAPTIONS: Record<WorstFlaw['kind'], (w: string) => string> = {
+  orphan: (w) => `"${w}" — abandoned alone on the last line. No book would print this.`,
+  stranded: (w) => `"${w}" — left hanging at the edge. A book keeps it with its word.`,
+  weak: (w) => `The thought snaps at "${w}". A book would end the line on meaning.`,
+};
 
 function ProofStage({ reduced }: { reduced: boolean }) {
   const [mode, setMode] = useState<'typeset' | 'browser'>('typeset');
-  const [width, setWidth] = useState(340);
+  // 274 default: measured sweet spot — the book uses the SAME number of
+  // lines as the browser here, and the browser strands a word anyway.
+  const [width, setWidth] = useState(274);
+  const [maxWidth, setMaxWidth] = useState(340);
   const [stats, setStats] = useState<{ b: PanelStats; t: PanelStats } | null>(null);
+  const [callout, setCallout] = useState<{ top: number; left: number; text: string } | null>(null);
   const browserRef = useRef<HTMLParagraphElement>(null);
   const typesetRef = useRef<HTMLParagraphElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
@@ -547,7 +584,11 @@ function ProofStage({ reduced }: { reduced: boolean }) {
   const demoed = useRef(false);
 
   useEffect(() => {
-    const update = () => setWidth(Math.min(340, Math.max(250, window.innerWidth - 72)));
+    const update = () => {
+      const max = Math.min(345, Math.max(250, window.innerWidth - 72));
+      setMaxWidth(max);
+      setWidth((w) => Math.min(w, max));
+    };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
@@ -562,6 +603,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
       if (cancelled) return;
       const b = browserRef.current;
       const t = typesetRef.current;
+      const stack = stackRef.current;
       if (!b || !t) return;
       b.textContent = PROOF_TEXT;
       t.dataset.tsRaw = PROOF_TEXT;
@@ -569,9 +611,22 @@ function ProofStage({ reduced }: { reduced: boolean }) {
       delete t.dataset.typesetDone;
       typeset(t);
       setStats({ b: panelStats(b, width), t: panelStats(t, width) });
-      annotateBrowserFlaws(b);
-      if (stackRef.current) {
-        stackRef.current.style.minHeight = `${Math.max(b.offsetHeight, t.offsetHeight)}px`;
+      const worst = annotateBrowserFlaws(b);
+      const panelBottom = Math.max(b.offsetHeight, t.offsetHeight);
+      if (worst && stack) {
+        const sr = stack.getBoundingClientRect();
+        const wr = worst.span.getBoundingClientRect();
+        // Below the panel (never over the text), x-aligned under the flaw.
+        setCallout({
+          top: panelBottom + 16,
+          left: Math.max(0, Math.min(wr.left - sr.left, width - 190)),
+          text: FLAW_CAPTIONS[worst.kind](worst.word),
+        });
+      } else {
+        setCallout(null);
+      }
+      if (stack) {
+        stack.style.minHeight = `${panelBottom + (worst ? 96 : 20)}px`;
       }
     })();
     return () => {
@@ -618,25 +673,33 @@ function ProofStage({ reduced }: { reduced: boolean }) {
     setMode(m);
   };
 
-  const rows: { label: string; b: string; t: string; better: boolean }[] = stats
+  const rows: { label: string; hint?: string; b: string; t: string; better: boolean; neutral?: boolean }[] = stats
     ? [
         {
-          label: 'Weak words stranded at line ends',
-          b: String(stats.b.weak),
-          t: String(stats.t.weak),
-          better: stats.t.weak < stats.b.weak,
+          label: 'Words left hanging at line edges',
+          hint: 'little words and snapped thoughts a book would carry down',
+          b: String(stats.b.weak + stats.b.openers),
+          t: String(stats.t.weak + stats.t.openers),
+          better: stats.t.weak + stats.t.openers < stats.b.weak + stats.b.openers,
         },
         {
-          label: 'Sentence openers left dangling',
-          b: String(stats.b.openers),
-          t: String(stats.t.openers),
-          better: stats.t.openers < stats.b.openers,
-        },
-        {
-          label: 'Orphan on the last line',
+          label: 'A word abandoned on the last line',
           b: stats.b.orphan ? 'yes' : 'no',
           t: stats.t.orphan ? 'yes' : 'no',
           better: !stats.t.orphan && stats.b.orphan,
+        },
+        {
+          label: 'Lines used',
+          hint:
+            stats.t.lines === stats.b.lines
+              ? 'same words, same space'
+              : stats.t.lines > stats.b.lines
+                ? 'the book spends one more line — and abandons nothing'
+                : 'fewer lines, nothing abandoned',
+          b: String(stats.b.lines),
+          t: String(stats.t.lines),
+          better: stats.t.lines < stats.b.lines,
+          neutral: stats.t.lines === stats.b.lines,
         },
       ]
     : [];
@@ -644,11 +707,12 @@ function ProofStage({ reduced }: { reduced: boolean }) {
   return (
     <section id="proof" className="v2-section">
       <p className="v2-label">01 — The Proof</p>
-      <h2 className="v2-h2">Same text. Same width. Same font. Watch.</h2>
+      <h2 className="v2-h2">Your phone wraps text. A book sets it.</h2>
       <p data-no-typeset className="v2-body v2-narrow">
-        This is not a mockup. Both versions below are rendered by your browser,
-        right now. One is left to the browser&rsquo;s greedy line breaking. One is
-        composed by the engine. Flip between them and read the right edge.
+        Same words, same space, both rendered by your browser right now. One is
+        how every phone shows text — wherever the words happen to fall. The
+        other is how every book you&rsquo;ve ever trusted was set. Then squeeze
+        the column and watch which one falls apart.
       </p>
 
       <div className="v2-stage">
@@ -659,7 +723,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
             className={mode === 'browser' ? 'v2-tab v2-tab-on' : 'v2-tab'}
             onClick={() => pick('browser')}
           >
-            Browser
+            Your browser
           </button>
           <button
             role="tab"
@@ -667,14 +731,17 @@ function ProofStage({ reduced }: { reduced: boolean }) {
             className={mode === 'typeset' ? 'v2-tab v2-tab-on' : 'v2-tab'}
             onClick={() => pick('typeset')}
           >
-            Typeset
+            A good book
           </button>
         </div>
 
-        <p className="v2-stage-caption" aria-live="polite">
+        {/* data-no-typeset is load-bearing: without it the global pipeline
+            composes this into frozen spans, destroying React's text node —
+            the caption then never updates when the mode flips. */}
+        <p data-no-typeset className="v2-stage-caption" aria-live="polite">
           {mode === 'browser'
-            ? 'Greedy wrapping — the dotted words are stranded at line ends.'
-            : 'Composed — the quote hangs in the margin; lines end on meaning.'}
+            ? 'Lines break wherever the words run out — by chance.'
+            : 'Every line ends where it should — by intention. Same words, same space.'}
         </p>
 
         <div ref={stackRef} className="v2-stack" style={{ width: `${width}px` }}>
@@ -691,21 +758,54 @@ function ProofStage({ reduced }: { reduced: boolean }) {
             style={{ width: `${width}px` }}
           />
           <span className="v2-edge" aria-hidden="true" />
+          {callout && mode === 'browser' && (
+            <span
+              className="v2-callout"
+              style={{ top: `${callout.top}px`, left: `${callout.left}px` }}
+            >
+              {callout.text}
+            </span>
+          )}
+        </div>
+
+        <div className="v2-squeeze">
+          <label className="v2-squeeze-label" htmlFor="v2-squeeze-input">
+            Squeeze the column — {width}px
+          </label>
+          <input
+            id="v2-squeeze-input"
+            type="range"
+            min={250}
+            max={maxWidth}
+            value={width}
+            onChange={(e) => {
+              userTouched.current = true;
+              setWidth(Number(e.target.value));
+            }}
+            aria-label="Column width"
+          />
+          <p data-no-typeset className="v2-squeeze-note">
+            Somewhere in there, your browser abandons a word. The book version
+            never does — at any width.
+          </p>
         </div>
 
         {stats && (
           <div className="v2-stats">
             <div className="v2-stats-head">
               <span>Measured from the rendered lines</span>
-              <span className="v2-stats-cols"><em>browser</em> / <em className="v2-gold">typeset</em></span>
+              <span className="v2-stats-cols"><em>browser</em> / <em className="v2-gold">book</em></span>
             </div>
             {rows.map((r) => (
               <div key={r.label} className="v2-stat-row">
-                <span className="v2-stat-label">{r.label}</span>
+                <span className="v2-stat-label">
+                  {r.label}
+                  {r.hint && <span className="v2-stat-hint">{r.hint}</span>}
+                </span>
                 <span className="v2-stat-vals">
                   <em>{r.b}</em>
                   <i>/</i>
-                  <em className={r.better ? 'v2-gold' : ''}>{r.t}</em>
+                  <em className={r.better ? 'v2-gold' : r.neutral ? 'v2-even' : ''}>{r.t}</em>
                 </span>
               </div>
             ))}
@@ -1055,6 +1155,55 @@ body:has(.v2-root) header.fixed { display: none; }
   text-decoration-thickness: 2px;
   text-underline-offset: 4px;
 }
+.v2-callout {
+  position: absolute;
+  max-width: 190px;
+  padding: 8px 10px;
+  border-left: 2px solid rgba(224, 110, 90, .95);
+  background: rgba(5, 5, 5, .95);
+  font-family: var(--font-mono), monospace;
+  font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+  line-height: 1.7; color: #c9c9c9;
+  z-index: 3;
+  animation: v2-callout-in .5s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes v2-callout-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.v2-squeeze { margin-top: 34px; max-width: 480px; }
+.v2-squeeze-label {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+  color: ${GOLD}; margin-bottom: 12px;
+}
+.v2-squeeze input[type="range"] {
+  width: 100%; max-width: 340px;
+  appearance: none; -webkit-appearance: none;
+  height: 2px; background: #2a2a2a; outline: none;
+  accent-color: ${GOLD};
+}
+.v2-squeeze input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px; background: ${GOLD};
+  cursor: ew-resize; border: 0;
+}
+.v2-squeeze input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; background: ${GOLD};
+  cursor: ew-resize; border: 0; border-radius: 0;
+}
+.v2-squeeze-note {
+  margin: 12px 0 0;
+  font-family: var(--font-source-sans), sans-serif;
+  font-size: .85rem; line-height: 1.6; color: #a3a3a3;
+  text-wrap: pretty;
+}
+.v2-stat-hint {
+  display: block;
+  font-size: .76rem; color: #8f8f8f;
+}
+.v2-even { color: #d6d6d6; }
 .v2-edge {
   position: absolute; top: 0; bottom: 0; right: -1px;
   width: 1px;
