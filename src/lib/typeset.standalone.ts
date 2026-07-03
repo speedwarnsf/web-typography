@@ -125,14 +125,32 @@ const Typeset = {
 
       // Late-loading webfonts: compositions measured against fallback metrics
       // render wrong once the real font arrives — recompose with true metrics.
-      document.fonts.addEventListener?.('loadingdone', () => {
-        setTimeout(() => {
+      // Surgical: debounced across events, only elements set in a face that
+      // actually loaded, and the reader's scroll position preserved (pages
+      // that stream in many fonts must not become recompose storms).
+      const pendingFamilies = new Set<string>();
+      let fontsTimer: ReturnType<typeof setTimeout> | null = null;
+      document.fonts.addEventListener?.('loadingdone', (e: Event) => {
+        const faces = (e as unknown as { fontfaces?: { family: string }[] }).fontfaces ?? [];
+        for (const f of faces) pendingFamilies.add(f.family.replace(/['"]/g, '').toLowerCase());
+        if (fontsTimer) clearTimeout(fontsTimer);
+        fontsTimer = setTimeout(() => {
+          const families = Array.from(pendingFamilies);
+          pendingFamilies.clear();
+          if (!families.length) return;
+          const sx = window.scrollX;
+          const sy = window.scrollY;
+          let touched = 0;
           document.querySelectorAll<HTMLElement>(selector).forEach((p) => {
             if (!p.hasAttribute('data-typeset-done')) return;
+            const fam = getComputedStyle(p).fontFamily.toLowerCase();
+            if (!families.some((f) => fam.includes(f))) return;
+            touched++;
             p.removeAttribute('data-typeset-done');
             runOne(p);
           });
-        }, 50);
+          if (touched) setTimeout(() => window.scrollTo(sx, sy), 60);
+        }, 150);
       });
 
       // Width changes (rotation, window resize): recompose to the new measure.

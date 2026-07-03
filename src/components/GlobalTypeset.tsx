@@ -376,18 +376,44 @@ export default function GlobalTypeset() {
     // so a paragraph composed against fallback metrics renders wrong once the
     // real font arrives. When loading settles, restore canonical text and
     // recompose with true metrics.
-    const onFontsLoadingDone = () => {
-      setTimeout(() => {
+    //
+    // SURGICAL, not global: pages like the pairings library load dozens of
+    // Google Fonts, staggered. Resetting EVERY composed block on every
+    // loadingdone event caused a recompose storm — text flashing, heights
+    // collapsing, scroll position yanked (worst on mobile). Now: debounce
+    // across events, reset only elements whose computed font-family is among
+    // the faces that actually loaded, and put the reader's scroll back.
+    const pendingFamilies = new Set<string>();
+    let fontsTimer: ReturnType<typeof setTimeout> | null = null;
+    const onFontsLoadingDone = (e: Event) => {
+      const faces = (e as unknown as { fontfaces?: { family: string }[] }).fontfaces ?? [];
+      for (const f of faces) {
+        pendingFamilies.add(f.family.replace(/['"]/g, '').toLowerCase());
+      }
+      if (fontsTimer) clearTimeout(fontsTimer);
+      fontsTimer = setTimeout(() => {
+        const families = Array.from(pendingFamilies);
+        pendingFamilies.clear();
+        if (!families.length) return;
+        const sx = window.scrollX;
+        const sy = window.scrollY;
+        let touched = 0;
         document.querySelectorAll<HTMLElement>('[data-typeset-done]').forEach((el) => {
           const original = canonicalText.get(el);
           if (!original) return;
+          const fam = getComputedStyle(el).fontFamily.toLowerCase();
+          if (!families.some((f) => fam.includes(f))) return;
+          touched++;
           safeWrite(() => {
             el.removeAttribute('data-typeset-done');
             el.textContent = original;
           });
         });
+        if (!touched) return;
         runPipeline();
-      }, 50);
+        // Recomposition changes heights above the fold — restore the reader.
+        setTimeout(() => window.scrollTo(sx, sy), 60);
+      }, 150);
     };
     document.fonts?.addEventListener?.('loadingdone', onFontsLoadingDone);
 
@@ -399,6 +425,7 @@ export default function GlobalTypeset() {
       }
       clearInterval(reObserveTimer);
       delayedRuns.forEach(clearTimeout);
+      if (fontsTimer) clearTimeout(fontsTimer);
       document.fonts?.removeEventListener?.('loadingdone', onFontsLoadingDone);
     };
   }, []);

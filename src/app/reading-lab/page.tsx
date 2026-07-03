@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { typesetText, smoothRagSpans } from "@/lib/typeset";
+import typeset, { typesetText } from "@/lib/typeset";
 import CodeBlock from "@/components/CodeBlock";
 
 interface TypographySettings {
@@ -124,17 +124,15 @@ export default function ReadingLab() {
     return () => clearTimeout(timer);
   }, [settings, previewDark]);
 
-  // Apply rag smoothing from the library after debounce
+  // Compose with the current engine after debounce (replaces the legacy
+  // span-based rag smoother). typeset() is idempotent across re-runs via
+  // the canonical-text cache; settings changes re-render the text anyway.
   useEffect(() => {
     if (!ragSmoothed || !previewRef.current) return;
-
-    const cleanups: (() => void)[] = [];
-    const paragraphs = previewRef.current.querySelectorAll<HTMLElement>('p');
-    paragraphs.forEach((p) => {
-      cleanups.push(smoothRagSpans(p));
+    previewRef.current.querySelectorAll<HTMLElement>('p').forEach((p) => {
+      delete p.dataset.typesetDone;
+      typeset(p);
     });
-
-    return () => cleanups.forEach((fn) => fn());
   }, [ragSmoothed]);
 
   const comfortScore = calculateComfortScore();

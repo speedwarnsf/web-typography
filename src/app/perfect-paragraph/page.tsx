@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { typesetText, smoothRag, measureCh, postRenderFix } from '@/lib/typeset';
+import typeset, { typesetText, measureCh } from '@/lib/typeset';
 import CodeBlock from '@/components/CodeBlock';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park across the road. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a brass chain. Everything had its place and every place had a purpose. She believed good work came from good order, and two decades of practice had proven her right.";
@@ -41,8 +41,8 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
   },
   {
     id: 'ragSmoothing',
-    label: 'Rag smoothing',
-    description: 'Knuth-Plass optimal line breaking for even right edge',
+    label: 'Full composition (V2)',
+    description: 'Beam-search line breaking with contour re-ranking and self-checked lines',
     jsRequired: true,
   },
   {
@@ -94,7 +94,6 @@ export default function PerfectParagraph() {
   });
 
   const typesetRef = useRef<HTMLParagraphElement>(null);
-  const smoothRagCleanupRef = useRef<(() => void) | null>(null);
 
   // Calculate refinement score
   const enabledCount = Object.values(toggles).filter(Boolean).length;
@@ -105,40 +104,26 @@ export default function PerfectParagraph() {
   useEffect(() => {
     if (!typesetRef.current) return;
 
-    // Reset
-    typesetRef.current.innerHTML = text;
-    if (smoothRagCleanupRef.current) {
-      smoothRagCleanupRef.current();
-      smoothRagCleanupRef.current = null;
-    }
+    // Reset to raw text
+    const el = typesetRef.current;
+    el.innerHTML = text;
+    delete el.dataset.typesetDone;
 
-    // Apply typesetText if any of the text-processing toggles are enabled
-    // CRITICAL: pass actual container measure so bindings scale correctly
-    // for the viewport width. Without this, defaults to 65ch and fires
-    // all bindings even on a 30ch mobile screen.
     const needsTypesetting = toggles.orphan || toggles.shortWord || toggles.sentenceStart || toggles.sentenceEnd;
-    if (needsTypesetting) {
-      const measure = measureCh(typesetRef.current);
-      typesetRef.current.innerHTML = typesetText(text, { measure });
-    }
 
-    // Apply smoothRag if enabled (legacy full Knuth-Plass)
     if (toggles.ragSmoothing) {
-      smoothRagCleanupRef.current = smoothRag(typesetRef.current);
+      // Full V2 compositor — composition, spacing, overflow self-check.
+      // (Replaces the legacy smoothRag / postRenderFix passes entirely;
+      // running those after composition mangles the frozen lines.)
+      el.dataset.tsRaw = text;
+      typeset(el);
+      return;
     }
 
-    // Post-render analysis: detect and fix actual rendered problems.
-    // This runs AFTER the browser has laid out the text, so it can
-    // measure real line widths and fix real orphans.
-    if (needsTypesetting && !toggles.ragSmoothing) {
-      // Only run post-render fix when smoothRag isn't handling it
-      // (smoothRag already does its own line analysis)
-      requestAnimationFrame(() => {
-        if (typesetRef.current) {
-          const cleanup = postRenderFix(typesetRef.current);
-          if (cleanup) smoothRagCleanupRef.current = cleanup;
-        }
-      });
+    if (needsTypesetting) {
+      // Bindings only — pass the real measure so rules scale to the column.
+      const measure = measureCh(el);
+      el.innerHTML = typesetText(text, { measure });
     }
   }, [text, toggles]);
 
@@ -185,16 +170,14 @@ export default function PerfectParagraph() {
     const hasRagSmoothing = toggles.ragSmoothing;
     const hasTypesetting = jsToggles.some(id => id !== 'ragSmoothing');
 
-    let code = `import { ${hasTypesetting ? 'typesetText' : ''}${hasTypesetting && hasRagSmoothing ? ', ' : ''}${hasRagSmoothing ? 'smoothRag' : ''} } from '@/lib/typeset';\n\n`;
+    let code = `import typeset${hasTypesetting && !hasRagSmoothing ? ', { typesetText }' : ''} from '@/lib/typeset';\n\n`;
     code += `const element = document.querySelector('.typeset-paragraph');\n`;
 
-    if (hasTypesetting) {
+    if (hasRagSmoothing) {
+      code += `typeset(element); // full pipeline: composition + spacing + self-checks\n`;
+    } else if (hasTypesetting) {
       code += `const text = element.textContent;\n`;
       code += `element.innerHTML = typesetText(text);\n`;
-    }
-
-    if (hasRagSmoothing) {
-      code += `${hasTypesetting ? '' : '\n'}smoothRag(element);\n`;
     }
 
     return code;

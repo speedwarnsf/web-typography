@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import CodeBlock from "@/components/CodeBlock";
-import { typesetText, smoothRag, typeset, measureCh, postRenderFix } from "@/lib/typeset";
+import { typesetText, typeset } from "@/lib/typeset";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -234,16 +234,17 @@ function PairingCardBuilder() {
 
   const rawText = useCustomText && customText ? customText : LOREM;
 
-  // Apply typeset + post-render analysis to the live preview body paragraph.
-  // Measures actual container width, applies appropriate bindings, then
-  // detects and fixes real rendered problems (orphans, rag).
+  // Apply the V2 compositor to the live preview body paragraph. typeset()
+  // is the whole pipeline now — composition, spacing, overflow self-check
+  // with graceful fallback. (The old postRenderFix pass must NOT run after
+  // it: it walks the frozen lines and mangles the composed output.)
   useEffect(() => {
-    if (!bodyParaRef.current) return;
-    bodyParaRef.current.textContent = rawText;
-    typeset(bodyParaRef.current);
-    requestAnimationFrame(() => {
-      if (bodyParaRef.current) postRenderFix(bodyParaRef.current);
-    });
+    const el = bodyParaRef.current;
+    if (!el) return;
+    el.dataset.tsRaw = rawText; // canonical-text override — re-runs stay correct
+    el.textContent = rawText;
+    delete el.dataset.typesetDone;
+    typeset(el);
   }, [rawText, heading, body, bSize, leading, colW]);
 
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
@@ -278,13 +279,11 @@ function PairingCardBuilder() {
     document.body.appendChild(container);
     await new Promise((r) => setTimeout(r, 300));
 
-    // Apply post-render fixes then smoothRag
+    // Compose the card body with the current engine (V2 pipeline; replaces
+    // the legacy postRenderFix + smoothRag passes).
     const bodyP = container.querySelector("p");
-    let cleanupRag: (() => void) | undefined;
     if (bodyP) {
-      postRenderFix(bodyP as HTMLElement);
-      await new Promise((r) => setTimeout(r, 100));
-      cleanupRag = smoothRag(bodyP as HTMLElement);
+      typeset(bodyP as HTMLElement);
     }
     await new Promise((r) => setTimeout(r, 200));
 
@@ -294,7 +293,6 @@ function PairingCardBuilder() {
       useCORS: true,
     });
 
-    if (cleanupRag) cleanupRag();
     document.body.removeChild(container);
     return canvas.toDataURL("image/png");
   };
@@ -404,107 +402,16 @@ h1, h2, h3 {
 </body>
 </html>`;
 
-  const typesetJS = `/**
- * typeset.js — Typographic refinement for the web
- * Prevents orphans, binds short words, protects sentence boundaries.
- * From web-typography.vercel.app
- *
- * Usage:
- *   typesetText(string) — returns string with non-breaking spaces
- *   typeset(element)    — processes all text nodes in a DOM element
- *   typesetAll(selector) — processes all matching elements
- *
- * Drop-in: add typesetAll('p, h1, h2, h3, h4, li') on DOMContentLoaded
- */
+  // The CURRENT engine, not a snapshot. This card page once embedded a
+  // frozen copy of an early typeset.js here — anyone who copied it got a
+  // years-old engine. Never embed the engine as a string again; point at
+  // the generated distributable, which is always the same code as the site.
+  const typesetJS = `<!-- Typeset — the engine that set this card's preview.
+     Full pipeline: beam-search composition, hanging punctuation,
+     Tschichold spacing, self-healing lines. One line, no build step: -->
+<script src="https://typeset.us/go.js" defer></script>
 
-const NBSP = '\\u00A0';
-
-function isSentenceEnd(word) {
-  return /[.!?]$/.test(word) || /[.!?]["'\\u201D\\u2019]$/.test(word);
-}
-
-function typesetText(text) {
-  if (!text || text.length < 10) return text;
-  const words = text.split(/\\s+/).filter(Boolean);
-  if (words.length < 3) return text;
-  const result = [];
-  const shortWords = ['a','an','the','to','in','on','of','is','it','or','at','by','if','no','so','up','as','we','my','do','be'];
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const prevWord = i > 0 ? words[i - 1] : null;
-    const nextWord = i < words.length - 1 ? words[i + 1] : null;
-
-    // Rule 1: No orphans — last two words always bound
-    if (i === words.length - 2) {
-      result.push(word + NBSP + words[i + 1]);
-      break;
-    }
-
-    // Rule 2: Sentence-start protection
-    if (prevWord && isSentenceEnd(prevWord) && nextWord && !isSentenceEnd(word)) {
-      if (word.length <= 6) {
-        result.push(word + NBSP + words[i + 1]);
-        i++;
-        continue;
-      }
-    }
-
-    // Rule 3: Sentence-end protection (short punctuated words)
-    if (/[.!?,;:]$/.test(word) && word.length <= 7 && result.length > 0) {
-      const last = result.pop();
-      result.push(last + NBSP + word);
-      continue;
-    }
-
-    // Rule 3b: Bind with next short punctuated word
-    if (nextWord && /[.!?,;:]$/.test(nextWord) && nextWord.length <= 5 && i < words.length - 2) {
-      result.push(word + NBSP + words[i + 1]);
-      i++;
-      continue;
-    }
-
-    // Rule 4: Short word binding (prepositions, articles)
-    // Binds to BOTH previous and next word
-    if (shortWords.includes(word.toLowerCase()) && nextWord && !/[,;:.!?]$/.test(word)) {
-      if (result.length > 0) {
-        const prev = result.pop();
-        result.push(prev + NBSP + word + NBSP + words[i + 1]);
-      } else {
-        result.push(word + NBSP + words[i + 1]);
-      }
-      i++;
-      continue;
-    }
-
-    result.push(word);
-  }
-  return result.join(' ');
-}
-
-function typeset(element) {
-  if (!element) return;
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
-  const nodes = [];
-  let node;
-  while ((node = walker.nextNode())) nodes.push(node);
-  for (const textNode of nodes) {
-    const original = textNode.textContent;
-    if (!original || original.trim().length < 10) continue;
-    const leading = original.match(/^\\s*/)?.[0] || '';
-    const trailing = original.match(/\\s*$/)?.[0] || '';
-    textNode.textContent = leading + typesetText(original.trim()) + trailing;
-  }
-}
-
-function typesetAll(selector) {
-  document.querySelectorAll(selector).forEach(typeset);
-}
-
-// Auto-run on page load
-document.addEventListener('DOMContentLoaded', function() {
-  typesetAll('p, h1, h2, h3, h4, li, blockquote, figcaption');
-});`;
+<!-- Library version (window.Typeset) and docs: https://typeset.us/utility -->`;
 
   const [showCode, setShowCode] = useState(false);
   const [copiedField, setCopiedField] = useState("");
@@ -780,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <CodeBlock code={generatedHTML} title="HTML" />
 
                     {/* Typeset.js */}
-                    <CodeBlock code={typesetJS} title="Typeset.js — rag control + word binding" />
+                    <CodeBlock code={typesetJS} title="Typeset — one-line install (the engine that set this preview)" />
 
                     {/* Share Code */}
                     <button
