@@ -274,8 +274,10 @@ input[type="range"] {
 .text-neutral-600 { color: #8f8f8f !important; }
 .text-neutral-500 { color: #a3a3a3 !important; }
 
-/* Content sits above the field */
-body > div { position: relative; z-index: 2; }
+/* NOTE: no `body > div` positioning rule here. The app wrapper carries its
+   own position/z-index inline (layout.tsx). A global rule was tried and it
+   BROKE PORTALS: un-layered CSS beats Tailwind's layered utilities, so it
+   overrode `fixed` on the essay modal and dropped it into page flow. */
 
 @media (max-width: 640px) {
   .site-menu { top: 16px; left: 16px; }
