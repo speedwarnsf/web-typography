@@ -34,3 +34,14 @@ await build({
     js: '/* typeset.us typeset.min.js v3.0.0 — window.Typeset library; generated from src/lib/typeset.ts by scripts/build-dist.mjs; do not edit by hand. https://typeset.us */',
   },
 });
+
+// Framework-agnostic ESM core for bundler consumers (import ... from).
+await build({
+  ...common,
+  format: 'esm',
+  entryPoints: ['src/lib/typeset.ts'],
+  outfile: 'public/typeset.esm.js',
+  banner: {
+    js: '/* typeset.us typeset.esm.js v3.0.0 — ESM core; generated from src/lib/typeset.ts by scripts/build-dist.mjs; do not edit by hand. https://typeset.us */',
+  },
+});

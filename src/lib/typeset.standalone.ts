@@ -20,6 +20,7 @@ import {
   typesetAll,
   typesetText,
   typesetHeading,
+  audit,
   smoothRag,
   smoothRagSpans,
   optimizeBreaks,
@@ -77,6 +78,13 @@ const Typeset = {
 
   /** Measure element width in ch units */
   measureCh,
+
+  /**
+   * Audit composed elements from the actual rendering (DOM Range probes):
+   * returns violations — overflows, one-word last lines, weak line ends.
+   * Turns "trust us" into a CI-testable guarantee: Typeset.audit().length === 0
+   */
+  audit,
 
   /**
    * Compositor V2 — beam-search paragraph compositor.

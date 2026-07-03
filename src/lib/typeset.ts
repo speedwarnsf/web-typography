@@ -104,7 +104,10 @@ function leadingOpticalIndentPx(
  */
 export interface TypesetOptions {
   mode?: 'body' | 'heading';
-  /** Line length in characters — at narrow measures (<50ch), only orphan prevention runs */
+  /** Line length in characters. Bindings scale with measure via width-tiered
+   *  rules; the V2 compositor itself runs at every measure with tiered
+   *  profiles (see profileForMeasure) and falls back to bindings when no
+   *  valid composition exists. */
   measure?: number;
 }
 
@@ -115,7 +118,10 @@ export interface TypesetOptions {
 export function safeWrite(fn: () => void): void {
   isInternalWrite = true;
   fn();
-  requestAnimationFrame(() => { isInternalWrite = false; });
+  // setTimeout, NOT requestAnimationFrame: rAF never fires in hidden tabs,
+  // which left the flag stuck true and the MutationObserver permanently deaf
+  // for content that hydrated while backgrounded (richmondfog dogfood #7).
+  setTimeout(() => { isInternalWrite = false; }, 0);
 }
 
 /**
@@ -817,7 +823,7 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
     p.setAttribute("role", "text");
 
 
-    for (const line of lines) {
+    lines.forEach((line, i) => {
       const span = document.createElement("span");
       span.className = "ts-line";
       span.style.display = "block";
@@ -835,8 +841,13 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
       }
 
       span.textContent = line.text;
+      // Newline text node between block spans: invisible in layout, but it
+      // restores word boundaries for clipboard, find-in-page, and screen
+      // readers — without it textContent reads "The BalboaIs OlderThan Sound"
+      // (dogfood #6).
+      if (i > 0) p.appendChild(document.createTextNode('\n'));
       p.appendChild(span);
-    }
+    });
   });
 }
 
@@ -919,7 +930,8 @@ export function typesetHeading(text: string): string {
  *   - Closing punctuation attaches to previous token
  *   - Percent signs attach to previous token
  *   - Currency symbols attach to following token
- *   - One-letter article/pronoun protection (a, I) ONLY when measure >= 45ch
+ *   - One-letter article/pronoun protection (a, I) at every measure
+ *   - Rule-1 floor: the final two atoms always bind (no one-word last lines)
  *
  * All weak-word handling is now done by the compositor via penalties.
  */
@@ -929,7 +941,7 @@ function typesetBodyText(text: string, measure?: number): string {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length < 3) return text;
 
-  const m = measure ?? 65;
+  void measure; // kept for API compatibility; all bindings now run at every measure
   const result: string[] = [];
 
   for (let i = 0; i < words.length; i++) {
@@ -965,8 +977,11 @@ function typesetBodyText(text: string, measure?: number): string {
       continue;
     }
 
-    // One-letter article/pronoun protection (only at wider measures)
-    if (m >= 45 && nextWord) {
+    // One-letter article/pronoun protection (a, I) — at EVERY measure. This
+    // was gated to >=45ch, but phones need it most: "…households. I / know,
+    // because…" is the worst-looking strand in the system, and a two-character
+    // atom cannot meaningfully distort even a narrow rag (dogfood #3).
+    if (nextWord) {
       const lc = word.toLowerCase();
       if (lc === 'a' || lc === 'i') {
         result.push(word + NBSP + words[i + 1]);
@@ -993,6 +1008,17 @@ function typesetBodyText(text: string, measure?: number): string {
     result.push(word);
   }
 
+  // Rule-1 floor: the last line must never be a single word. Weak-word
+  // binding alone doesn't guarantee it ("…not to / through-traffic." — a
+  // strong lone last word still orphans). Bind the final two atoms
+  // unconditionally; worst case the pair wraps together, which is the
+  // desired floor (dogfood #5).
+  if (result.length >= 3) {
+    const lastAtom = result.pop()!;
+    const prevAtom = result.pop()!;
+    result.push(prevAtom + NBSP + lastAtom);
+  }
+
   return result.join(' ');
 }
 
@@ -1016,9 +1042,11 @@ const _chCache = new WeakMap<HTMLElement, { width: number; ch: number }>();
 let _canvas: CanvasRenderingContext2D | null = null;
 
 export function measureCh(element: HTMLElement): number {
-  // Check cache — invalidate if element width changed
+  // Check cache — invalidate if element width changed.
+  // clientWidth is 0 on inline elements; fall back to the bounding rect
+  // so they measure instead of silently defaulting (dogfood #8).
   const cached = _chCache.get(element);
-  const elWidth = element.clientWidth;
+  const elWidth = element.clientWidth || element.getBoundingClientRect().width;
   if (cached && cached.width === elWidth) return cached.ch;
 
   const cs = getComputedStyle(element);
@@ -1098,10 +1126,18 @@ function makeMeasurer(element: HTMLElement): (text: string) => number {
   }
   const ctx = _canvas;
   const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  // ctx.font ignores letter-spacing; modern Chromium exposes ctx.letterSpacing.
+  // Without it, tracked-out text measures narrower than it renders and the
+  // composed fills drift by a few percent (dogfood #10).
+  const letterSpacing =
+    cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '';
   const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
   return (text: string) => {
     if (!ctx) return text.length * fallbackCh;
     ctx.font = font;
+    if ('letterSpacing' in ctx) {
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = letterSpacing;
+    }
     return ctx.measureText(text).width;
   };
 }
@@ -1109,7 +1145,11 @@ function makeMeasurer(element: HTMLElement): (text: string) => number {
 /** Content-box width of an element in px (clientWidth minus horizontal padding). */
 function containerPxOf(element: HTMLElement): number {
   const cs = getComputedStyle(element);
-  return element.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  // clientWidth is 0 on inline elements (a linked headline's <a>, a styled
+  // <span>) — fall back to the bounding rect so they measure instead of
+  // silently failing (dogfood #8).
+  const base = element.clientWidth || element.getBoundingClientRect().width;
+  return base - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
 }
 
 /**
@@ -1155,6 +1195,69 @@ export function linesOverflow(element: HTMLElement, tolerancePx = 0.75): boolean
   return false;
 }
 
+export interface TypesetAuditViolation {
+  element: HTMLElement;
+  type: 'overflow' | 'orphan' | 'weak-line-end';
+  detail: string;
+}
+
+/**
+ * Typeset.audit(selector?) — turn "trust us" into a checkable guarantee.
+ * Scans composed elements (frozen .ts-line output) and returns typographic
+ * violations measured from the ACTUAL rendering via DOM Range probes:
+ * lines overflowing the measure, one-word last lines, and weak words
+ * stranded at line ends. Suitable for CI and integration smoke tests.
+ *
+ * Note: a weak-line-end can be a deliberate trade at very narrow measures
+ * (the engine bumps weak enders only "where width allows") — treat those
+ * entries as review items, not hard failures.
+ */
+export function audit(
+  selector = 'p, li, blockquote, figcaption, h1, h2, h3, h4'
+): TypesetAuditViolation[] {
+  if (typeof document === 'undefined') return [];
+  const violations: TypesetAuditViolation[] = [];
+  document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    const lines = Array.from(el.querySelectorAll<HTMLElement>(':scope > .ts-line'));
+    if (!lines.length) return;
+    const cs = getComputedStyle(el);
+    const rightEdge = el.getBoundingClientRect().right - parseFloat(cs.paddingRight);
+    lines.forEach((span, i) => {
+      const range = document.createRange();
+      range.selectNodeContents(span);
+      const over = range.getBoundingClientRect().right - rightEdge;
+      if (over > 0.75) {
+        violations.push({
+          element: el,
+          type: 'overflow',
+          detail: `line ${i + 1} exceeds the measure by ${over.toFixed(1)}px: "${(span.textContent || '').slice(0, 48)}"`,
+        });
+      }
+      if (i < lines.length - 1) {
+        const lastWord = (span.textContent || '').trim().split(/\s+/).pop() || '';
+        const clean = lastWord.replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase();
+        if (WEAK_END_WORDS.has(clean) || LINKING_END_WORDS.has(clean)) {
+          violations.push({
+            element: el,
+            type: 'weak-line-end',
+            detail: `line ${i + 1} ends on "${lastWord}"`,
+          });
+        }
+      }
+    });
+    const last = lines[lines.length - 1];
+    const words = (last.textContent || '').trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+    if (lines.length > 1 && words.length === 1 && !/^H[1-6]$/.test(el.tagName)) {
+      violations.push({
+        element: el,
+        type: 'orphan',
+        detail: `last line is a single word: "${(last.textContent || '').trim()}"`,
+      });
+    }
+  });
+  return violations;
+}
+
 /**
  * Full V2 line composition for a pure-text block. Sources the canonical raw
  * text (wrapper-provided `data-ts-raw`, then cache, then the live DOM), educates
@@ -1167,23 +1270,46 @@ function composeElement(element: HTMLElement, measure: number): boolean {
     ?? canonicalText.get(element)
     ?? (element.textContent || '');
   raw = educateQuotes(raw.trim());
-  if (raw.length < 10) return false;
+  if (raw.length < 10) {
+    element.dataset.tsOutcome = 'skipped:short';
+    return false;
+  }
   canonicalText.set(element, raw);
 
   const measurePx = containerPxOf(element);
-  if (measurePx <= 0) return false;
+  if (measurePx <= 0) {
+    // Usually an inline element (clientWidth 0) or display:none.
+    element.dataset.tsOutcome = 'unmeasurable';
+    return false;
+  }
 
   const measurer = makeMeasurer(element);
   const tokens = tokenize(raw, measurer);
-  const isHeading = /^H[1-6]$/.test(element.tagName);
+  // Heading detection must survive the linked-headline pattern (h4 > a, the
+  // most common listing markup on the web): an anchor composed in body mode
+  // hits the absolute orphan ban and can have NO legal composition at narrow
+  // measures — the engine then ships the exact orphan it exists to prevent
+  // (dogfood #1).
+  const isHeading =
+    /^H[1-6]$/.test(element.tagName) || !!element.closest('h1,h2,h3,h4,h5,h6');
   const composed = composeParagraph(tokens, measurePx, measure, { isHeading });
-  if (!composed) return restorePlain(element, raw);
+  if (!composed) {
+    element.dataset.tsOutcome = 'fallback:no-composition';
+    return restorePlain(element, raw);
+  }
 
   const shaped = shapeExactLines(composed, measure, measurePx) ?? composed;
-  if (!finalValidate(shaped, measure, isHeading)) return restorePlain(element, raw);
+  if (!finalValidate(shaped, measure, isHeading)) {
+    element.dataset.tsOutcome = 'fallback:validate';
+    return restorePlain(element, raw);
+  }
 
   renderFrozenLines(element, shaped);
-  if (linesOverflow(element)) return restorePlain(element, raw);
+  if (linesOverflow(element)) {
+    element.dataset.tsOutcome = 'fallback:overflow';
+    return restorePlain(element, raw);
+  }
+  element.dataset.tsOutcome = 'composed';
   return true;
 }
 
@@ -1278,6 +1404,8 @@ export function typeset(element: HTMLElement): void {
   // and we're done; otherwise fall through to the Phase-1 text-node path below.
   if (canCompose(element)) {
     if (composeElement(element, measure)) return;
+  } else {
+    element.dataset.tsOutcome = 'phase1:inline-markup';
   }
 
   const walker = document.createTreeWalker(
@@ -1605,11 +1733,12 @@ export function postRenderFix(element: HTMLElement): (() => void) | null {
 export function useTypeset(ref: { readonly current: HTMLElement | null }, deps: any[] = []) {
   if (typeof window === 'undefined') return;
 
-  // Use requestAnimationFrame to run after render
+  // setTimeout, not rAF — rAF never fires in hidden tabs, so content that
+  // mounted while backgrounded would never typeset (dogfood #7).
   const run = () => {
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       if (ref.current) typeset(ref.current);
-    });
+    }, 0);
   };
 
   // MutationObserver approach for dynamic content
@@ -1993,7 +2122,7 @@ export function smoothRag(element: HTMLElement, options?: SmoothRagOptions): () 
 
   const observer = new ResizeObserver(() => {
     if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => requestAnimationFrame(apply), 150);
+    resizeTimer = setTimeout(apply, 150); // no rAF — dead in hidden tabs
   });
   observer.observe(element);
 
@@ -2386,7 +2515,7 @@ export function optimizeBreaks(element: HTMLElement, opts?: OptimizeBreaksOption
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       lastWidth = -1; // Reset so apply() doesn't skip
-      requestAnimationFrame(apply);
+      apply(); // no rAF — dead in hidden tabs
     }, 250);
   });
   observer.observe(element);
