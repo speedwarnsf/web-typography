@@ -1063,6 +1063,9 @@ export function measureCh(element: HTMLElement): number {
   }
   if (_canvas) {
     _canvas.font = '7px serif'; // clear sticky state
+    if ('letterSpacing' in _canvas) {
+      (_canvas as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
+    }
     _canvas.font = canvasFontString(cs);
     const chPx = _canvas.font.includes(cs.fontSize) ? _canvas.measureText('0').width : 0;
     if (chPx > 0) {
@@ -1154,8 +1157,12 @@ function makeMeasurer(element: HTMLElement): Measurer {
   }
   const ctx = _canvas;
   const font = canvasFontString(cs);
+  // '0px', NEVER '' — an empty string is an invalid letterSpacing and the
+  // canvas SILENTLY KEEPS THE PREVIOUS VALUE. One tracked-out label (the
+  // hero kicker runs .38em) then poisons every subsequent measurement on
+  // the shared canvas: words measure ~25% wide, compositions starve.
   const letterSpacing =
-    cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '';
+    cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '0px';
   const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
 
   // Verify the canvas actually accepted the font: reset to a sentinel, set,
@@ -1163,6 +1170,9 @@ function makeMeasurer(element: HTMLElement): Measurer {
   let canvasOk = false;
   if (ctx) {
     ctx.font = '7px serif'; // sentinel — clears any sticky previous font
+    if ('letterSpacing' in ctx) {
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
+    }
     ctx.font = font;
     canvasOk = ctx.font.includes(cs.fontSize);
   }
