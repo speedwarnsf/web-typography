@@ -1259,10 +1259,16 @@ body:has(.v2-root) header.fixed { display: none; }
 .v2-manifesto {
   font-family: var(--font-playfair), Georgia, serif;
   font-size: clamp(1.25rem, 2.6vw, 1.8rem);
-  line-height: 1.55; color: #dcdcdc;
+  line-height: 1.66;
+  letter-spacing: .015em;
+  color: #dcdcdc;
   max-width: 34ch;
   margin: 26px 0 0;
 }
+/* Display type breathes: the engine's word-spacing contraction is tuned
+   for body sizes and reads pinched at manifesto scale — keep the composed
+   line breaks, discard the spacing squeeze. */
+.v2-manifesto .ts-line { word-spacing: normal !important; }
 
 /* ── Craft grid ── */
 .v2-grid {
