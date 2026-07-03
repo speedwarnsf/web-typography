@@ -1,7 +1,6 @@
 import { rules } from "./rules-data";
 import CodeBlock from "@/components/CodeBlock";
 import CopyButton from "@/components/CopyButton";
-import AnimatedHeroHeading from "@/components/AnimatedHeroHeading";
 
 import { readFileSync } from "fs";
 import path from "path";
@@ -234,33 +233,33 @@ export default function Home() {
       {/* Google Fonts for all 36 pairings */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
-      {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center pt-8 sm:pt-12 lg:pt-[12vh] min-h-[85vh] px-4 sm:px-6 text-center mb-4 bg-black/65 backdrop-blur-sm mx-3 sm:mx-6 lg:mx-12">
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
-        <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-8">
+      {/* ── Hero — the new-era idiom: left-aligned, engine-composed, quiet.
+             Resolution is the resting state (see docs/DESIGN-REVIEW-V2.md). ── */}
+      <section className="relative flex flex-col justify-center min-h-[78vh] px-6 sm:px-8 pt-28 pb-16 max-w-5xl mx-auto">
+        <p className="font-mono text-xs uppercase tracking-[0.4em] text-[#B8963E] mb-9">
           A resource for designers and developers
         </p>
-        <AnimatedHeroHeading />
+        <h1
+          className="text-[2.7rem] sm:text-6xl lg:text-7xl font-bold tracking-tight text-neutral-100 mb-9 max-w-[13ch]"
+          style={{ fontFamily: "var(--font-playfair)", lineHeight: 1.08 }}
+        >
+          Web typography, set like it matters.
+        </h1>
         <p
           data-no-typeset
-          className="max-w-xl text-base sm:text-lg text-neutral-400 leading-relaxed mt-6 lg:mt-16"
-          style={{ fontFamily: "var(--font-source-sans)", textWrap: "balance" }}
+          className="max-w-xl text-base sm:text-lg text-neutral-400 leading-relaxed"
+          style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >
-          Typography is the foundation of great&nbsp;design.
-          <br />
-          It shapes how we read, how we feel, and how we&nbsp;understand.
-          <br />
-          This is a practical guide to getting it right on the&nbsp;web.
+          Rules, pairings, and working tools for text on screens — every
+          paragraph on this site set live by the same engine we&nbsp;ship.
         </p>
-        <div className="mt-auto pt-8 lg:pt-12 pb-8 flex flex-wrap justify-center gap-3 text-xs font-mono uppercase tracking-widest text-neutral-600">
-          <a href="#rules" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Rules</a>
-          <a href="#pairings" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Pairings</a>
-          <a href="#tips" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Tips</a>
-          <a href="/utility" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Utility</a>
-          <a href="/proof" className="border border-neutral-800 px-4 py-2 hover:border-[#B8963E] hover:text-[#B8963E] transition-colors">Proof</a>
-        </div>
-        </div>
+        <nav className="mt-14 flex flex-wrap gap-x-8 gap-y-5">
+          <a href="#rules" className="font-mono text-xs uppercase tracking-[0.25em] text-[#B8963E] border-b border-[#B8963E] pb-1 hover:text-[#d4b158] hover:border-[#d4b158] transition-colors">Rules</a>
+          <a href="#pairings" className="font-mono text-xs uppercase tracking-[0.25em] text-[#B8963E] border-b border-[#B8963E] pb-1 hover:text-[#d4b158] hover:border-[#d4b158] transition-colors">Pairings</a>
+          <a href="#tips" className="font-mono text-xs uppercase tracking-[0.25em] text-[#B8963E] border-b border-[#B8963E] pb-1 hover:text-[#d4b158] hover:border-[#d4b158] transition-colors">Tips</a>
+          <a href="/proof" className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-400 border-b border-neutral-700 pb-1 hover:text-neutral-200 hover:border-neutral-400 transition-colors">The Proof</a>
+          <a href="/v2" className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-400 border-b border-neutral-700 pb-1 hover:text-neutral-200 hover:border-neutral-400 transition-colors">The New Era</a>
+        </nav>
       </section>
 
       {/* ── Content area — transparent wrapper, each section gets its own dark box ── */}
