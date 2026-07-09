@@ -161,22 +161,20 @@ export default function ReadingLab() {
   if (m >= 45) activeRules.push('sentence protection');
   if (m >= 55) activeRules.push('short-word binding');
 
-  const generatedJS = `import { typesetText, smoothRag } from 'typeset';
+  const generatedJS = `import { typeset } from 'typeset.us';
 
 // At ${settings.lineLength}ch measure, active rules:
 // ${activeRules.length > 0 ? activeRules.join(', ') : 'none (measure too narrow for binding rules)'}
 
-const element = document.querySelector('.readable-text');
+// One call runs the whole pipeline: quote education, beam-search
+// composition with contour re-ranking, per-line spacing, and the
+// post-render self-checks (overflow, starvation). If the engine
+// can't improve the element it restores plain text and records
+// why in data-ts-outcome.
+document.querySelectorAll('.readable-text p').forEach(typeset);
 
-// Step 1: Apply text-level rules (non-breaking spaces)
-element.innerHTML = typesetText(element.textContent, {
-  measure: ${settings.lineLength}
-});
-
-// Step 2: Smooth the rag (per-line word-spacing)
-const cleanup = smoothRag(element);
-
-// To undo: cleanup();`;
+// Or skip the import entirely:
+// <script src="https://typeset.us/go.js" defer></script>`;
 
   const previewText = [
     "Typography is the craft of endowing human language with a durable visual form, and thus with an independent existence. Its heartwood is calligraphy—the dance, on a smaller page, of the living, speaking hand—and its roots reach into living soil, though its branches may be hung with dead conventions.",

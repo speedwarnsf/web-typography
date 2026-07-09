@@ -12,7 +12,23 @@ The web abandoned paragraph-level typography forty years ago. When text moved fr
 
 This document records our attempt to bring that taste back, drawing on the mathematical foundations laid by the masters of the craft and encoding them as functions that run in the browser.
 
-**The thesis:** A well-set paragraph is not an accident. It is the product of measurable decisions — about where to break, how much to stretch, what to avoid — that have been understood for centuries. We can express those decisions as math, and the math can run on any text, any font, any column width, on any device, in milliseconds.
+> **Status note (2026-07-09).** This is a journal, and journals accumulate
+> history. Parts II–X document the v5/v6 architecture (`optimizeBreaks` +
+> `shapeRag`), which was **retired on 2026-03-17** and no longer runs
+> anywhere. The engine that actually ships — on typeset.us and in go.js —
+> is a **beam-search compositor with post-render self-verification**,
+> described in **Part XIII**, which is the only part of this document that
+> speaks in the present tense. Where the historical parts claim something
+> is "deployed" or "live," read that as *was, in March 2026*. Where they
+> claim the optimizer "evaluates all possible break configurations," that
+> was an overstatement even then (the v5 DP had a bounded lookback window),
+> and the shipped engine makes no such claim: a beam search examines a
+> pruned slice of the configuration space and **verifies its output**
+> instead of asserting optimality. We keep the old parts because the
+> failures in them — v3's merged words, the Pass 2 that was never wired —
+> are part of the record.
+
+**The thesis:** A well-set paragraph is not an accident. It is the product of measurable decisions — about where to break, how much to stretch, what to avoid — that have been understood for centuries. We can express those decisions as math, and the math can run on any text, any font, any column width, on any device, in milliseconds per paragraph (measured, not asserted: docs/BENCHMARKS.md — median 1.4 ms per paragraph in Chromium at desktop speed, 6.6 ms at a 4x-throttled mid-range-phone proxy).
 
 **The constraint:** No hyphens. "Fuck the hyphen — we have math." The web has `hyphens: auto` but it produces ugly, often wrong breaks. The great narrow-column publications (The New Yorker, Typographica, Octavo) relied on five tools: hyphenation, H&J parameters, paragraph-level optimization, hanging punctuation, and skilled editing. We're rebuilding four of the five without the one most publications leaned on.
 
@@ -84,7 +100,17 @@ Knuth's TeX line-breaking algorithm (with Michael Plass, 1981) introduced two re
 
 2. **Cubic penalty**: Badness = (deviation)³. A line that's 5% off-target costs 125 units. A line that's 15% off costs 3,375 units — 27× worse. This makes the optimizer strongly prefer many small deviations over a few large ones, which matches human perception: one terrible line in an otherwise good paragraph is worse than several slightly loose lines.
 
-**Our implementation:** Dynamic programming over all possible break points, with cubic badness centered on 85% fill (the sweet spot for ragged-right text). The DP evaluates up to 25 words back per break point, ensuring it can find optimal configurations even for lines with very long words.
+**Our v5 implementation (retired):** Dynamic programming over break points
+with cubic badness centered on 85% fill, evaluating up to 25 words back per
+break point — a bounded window, not the full configuration space, so
+"optimal" was always *optimal within the window*.
+
+**The shipped implementation (Part XIII):** a beam search, not a DP. It
+keeps Knuth's two real insights — score whole paragraphs, not single lines,
+and make deviation cost grow superlinearly — but drops the optimality
+claim. Deviation cost in the live scorer is quadratic and asymmetric
+(short lines cost more than full ones), because that is what measured
+better on real text at real widths, not because Knuth said cubic.
 
 ### The Golden Ratio Line Height (GRT)
 
@@ -173,9 +199,16 @@ The key insight: the "optimal" solution by badness score isn't always the most b
 
 ---
 
-## Part VI: The Spacing Pass (shapeRag)
+## Part VI: The Spacing Pass (shapeRag) — SUPERSEDED
 
-After breaks are optimized, spacing is adjusted to smooth the rag. This is the "accordion" — gently expanding short lines and contracting long lines toward the median fill. As of March 11, 2026, this pass is **fully implemented and deployed** as `shapeRag()` in `typeset.ts`, wired into `GlobalTypeset` as Pass 2 via a callback from `optimizeBreaks`.
+> **Historical (March 2026).** `shapeRag` and `optimizeBreaks` were retired
+> on 2026-03-17 and do not run anywhere. The shipped engine's spacing pass
+> is `shapeExactLines` (Part XIII): per-line word-spacing within a flat
+> ±0.03/0.04 em envelope, applied to lines the compositor already froze.
+> The Tschichold-derived tolerances and lhScale described below exist only
+> in this superseded code.
+
+After breaks are optimized, spacing is adjusted to smooth the rag. This is the "accordion" — gently expanding short lines and contracting long lines toward the median fill. As of March 11, 2026, this pass was implemented and deployed as `shapeRag()` in `typeset.ts`, wired into `GlobalTypeset` as Pass 2 via a callback from `optimizeBreaks`.
 
 ### Two Levers
 
@@ -236,7 +269,10 @@ No separate ResizeObserver — it inherits the resize lifecycle from `optimizeBr
 
 ---
 
-## Part VII: Results
+## Part VII: Results — HISTORICAL (v5)
+
+> These numbers were measured on the retired v5 system. Current measured
+> results are in Part XII (the /proof instrument) and docs/BENCHMARKS.md.
 
 ### Best Cases (v5)
 
@@ -262,9 +298,12 @@ At Tschichold's maximum expansion (133% of natural space = +1.4px), the spacing 
 
 ---
 
-## Part VIII: Architecture
+## Part VIII: Architecture — SUPERSEDED
 
-### Two-Pass System (Deployed)
+> **Historical (March 2026).** This two-pass system was retired 2026-03-17.
+> The shipped architecture is in Part XIII.
+
+### Two-Pass System (was deployed March 2026)
 
 ```
 Text → typesetText (pre-render bindings)
@@ -296,15 +335,26 @@ For every paragraph, the system measures:
 - **Alphabet length** → Bringhurst measure diagnostic
 - **Every word width** → exact line-width calculation
 
-### No Magic Numbers
+### No Magic Numbers (a claim we no longer make in this form)
 
-Every constant in the system traces back to a published typographic authority:
+The v5 ambition was that every constant trace to a published typographic
+authority:
 - 80% minimum word space → Tschichold
 - 133% maximum word space → Tschichold
 - 1.5–2.5× alphabet measure → Bringhurst
 - Cubic badness → Knuth
 - GRT line-height → Golden ratio research
 - Font-to-measure ratio → Fibonacci/Bringhurst
+
+**Correction (2026-07-09):** the shipped scorer contains dozens of
+constants that trace to *measurement on real text*, not to a book —
+penalty weights, fill-band edges, cliff caps, contour weights. That is a
+different and, we now think, more honest epistemology: the authorities
+supply the principles (protect meaning, avoid cliffs, prefer many small
+deviations), and the constants are tuned until the /proof instrument and
+the eye agree on real paragraphs at real widths. Part XIII lists the live
+constants and how each earned its value. Where a constant is a taste
+decision, we say so.
 
 ---
 
@@ -316,7 +366,7 @@ Traditional typesetting relied on five tools for narrow columns:
 
 1. **Hyphenation** — Breaking words at syllable boundaries. ❌ We chose not to use this.
 2. **H&J Parameters** — Precise control over hyphenation and justification spacing. ✅ Rebuilt as Tschichold tolerances.
-3. **Paragraph-level optimization** — Evaluating all possible break configurations. ✅ Rebuilt as Knuth-Plass DP.
+3. **Paragraph-level optimization** — Scoring whole paragraphs instead of single lines. ✅ Rebuilt — first as a windowed DP (v5, retired), now as a beam search with self-verification (Part XIII). No version ever evaluated *all* configurations, and the shipped engine doesn't claim to.
 4. **Hanging punctuation** — Optically aligning punctuation outside the text block. 🔜 CSS `hanging-punctuation` exists but has limited support.
 5. **Skilled editing** — Rewriting to fit the measure. ❌ We can't change the author's words.
 
@@ -336,9 +386,15 @@ These publications solved narrow-column typography through craft:
 
 ---
 
-## Part X: What's Deployed (as of March 11, 2026)
+## Part X: What Was Deployed (as of March 11, 2026) — HISTORICAL
 
-The full two-pass system is live on typeset.us:
+> **None of the rows below are live anymore.** The two-pass system was
+> retired 2026-03-17 in favor of the compositor described in Part XIII;
+> `optimizeBreaks`, `shapeRag`, `smoothRag`, and their relatives survive
+> only in a quarantined legacy block that ships in no bundle. What is
+> deployed *today* is one path: `typeset()`.
+
+The full two-pass system was live on typeset.us:
 
 | Component | Function | Status |
 |-----------|----------|--------|
@@ -432,6 +488,112 @@ half). Measured on the same essay paragraph at 375px: lines 11→10, rag range
 21%→17%, stairsteps 2→1, and the composition now ends three sentences
 exactly at line ends. Zero additional composition cost — the candidates were
 already computed and previously discarded.
+
+---
+
+## Part XIII: The Shipped Engine (2026-07-09) — the present tense
+
+Everything above this line is history or measurement. This part describes
+what actually runs — on every page of typeset.us, in go.js, and in
+typeset.min.js — with no claims the code doesn't back.
+
+### The pipeline
+
+```
+text → educateQuotes (author's dash spacing preserved)
+     → tokenize (whitespace tokens + syntactic bindings)
+     → composeParagraph        BEAM SEARCH, not DP
+     → contour re-rank         best rag shape among near-optimal completes
+     → shapeExactLines         per-line word-spacing, +0.03 / −0.04 em
+     → finalValidate           every frozen line re-measured against the box
+     → renderFrozenLines       block spans + \n text nodes, optical indents
+     → post-render self-checks linesOverflow, linesStarved → restore plain
+```
+
+One path. `GlobalTypeset` on the site and `Typeset.compose()` in the
+bundles both call `typeset()`; there is no parallel wiring.
+
+### The search, stated plainly
+
+`composeParagraph` is a **beam search**: it advances line by line, keeping
+the best **48** partial compositions (**80** for paragraphs over 120
+tokens), considering up to **25** tokens of lookahead per line, retaining
+up to **200** finished compositions, and stopping after at most 500
+iterations. A paragraph of *n* words has on the order of 2^(n−1) possible
+break configurations; the beam examines a vanishingly small, heuristically
+chosen slice of them.
+
+**Therefore the engine does not — and cannot — claim optimality.** What it
+claims instead is *verified adequacy*: every composition it ships has been
+re-measured line by line against the real content box (`finalValidate`),
+checked for overflow and starvation after rendering, and abandoned in
+favor of the browser's own layout if it fails (`data-ts-outcome`
+records which). The guarantee moved from the search ("we looked at
+everything") to the checker ("we measured what we shipped"). The second
+guarantee is the one a reader can feel and a test can assert.
+
+### The economics (live constants, and where each came from)
+
+The governing principle, learned the hard way in the July rag-tuning
+session: **shape must never outbid meaning.** Every structural violation
+costs more than any sum of cosmetic improvements can buy back.
+
+| Constant | Value | Earned how |
+|---|---|---|
+| Fill target (body) | 0.85 | Ragged-right sweet spot (Knuth's center, kept) |
+| Admissibility cap | fill ≤ 0.97 | Measured: the old 0.85 cap cost 2–3 lines per paragraph at 375px |
+| Fill deviation | quadratic, ×3000 short / ×1200 full | Asymmetry measured on /proof: short lines read worse than full ones |
+| Weak line-end (preposition/article/conjunction) | 7,000–8,200 by tier | Raised above any plausible cliff sum so smoothness can never buy a weak ender |
+| Linking-verb line-end | 1,600 | Taste, tested on real text |
+| Dangling sentence start | 2,600–7,000 | Reading-flow protection |
+| Orphan (last line) | effectively infinite (10⁹) | The classic sin is not for sale |
+| Heading widow | 60,000 (finite) | Headings may widow only when physics forces it |
+| Rag cliff (adjacent fill jump > 6%) | min(1800, 250000·(jump−0.06)²) | Graduated and *capped below one weak ender* |
+| Contour re-rank slack | ≤ 3,200 | Capped below one violation: re-ranking may spend taste, never meaning |
+| Contour score | 2.0·spread + 3.0·maxStep + 1.5·registerShift | Weights tuned on the /about long paragraphs |
+| Word-spacing envelope | +0.03 / −0.04 em | Tighter than Tschichold's 80–133%; at body sizes more is visible |
+
+These are tuned constants, verified by measurement on real paragraphs at
+real widths through the /proof instrument. The authorities supply the
+principles; the numbers earn their keep or get changed.
+
+### Self-verification (the part we'd defend in diligence)
+
+- `finalValidate` — every line re-measured before rendering.
+- `linesOverflow` — rendered ink wider than the content box → composition
+  discarded, plain text restored.
+- `linesStarved` — median non-last fill < 0.62 on a body paragraph →
+  discarded. (This check caught the iOS canvas-state poisoning bug before
+  we understood its cause — the checker paid for itself.)
+- `data-ts-outcome` — every element records what happened to it:
+  `composed`, `fallback:*`, or `skipped:*`.
+- `Typeset.audit()` — DOM-Range probes of the *actual rendering*: returns
+  overflows, orphans, weak line-ends. Asserted in CI (tests/engine.spec.ts)
+  in Chromium and WebKit.
+
+### Measurement discipline
+
+Canvas text state silently keeps invalid assignments (`ctx.letterSpacing
+= ''` keeps the previous tracked value; Safari keeps the previous font if
+a family fails to parse). So: every family quoted, sentinel resets between
+sessions, the measurer *verifies* the canvas accepted the font and falls
+back to a DOM-span measurer when it doesn't. Every one of those clauses is
+a production bug we shipped, found on a real phone, and root-caused.
+
+### Honest limits (current)
+
+- **English-only heuristics.** The weak-word lists, quote education, and
+  whitespace tokenizer assume English; the engine skips what it can't
+  measure, but a `lang` gate is future work, not present fact.
+- **Copy/paste** carries a `\n` at composed line breaks (chosen over the
+  worse defect of welded words).
+- **Synchronous composition** on the main thread; measured budgets are in
+  docs/BENCHMARKS.md rather than claimed in prose.
+- **Dynamic text** must opt out (`data-no-typeset`): in-place text-node
+  updates from a framework are not detected, and stale restores are
+  possible without it.
+
+*This part supersedes Parts II–X wherever they disagree.*
 
 ---
 

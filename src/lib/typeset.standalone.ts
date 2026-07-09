@@ -15,22 +15,19 @@
  *   </script>
  */
 
+// Only the live pipeline is imported here. The legacy v5 passes (smoothRag,
+// optimizeBreaks, shapeRag, postRenderFix, …) are quarantined: they are NOT
+// part of the public bundle API, so esbuild tree-shakes their ~1,400 lines
+// (including innerHTML paths unsafe on user-generated text) out of every
+// distributable. If you relied on them, migrate to Typeset.run/compose —
+// the compositor replaces all of them through one verified path.
 import {
   typeset,
   typesetAll,
   typesetText,
   typesetHeading,
   audit,
-  smoothRag,
-  smoothRagSpans,
-  optimizeBreaks,
-  shapeRag,
-  fixRealOrphans,
-  fixRag,
-  fixStrandedSentenceStarts,
-  postRenderFix,
   measureCh,
-  safeWrite,
   shouldIgnoreMutation,
   tokenize,
   composeParagraph,
@@ -51,30 +48,6 @@ const Typeset = {
 
   /** Process a heading string (returns string with semantic line breaks) */
   heading: typesetHeading,
-
-  /** Smooth the right rag of an element via word-spacing adjustments */
-  smoothRag,
-
-  /** Smooth rag using pre-wrapped span elements (non-destructive) */
-  smoothRagSpans,
-
-  /** Optimize line breaks using Knuth-Plass algorithm */
-  optimizeBreaks,
-
-  /** Shape the rag (combine smoothing + optimization) */
-  shapeRag,
-
-  /** Fix orphans only */
-  fixOrphans: fixRealOrphans,
-
-  /** Fix rag only */
-  fixRag,
-
-  /** Fix stranded sentence starts */
-  fixStrandedSentenceStarts,
-
-  /** Post-render fix (orphans + rag) */
-  postRenderFix,
 
   /** Measure element width in ch units */
   measureCh,
@@ -184,11 +157,10 @@ const Typeset = {
   /** Auto-run on DOMContentLoaded for elements with [data-typeset] */
   auto() {
     const run = () => {
-      document.querySelectorAll<HTMLElement>('[data-typeset]').forEach(el => {
+      document.querySelectorAll<HTMLElement>('[data-typeset], [data-typeset-smooth]').forEach(el => {
+        // [data-typeset-smooth] used to invoke the legacy smoothRag pass;
+        // the compositor supersedes it, so both attributes route to typeset().
         typeset(el);
-      });
-      document.querySelectorAll<HTMLElement>('[data-typeset-smooth]').forEach(el => {
-        smoothRag(el);
       });
       document.querySelectorAll<HTMLElement>('[data-typeset-heading]').forEach(el => {
         el.innerHTML = typesetHeading(el.textContent || '');

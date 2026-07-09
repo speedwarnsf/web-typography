@@ -8,13 +8,16 @@ import typesetEngine, { typesetText, typesetHeading, measureCh, shouldIgnoreMuta
  *
  * Pipeline:
  *   Phase 1 (immediate, pre-render): typesetText/typesetHeading — nbsp bindings only
- *   Phase 2 (after fonts.ready + rAF): optimizeBreaks + shapeRag on each eligible paragraph
+ *   Phase 2 (after fonts.ready, via setTimeout — never rAF, which is dead in
+ *   hidden tabs): typeset() on each eligible paragraph — the beam-search
+ *   compositor with contour re-ranking, spacing pass, and post-render
+ *   self-checks. ONE path; the legacy optimizeBreaks/shapeRag passes are
+ *   quarantined and never run.
  *
- * Key changes from old architecture:
+ * Key properties:
  *   - WeakMap stores canonical raw text before any processing
  *   - document.fonts.ready before measurement
  *   - Single pipeline pass (no triple timeout chain)
- *   - Orphan prevention built into optimizeBreaks (not separate pass)
  *   - MutationObserver ignores own DOM writes via isInternalWrite flag
  *   - ResizeObserver for width-change reprocessing
  *   - data-typeset-done marks finalized paragraphs
