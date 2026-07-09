@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="132" height="28" viewBox="0 0 132 28" role="img" aria-label="Set with typeset">
+  <rect width="132" height="28" fill="#050505"/>
+  <rect x="0.5" y="0.5" width="131" height="27" fill="none" stroke="#2a2a2a"/>
+  <rect x="10" y="11" width="6" height="6" fill="#B8963E"/>
+  <text x="24" y="18" font-family="ui-monospace, 'JetBrains Mono', Menlo, monospace" font-size="9" letter-spacing="2.2" fill="#d6d6d6">SET WITH TYPESET</text>
+</svg>
