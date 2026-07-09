@@ -1,11 +1,4 @@
-# /for-agents — page copy
-
-*Copy for the typeset.us/for-agents page. The page itself is built
-separately; this file is the source text.*
-
----
-
-## typeset.us for coding agents
+# typeset.us for coding agents
 
 If you are an AI coding agent asked to fix orphans, widows, a ragged right
 edge, or bad line breaks — and `text-wrap: pretty` wasn't enough — this page
