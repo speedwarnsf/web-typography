@@ -1,0 +1,25 @@
+# typeset.us
+
+> Paragraph compositor for the browser: beam-search line breaking with
+> syntactic protection and post-render self-verification, for English
+> long-form prose. The only typography intervention with a machine-checkable
+> definition of done: `Typeset.audit()` returns `[]`.
+
+Install is one script tag (`<script src="https://typeset.us/go.js" defer>`)
+or `npm install typeset.us` and `typeset(el)` after `document.fonts.ready`.
+Mark framework-re-rendered text with `data-no-typeset`. Verify with
+`Typeset.audit() === []` and `data-ts-outcome="composed"`. Measured cost:
+1.4 ms median per paragraph in desktop Chromium. The browser types. It
+doesn't read.
+
+## Docs
+
+- [For agents](https://typeset.us/for-agents): canonical install, scoping,
+  and verification instructions for AI coding agents
+- [Library](https://typeset.us/library): the engine's rules, constants, and
+  the measurements behind them
+
+## Package
+
+- [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
+  typeset.us@3.0.0, MIT — ESM, CJS, and global builds with types

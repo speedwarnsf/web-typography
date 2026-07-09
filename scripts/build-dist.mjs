@@ -90,4 +90,55 @@ execSync(
 );
 
 await copyFile('LICENSE', 'packages/typeset.us/LICENSE');
+
+// ── Versioned URL + SRI (the receipts) ──
+// typeset.us/go.js stays the evergreen civilian alias; go@<version>.js is
+// the pinnable artifact with a published integrity hash, so marketplaces,
+// enterprises, and agents can verify exactly what they're running.
+const { createHash } = await import('node:crypto');
+const { writeFile, readdir, unlink } = await import('node:fs/promises');
+
+const goBytes = await readFile('public/go.js');
+// Remove stale versioned copies so the repo carries exactly one.
+for (const f of await readdir('public')) {
+  if (/^go@\d+\.\d+\.\d+\.js$/.test(f) && f !== `go@${V}.js`) await unlink(`public/${f}`);
+}
+await writeFile(`public/go@${V}.js`, goBytes);
+
+const sri = (buf) => `sha384-${createHash('sha384').update(buf).digest('base64')}`;
+const manifest = {
+  version: V,
+  files: {
+    [`go@${V}.js`]: sri(goBytes),
+    'typeset.min.js': sri(await readFile('public/typeset.min.js')),
+    'typeset.esm.js': sri(await readFile('public/typeset.esm.js')),
+  },
+  snippet: `<script src="https://typeset.us/go@${V}.js" integrity="${sri(goBytes)}" crossorigin="anonymous" defer></script>`,
+};
+await writeFile('public/sri.json', JSON.stringify(manifest, null, 2) + '\n');
+
+// Substitute version/SRI into agent-facing docs (idempotent: matches both
+// the __GO_VERSION__/__GO_SRI__ placeholders and any previously-substituted
+// concrete values, so re-running after a version bump re-pins everything).
+const substituteInto = async (path) => {
+  let text;
+  try { text = await readFile(path, 'utf8'); } catch { return; }
+  const out = text
+    .replaceAll('__GO_VERSION__', V)
+    .replaceAll('__GO_SRI__', manifest.files[`go@${V}.js`])
+    .replace(/go@\d+\.\d+\.\d+\.js/g, `go@${V}.js`)
+    .replace(/sha384-[A-Za-z0-9+/=]+/g, manifest.files[`go@${V}.js`]);
+  if (out !== text) await writeFile(path, out);
+};
+for (const p of ['packages/typeset.us/AGENTS.md', 'SKILL.md', 'public/llms.txt', 'docs/for-agents-copy.md', 'docs/agents-canonical.md']) {
+  await substituteInto(p);
+}
+
+// /for-agents.md — the canonical doc served raw from the site (agents fetch
+// markdown; llms.txt and SKILL.md point here).
+try {
+  await copyFile('docs/for-agents-copy.md', 'public/for-agents.md');
+} catch { /* doc not present in partial builds */ }
+
 console.log(`\npackage artifacts built: packages/typeset.us v${V}`);
+console.log(`versioned drop-in: public/go@${V}.js  ${manifest.files[`go@${V}.js`]}`);

@@ -1,4 +1,4 @@
-/* typeset.us v3.0.0 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.1.0 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";

@@ -1,0 +1,9 @@
+{
+  "version": "3.1.0",
+  "files": {
+    "go@3.1.0.js": "sha384-J9UY6pNw+i3NT2MKEEzGIzniRFa4pbQxH24k62MLRFls0fytpa7nAt/7VB7Db+rD",
+    "typeset.min.js": "sha384-xGhI0WRsb3skvX5F6/f4y1vhPZLiV1m/0zFAPKMBbvBKDVHiIu6G86Kjw6XNvmN4",
+    "typeset.esm.js": "sha384-dqt059REnxy/mTGerOvetIsarZE3okVP92kVOJNNd0wbXjbHk0Qez60AX2+D+twt"
+  },
+  "snippet": "<script src=\"https://typeset.us/go@3.1.0.js\" integrity=\"sha384-J9UY6pNw+i3NT2MKEEzGIzniRFa4pbQxH24k62MLRFls0fytpa7nAt/7VB7Db+rD\" crossorigin=\"anonymous\" defer></script>"
+}
