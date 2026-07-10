@@ -119,8 +119,8 @@ export default function EssayPage() {
         </p>
 
         <p>
-          And then — this is the part I refuse to ship without — it checks
-          its own work. Every composition is re-measured against the live
+          And then it checks its own work. Every composition is re-measured
+          against the live
           rendering. If a webfont arrives late, if a container lies about its
           width, if any of a dozen browser quirks would make the composed
           paragraph worse than the browser&rsquo;s own, the engine restores
