@@ -1,4 +1,4 @@
-/* typeset.us v3.2.0 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.2.1 — MIT © Dustin York. https://typeset.us */
 "use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -324,17 +324,18 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
       penalty += 7e3;
     }
     if (!isLast && lastContent && !isSentenceEnd(lastContent.text)) {
-      let crossesBoundary = false;
+      let wordsIntoSentence = -1;
       for (const t of lineTokens) {
         if (t === lastContent) break;
-        if (t.kind !== "space" && isSentenceEnd(t.text)) {
-          crossesBoundary = true;
-          break;
-        }
+        if (t.kind === "space") continue;
+        if (isSentenceEnd(t.text)) wordsIntoSentence = 0;
+        else if (wordsIntoSentence >= 0) wordsIntoSentence++;
       }
-      if (crossesBoundary) {
+      if (wordsIntoSentence === 0) {
         const openerLen = lastContent.text.replace(/[^A-Za-z0-9]/g, "").length;
         penalty += openerLen <= 4 ? 7e3 : DANGLING_START_PENALTY;
+      } else if (wordsIntoSentence === 1) {
+        penalty += 2600;
       }
     }
     if (isHeading && lastContent && isSentenceEnd(lastContent.text)) {

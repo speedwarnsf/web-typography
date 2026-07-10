@@ -526,21 +526,28 @@ function composeParagraph(
     // whenever the shortened previous line's fill penalty stays under this, so
     // it only fires "where width allows" and never overrides orphanPenalty.
     if (!isLast && lastContent && !isSentenceEnd(lastContent.text)) {
-      let crossesBoundary = false;
+      // Distance matters (2026-07-09, the essay's odd-rag regression): the
+      // sin is a new sentence's OPENING stranded at the line end ("…word.
+      // Books"), not a line that merely carries a boundary and reads on.
+      // Charging every boundary-crossing line (the old check) at real
+      // strength made the engine end lines at sentence ends instead, buying
+      // 50%-fill lines to avoid mid-line periods. Charge by how few words
+      // the new sentence got before the break: one word = stranded opener,
+      // two = mild, three or more = an ordinary healthy line.
+      let wordsIntoSentence = -1; // -1: no boundary before lastContent
       for (const t of lineTokens) {
         if (t === lastContent) break;
-        if (t.kind !== "space" && isSentenceEnd(t.text)) {
-          crossesBoundary = true;
-          break;
-        }
+        if (t.kind === "space") continue;
+        if (isSentenceEnd(t.text)) wordsIntoSentence = 0;
+        else if (wordsIntoSentence >= 0) wordsIntoSentence++;
       }
-      if (crossesBoundary) {
-        // A SHORT opener stranded at a line end ("…justice. He") is the worst
-        // case — penalize it hard enough to beat all but the most extreme
-        // short-line cost, so the engine breaks before it. Longer openers get
-        // the milder base penalty.
+      if (wordsIntoSentence === 0) {
+        // lastContent is the new sentence's FIRST word, stranded at the edge.
         const openerLen = lastContent.text.replace(/[^A-Za-z0-9]/g, "").length;
         penalty += openerLen <= 4 ? 7000 : DANGLING_START_PENALTY;
+      } else if (wordsIntoSentence === 1) {
+        // Two words in — readable, but the opening still clings to the edge.
+        penalty += 2600;
       }
     }
 

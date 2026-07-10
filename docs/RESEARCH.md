@@ -545,7 +545,7 @@ costs more than any sum of cosmetic improvements can buy back.
 | Fill deviation | quadratic, ×3000 short / ×1200 full | Asymmetry measured on /proof: short lines read worse than full ones |
 | Weak line-end (preposition/article/conjunction) | 7,000–8,200 by tier | Raised above any plausible cliff sum so smoothness can never buy a weak ender |
 | Linking-verb line-end | 1,600 | Taste, tested on real text |
-| Dangling sentence start | 2,600–7,000 | Reading-flow protection |
+| Dangling sentence start | by distance: opener stranded = 5,200 (7,000 if ≤4 letters), two words in = 2,600, three+ = free | Reading-flow protection — charging every boundary-crossing line steered breaks toward sentence ends and bought 50%-fill lines (the essay's odd-rag regression, 2026-07-09) |
 | Orphan (last line) | effectively infinite (10⁹) | The classic sin is not for sale |
 | Heading widow | 60,000 (finite) | Headings may widow only when physics forces it |
 | Rag cliff (adjacent fill jump > 6%) | min(1800, 250000·(jump−0.06)²) | Graduated and *capped below one weak ender* |
