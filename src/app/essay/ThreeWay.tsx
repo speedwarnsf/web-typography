@@ -74,8 +74,8 @@ function measureComposed(p: HTMLElement): Tally {
 
 export default function ThreeWay() {
   const [mode, setMode] = useState<ModeKey>('browser');
-  const [width, setWidth] = useState(320);
-  const [maxW, setMaxW] = useState(400);
+  const [width, setWidth] = useState(0); // set to the wide-open max on mount
+  const [maxW, setMaxW] = useState(592);
   const [tallies, setTallies] = useState<Record<ModeKey, Tally> | null>(null);
   const refs = {
     browser: useRef<HTMLParagraphElement>(null),
@@ -84,10 +84,14 @@ export default function ThreeWay() {
   };
 
   useEffect(() => {
+    // Wide end = the full reading column (592px inside .es-root), so the
+    // squeeze travels from a real desktop measure down to phone-narrow —
+    // the whole collapse, not a tour of narrow-column land. Start wide
+    // open; the reader does the squeezing.
     const clamp = () => {
-      const m = Math.min(400, Math.max(250, window.innerWidth - 72));
+      const m = Math.min(592, Math.max(250, window.innerWidth - 72));
       setMaxW(m);
-      setWidth((w) => Math.min(w, m));
+      setWidth((w) => (w === 0 ? m : Math.min(w, m)));
     };
     clamp();
     window.addEventListener('resize', clamp);
@@ -97,6 +101,7 @@ export default function ThreeWay() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (width === 0) return; // waiting for the mount-time clamp
       await document.fonts.ready.catch(() => {});
       if (cancelled) return;
       const spanHtml = DEMO_TEXT.split(' ').map((w) => `<span data-w>${w}</span>`).join(' ');

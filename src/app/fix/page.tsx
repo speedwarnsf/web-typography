@@ -165,10 +165,10 @@ export default function FixPage() {
     }
   };
 
-  // Panels must never overflow a phone viewport.
+  // Wide end = a real desktop reading measure; never overflow a phone.
   useEffect(() => {
     const clamp = () => {
-      const m = Math.min(420, Math.max(250, window.innerWidth - 72));
+      const m = Math.min(640, Math.max(250, window.innerWidth - 72));
       setMaxW(m);
       setWidth((w) => Math.min(w, m));
     };
@@ -266,8 +266,9 @@ export default function FixPage() {
               <p ref={typesetRef} className={mode === 'typeset' ? 'fx-panel' : 'fx-panel fx-panel-off'} data-no-typeset />
             </div>
             <p className="fx-source" data-no-typeset>
-              Your opening paragraph, from {g.title} — set in our reading face at
-              phone width. Dotted marks are measured, not decorative.
+              Your opening paragraph, from {g.title} — set in our reading
+              face. Squeeze the column and watch the counts. Dotted marks are
+              measured, not decorative.
             </p>
           </section>
 
