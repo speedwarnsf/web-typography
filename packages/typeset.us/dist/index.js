@@ -1,4 +1,4 @@
-/* typeset.us v3.1.1 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.1.2 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -157,7 +157,7 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
   const BEAM = tokens.length > 120 ? 80 : 48;
   const isHeading = opts.isHeading === true;
   const SENTENCE_END_BONUS = 1300;
-  const DANGLING_START_PENALTY = 2600;
+  const DANGLING_START_PENALTY = 5200;
   const LINKING_END_PENALTY = 1600;
   const contentTokens = tokens.filter((t) => t.kind !== "space");
   if (contentTokens.length < 2) return null;
@@ -424,7 +424,7 @@ function shapeExactLines(lines, measureCh2, measurePx) {
     const maxExpand = 0.03;
     const maxContract = 0.04;
     if (spacingEm > maxExpand) {
-      shapedLines.push({ ...line, wordSpacingEm: spacingEm > maxExpand * 2 ? 0 : maxExpand });
+      shapedLines.push({ ...line, wordSpacingEm: maxExpand });
     } else if (spacingEm < -maxContract) {
       shapedLines.push({ ...line, wordSpacingEm: spacingEm < -maxContract * 2 ? 0 : -maxContract });
     } else {

@@ -302,7 +302,12 @@ function composeParagraph(
   // width allows." Rewards ending a line at a sentence boundary; penalizes a
   // line that crosses a boundary and leaves a sentence-start word dangling.
   const SENTENCE_END_BONUS = 1300;
-  const DANGLING_START_PENALTY = 2600;
+  // 5200, was 2600: "…abandoned word. Books" — a five-letter sentence
+  // opener dangled at a line end because the mild tier was cheap enough
+  // for shape costs to outbid meaning (Dustin caught it on the essay,
+  // 2026-07-09). Now above any plausible cliff sum, below the weak-end
+  // floor (7000) that short openers already get.
+  const DANGLING_START_PENALTY = 5200;
   // Gentle nudge against copula/auxiliary verbs at a line end (below the fill
   // penalty for a sub-0.70 line, so it only bumps when the line stays full).
   const LINKING_END_PENALTY = 1600;
@@ -766,16 +771,15 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     const maxExpand = 0.03;    // subtle expansion on short lines
     const maxContract = 0.04;  // contraction cap, aligned with finalValidate
 
-    // The accordion's reach: within the caps, shape proportionally; just
-    // beyond them, apply the cap (the line is close enough that full gentle
-    // force still moves the rag). But a line needing more than twice the
-    // cap is OUT OF REACH — maximum force would shift its edge by a
-    // fraction of the gap while visibly tinting its texture, so leave it
-    // natural. (2026-07-09, Dustin's whole-page-reads-tight catch: at
-    // narrow measures most lines were out of reach and piled at maximum
-    // contraction — all tightening, no rag benefit.)
+    // The accordion is ASYMMETRIC (Dustin, 2026-07-09). Expansion: short
+    // lines always breathe out, at the cap if need be — air helps the rag
+    // and never reads cramped. Contraction: only within reach; a line
+    // needing more than twice the cap would gain a fraction of a gap at
+    // the edge while visibly tightening its texture, so it stays natural
+    // (the whole-page-reads-tight regression: at narrow measures most
+    // lines were out of reach and piled at maximum contraction).
     if (spacingEm > maxExpand) {
-      shapedLines.push({ ...line, wordSpacingEm: spacingEm > maxExpand * 2 ? 0 : maxExpand });
+      shapedLines.push({ ...line, wordSpacingEm: maxExpand });
     } else if (spacingEm < -maxContract) {
       shapedLines.push({ ...line, wordSpacingEm: spacingEm < -maxContract * 2 ? 0 : -maxContract });
     } else {
