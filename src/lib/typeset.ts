@@ -738,9 +738,15 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
       : nonLastFills[mid];
       
     // Prevent target from being too wide (justification) or too narrow.
-    // Upper clamp tracks the compositor's fuller admissible band (was 0.85,
-    // which forced contraction on every composition fuller than that).
-    targetFill = Math.max(0.70, Math.min(0.93, targetFill));
+    // Upper clamp must track the compositor's admissible band (fill <= 0.97)
+    // or the accordion leans tight across the whole page: at 0.93, every
+    // line legitimately composed in the 0.93-0.97 band was pulled DOWN by
+    // word-spacing contraction — on real pages ~40% of lines sat at maximum
+    // contraction and whole text blocks read "kerned tight" (Dustin's catch,
+    // 2026-07-09). 0.965 re-centers the accordion where the compositor
+    // actually lives; short lines still expand, genuinely overfull lines
+    // still contract.
+    targetFill = Math.max(0.70, Math.min(0.965, targetFill));
 
     const targetWidth = measurePx * targetFill;
     const delta = targetWidth - line.width;
@@ -760,10 +766,18 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     const maxExpand = 0.03;    // subtle expansion on short lines
     const maxContract = 0.04;  // contraction cap, aligned with finalValidate
 
+    // The accordion's reach: within the caps, shape proportionally; just
+    // beyond them, apply the cap (the line is close enough that full gentle
+    // force still moves the rag). But a line needing more than twice the
+    // cap is OUT OF REACH — maximum force would shift its edge by a
+    // fraction of the gap while visibly tinting its texture, so leave it
+    // natural. (2026-07-09, Dustin's whole-page-reads-tight catch: at
+    // narrow measures most lines were out of reach and piled at maximum
+    // contraction — all tightening, no rag benefit.)
     if (spacingEm > maxExpand) {
-      shapedLines.push({ ...line, wordSpacingEm: maxExpand });
+      shapedLines.push({ ...line, wordSpacingEm: spacingEm > maxExpand * 2 ? 0 : maxExpand });
     } else if (spacingEm < -maxContract) {
-      shapedLines.push({ ...line, wordSpacingEm: -maxContract });
+      shapedLines.push({ ...line, wordSpacingEm: spacingEm < -maxContract * 2 ? 0 : -maxContract });
     } else {
       shapedLines.push({ ...line, wordSpacingEm: spacingEm });
     }

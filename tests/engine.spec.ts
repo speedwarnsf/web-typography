@@ -90,6 +90,34 @@ test('quarantined legacy API does not ship in the bundle', async ({ page }) => {
   expect(legacy).toEqual([]);
 });
 
+test('spacing accordion is centered, not biased tight', async ({ page }) => {
+  // Texture invariant (added 2026-07-09 after the whole-page-reads-tight
+  // regression): the accordion must breathe AROUND the compositor's chosen
+  // fills — short lines expand, genuinely overfull lines contract. When the
+  // spacing-pass target clamp falls below the compositor's admissible band,
+  // the broad middle of every page gets pulled down and body text reads
+  // "kerned tight" while every violation-based check still passes. Guard the
+  // distribution itself: no more than a quarter of shaped lines may sit at
+  // maximum contraction.
+  await loadFixture(page);
+  const stats = await page.$$eval('p:not([data-no-typeset])', (ps) => {
+    const ws: number[] = [];
+    for (const p of ps) {
+      const lines = Array.from(p.querySelectorAll<HTMLElement>(':scope > .ts-line'));
+      // Non-last lines only: the last line is the rag's tail and unshaped.
+      for (const line of lines.slice(0, -1)) {
+        ws.push(parseFloat(line.style.wordSpacing) || 0);
+      }
+    }
+    const atMaxContraction = ws.filter((v) => v <= -0.039).length;
+    const mean = ws.reduce((a, b) => a + b, 0) / (ws.length || 1);
+    return { lines: ws.length, atMaxContraction, mean };
+  });
+  expect(stats.lines).toBeGreaterThan(4);
+  const share = stats.atMaxContraction / stats.lines;
+  expect(share, `${stats.atMaxContraction}/${stats.lines} lines at max contraction (mean ${stats.mean.toFixed(4)}em)`).toBeLessThan(0.25);
+});
+
 test('recomposition survives a width change without overflow', async ({ page }) => {
   await loadFixture(page);
   await page.setViewportSize({ width: 375, height: 800 });

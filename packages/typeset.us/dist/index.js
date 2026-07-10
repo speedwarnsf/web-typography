@@ -1,4 +1,4 @@
-/* typeset.us v3.1.0 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.1.1 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -415,7 +415,7 @@ function shapeExactLines(lines, measureCh2, measurePx) {
     const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
     const mid = Math.floor(nonLastFills.length / 2);
     targetFill = nonLastFills.length % 2 === 0 ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 : nonLastFills[mid];
-    targetFill = Math.max(0.7, Math.min(0.93, targetFill));
+    targetFill = Math.max(0.7, Math.min(0.965, targetFill));
     const targetWidth = measurePx * targetFill;
     const delta = targetWidth - line.width;
     const spacingPx = delta / gaps;
@@ -424,9 +424,9 @@ function shapeExactLines(lines, measureCh2, measurePx) {
     const maxExpand = 0.03;
     const maxContract = 0.04;
     if (spacingEm > maxExpand) {
-      shapedLines.push({ ...line, wordSpacingEm: maxExpand });
+      shapedLines.push({ ...line, wordSpacingEm: spacingEm > maxExpand * 2 ? 0 : maxExpand });
     } else if (spacingEm < -maxContract) {
-      shapedLines.push({ ...line, wordSpacingEm: -maxContract });
+      shapedLines.push({ ...line, wordSpacingEm: spacingEm < -maxContract * 2 ? 0 : -maxContract });
     } else {
       shapedLines.push({ ...line, wordSpacingEm: spacingEm });
     }
