@@ -83,6 +83,12 @@
   color: #8f8f8f;
 }
 .es-squeeze input { width: 130px; accent-color: #b8963e; }
+.es-width-readout {
+  color: #b8963e;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  min-width: 4.2em;
+}
 .es-panels {
   position: relative;
   border-left: 1px solid #2a2a2a;

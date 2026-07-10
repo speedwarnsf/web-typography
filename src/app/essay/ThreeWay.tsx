@@ -92,7 +92,10 @@ export default function ThreeWay() {
     // the whole collapse, not a tour of narrow-column land. Start wide
     // open; the reader does the squeezing.
     const clamp = () => {
-      const m = Math.min(592, Math.max(250, window.innerWidth - 72));
+      // -40, not -72: on a phone the dashed measure line should run to
+      // within ~16px of the screen edge (the panel may overhang the reading
+      // column's right padding; main clips nothing until the viewport).
+      const m = Math.min(592, Math.max(250, window.innerWidth - 40));
       setMaxW(m);
       setWidth((w) => (w === 0 ? m : Math.min(w, m)));
     };
@@ -149,6 +152,7 @@ export default function ThreeWay() {
         <label className="es-squeeze">
           <span>squeeze</span>
           <input type="range" min={250} max={maxW} value={width} onChange={(e) => setWidth(Number(e.target.value))} />
+          <span className="es-width-readout">{width || maxW}px</span>
         </label>
       </div>
 

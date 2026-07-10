@@ -168,7 +168,8 @@ export default function FixPage() {
   // Wide end = a real desktop reading measure; never overflow a phone.
   useEffect(() => {
     const clamp = () => {
-      const m = Math.min(640, Math.max(250, window.innerWidth - 72));
+      // -40: the dashed measure line runs to within ~16px of a phone's edge.
+      const m = Math.min(640, Math.max(250, window.innerWidth - 40));
       setMaxW(m);
       setWidth((w) => Math.min(w, m));
     };
@@ -255,6 +256,7 @@ export default function FixPage() {
               <label className="fx-squeeze">
                 <span>squeeze</span>
                 <input type="range" min={250} max={maxW} value={width} onChange={(e) => squeeze(Number(e.target.value))} />
+                <span className="fx-width-readout">{width}px</span>
               </label>
             </div>
 
@@ -426,6 +428,12 @@ export default function FixPage() {
           color: #8f8f8f;
         }
         .fx-squeeze input { width: 150px; accent-color: #b8963e; }
+        .fx-width-readout {
+          color: #b8963e;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: 0.08em;
+          min-width: 4.2em;
+        }
         .fx-panels {
           border-left: 1px solid #2a2a2a;
           border-right: 1px dashed #333;
