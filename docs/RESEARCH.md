@@ -551,7 +551,8 @@ costs more than any sum of cosmetic improvements can buy back.
 | Rag cliff (adjacent fill jump > 6%) | min(1800, 250000·(jump−0.06)²) | Graduated and *capped below one weak ender* |
 | Contour re-rank slack | ≤ 3,200 | Capped below one violation: re-ranking may spend taste, never meaning |
 | Contour score | 2.0·spread + 3.0·maxStep + 1.5·registerShift | Weights tuned on the /about long paragraphs |
-| Word-spacing envelope | +0.03 / −0.04 em | Tighter than Tschichold's 80–133%; at body sizes more is visible |
+| Word-spacing envelope (body) | +0.0825 / −0.05 em | Tschichold's 80–133% of the quarter-em natural space — InDesign's justification defaults; targets are neighbor-relational (each line blends its neighbors' fills with the paragraph median), expansion always participates, contraction only within reach |
+| Word-spacing envelope (display) | +0.03 / −0.02 em | Word-space play at headline sizes reads pinched or gappy — display keeps the gentle envelope |
 
 These are tuned constants, verified by measurement on real paragraphs at
 real widths through the /proof instrument. The authorities supply the

@@ -56,7 +56,7 @@ declare function composeParagraph(tokens: Token[], measurePx: number, measureCh:
  * Adjust word-spacing within fixed line membership.
  * May NOT change which words belong to which line.
  */
-declare function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number): FrozenLine[] | null;
+declare function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number, isHeading?: boolean): FrozenLine[] | null;
 /**
  * Validate final composition before rendering.
  */

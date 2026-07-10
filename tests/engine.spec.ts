@@ -109,7 +109,10 @@ test('spacing accordion is centered, not biased tight', async ({ page }) => {
         ws.push(parseFloat(line.style.wordSpacing) || 0);
       }
     }
-    const atMaxContraction = ws.filter((v) => v <= -0.039).length;
+    // -0.049: at-max means the body contraction cap (-0.05em, the
+    // Tschichold/InDesign 80%-of-natural floor) — keep in step with
+    // shapeExactLines.
+    const atMaxContraction = ws.filter((v) => v <= -0.049).length;
     const mean = ws.reduce((a, b) => a + b, 0) / (ws.length || 1);
     return { lines: ws.length, atMaxContraction, mean };
   });

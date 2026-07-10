@@ -1,4 +1,4 @@
-/* typeset.us v3.1.2 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.2.0 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -393,10 +393,13 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     wordSpacingEm: 0
   }));
 }
-function shapeExactLines(lines, measureCh2, measurePx) {
-  const profile = profileForMeasure(measureCh2);
-  const maxSpacingEm = profile.maxWordSpacing;
+function shapeExactLines(lines, measureCh2, measurePx, isHeading = false) {
   const shapedLines = [];
+  const maxExpand = isHeading ? 0.03 : 0.0825;
+  const maxContract = isHeading ? 0.02 : 0.05;
+  const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
+  const mid = Math.floor(nonLastFills.length / 2);
+  const median = nonLastFills.length === 0 ? 0.85 : nonLastFills.length % 2 === 0 ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 : nonLastFills[mid];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const isLast = i === lines.length - 1;
@@ -410,19 +413,17 @@ function shapeExactLines(lines, measureCh2, measurePx) {
       shapedLines.push({ ...line, wordSpacingEm: 0 });
       continue;
     }
-    const fill = line.fill;
-    let targetFill;
-    const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
-    const mid = Math.floor(nonLastFills.length / 2);
-    targetFill = nonLastFills.length % 2 === 0 ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 : nonLastFills[mid];
+    const neighbors = [];
+    if (i > 0) neighbors.push(lines[i - 1].fill);
+    if (i < lines.length - 2) neighbors.push(lines[i + 1].fill);
+    const local = neighbors.length ? neighbors.reduce((a, b) => a + b, 0) / neighbors.length : median;
+    let targetFill = 0.5 * local + 0.5 * median;
     targetFill = Math.max(0.7, Math.min(0.965, targetFill));
     const targetWidth = measurePx * targetFill;
     const delta = targetWidth - line.width;
     const spacingPx = delta / gaps;
     const approxFontSize = measurePx / measureCh2;
     const spacingEm = spacingPx / approxFontSize;
-    const maxExpand = 0.03;
-    const maxContract = 0.04;
     if (spacingEm > maxExpand) {
       shapedLines.push({ ...line, wordSpacingEm: maxExpand });
     } else if (spacingEm < -maxContract) {
@@ -461,7 +462,7 @@ function finalValidate(lines, measureCh2, isHeading = false) {
     if (lastContent && (lastContent.kind === "openPunct" || lastContent.stickyNext)) {
       return false;
     }
-    if (lines[i].wordSpacingEm > 0.08 || lines[i].wordSpacingEm < -0.04) {
+    if (lines[i].wordSpacingEm > 0.085 || lines[i].wordSpacingEm < -0.055) {
       return false;
     }
   }
@@ -827,7 +828,7 @@ function composeElement(element, measure) {
     element.dataset.tsOutcome = "fallback:no-composition";
     return restorePlain(element, raw);
   }
-  const shaped = (_d = shapeExactLines(composed, measure, measurePx)) != null ? _d : composed;
+  const shaped = (_d = shapeExactLines(composed, measure, measurePx, isHeading)) != null ? _d : composed;
   if (!finalValidate(shaped, measure, isHeading)) {
     element.dataset.tsOutcome = "fallback:validate";
     return restorePlain(element, raw);

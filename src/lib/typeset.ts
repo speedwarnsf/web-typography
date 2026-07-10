@@ -704,11 +704,35 @@ function composeParagraph(
  * Adjust word-spacing within fixed line membership.
  * May NOT change which words belong to which line.
  */
-function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number): FrozenLine[] | null {
-  const profile = profileForMeasure(measureCh);
-  const maxSpacingEm = profile.maxWordSpacing;
-
+function shapeExactLines(
+  lines: FrozenLine[],
+  measureCh: number,
+  measurePx: number,
+  isHeading = false
+): FrozenLine[] | null {
   const shapedLines: FrozenLine[] = [];
+
+  // The accordion's envelope comes from the literature, expressed against
+  // the ~0.25em natural word space of a text face (Bringhurst's quarter-em):
+  // Tschichold's tolerances — and InDesign's justification defaults, which
+  // adopted them verbatim — allow 80%..133% of natural, i.e. -0.05em to
+  // +0.0825em of adjustment. (The old +-0.03/0.04 caps expanded to only
+  // ~112% of natural — half the sanctioned authority; Dustin, 2026-07-09:
+  // "0.03em seems ineffectual".) Display type keeps a gentle envelope —
+  // visible word-space play at headline sizes reads pinched or gappy (the
+  // manifesto lesson). finalValidate's bounds are paired to these caps;
+  // change them TOGETHER or compositions get silently rejected.
+  const maxExpand = isHeading ? 0.03 : 0.0825;   // 133% of a 1/4-em space
+  const maxContract = isHeading ? 0.02 : 0.05;   // 80% of a 1/4-em space
+
+  // Global median of non-last fills — the paragraph's register.
+  const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
+  const mid = Math.floor(nonLastFills.length / 2);
+  const median = nonLastFills.length === 0
+    ? 0.85
+    : nonLastFills.length % 2 === 0
+      ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2
+      : nonLastFills[mid];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -729,28 +753,24 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
       continue;
     }
 
-    // SHORT LINES: expand toward container edge
-    // LONG LINES: contract slightly to create breathing room
-    // Goal: visible rag adjustment, not uniform fill
-    const fill = line.fill;
-    let targetFill: number;
+    // Lines are shaped IN RELATION TO ONE ANOTHER (Dustin, 2026-07-09):
+    // each line's target blends its neighbors' fills with the paragraph
+    // median, so a line that towers over the lines beside it pulls in and
+    // a line that dips below them opens up. That is what smooths the rag —
+    // adjacent steps shrink — rather than herding every line toward one
+    // global number.
+    const neighbors: number[] = [];
+    if (i > 0) neighbors.push(lines[i - 1].fill);
+    if (i < lines.length - 2) neighbors.push(lines[i + 1].fill); // skip last line
+    const local = neighbors.length
+      ? neighbors.reduce((a, b) => a + b, 0) / neighbors.length
+      : median;
+    let targetFill = 0.5 * local + 0.5 * median;
 
-    // Target the median fill of non-last lines to smooth the rag dynamically
-    const nonLastFills = lines.slice(0, -1).map(l => l.fill).sort((a, b) => a - b);
-    const mid = Math.floor(nonLastFills.length / 2);
-    targetFill = nonLastFills.length % 2 === 0 
-      ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 
-      : nonLastFills[mid];
-      
-    // Prevent target from being too wide (justification) or too narrow.
-    // Upper clamp must track the compositor's admissible band (fill <= 0.97)
-    // or the accordion leans tight across the whole page: at 0.93, every
-    // line legitimately composed in the 0.93-0.97 band was pulled DOWN by
-    // word-spacing contraction — on real pages ~40% of lines sat at maximum
-    // contraction and whole text blocks read "kerned tight" (Dustin's catch,
-    // 2026-07-09). 0.965 re-centers the accordion where the compositor
-    // actually lives; short lines still expand, genuinely overfull lines
-    // still contract.
+    // Clamp: never toward justification, never starved. Upper bound tracks
+    // the compositor's admissible band (fill <= 0.97) — when it sat below
+    // the band at 0.93, whole pages read "kerned tight" (the 2026-07-09
+    // regression).
     targetFill = Math.max(0.70, Math.min(0.965, targetFill));
 
     const targetWidth = measurePx * targetFill;
@@ -762,14 +782,6 @@ function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: numb
     // Convert to em using approximate font size
     const approxFontSize = measurePx / measureCh;
     const spacingEm = spacingPx / approxFontSize;
-
-    // Gentle caps - revert to subtle.
-    // NOTE: maxContract must stay within finalValidate()'s accepted range
-    // (it rejects wordSpacingEm < -0.04). Previously 0.05, which caused every
-    // line needing contraction to be composed and then rejected by the
-    // validator — so longer paragraphs silently fell back to browser wrapping.
-    const maxExpand = 0.03;    // subtle expansion on short lines
-    const maxContract = 0.04;  // contraction cap, aligned with finalValidate
 
     // The accordion is ASYMMETRIC (Dustin, 2026-07-09). Expansion: short
     // lines always breathe out, at the cap if need be — air helps the rag
@@ -837,7 +849,10 @@ function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false
     }
 
     // Spacing exceeds generous threshold
-    if (lines[i].wordSpacingEm > 0.08 || lines[i].wordSpacingEm < -0.04) {
+    // Paired to shapeExactLines' literature envelope (+0.0825/-0.05 body):
+    // these bounds must always sit just outside the shaping caps, or every
+    // line at a cap gets composed and then silently rejected here.
+    if (lines[i].wordSpacingEm > 0.085 || lines[i].wordSpacingEm < -0.055) {
       return false;
     }
   }
@@ -1424,7 +1439,7 @@ function composeElement(element: HTMLElement, measure: number): boolean {
     return restorePlain(element, raw);
   }
 
-  const shaped = shapeExactLines(composed, measure, measurePx) ?? composed;
+  const shaped = shapeExactLines(composed, measure, measurePx, isHeading) ?? composed;
   if (!finalValidate(shaped, measure, isHeading)) {
     element.dataset.tsOutcome = 'fallback:validate';
     return restorePlain(element, raw);
