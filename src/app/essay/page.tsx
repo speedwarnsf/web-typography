@@ -28,10 +28,10 @@ export default function EssayPage() {
 
         <p>
           Pick up any book you trust. Open it anywhere and run your eye down
-          the right-hand edge of the text. You will not find a line that ends
-          on the word &ldquo;of&rdquo;. You will not find &ldquo;the&rdquo;
-          dangling at an edge, cut off from its noun. You will not find the last line of
-          a paragraph holding one abandoned word. Books have been free of
+          the right-hand edge of the text. You will rarely find a line that
+          ends on the word &ldquo;of&rdquo; or a &ldquo;the&rdquo; dangling
+          at an edge, cut off from its noun. You will not find the last line
+          of a paragraph holding one abandoned word. Books have been free of
           these things for five hundred years — not by luck, but because the
           people who set them considered such breaks defects, and fixed them,
           by hand, line by line.
