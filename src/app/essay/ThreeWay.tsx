@@ -11,8 +11,11 @@
 import { useEffect, useRef, useState } from 'react';
 import typeset from '@/lib/typeset';
 
+// Chosen empirically (scripts/screen-demo-text.mjs, 18 widths, production
+// face): browser-set it fails at 12/18 widths and orphans at 5; typeset
+// holds zero flaws at every width screened.
 const DEMO_TEXT =
-  'Your browser does not know what a sentence is. It fills each line until the next word will not fit, then it breaks — wherever that happens to be. It will end a line on the word "of" and think nothing of it. It will leave a single word alone on the last line of your best paragraph. Every book you have ever trusted was set by people who considered these things unacceptable, and fixed them by hand, line by line, for five hundred years.';
+  'Look closely at the right edge of this paragraph as you squeeze it. Watch which words get left at the ends of lines, and what happens to the last word when the column gets narrow enough. This is the shape of every article you have ever read on a phone, and none of it was decided by anyone.';
 
 const WEAK = new Set([
   'a', 'an', 'the', 'of', 'in', 'at', 'by', 'to', 'for', 'with', 'from', 'on',
