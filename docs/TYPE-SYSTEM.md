@@ -29,8 +29,10 @@ gallery, proof panels — overrides deliberately via inline `fontFamily` or a
 | CTA link | `.25em` | "SEE THE PROOF" |
 | UI mono | `.2em` | tabs, menu items, chips, table heads |
 
-Display headings: `-0.02em` (element default). Body: normal. No fifth value
-exists; `tracking-widest`/`tracking-wider` are banned.
+Display headings: `-0.01em` (element default; relaxed from `-0.02em`
+2026-07-09 — Dustin's call: the tighter track reads cramped in Playfair at
+display sizes). Body: normal. No fifth value exists;
+`tracking-widest`/`tracking-wider` are banned.
 
 ## Sizes & color floors
 

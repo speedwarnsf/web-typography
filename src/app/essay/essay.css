@@ -1,0 +1,154 @@
+.es-root {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 128px 24px 96px;
+}
+/* Hero kicker — the v2 idiom exactly: mono, .38em hero track, gold.
+   .es-root prefix: must out-specify the article > p reading style. */
+.es-root .es-kicker {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: #b8963e;
+  margin-bottom: 28px;
+}
+.es-root h1 {
+  font-size: clamp(2.1rem, 6vw, 3.4rem);
+  line-height: 1.08;
+  margin-bottom: 18px;
+}
+/* Byline — editorial, not UI: the site's reading voice, small and quiet. */
+.es-root .es-byline {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: #8f8f8f;
+  margin-bottom: 48px;
+}
+.es-root article > p {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: #c9c9c9;
+  margin-bottom: 26px;
+}
+.es-root h2 {
+  font-size: clamp(1.35rem, 3.4vw, 1.8rem);
+  margin: 52px 0 20px;
+}
+.es-root code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.9em;
+  color: #ededed;
+  background: #141414;
+  padding: 1px 5px;
+}
+.es-root article a {
+  color: #b8963e;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(184, 150, 62, 0.35);
+}
+
+/* ── the three-way demo ── */
+.es-demo { margin: 40px 0 48px; }
+.es-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.es-toggle { display: flex; border: 1px solid #2a2a2a; }
+.es-tab {
+  background: none;
+  border: 0;
+  color: #a3a3a3;
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 10px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.es-tab-on { background: #b8963e; color: #050505; }
+.es-squeeze {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8f8f8f;
+}
+.es-squeeze input { width: 130px; accent-color: #b8963e; }
+.es-panels {
+  position: relative;
+  border-left: 1px solid #2a2a2a;
+  border-right: 1px dashed #333;
+  padding: 4px 0;
+}
+.es-panel {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: #dcdcdc;
+  margin: 0;
+  width: 100%;
+}
+.es-pretty { text-wrap: pretty; }
+.es-panel-off {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  visibility: hidden;
+}
+.es-flaw { border-bottom: 1px dotted #b8963e; padding-bottom: 1px; }
+.es-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 26px;
+}
+.es-table th,
+.es-table td {
+  text-align: left;
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid #1c1c1c;
+  font-size: 0.875rem;
+  color: #c9c9c9;
+}
+.es-table th {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8f8f8f;
+}
+.es-table .es-th-on { color: #b8963e; }
+.es-table td:not(:first-child),
+.es-table th:not(:first-child) {
+  text-align: right;
+  font-family: var(--font-mono), monospace;
+}
+.es-note {
+  margin-top: 14px;
+  font-size: 0.8125rem;
+  color: #8f8f8f;
+  line-height: 1.6;
+  max-width: 52ch;
+}
+.es-snippet {
+  display: flex;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+  margin: 6px 0 30px;
+}
+.es-snippet code {
+  flex: 1;
+  background: none;
+  font-size: 12.5px;
+  padding: 13px 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.es-close { font-size: 1.125rem; color: #ededed; }

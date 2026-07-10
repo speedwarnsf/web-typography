@@ -79,7 +79,9 @@ h1, h2, h3, h4 {
   text-wrap: balance;
 }
 h1, h2 {
-  letter-spacing: -0.02em; /* display sizes want the tight track */
+  /* -0.01em, not -0.02em: Dustin's call 2026-07-09 — the tighter track
+     reads cramped in Playfair at display sizes. One value, site-wide. */
+  letter-spacing: -0.01em;
   color: #f2f2f2;
 }
 h3, h4 {
