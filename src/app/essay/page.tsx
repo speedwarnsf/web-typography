@@ -38,7 +38,7 @@ export default function EssayPage() {
         </p>
 
         <p>
-          Now read anything on your phone.
+          Now open the last article you read — on this same screen.
         </p>
 
         <p>
