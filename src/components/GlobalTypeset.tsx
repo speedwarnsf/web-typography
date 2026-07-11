@@ -121,10 +121,12 @@ export default function GlobalTypeset() {
         try {
           const text = canonicalText.get(p) || p.textContent || '';
 
-          // The compositor strictly replaces content with text nodes; blocks
-          // with real inline markup (<strong>, <a>, dropcaps) keep Phase 1
-          // bindings only. Short blocks compose poorly — skip those too.
-          if (p.querySelector('*') !== null || text.length < 30) {
+          // Short blocks compose poorly — skip. Inline markup no longer
+          // disqualifies: typeset() carries the rich path (links, em, code
+          // chips compose with run provenance) and falls back to Phase-1
+          // bindings itself for anything unrebuildable (dropcaps, decorated
+          // spans, unknown elements).
+          if (text.trim().length < 30) {
             safeWrite(() => {
               p.setAttribute('data-typeset-done', '');
             });
@@ -268,9 +270,11 @@ export default function GlobalTypeset() {
             el.removeAttribute('data-typeset-done');
 
             // Composed-only restore — see the loadingdone handler. Never
-            // flatten real markup with a textContent write.
+            // flatten real markup with a textContent write. Rich-composed
+            // elements (data-ts-rich) restore their own innerHTML inside
+            // the engine at the next compose — hands off here.
             const original = canonicalText.get(el);
-            if (original && el.querySelector(':scope > .ts-line')) {
+            if (original && !el.dataset.tsRich && el.querySelector(':scope > .ts-line')) {
               el.textContent = original;
             }
           });
@@ -337,11 +341,13 @@ export default function GlobalTypeset() {
           // children). For anything still carrying real markup, textContent
           // restore would FLATTEN it and weld words together (the About
           // credentials bug: two flex spans became "EducationNSCAD").
+          // Rich-composed blocks (data-ts-rich) restore their own innerHTML
+          // inside the engine at the next compose — hands off here too.
           const composed = !!el.querySelector(':scope > .ts-line');
           touched++;
           safeWrite(() => {
             el.removeAttribute('data-typeset-done');
-            if (composed) el.textContent = original;
+            if (composed && !el.dataset.tsRich) el.textContent = original;
           });
         });
         if (!touched) return;

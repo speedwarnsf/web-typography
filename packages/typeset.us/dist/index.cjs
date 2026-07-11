@@ -95,6 +95,44 @@ function shouldIgnoreMutation() {
   return isInternalWrite;
 }
 var isSentenceEnd = (word) => /[.!?]$/.test(word) || /[.!?]["'\u201D\u2019]$/.test(word);
+function classifyWord(part) {
+  const lower = part.toLowerCase();
+  const firstChar = part[0];
+  const lastChar = part[part.length - 1];
+  let kind = "word";
+  let stickyPrev = false;
+  let stickyNext = false;
+  let weakEnd = false;
+  let protectedCompound = false;
+  let emergencyBreakParts;
+  if (OPEN_PUNCT.has(firstChar) && part.length === 1) {
+    kind = "openPunct";
+    stickyNext = true;
+  } else if (CLOSE_PUNCT.has(lastChar) && (part.length === 1 || CLOSE_PUNCT.has(part))) {
+    kind = "closePunct";
+    stickyPrev = true;
+  } else if (DASHES.has(part)) {
+    kind = "dash";
+    stickyPrev = true;
+  } else if (part.length <= 20 && part.indexOf("-") > 0 && part.indexOf("-") < part.length - 1) {
+    kind = "compound";
+    protectedCompound = true;
+  } else if (part.length > 16 && !/\s/.test(part)) {
+    kind = "longSlug";
+    const camelParts = part.split(/(?<=[a-z])(?=[A-Z])/);
+    if (camelParts.length > 1) {
+      emergencyBreakParts = camelParts;
+    } else {
+      const delimParts = part.split(/[_\/]/);
+      if (delimParts.length > 1) {
+        emergencyBreakParts = delimParts;
+      }
+    }
+  } else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ""))) {
+    weakEnd = true;
+  }
+  return { text: part, kind, stickyPrev, stickyNext, weakEnd, protectedCompound, emergencyBreakParts };
+}
 function tokenize(text, measurer) {
   if (!text || text.trim().length === 0) return [];
   const parts = text.split(/(\s+)/);
@@ -109,53 +147,196 @@ function tokenize(text, measurer) {
       });
       continue;
     }
-    const lower = part.toLowerCase();
-    const firstChar = part[0];
-    const lastChar = part[part.length - 1];
-    let kind = "word";
-    let stickyPrev = false;
-    let stickyNext = false;
-    let weakEnd = false;
-    let protectedCompound = false;
-    let emergencyBreakParts;
-    if (OPEN_PUNCT.has(firstChar) && part.length === 1) {
-      kind = "openPunct";
-      stickyNext = true;
-    } else if (CLOSE_PUNCT.has(lastChar) && (part.length === 1 || CLOSE_PUNCT.has(part))) {
-      kind = "closePunct";
-      stickyPrev = true;
-    } else if (DASHES.has(part)) {
-      kind = "dash";
-      stickyPrev = true;
-    } else if (part.length <= 20 && part.indexOf("-") > 0 && part.indexOf("-") < part.length - 1) {
-      kind = "compound";
-      protectedCompound = true;
-    } else if (part.length > 16 && !/\s/.test(part)) {
-      kind = "longSlug";
-      const camelParts = part.split(/(?<=[a-z])(?=[A-Z])/);
-      if (camelParts.length > 1) {
-        emergencyBreakParts = camelParts;
-      } else {
-        const delimParts = part.split(/[_\/]/);
-        if (delimParts.length > 1) {
-          emergencyBreakParts = delimParts;
-        }
-      }
-    } else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ""))) {
-      weakEnd = true;
-    }
-    tokens.push({
-      text: part,
-      kind,
-      width: measurer(part),
-      stickyPrev,
-      stickyNext,
-      weakEnd,
-      protectedCompound,
-      emergencyBreakParts
-    });
+    tokens.push({ ...classifyWord(part), width: measurer(part) });
   }
   return tokens;
+}
+var INLINE_COMPOSE_TAGS = /* @__PURE__ */ new Set([
+  "A",
+  "EM",
+  "STRONG",
+  "I",
+  "B",
+  "CODE",
+  "SPAN",
+  "MARK",
+  "SMALL",
+  "ABBR",
+  "CITE",
+  "Q",
+  "TIME",
+  "SUP",
+  "SUB",
+  "U",
+  "S",
+  "DEL",
+  "INS",
+  "KBD",
+  "SAMP",
+  "VAR"
+]);
+var ALWAYS_ATOMIC_TAGS = /* @__PURE__ */ new Set(["SUP", "SUB", "KBD"]);
+function isVisiblyBoxed(el) {
+  const s = getComputedStyle(el);
+  if (parseFloat(s.paddingLeft) > 0 || parseFloat(s.paddingRight) > 0) return true;
+  if (parseFloat(s.borderLeftWidth) > 0 || parseFloat(s.borderRightWidth) > 0) return true;
+  const bg = s.backgroundColor || "";
+  return bg !== "" && bg !== "transparent" && !/^rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)$/.test(bg);
+}
+function extractInlineContent(element) {
+  const segments = [];
+  const runs = [];
+  const runByInnermost = /* @__PURE__ */ new Map();
+  const runFor = (chain) => {
+    const innermost = chain[chain.length - 1];
+    const existing = runByInnermost.get(innermost);
+    if (existing) return existing;
+    const cs = getComputedStyle(innermost);
+    const run = {
+      id: runs.length,
+      chain: chain.slice(),
+      fontString: canvasFontString(cs),
+      letterSpacing: cs.letterSpacing && cs.letterSpacing !== "normal" ? cs.letterSpacing : "0px",
+      atomic: chain.some((el) => ALWAYS_ATOMIC_TAGS.has(el.tagName)) || chain.some((el) => isVisiblyBoxed(el))
+    };
+    runs.push(run);
+    runByInnermost.set(innermost, run);
+    return run;
+  };
+  const walk = (node, chain) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        const text = child.data;
+        if (!text) continue;
+        segments.push({ text, runId: chain.length ? runFor(chain).id : null });
+        continue;
+      }
+      if (child.nodeType === 8) continue;
+      if (child.nodeType !== 1) return false;
+      const el = child;
+      if (!INLINE_COMPOSE_TAGS.has(el.tagName)) return false;
+      if (el.tagName === "SPAN" && (el.className || el.id || el.getAttribute("style"))) return false;
+      if (getComputedStyle(el).display !== "inline") return false;
+      if (!walk(el, chain.concat(el))) return false;
+    }
+    return true;
+  };
+  if (!walk(element, [])) return null;
+  if (!runs.length) return null;
+  return { segments, runs };
+}
+function richTokenize(content, measure) {
+  const { segments, runs } = content;
+  const tokens = [];
+  let pending = [];
+  const flush = () => {
+    if (!pending.length) return;
+    const full = pending.map((p) => p.text).join("");
+    if (!full) {
+      pending = [];
+      return;
+    }
+    const cls = classifyWord(full);
+    const width = pending.reduce((sum, p) => sum + measure(p.text, p.runId), 0);
+    const token = { ...cls, width };
+    if (pending.length === 1) token.runId = pending[0].runId;
+    else token.parts = pending;
+    tokens.push(token);
+    pending = [];
+  };
+  for (const seg of segments) {
+    const run = seg.runId === null ? null : runs[seg.runId];
+    if (run == null ? void 0 : run.atomic) {
+      pending.push({ text: seg.text, runId: seg.runId });
+      continue;
+    }
+    const pieces = seg.text.split(/(\s+)/);
+    for (const piece of pieces) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) {
+        if (/^[  ]+$/.test(piece)) {
+          pending.push({ text: piece, runId: seg.runId });
+          continue;
+        }
+        flush();
+        tokens.push({ text: piece, kind: "space", width: measure(piece, seg.runId), runId: seg.runId });
+        continue;
+      }
+      pending.push({ text: piece, runId: seg.runId });
+    }
+  }
+  flush();
+  return tokens;
+}
+function makeRunMeasurer(element, runs) {
+  var _a;
+  const cs = getComputedStyle(element);
+  const base = {
+    font: canvasFontString(cs),
+    ls: cs.letterSpacing && cs.letterSpacing !== "normal" ? cs.letterSpacing : "0px"
+  };
+  const fonts = /* @__PURE__ */ new Map();
+  fonts.set(null, base);
+  for (const run of runs) fonts.set(run.id, { font: run.fontString, ls: run.letterSpacing });
+  if (!_canvas) {
+    const c = document.createElement("canvas");
+    _canvas = c.getContext("2d");
+  }
+  const ctx = _canvas;
+  const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
+  let canvasOk = !!ctx;
+  if (ctx) {
+    for (const f of fonts.values()) {
+      ctx.font = "7px serif";
+      if ("letterSpacing" in ctx) {
+        ctx.letterSpacing = "0px";
+      }
+      ctx.font = f.font;
+      const size = (_a = /(\d+(?:\.\d+)?px)/.exec(f.font)) == null ? void 0 : _a[1];
+      if (!size || !ctx.font.includes(size)) {
+        canvasOk = false;
+        break;
+      }
+    }
+  }
+  if (ctx && canvasOk) {
+    return {
+      measure: (text, runId) => {
+        var _a2;
+        const f = (_a2 = fonts.get(runId != null ? runId : null)) != null ? _a2 : base;
+        ctx.font = f.font;
+        if ("letterSpacing" in ctx) {
+          ctx.letterSpacing = f.ls;
+        }
+        return ctx.measureText(text).width;
+      },
+      cleanup: () => {
+      }
+    };
+  }
+  const probes = /* @__PURE__ */ new Map();
+  const makeProbe = (font, ls) => {
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;pointer-events:none;";
+    probe.style.font = font;
+    probe.style.letterSpacing = ls;
+    element.appendChild(probe);
+    return probe;
+  };
+  for (const [id, f] of fonts) probes.set(id, makeProbe(f.font, f.ls));
+  return {
+    measure: (text, runId) => {
+      const probe = probes.get(runId != null ? runId : null);
+      if (!probe || !probe.isConnected) return text.length * fallbackCh;
+      probe.textContent = text;
+      return probe.getBoundingClientRect().width;
+    },
+    cleanup: () => {
+      for (const probe of probes.values()) {
+        if (probe.parentNode) probe.parentNode.removeChild(probe);
+      }
+    }
+  };
 }
 function profileForMeasure(measureCh2) {
   if (measureCh2 < 18) return {
@@ -508,7 +689,7 @@ function finalValidate(lines, measureCh2, isHeading = false) {
   }
   return true;
 }
-function renderFrozenLines(p, lines) {
+function renderFrozenLines(p, lines, runs) {
   var _a;
   const cs = getComputedStyle(p);
   const fontSizePx = parseFloat(cs.fontSize) || 16;
@@ -529,12 +710,56 @@ function renderFrozenLines(p, lines) {
       if (indentPx > 0.25) {
         span.style.textIndent = `-${indentPx.toFixed(2)}px`;
       }
-      span.textContent = line.text;
+      if (runs) {
+        renderRichLineInto(span, line, runs);
+      } else {
+        span.textContent = line.text;
+      }
       if (i > 0) p.appendChild(document.createTextNode("\n"));
       p.appendChild(span);
     });
   });
   (_a = measurer.cleanup) == null ? void 0 : _a.call(measurer);
+}
+function renderRichLineInto(span, line, runs) {
+  var _a, _b;
+  const flat = [];
+  for (const t of line.tokens) {
+    const parts = (_b = t.parts) != null ? _b : [{ text: t.text, runId: (_a = t.runId) != null ? _a : null }];
+    if (flat.length) {
+      const prev = flat[flat.length - 1];
+      const next = parts[0];
+      flat.push({ text: " ", runId: prev.runId === next.runId ? next.runId : null });
+    }
+    flat.push(...parts);
+  }
+  const groups = [];
+  for (const part of flat) {
+    const last = groups[groups.length - 1];
+    if (last && last.runId === part.runId) last.text += part.text;
+    else groups.push({ runId: part.runId, text: part.text });
+  }
+  for (const g of groups) {
+    if (g.runId === null) {
+      span.appendChild(document.createTextNode(g.text));
+      continue;
+    }
+    const run = runs[g.runId];
+    let outer = null;
+    let inner = null;
+    for (const orig of run.chain) {
+      const clone = orig.cloneNode(false);
+      if (inner) inner.appendChild(clone);
+      else outer = clone;
+      inner = clone;
+    }
+    if (inner && outer) {
+      inner.textContent = g.text;
+      span.appendChild(outer);
+    } else {
+      span.appendChild(document.createTextNode(g.text));
+    }
+  }
 }
 function typesetHeadingText(text) {
   if (!text || text.length < 5) return text;
@@ -760,6 +985,7 @@ function containerPxOf(element) {
 function canCompose(element) {
   const tag = element.tagName;
   if (tag === "UL" || tag === "OL" || tag === "LI") return false;
+  if (element.dataset.tsRich) return false;
   for (const child of Array.from(element.childNodes)) {
     if (child.nodeType !== 1) continue;
     const el = child;
@@ -885,6 +1111,70 @@ function composeElement(element, measure) {
   element.dataset.tsOutcome = "composed";
   return true;
 }
+var canonicalRichHTML = /* @__PURE__ */ new WeakMap();
+function composeRichElement(element, measure) {
+  var _a;
+  const stored = canonicalRichHTML.get(element);
+  if (stored !== void 0) {
+    safeWrite(() => {
+      element.innerHTML = stored;
+    });
+  }
+  const restoreRich = () => {
+    const html = canonicalRichHTML.get(element);
+    if (html !== void 0) {
+      safeWrite(() => {
+        element.innerHTML = html;
+      });
+    }
+    return false;
+  };
+  const content = extractInlineContent(element);
+  if (!content) {
+    element.dataset.tsOutcome = "phase1:inline-markup";
+    return false;
+  }
+  if ((element.textContent || "").trim().length < 10) {
+    element.dataset.tsOutcome = "skipped:short";
+    return false;
+  }
+  if (stored === void 0) canonicalRichHTML.set(element, element.innerHTML);
+  const measurePx = containerPxOf(element);
+  if (measurePx <= 0) {
+    element.dataset.tsOutcome = "unmeasurable";
+    return false;
+  }
+  const rm = makeRunMeasurer(element, content.runs);
+  const tokens = richTokenize(content, rm.measure);
+  rm.cleanup();
+  if (!tokens.length) {
+    element.dataset.tsOutcome = "skipped:short";
+    return false;
+  }
+  const isHeading = /^H[1-6]$/.test(element.tagName) || !!element.closest("h1,h2,h3,h4,h5,h6");
+  const composed = composeParagraph(tokens, measurePx, measure, { isHeading });
+  if (!composed) {
+    element.dataset.tsOutcome = "fallback:no-composition";
+    return restoreRich();
+  }
+  const shaped = (_a = shapeExactLines(composed, measure, measurePx, isHeading)) != null ? _a : composed;
+  if (!finalValidate(shaped, measure, isHeading)) {
+    element.dataset.tsOutcome = "fallback:validate";
+    return restoreRich();
+  }
+  renderFrozenLines(element, shaped, content.runs);
+  if (linesOverflow(element)) {
+    element.dataset.tsOutcome = "fallback:overflow";
+    return restoreRich();
+  }
+  if (!isHeading && linesStarved(element)) {
+    element.dataset.tsOutcome = "fallback:starved";
+    return restoreRich();
+  }
+  element.dataset.tsOutcome = "composed";
+  element.dataset.tsRich = "1";
+  return true;
+}
 function typeset(element) {
   var _a, _b;
   if (!element) return;
@@ -958,7 +1248,7 @@ function typeset(element) {
   if (canCompose(element)) {
     if (composeElement(element, measure)) return;
   } else {
-    element.dataset.tsOutcome = "phase1:inline-markup";
+    if (composeRichElement(element, measure)) return;
   }
   const walker = document.createTreeWalker(
     element,

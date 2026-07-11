@@ -329,6 +329,13 @@ function extractInlineContent(element: HTMLElement): RichContent | null {
       if (child.nodeType !== 1) return false;
       const el = child as HTMLElement;
       if (!INLINE_COMPOSE_TAGS.has(el.tagName)) return false;
+      // Bare semantic spans are prose; spans with classes/styles/ids are
+      // decoration or app-managed (animated heros, React-driven text) —
+      // those keep Phase-1 treatment, exactly as before this feature.
+      if (
+        el.tagName === 'SPAN' &&
+        (el.className || el.id || el.getAttribute('style'))
+      ) return false;
       if (getComputedStyle(el).display !== 'inline') return false;
       if (!walk(el, chain.concat(el))) return false;
     }
@@ -1118,7 +1125,7 @@ function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false
 /**
  * Render exact lines as block spans (no pre-line + \n).
  */
-function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
+function renderFrozenLines(p: HTMLElement, lines: FrozenLine[], runs?: InlineRun[]): void {
   const cs = getComputedStyle(p);
   const fontSizePx = parseFloat(cs.fontSize) || 16;
   const measurer = makeMeasurer(p);
@@ -1145,7 +1152,11 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
         span.style.textIndent = `-${indentPx.toFixed(2)}px`;
       }
 
-      span.textContent = line.text;
+      if (runs) {
+        renderRichLineInto(span, line, runs);
+      } else {
+        span.textContent = line.text;
+      }
       // Newline text node between block spans: invisible in layout, but it
       // restores word boundaries for clipboard, find-in-page, and screen
       // readers — without it textContent reads "The BalboaIs OlderThan Sound"
@@ -1155,6 +1166,58 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void {
     });
   });
   measurer.cleanup?.();
+}
+
+/**
+ * Rebuild a frozen line's inline structure: consecutive token parts in the
+ * same run merge, base text becomes text nodes, run text gets its original
+ * element chain re-created via attribute-preserving shallow clones. A run
+ * spanning a line break gets one clone chain per line — a split link is two
+ * <a> segments with the same href. (Attached JS listeners do not survive
+ * cloning; hrefs and styling do — documented in the design doc.)
+ */
+function renderRichLineInto(span: HTMLElement, line: FrozenLine, runs: InlineRun[]): void {
+  // FrozenLine.tokens excludes space tokens (the compositor reconstructs
+  // line text with joins) — reinsert the separators here. A space between
+  // two parts of the SAME run goes inside that run, so anchor/emphasis
+  // text keeps its internal spaces; between different runs it's base text.
+  const flat: TokenPart[] = [];
+  for (const t of line.tokens) {
+    const parts = t.parts ?? [{ text: t.text, runId: t.runId ?? null }];
+    if (flat.length) {
+      const prev = flat[flat.length - 1];
+      const next = parts[0];
+      flat.push({ text: ' ', runId: prev.runId === next.runId ? next.runId : null });
+    }
+    flat.push(...parts);
+  }
+  const groups: { runId: number | null; text: string }[] = [];
+  for (const part of flat) {
+    const last = groups[groups.length - 1];
+    if (last && last.runId === part.runId) last.text += part.text;
+    else groups.push({ runId: part.runId, text: part.text });
+  }
+  for (const g of groups) {
+    if (g.runId === null) {
+      span.appendChild(document.createTextNode(g.text));
+      continue;
+    }
+    const run = runs[g.runId];
+    let outer: HTMLElement | null = null;
+    let inner: HTMLElement | null = null;
+    for (const orig of run.chain) {
+      const clone = orig.cloneNode(false) as HTMLElement;
+      if (inner) inner.appendChild(clone);
+      else outer = clone;
+      inner = clone;
+    }
+    if (inner && outer) {
+      inner.textContent = g.text;
+      span.appendChild(outer);
+    } else {
+      span.appendChild(document.createTextNode(g.text));
+    }
+  }
 }
 
 /**
@@ -1529,6 +1592,11 @@ function containerPxOf(element: HTMLElement): number {
 function canCompose(element: HTMLElement): boolean {
   const tag = element.tagName;
   if (tag === 'UL' || tag === 'OL' || tag === 'LI') return false;
+  // Once rich-composed, always rich: after rendering, the direct children
+  // are our .ts-line spans (the markup lives INSIDE them), so this check
+  // would misread the element as plain and the plain path would compose
+  // its flattened text — destroying the markup for good.
+  if (element.dataset.tsRich) return false;
   for (const child of Array.from(element.childNodes)) {
     if (child.nodeType !== 1 /* ELEMENT_NODE */) continue;
     const el = child as HTMLElement;
@@ -1715,6 +1783,94 @@ function composeElement(element: HTMLElement, measure: number): boolean {
   return true;
 }
 
+// Original innerHTML of rich-composed elements — the restore source for
+// every failure path and for recomposition (resize, font loads). DOM-true:
+// what goes back is exactly what was there.
+const canonicalRichHTML = new WeakMap<HTMLElement, string>();
+
+/**
+ * Compose a paragraph that carries inline markup (links, em/strong, code
+ * chips, …). Mirrors composeElement, with three differences: the canonical
+ * original is stored as innerHTML (not a string); tokens carry run
+ * provenance and are measured in their own fonts; every failure path
+ * restores the original structure so Phase 1 can bind its text nodes.
+ * Quote education is NOT applied in v1 (a transform spanning element
+ * boundaries can't be remapped safely — documented).
+ */
+function composeRichElement(element: HTMLElement, measure: number): boolean {
+  // Recomposition cycle: restore the original structure FIRST so extraction
+  // and computed styles read the author's DOM, not our frozen lines.
+  const stored = canonicalRichHTML.get(element);
+  if (stored !== undefined) {
+    safeWrite(() => {
+      element.innerHTML = stored;
+    });
+  }
+
+  const restoreRich = (): boolean => {
+    const html = canonicalRichHTML.get(element);
+    if (html !== undefined) {
+      safeWrite(() => {
+        element.innerHTML = html;
+      });
+    }
+    return false;
+  };
+
+  const content = extractInlineContent(element);
+  if (!content) {
+    element.dataset.tsOutcome = 'phase1:inline-markup';
+    return false; // unsupported structure — Phase 1 owns it
+  }
+
+  if ((element.textContent || '').trim().length < 10) {
+    element.dataset.tsOutcome = 'skipped:short';
+    return false;
+  }
+  if (stored === undefined) canonicalRichHTML.set(element, element.innerHTML);
+
+  const measurePx = containerPxOf(element);
+  if (measurePx <= 0) {
+    element.dataset.tsOutcome = 'unmeasurable';
+    return false;
+  }
+
+  const rm = makeRunMeasurer(element, content.runs);
+  const tokens = richTokenize(content, rm.measure);
+  rm.cleanup();
+  if (!tokens.length) {
+    element.dataset.tsOutcome = 'skipped:short';
+    return false;
+  }
+
+  const isHeading =
+    /^H[1-6]$/.test(element.tagName) || !!element.closest('h1,h2,h3,h4,h5,h6');
+  const composed = composeParagraph(tokens, measurePx, measure, { isHeading });
+  if (!composed) {
+    element.dataset.tsOutcome = 'fallback:no-composition';
+    return restoreRich();
+  }
+
+  const shaped = shapeExactLines(composed, measure, measurePx, isHeading) ?? composed;
+  if (!finalValidate(shaped, measure, isHeading)) {
+    element.dataset.tsOutcome = 'fallback:validate';
+    return restoreRich();
+  }
+
+  renderFrozenLines(element, shaped, content.runs);
+  if (linesOverflow(element)) {
+    element.dataset.tsOutcome = 'fallback:overflow';
+    return restoreRich();
+  }
+  if (!isHeading && linesStarved(element)) {
+    element.dataset.tsOutcome = 'fallback:starved';
+    return restoreRich();
+  }
+  element.dataset.tsOutcome = 'composed';
+  element.dataset.tsRich = '1';
+  return true;
+}
+
 /**
  * Apply typographic rules to a DOM element's text content.
  * Processes text nodes recursively.
@@ -1807,7 +1963,11 @@ export function typeset(element: HTMLElement): void {
   if (canCompose(element)) {
     if (composeElement(element, measure)) return;
   } else {
-    element.dataset.tsOutcome = 'phase1:inline-markup';
+    // Rich path: paragraphs with rebuildable inline markup (links, em,
+    // code chips) go through the full compositor with run provenance.
+    // Anything the renderer can't faithfully rebuild falls through to the
+    // Phase-1 text-node bindings, exactly as before.
+    if (composeRichElement(element, measure)) return;
   }
 
   const walker = document.createTreeWalker(

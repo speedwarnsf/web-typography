@@ -35,7 +35,7 @@ Script tag (defaults to composing prose-ish elements site-wide; scope it):
 ```
 
 Version-pinned: `https://typeset.us/go@3.2.1.js` with
-`integrity="sha384-NHFbloukhWxDjR2PKy5IWet/fxf4bzWSo1C95MSMYx4FcjPVJ880oAxjoqR+Dbd3" crossorigin="anonymous"`.
+`integrity="sha384-Is9rA1DL9xXjcCQ+LR/moxNj/MJpeNCpelv1DC6kNRuNVzmtx7NviLddUWDFUo/q" crossorigin="anonymous"`.
 
 Or npm:
 

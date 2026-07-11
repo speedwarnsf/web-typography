@@ -11,6 +11,13 @@ type Token = {
     protectedCompound?: boolean;
     emergencyBreakParts?: string[];
     compoundId?: string;
+    /** Inline composition: run this token lives in (null/undefined = base text). */
+    runId?: number | null;
+    /** Composite token spanning run boundaries without whitespace. */
+    parts?: {
+        text: string;
+        runId: number | null;
+    }[];
 };
 /** Frozen line with exact membership and spacing adjustments */
 interface FrozenLine {
@@ -19,6 +26,20 @@ interface FrozenLine {
     fill: number;
     width: number;
     wordSpacingEm: number;
+}
+/**
+ * One run per innermost inline element instance. Tokens carry the run they
+ * live in so the renderer can rebuild the element chain per frozen line.
+ * Base text (direct text nodes of the paragraph) has runId null.
+ */
+interface InlineRun {
+    id: number;
+    /** Outermost → innermost ORIGINAL elements (live at extraction time). */
+    chain: HTMLElement[];
+    fontString: string;
+    letterSpacing: string;
+    /** Padded/bordered/backgrounded (code chips) — never split across lines. */
+    atomic: boolean;
 }
 /**
  * Options for typesetText
@@ -40,10 +61,6 @@ export declare function safeWrite(fn: () => void): void;
  * Check if MutationObserver should ignore current mutations.
  */
 export declare function shouldIgnoreMutation(): boolean;
-/**
- * Tokenize text into typed tokens with measurements.
- * Detects compound words, long slugs, punctuation stickiness, weak-end words.
- */
 declare function tokenize(text: string, measurer: (text: string) => number): Token[];
 /**
  * Compose paragraph using beam search over exact break candidates.
@@ -64,7 +81,7 @@ declare function finalValidate(lines: FrozenLine[], measureCh: number, isHeading
 /**
  * Render exact lines as block spans (no pre-line + \n).
  */
-declare function renderFrozenLines(p: HTMLElement, lines: FrozenLine[]): void;
+declare function renderFrozenLines(p: HTMLElement, lines: FrozenLine[], runs?: InlineRun[]): void;
 /**
  * Insert non-breaking spaces to enforce typographic rules.
  * Works by analyzing word groups and binding words that must stay together.

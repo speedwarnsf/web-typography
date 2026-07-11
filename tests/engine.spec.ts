@@ -90,6 +90,78 @@ test('quarantined legacy API does not ship in the bundle', async ({ page }) => {
   expect(legacy).toEqual([]);
 });
 
+test('rich paragraphs compose with markup intact', async ({ page }) => {
+  // Inline composition: links/em/code paragraphs go through the full
+  // compositor. The contract: every href survives with its exact value and
+  // text, nested emphasis is rebuilt, and a visibly-boxed chip (padding/
+  // background) is atomic — never split across two lines.
+  await loadFixture(page);
+  const rich = await page.evaluate(() => {
+    const read = (id: string) => {
+      const p = document.getElementById(id)!;
+      return {
+        outcome: p.getAttribute('data-ts-outcome'),
+        richFlag: p.getAttribute('data-ts-rich'),
+        lines: p.querySelectorAll(':scope > .ts-line').length,
+        anchors: [...p.querySelectorAll('a')].map((a) => ({
+          href: a.getAttribute('href'),
+          text: a.textContent,
+        })),
+        codeClones: p.querySelectorAll('code').length,
+        codeText: p.querySelector('code')?.textContent ?? null,
+        emCount: p.querySelectorAll('em').length,
+      };
+    };
+    return { link: read('rich-link'), mixed: read('rich-mixed'), chip: read('rich-chip') };
+  });
+
+  expect(rich.link.outcome).toBe('composed');
+  expect(rich.link.richFlag).toBe('1');
+  expect(rich.link.lines).toBeGreaterThan(1);
+  // Split anchors are allowed (one clone per line) but every clone carries
+  // the exact href, and their combined text is the original link text.
+  expect(rich.link.anchors.length).toBeGreaterThanOrEqual(1);
+  for (const a of rich.link.anchors) expect(a.href).toBe('https://typeset.us/library');
+  expect(rich.link.anchors.map((a) => a.text).join('')).toContain('documented in the library');
+
+  expect(rich.mixed.outcome).toBe('composed');
+  expect(rich.mixed.emCount).toBeGreaterThanOrEqual(2);
+  for (const a of rich.mixed.anchors) expect(a.href).toBe('https://typeset.us/fix');
+
+  expect(rich.chip.outcome).toBe('composed');
+  expect(rich.chip.codeClones, 'boxed chip must never split across lines').toBe(1);
+  expect(rich.chip.codeText).toBe('text-wrap: pretty');
+});
+
+test('rich paragraphs preserve every word and survive recomposition', async ({ page }) => {
+  await page.goto('/go-test.html');
+  const before = await page.$$eval('#rich-link, #rich-mixed, #rich-chip', (ps) =>
+    ps.map((p) => (p.textContent || '').trim().split(/\s+/).length),
+  );
+  await loadFixture(page);
+  const after = await page.$$eval('#rich-link, #rich-mixed, #rich-chip', (ps) =>
+    ps.map((p) => (p.textContent || '').trim().split(/\s+/).length),
+  );
+  expect(after).toEqual(before);
+
+  // Width change → engine restores its stored original innerHTML and
+  // recomposes; markup must survive the round trip.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.waitForFunction(() =>
+    ['rich-link', 'rich-mixed', 'rich-chip'].every((id) =>
+      document.getElementById(id)?.hasAttribute('data-typeset-done'),
+    ),
+  );
+  const roundTrip = await page.evaluate(() => ({
+    hrefs: [...document.querySelectorAll('#rich-link a')].map((a) => a.getAttribute('href')),
+    chipClones: document.querySelectorAll('#rich-chip code').length,
+    words: (document.getElementById('rich-link')!.textContent || '').trim().split(/\s+/).length,
+  }));
+  for (const href of roundTrip.hrefs) expect(href).toBe('https://typeset.us/library');
+  expect(roundTrip.chipClones).toBe(1);
+  expect(roundTrip.words).toBe(before[0]);
+});
+
 test('spacing accordion is centered, not biased tight', async ({ page }) => {
   // Texture invariant (added 2026-07-09 after the whole-page-reads-tight
   // regression): the accordion must breathe AROUND the compositor's chosen
