@@ -29,7 +29,7 @@ export default function EssayPage() {
         <p>
           Pick up any book you trust. Open it anywhere and run your eye down
           the right-hand edge of the text. You will rarely find a line that
-          ends on the word &ldquo;of&rdquo; or a &ldquo;the&rdquo; dangling
+          ends on the word <em>of</em> or a <em>the</em> dangling
           at an edge, cut off from its noun. You will not find the last line
           of a paragraph holding one abandoned word. Books have been free of
           these things for five hundred years — not by luck, but because the
@@ -44,8 +44,7 @@ export default function EssayPage() {
         <p>
           The browser sets text with one rule: fill the line until the next
           word doesn&rsquo;t fit, then break. It is fast, it is simple, and
-          it has no idea what it is breaking. It doesn&rsquo;t know that
-          &ldquo;of&rdquo; belongs to the word that follows it. It doesn&rsquo;t
+          it has no idea what it is breaking. It doesn&rsquo;t know that <em>of</em> belongs to the word that follows it. It doesn&rsquo;t
           know a sentence just started. It doesn&rsquo;t know your paragraph
           ends on its most important word and just stranded it alone. The
           browser types. It doesn&rsquo;t read.
@@ -68,26 +67,25 @@ export default function EssayPage() {
 
         <p>
           The browsers skipped it. Not out of contempt — out of arithmetic. A
-          nineties browser was laying out text while it was still downloading,
+          nineties browser was laying out text <em>while it was still downloading</em>,
           into columns that could change width at any moment, on machines
           with nothing to spare; a one-pass greedy break was the only bill
           it could pay. The emergency measure calcified into the definition
           of a line on the web. The machines have gotten ten thousand times
           faster since. The rule was never revisited. The web got
-          CSS instead: word-spacing, text-align, and forty years of waiting.
+          CSS instead: <code>word-spacing</code>, <code>text-align</code>, and forty years of waiting.
         </p>
 
         <h2>The platform&rsquo;s answer, measured</h2>
 
         <p>
-          The platform is finally moving. text-wrap: pretty
-          shipped in Chrome and Safari, and it is genuinely better than
+          The platform is finally moving. <code>text-wrap: pretty</code> shipped in Chrome and Safari, and it is genuinely better than
           nothing — Safari&rsquo;s version even scores the whole paragraph.
           Credit where due. But look at what it optimizes: line lengths,
           hyphenation points, the geometry of the rag. No shipping
           implementation knows what a preposition is. None will spend a line
           to keep a sentence&rsquo;s opening intact. And the spec offers no
-          way to ask what it did — pretty is defined as
+          way to ask what it did — <code>pretty</code> is defined as
           &ldquo;the browser may try harder,&rdquo; which cannot be tested,
           asserted on, or trusted with anything you care about.
         </p>
@@ -125,10 +123,11 @@ export default function EssayPage() {
           width, if any of a dozen browser quirks would make the composed
           paragraph worse than the browser&rsquo;s own, the engine restores
           the original and records why. The result is a property no CSS
-          declaration can offer: audit() returns the measured
+          declaration can offer: <code>audit()</code> returns the measured
           violations on the page — overflows, orphans, weak line-ends — as
           data. Zero means zero. Your CI can assert it. Your AI agent can
-          verify it. You can watch it count.
+          verify it. You can paste any URL into{' '}
+          <Link href="/fix">the grader</Link> and watch it count.
         </p>
 
         <p>
