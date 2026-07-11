@@ -48,6 +48,10 @@ type Token = {
   protectedCompound?: boolean;  // e.g., "human-centric" — don't split
   emergencyBreakParts?: string[];  // for long slugs like ThePaperLanternStore
   compoundId?: string;             // shared ID for tokens in the same protected compound
+  /** Inline composition: run this token lives in (null/undefined = base text). */
+  runId?: number | null;
+  /** Composite token spanning run boundaries without whitespace. */
+  parts?: { text: string; runId: number | null }[];
 };
 
 /** Frozen line with exact membership and spacing adjustments */
@@ -57,6 +61,35 @@ interface FrozenLine {
   fill: number;  // 0-1 fill ratio
   width: number;  // actual line width in pixels
   wordSpacingEm: number;  // spacing adjustment in em units
+}
+
+// ─── Inline composition (rich paragraphs: links, em, code, …) ───
+
+/**
+ * One run per innermost inline element instance. Tokens carry the run they
+ * live in so the renderer can rebuild the element chain per frozen line.
+ * Base text (direct text nodes of the paragraph) has runId null.
+ */
+interface InlineRun {
+  id: number;
+  /** Outermost → innermost ORIGINAL elements (live at extraction time). */
+  chain: HTMLElement[];
+  fontString: string;
+  letterSpacing: string;
+  /** Padded/bordered/backgrounded (code chips) — never split across lines. */
+  atomic: boolean;
+}
+
+/** A piece of a token that lives in one run (composite-token support). */
+interface TokenPart {
+  text: string;
+  runId: number | null;
+}
+
+/** Extraction result for a rich paragraph. */
+interface RichContent {
+  segments: { text: string; runId: number | null }[];
+  runs: InlineRun[];
 }
 
 // Token classification sets
@@ -143,6 +176,66 @@ const isSentenceEnd = (word: string) =>
  * Tokenize text into typed tokens with measurements.
  * Detects compound words, long slugs, punctuation stickiness, weak-end words.
  */
+/**
+ * Classify one whitespace-delimited word/punctuation chunk. Shared by the
+ * plain-string tokenizer and the rich (inline-markup) tokenizer so the two
+ * paths can never disagree about what a weak ender or sticky dash is.
+ */
+function classifyWord(part: string): Omit<Token, 'width'> {
+  const lower = part.toLowerCase();
+  const firstChar = part[0];
+  const lastChar = part[part.length - 1];
+
+  let kind: TokenKind = "word";
+  let stickyPrev = false;
+  let stickyNext = false;
+  let weakEnd = false;
+  let protectedCompound = false;
+  let emergencyBreakParts: string[] | undefined;
+
+  // Opening punctuation
+  if (OPEN_PUNCT.has(firstChar) && part.length === 1) {
+    kind = "openPunct";
+    stickyNext = true;
+  }
+  // Closing punctuation
+  else if (CLOSE_PUNCT.has(lastChar) && (part.length === 1 || CLOSE_PUNCT.has(part))) {
+    kind = "closePunct";
+    stickyPrev = true;
+  }
+  // Dash
+  else if (DASHES.has(part)) {
+    kind = "dash";
+    stickyPrev = true;
+  }
+  // Compound word (internal hyphen, <=20 chars)
+  else if (part.length <= 20 && part.indexOf('-') > 0 && part.indexOf('-') < part.length - 1) {
+    kind = "compound";
+    protectedCompound = true;
+  }
+  // Long slug (>16 chars, no spaces)
+  else if (part.length > 16 && !/\s/.test(part)) {
+    kind = "longSlug";
+    // Detect camelCase boundaries
+    const camelParts = part.split(/(?<=[a-z])(?=[A-Z])/);
+    if (camelParts.length > 1) {
+      emergencyBreakParts = camelParts;
+    } else {
+      // Try underscore/slash
+      const delimParts = part.split(/[_\/]/);
+      if (delimParts.length > 1) {
+        emergencyBreakParts = delimParts;
+      }
+    }
+  }
+  // Weak-end word
+  else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ''))) {
+    weakEnd = true;
+  }
+
+  return { text: part, kind, stickyPrev, stickyNext, weakEnd, protectedCompound, emergencyBreakParts };
+}
+
 function tokenize(text: string, measurer: (text: string) => number): Token[] {
   if (!text || text.trim().length === 0) return [];
 
@@ -163,72 +256,225 @@ function tokenize(text: string, measurer: (text: string) => number): Token[] {
       continue;
     }
 
-    // Word/punctuation token
-    const lower = part.toLowerCase();
-    const firstChar = part[0];
-    const lastChar = part[part.length - 1];
-
-    // Classify token kind
-    let kind: TokenKind = "word";
-    let stickyPrev = false;
-    let stickyNext = false;
-    let weakEnd = false;
-    let protectedCompound = false;
-    let emergencyBreakParts: string[] | undefined;
-
-    // Opening punctuation
-    if (OPEN_PUNCT.has(firstChar) && part.length === 1) {
-      kind = "openPunct";
-      stickyNext = true;
-    }
-    // Closing punctuation
-    else if (CLOSE_PUNCT.has(lastChar) && (part.length === 1 || CLOSE_PUNCT.has(part))) {
-      kind = "closePunct";
-      stickyPrev = true;
-    }
-    // Dash
-    else if (DASHES.has(part)) {
-      kind = "dash";
-      stickyPrev = true;
-    }
-    // Compound word (internal hyphen, <=20 chars)
-    else if (part.length <= 20 && part.indexOf('-') > 0 && part.indexOf('-') < part.length - 1) {
-      kind = "compound";
-      protectedCompound = true;
-    }
-    // Long slug (>16 chars, no spaces)
-    else if (part.length > 16 && !/\s/.test(part)) {
-      kind = "longSlug";
-      // Detect camelCase boundaries
-      const camelParts = part.split(/(?<=[a-z])(?=[A-Z])/);
-      if (camelParts.length > 1) {
-        emergencyBreakParts = camelParts;
-      } else {
-        // Try underscore/slash
-        const delimParts = part.split(/[_\/]/);
-        if (delimParts.length > 1) {
-          emergencyBreakParts = delimParts;
-        }
-      }
-    }
-    // Weak-end word
-    else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ''))) {
-      weakEnd = true;
-    }
-
-    tokens.push({
-      text: part,
-      kind,
-      width: measurer(part),
-      stickyPrev,
-      stickyNext,
-      weakEnd,
-      protectedCompound,
-      emergencyBreakParts,
-    });
+    tokens.push({ ...classifyWord(part), width: measurer(part) });
   }
 
   return tokens;
+}
+
+// ─── Inline composition: extraction, tokenization, measurement ───
+
+/**
+ * Inline elements the rich path knows how to rebuild. Anything else in the
+ * paragraph (BR, IMG, unknown/custom elements, block-displayed children)
+ * means the paragraph keeps today's Phase-1 treatment — never guess.
+ */
+const INLINE_COMPOSE_TAGS = new Set([
+  'A', 'EM', 'STRONG', 'I', 'B', 'CODE', 'SPAN', 'MARK', 'SMALL', 'ABBR',
+  'CITE', 'Q', 'TIME', 'SUP', 'SUB', 'U', 'S', 'DEL', 'INS', 'KBD', 'SAMP',
+  'VAR',
+]);
+
+/** Elements that read wrong when split across lines even without padding. */
+const ALWAYS_ATOMIC_TAGS = new Set(['SUP', 'SUB', 'KBD']);
+
+function isVisiblyBoxed(el: HTMLElement): boolean {
+  const s = getComputedStyle(el);
+  if (parseFloat(s.paddingLeft) > 0 || parseFloat(s.paddingRight) > 0) return true;
+  if (parseFloat(s.borderLeftWidth) > 0 || parseFloat(s.borderRightWidth) > 0) return true;
+  const bg = s.backgroundColor || '';
+  // Anything but fully-transparent counts as a visible box.
+  return bg !== '' && bg !== 'transparent' && !/^rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)$/.test(bg);
+}
+
+/**
+ * Walk a LIVE paragraph and flatten it into text segments with run
+ * provenance. Returns null when the paragraph contains anything the
+ * renderer can't faithfully rebuild — the caller falls back to Phase 1.
+ */
+function extractInlineContent(element: HTMLElement): RichContent | null {
+  const segments: RichContent['segments'] = [];
+  const runs: InlineRun[] = [];
+  const runByInnermost = new Map<HTMLElement, InlineRun>();
+
+  const runFor = (chain: HTMLElement[]): InlineRun => {
+    const innermost = chain[chain.length - 1];
+    const existing = runByInnermost.get(innermost);
+    if (existing) return existing;
+    const cs = getComputedStyle(innermost);
+    const run: InlineRun = {
+      id: runs.length,
+      chain: chain.slice(),
+      fontString: canvasFontString(cs),
+      letterSpacing:
+        cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '0px',
+      atomic:
+        chain.some((el) => ALWAYS_ATOMIC_TAGS.has(el.tagName)) ||
+        chain.some((el) => isVisiblyBoxed(el)),
+    };
+    runs.push(run);
+    runByInnermost.set(innermost, run);
+    return run;
+  };
+
+  const walk = (node: Node, chain: HTMLElement[]): boolean => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3 /* TEXT */) {
+        const text = (child as Text).data;
+        if (!text) continue;
+        segments.push({ text, runId: chain.length ? runFor(chain).id : null });
+        continue;
+      }
+      if (child.nodeType === 8 /* COMMENT (JSX emits these) */) continue;
+      if (child.nodeType !== 1) return false;
+      const el = child as HTMLElement;
+      if (!INLINE_COMPOSE_TAGS.has(el.tagName)) return false;
+      if (getComputedStyle(el).display !== 'inline') return false;
+      if (!walk(el, chain.concat(el))) return false;
+    }
+    return true;
+  };
+
+  if (!walk(element, [])) return null;
+  if (!runs.length) return null; // no markup — plain path owns it
+  return { segments, runs };
+}
+
+/**
+ * Tokenize extracted segments. Words split across run boundaries WITHOUT
+ * whitespace ("re<em>read</em>ing", "(<a>link</a>)") become composite
+ * tokens; atomic runs (code chips) become one unbreakable token, internal
+ * spaces included. Author non-breaking spaces stay glue, never break
+ * points. Classification is classifyWord — identical to the plain path.
+ */
+function richTokenize(
+  content: RichContent,
+  measure: (text: string, runId: number | null) => number
+): Token[] {
+  const { segments, runs } = content;
+  const tokens: Token[] = [];
+  let pending: TokenPart[] = [];
+
+  const flush = () => {
+    if (!pending.length) return;
+    const full = pending.map((p) => p.text).join('');
+    if (!full) { pending = []; return; }
+    const cls = classifyWord(full);
+    const width = pending.reduce((sum, p) => sum + measure(p.text, p.runId), 0);
+    const token: Token = { ...cls, width };
+    if (pending.length === 1) token.runId = pending[0].runId;
+    else token.parts = pending;
+    tokens.push(token);
+    pending = [];
+  };
+
+  for (const seg of segments) {
+    const run = seg.runId === null ? null : runs[seg.runId];
+    if (run?.atomic) {
+      // The whole run is one glyph to the compositor.
+      pending.push({ text: seg.text, runId: seg.runId });
+      continue;
+    }
+    const pieces = seg.text.split(/(\s+)/);
+    for (const piece of pieces) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) {
+        if (/^[  ]+$/.test(piece)) {
+          // Author non-breaking space: glue, not a break opportunity.
+          pending.push({ text: piece, runId: seg.runId });
+          continue;
+        }
+        flush();
+        tokens.push({ text: piece, kind: 'space', width: measure(piece, seg.runId), runId: seg.runId });
+        continue;
+      }
+      pending.push({ text: piece, runId: seg.runId });
+    }
+  }
+  flush();
+  return tokens;
+}
+
+/**
+ * Measurer that knows every run's font. Same canvas discipline as
+ * makeMeasurer (sentinel resets, verified acceptance, DOM fallback) — the
+ * shared canvas keeps state, so font AND letterSpacing are set per call.
+ */
+function makeRunMeasurer(
+  element: HTMLElement,
+  runs: InlineRun[]
+): { measure: (text: string, runId: number | null) => number; cleanup: () => void } {
+  const cs = getComputedStyle(element);
+  const base = {
+    font: canvasFontString(cs),
+    ls: cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '0px',
+  };
+  const fonts = new Map<number | null, { font: string; ls: string }>();
+  fonts.set(null, base);
+  for (const run of runs) fonts.set(run.id, { font: run.fontString, ls: run.letterSpacing });
+
+  if (!_canvas) {
+    const c = document.createElement('canvas');
+    _canvas = c.getContext('2d');
+  }
+  const ctx = _canvas;
+  const fallbackCh = (parseFloat(cs.fontSize) || 16) * 0.5;
+
+  // Verify the canvas accepts EVERY font involved; one rejection (Safari's
+  // parser and next/font internal names have history here) sends the whole
+  // paragraph to the DOM path — mixed measurement sources would skew fills.
+  let canvasOk = !!ctx;
+  if (ctx) {
+    for (const f of fonts.values()) {
+      ctx.font = '7px serif';
+      if ('letterSpacing' in ctx) {
+        (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
+      }
+      ctx.font = f.font;
+      const size = /(\d+(?:\.\d+)?px)/.exec(f.font)?.[1];
+      if (!size || !ctx.font.includes(size)) { canvasOk = false; break; }
+    }
+  }
+
+  if (ctx && canvasOk) {
+    return {
+      measure: (text: string, runId: number | null) => {
+        const f = fonts.get(runId ?? null) ?? base;
+        ctx.font = f.font;
+        if ('letterSpacing' in ctx) {
+          (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = f.ls;
+        }
+        return ctx.measureText(text).width;
+      },
+      cleanup: () => {},
+    };
+  }
+
+  // DOM fallback: one probe per run with the run's explicit font.
+  const probes = new Map<number | null, HTMLSpanElement>();
+  const makeProbe = (font: string, ls: string) => {
+    const probe = document.createElement('span');
+    probe.style.cssText =
+      'position:absolute;visibility:hidden;white-space:pre;pointer-events:none;';
+    probe.style.font = font;
+    probe.style.letterSpacing = ls;
+    element.appendChild(probe);
+    return probe;
+  };
+  for (const [id, f] of fonts) probes.set(id, makeProbe(f.font, f.ls));
+  return {
+    measure: (text: string, runId: number | null) => {
+      const probe = probes.get(runId ?? null);
+      if (!probe || !probe.isConnected) return text.length * fallbackCh;
+      probe.textContent = text;
+      return probe.getBoundingClientRect().width;
+    },
+    cleanup: () => {
+      for (const probe of probes.values()) {
+        if (probe.parentNode) probe.parentNode.removeChild(probe);
+      }
+    },
+  };
 }
 
 // ─── Compositor (replaces optimizeBreaks) ───
