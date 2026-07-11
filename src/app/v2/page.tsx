@@ -649,7 +649,7 @@ function Closing() {
       <p data-no-typeset className="v2-body v2-narrow">
         The same engine that set this page: beam-search composition, hanging
         punctuation, smart quotes, self-checks that fall back to the browser
-        rather than ever make your text worse. 30&nbsp;KB, no dependencies,
+        rather than ever make your text worse. 20&nbsp;KB, no&nbsp;dependencies,
         generated from the source you can read.
       </p>
       <nav className="v2-links">

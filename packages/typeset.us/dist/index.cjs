@@ -44,7 +44,7 @@ var NBSP = "\xA0";
 var NBHY = "\u2011";
 var canonicalText = /* @__PURE__ */ new WeakMap();
 var isInternalWrite = false;
-var WEAK_END_WORDS = /* @__PURE__ */ new Set(["a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "and", "or", "but", "nor", "so", "as"]);
+var WEAK_END_WORDS = /* @__PURE__ */ new Set(["a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "and", "or", "but", "nor", "so", "as", "no"]);
 var LINKING_END_WORDS = /* @__PURE__ */ new Set([
   "is",
   "are",
@@ -56,7 +56,51 @@ var LINKING_END_WORDS = /* @__PURE__ */ new Set([
   "being",
   "has",
   "have",
-  "had"
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "can",
+  "could",
+  "should",
+  "shall",
+  "may",
+  "might",
+  "must",
+  "don\u2019t",
+  "doesn\u2019t",
+  "didn\u2019t",
+  "won\u2019t",
+  "wouldn\u2019t",
+  "can\u2019t",
+  "couldn\u2019t",
+  "shouldn\u2019t",
+  "isn\u2019t",
+  "aren\u2019t",
+  "wasn\u2019t",
+  "weren\u2019t",
+  "hasn\u2019t",
+  "haven\u2019t",
+  "hadn\u2019t",
+  "mustn\u2019t",
+  "don't",
+  "doesn't",
+  "didn't",
+  "won't",
+  "wouldn't",
+  "can't",
+  "couldn't",
+  "shouldn't",
+  "isn't",
+  "aren't",
+  "wasn't",
+  "weren't",
+  "hasn't",
+  "haven't",
+  "hadn't",
+  "mustn't"
 ]);
 var OPEN_PUNCT = /* @__PURE__ */ new Set(["(", "[", "{", "\u201C", "\u2018"]);
 var CLOSE_PUNCT = /* @__PURE__ */ new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);

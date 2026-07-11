@@ -93,12 +93,22 @@ interface RichContent {
 }
 
 // Token classification sets
-const WEAK_END_WORDS = new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as"]);
+// "no" added 2026-07-10 (Dustin: "30 KB, no / dependencies") — a determiner
+// that belongs to its noun exactly like "the".
+const WEAK_END_WORDS = new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as","no"]);
 // Copula / auxiliary verbs that read poorly when stranded at a line end
 // ("…Advertising is"). Penalized gently (below weakEndPenalty) so they're only
 // bumped to the next line when the shortened line stays full — "where width allows."
+// Auxiliaries + their contractions added 2026-07-10 (Dustin: "doesn't / fit,") —
+// an auxiliary split from its verb reads as badly as a stranded copula. Both
+// apostrophe forms listed: educated text carries U+2019, raw text carries '.
 const LINKING_END_WORDS = new Set([
   "is","are","was","were","be","been","am","being","has","have","had",
+  "do","does","did","will","would","can","could","should","shall","may","might","must",
+  "don’t","doesn’t","didn’t","won’t","wouldn’t","can’t","couldn’t","shouldn’t",
+  "isn’t","aren’t","wasn’t","weren’t","hasn’t","haven’t","hadn’t","mustn’t",
+  "don't","doesn't","didn't","won't","wouldn't","can't","couldn't","shouldn't",
+  "isn't","aren't","wasn't","weren't","hasn't","haven't","hadn't","mustn't",
 ]);
 const OPEN_PUNCT = new Set(["(", "[", "{", "\u201C", "\u2018"]);  // opening quotes/brackets
 const CLOSE_PUNCT = new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);

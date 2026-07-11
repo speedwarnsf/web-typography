@@ -20,7 +20,7 @@ assertion is an empty array.
    <script src="https://typeset.us/go.js" defer></script>
    <!-- or version-pinned with subresource integrity: -->
    <script src="https://typeset.us/go@3.2.1.js"
-           integrity="sha384-Is9rA1DL9xXjcCQ+LR/moxNj/MJpeNCpelv1DC6kNRuNVzmtx7NviLddUWDFUo/q" crossorigin="anonymous" defer></script>
+           integrity="sha384-BAAqsbK6q/BmmkWpVZB98Apo/h3L0ZutHsp91Khz4aTWtl+5lvlDOOBmEvRgGCz3" crossorigin="anonymous" defer></script>
    ```
 
    Or from npm (`npm install typeset.us`), after fonts are ready:
