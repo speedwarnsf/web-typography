@@ -22,6 +22,12 @@ export const sections: SiteSection[] = [
     name: "Learn",
     pages: [
       {
+        slug: "/essay",
+        name: "The Essay",
+        shortName: "Essay",
+        description: "The Browser Types. It Doesn’t Read.",
+      },
+      {
         slug: "/library",
         name: "The Library",
         shortName: "Library",

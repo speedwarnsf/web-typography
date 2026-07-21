@@ -140,6 +140,23 @@ export default function EssayPage() {
           calls its text &ldquo;pretty&rdquo; and cannot say what it fixed.
         </p>
 
+        <h2>What it doesn&rsquo;t do</h2>
+
+        <p>
+          A claim, unlike a vibe, has boundaries — so here are ours. Typeset
+          reads English prose and nothing else; drop it on another language
+          and it will decline rather than guess. Text you copy from a
+          composed paragraph carries a line break where each line ended — we
+          chose that over the worse defect of welded words. Until this week,
+          paragraphs carrying links or emphasis kept their protections but
+          not their composition; that gap is now closed, and this essay —
+          links, italics, code and all — is the proof. And typeset does not
+          read, either. It runs the checklist five centuries of compositors
+          wrote — priced, searched, and measured — at the speed of the
+          machine that forgot it. Every limit above is a decision with a
+          number on it, and the full accounting is public in the journal.
+        </p>
+
         <h2>One line</h2>
 
         <p>
