@@ -1,9 +1,9 @@
 {
-  "version": "3.3.0",
+  "version": "3.3.1",
   "files": {
-    "go@3.3.0.js": "sha384-ZyTt3ViyJsZ0arWPFvg5vebjeuFFxYZZ4tDU8T6OcAytzisSmSQpkGFaYPWlIEPf",
-    "typeset.min.js": "sha384-zltnZZSldQO5v9vEj+Wzsd0uaFlTDGU4zTZbWvPC5d6KndHmXUHkNDRR0K62KB8d",
-    "typeset.esm.js": "sha384-EWccN5pcVBhXzRT310lAf6DGisyUJHgP72aIq/vrxirtLqzjza//bCLa1K3pqxVI"
+    "go@3.3.1.js": "sha384-QhQM0yqOOaZxMfVF231gz4h5VHNX338ulXwc63lHpX1kN9zY7Eh0xMqdhVrFT7dV",
+    "typeset.min.js": "sha384-s6jdr9ckUrgzXABSZ1MhMyE9NL4UtJHgNttz43jabsr0byGZ/vsrNc1Uem0gJXdl",
+    "typeset.esm.js": "sha384-MElec9arg8KDl5Erv2fkWObQY8zfErDSgEiYTT7BumRUNDgm5E00W8YBqrFItgRW"
   },
-  "snippet": "<script src=\"https://typeset.us/go@3.3.0.js\" integrity=\"sha384-ZyTt3ViyJsZ0arWPFvg5vebjeuFFxYZZ4tDU8T6OcAytzisSmSQpkGFaYPWlIEPf\" crossorigin=\"anonymous\" defer></script>"
+  "snippet": "<script src=\"https://typeset.us/go@3.3.1.js\" integrity=\"sha384-QhQM0yqOOaZxMfVF231gz4h5VHNX338ulXwc63lHpX1kN9zY7Eh0xMqdhVrFT7dV\" crossorigin=\"anonymous\" defer></script>"
 }

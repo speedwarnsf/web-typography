@@ -1,4 +1,4 @@
-/* typeset.us v3.3.0 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.3.1 — MIT © Dustin York. https://typeset.us */
 "use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -44,7 +44,59 @@ var NBSP = "\xA0";
 var NBHY = "\u2011";
 var canonicalText = /* @__PURE__ */ new WeakMap();
 var isInternalWrite = false;
-var WEAK_END_WORDS = /* @__PURE__ */ new Set(["a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "and", "or", "but", "nor", "so", "as", "no"]);
+var WEAK_END_WORDS = /* @__PURE__ */ new Set([
+  "a",
+  "an",
+  "the",
+  "no",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "by",
+  "for",
+  "with",
+  "from",
+  "into",
+  "upon",
+  "about",
+  "between",
+  "through",
+  "without",
+  "during",
+  "before",
+  "after",
+  "against",
+  "among",
+  "within",
+  "beyond",
+  "toward",
+  "towards",
+  "across",
+  "along",
+  "behind",
+  "beneath",
+  "beside",
+  "besides",
+  "despite",
+  "except",
+  "inside",
+  "outside",
+  "underneath",
+  "until",
+  "unlike",
+  "and",
+  "or",
+  "but",
+  "nor",
+  "so",
+  "as",
+  "yet",
+  "if",
+  "than",
+  "that"
+]);
 var LINKING_END_WORDS = /* @__PURE__ */ new Set([
   "is",
   "are",
@@ -298,12 +350,8 @@ function richTokenize(content, measure) {
     for (const piece of pieces) {
       if (!piece) continue;
       if (/^\s+$/.test(piece)) {
-        if (/^[  ]+$/.test(piece)) {
-          pending.push({ text: piece, runId: seg.runId });
-          continue;
-        }
         flush();
-        tokens.push({ text: piece, kind: "space", width: measure(piece, seg.runId), runId: seg.runId });
+        tokens.push({ text: " ", kind: "space", width: measure(" ", seg.runId), runId: seg.runId });
         continue;
       }
       pending.push({ text: piece, runId: seg.runId });

@@ -93,9 +93,21 @@ interface RichContent {
 }
 
 // Token classification sets
-// "no" added 2026-07-10 (Dustin: "30 KB, no / dependencies") — a determiner
-// that belongs to its noun exactly like "the".
-const WEAK_END_WORDS = new Set(["a","an","the","of","to","in","on","at","by","for","and","or","but","nor","so","as","no"]);
+// The FULL Part-III vocabulary (35 prepositions + conjunctions + articles),
+// unified 2026-07-11: the engine's list had drifted to a 17-word subset of
+// what audit(), the CLI, and the graders judge by — so the engine composed
+// lines its own ruler then flagged ("without", "against" on the essay).
+// The maker and the ruler must share one list. "no" is the determiner
+// addition (2026-07-10, Dustin).
+const WEAK_END_WORDS = new Set([
+  "a","an","the","no",
+  "of","to","in","on","at","by","for","with","from","into","upon","about",
+  "between","through","without","during","before","after","against","among",
+  "within","beyond","toward","towards","across","along","behind","beneath",
+  "beside","besides","despite","except","inside","outside","underneath",
+  "until","unlike",
+  "and","or","but","nor","so","as","yet","if","than","that",
+]);
 // Copula / auxiliary verbs that read poorly when stranded at a line end
 // ("…Advertising is"). Penalized gently (below weakEndPenalty) so they're only
 // bumped to the next line when the shortened line stays full — "where width allows."
@@ -361,8 +373,9 @@ function extractInlineContent(element: HTMLElement): RichContent | null {
  * Tokenize extracted segments. Words split across run boundaries WITHOUT
  * whitespace ("re<em>read</em>ing", "(<a>link</a>)") become composite
  * tokens; atomic runs (code chips) become one unbreakable token, internal
- * spaces included. Author non-breaking spaces stay glue, never break
- * points. Classification is classifyWord — identical to the plain path.
+ * spaces included. NBSPs are treated as ordinary spaces (Phase 1 may
+ * have injected bindings before composition — the compositor re-earns
+ * every join itself). Classification is classifyWord — identical to the plain path.
  */
 function richTokenize(
   content: RichContent,
@@ -396,13 +409,16 @@ function richTokenize(
     for (const piece of pieces) {
       if (!piece) continue;
       if (/^\s+$/.test(piece)) {
-        if (/^[  ]+$/.test(piece)) {
-          // Author non-breaking space: glue, not a break opportunity.
-          pending.push({ text: piece, runId: seg.runId });
-          continue;
-        }
+        // NBSP is ordinary whitespace here, exactly like the plain path
+        // (\s matches U+00A0): GlobalTypeset's Phase 1 runs BEFORE
+        // composition and injects NBSP bindings into text nodes — treating
+        // those as glue welded words into unbreakable multi-word tokens,
+        // collapsed the candidate space, and forced the beam into weak
+        // enders it would never otherwise pay for (the essay's
+        // "…on the / …URL into" regression, 2026-07-11). The compositor's
+        // own binding rules re-earn every join.
         flush();
-        tokens.push({ text: piece, kind: 'space', width: measure(piece, seg.runId), runId: seg.runId });
+        tokens.push({ text: ' ', kind: 'space', width: measure(' ', seg.runId), runId: seg.runId });
         continue;
       }
       pending.push({ text: piece, runId: seg.runId });
