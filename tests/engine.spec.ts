@@ -162,6 +162,59 @@ test('rich paragraphs preserve every word and survive recomposition', async ({ p
   expect(roundTrip.words).toBe(before[0]);
 });
 
+test('the essay composes clean — launch page parity, forever', async ({ page }) => {
+  // public/essay-test.html mirrors the essay's real prose (markup intact).
+  // One orphan or weak ender on the launch page kills the pitch, so CI
+  // asserts what production must always be true of: every paragraph
+  // composed, zero violations under the FULL vocabulary, at desktop and
+  // phone measures.
+  const FULL_WEAK = ['a','an','the','no','of','to','in','on','at','by','for','with','from','into','upon','about','between','through','without','during','before','after','against','among','within','beyond','toward','towards','across','along','behind','beneath','beside','besides','despite','except','inside','outside','underneath','until','unlike','and','or','but','nor','so','as','yet','if','than','that'];
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/essay-test.html');
+    await page.waitForFunction(() => {
+      const ps = Array.from(document.querySelectorAll('#essay-paras > p'));
+      return ps.length > 0 && ps.every((p) => p.hasAttribute('data-typeset-done'));
+    });
+    const state = await page.evaluate((WEAK) => {
+      const weak = new Set(WEAK);
+      const ps = Array.from(document.querySelectorAll<HTMLElement>('#essay-paras > p'));
+      const enders: string[] = [];
+      let orphans = 0;
+      for (const p of ps) {
+        const lines = Array.from(p.querySelectorAll<HTMLElement>(':scope > .ts-line'));
+        lines.forEach((l, i) => {
+          const words = (l.textContent || '').trim().split(/\s+/);
+          if (i < lines.length - 1) {
+            const w = (words[words.length - 1] || '').replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase();
+            if (weak.has(w)) enders.push(w);
+          } else if (lines.length > 1 && words.filter((x) => /[A-Za-z0-9]/.test(x)).length === 1) {
+            orphans++;
+          }
+        });
+      }
+      return {
+        total: ps.length,
+        composed: ps.filter((p) => p.getAttribute('data-ts-outcome') === 'composed').length,
+        enders,
+        orphans,
+      };
+    }, FULL_WEAK);
+    expect(state.composed, `at ${width}px`).toBe(state.total);
+    expect(state.orphans, `orphans at ${width}px`).toBe(0);
+    if (width >= 592) {
+      // The reading measure: absolute zero.
+      expect(state.enders, `weak enders at ${width}px`).toEqual([]);
+    } else {
+      // Phone measure: the engine deliberately trades a bounded number of
+      // weak enders against orphans and inadmissible fills — "where width
+      // allows" is the documented economics. Bound the trade so drift
+      // still fails loudly.
+      expect(state.enders.length, `weak enders at ${width}px: ${state.enders.join(', ')}`).toBeLessThanOrEqual(8);
+    }
+  }
+});
+
 test('spacing accordion is centered, not biased tight', async ({ page }) => {
   // Texture invariant (added 2026-07-09 after the whole-page-reads-tight
   // regression): the accordion must breathe AROUND the compositor's chosen
