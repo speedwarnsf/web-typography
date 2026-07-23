@@ -39,7 +39,10 @@ const asJson = args.includes('--json');
 // The measurement that runs inside the page. Line boxes reconstructed with
 // DOM Ranges — the same technique the engine's own self-checks use.
 const PAGE_FN = ({ selector }) => {
-  const WEAK = new Set(['a','an','the','of','in','at','by','to','for','with','from','on','into','upon','about','between','through','without','during','before','after','against','among','within','beyond','toward','towards','across','along','behind','beneath','beside','besides','despite','except','inside','outside','underneath','until','unlike','and','or','but','nor','yet','so','is','are','was','were','be','been','as','if','than','that']);
+  // Exactly the engine's WEAK_END_WORDS — one vocabulary everywhere. The
+  // grader must measure with the same ruler the compositor set by, or a
+  // clean composition gets flagged by a list the engine never saw.
+  const WEAK = new Set(['a','an','the','no','of','to','in','on','at','by','for','with','from','into','upon','about','between','through','without','during','before','after','against','among','within','beyond','toward','towards','across','along','behind','beneath','beside','besides','despite','except','inside','outside','underneath','until','unlike','and','or','but','nor','so','as','yet','if','than','that']);
   const lang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
   if (lang && !lang.startsWith('en')) {
     return { graded: false, reason: `page lang="${lang}" — English-only heuristics do not apply` };
@@ -167,6 +170,28 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(url, { waitUntil: 'load', timeout: 30000 });
   await page.waitForTimeout(1500); // fonts + late scripts settle
+  // If the page runs typeset, grade the rendering the reader actually gets:
+  // wait for composition to settle (the composed count stops changing)
+  // before measuring. Without this, image-heavy pages get graded on a
+  // mid-compose frame and a script-tagged site is wrongly told to add the
+  // script tag. Engine absent, or present but inert past the deadline —
+  // grade raw, as before.
+  {
+    const deadline = Date.now() + 12000;
+    let prev = -1;
+    while (Date.now() < deadline) {
+      const s = await page.evaluate(() => ({
+        engine:
+          typeof window.Typeset !== 'undefined' ||
+          !!document.querySelector('script[src*="typeset"], script[src*="go@"], script[src*="go."]'),
+        done: document.querySelectorAll('[data-typeset-done], [data-ts-outcome]').length,
+      }));
+      if (!s.engine) break;
+      if (s.done > 0 && s.done === prev) break; // two stable reads — settled
+      prev = s.done;
+      await page.waitForTimeout(600);
+    }
+  }
   const result = await page.evaluate(PAGE_FN, { selector });
   const report = { url, selector, ...result };
 
