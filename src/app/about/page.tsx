@@ -100,9 +100,9 @@ export default function AboutPage() {
               The Practice
             </h2>
             <p className="leading-[1.8] mb-6">
-              For over 20 years, York has served as Art Director at Better
-              World Advertising — a studio dedicated exclusively to social
-              good. HIV/STD prevention, anti-tobacco initiatives, LGBTQ+
+              Art director, thirty years in the trade, more than twenty at
+              Better World Advertising — a studio dedicated exclusively to
+              social good. HIV/STD prevention, anti-tobacco initiatives, LGBTQ+
               rights, mental health, foster care, and environmental advocacy.
               In public health communication, typographic decisions are
               consequential. The wrong typeface undermines credibility. The
@@ -174,7 +174,9 @@ export default function AboutPage() {
                 <span className="font-bold text-neutral-100 min-w-[200px]">
                   Practice
                 </span>{' '}
-                <span className="text-neutral-400">20+ years professional</span>
+                <span className="text-neutral-400">
+                  Thirty years in the trade
+                </span>
               </li>
               <li className="flex flex-col sm:flex-row sm:gap-3">
                 <span className="font-bold text-neutral-100 min-w-[200px]">
@@ -190,6 +192,19 @@ export default function AboutPage() {
                 </span>{' '}
                 <span className="text-neutral-400">
                   Social marketing, public health, human rights campaigns
+                </span>
+              </li>
+              <li className="flex flex-col sm:flex-row sm:gap-3">
+                <span className="font-bold text-neutral-100 min-w-[200px]">
+                  Contact
+                </span>{' '}
+                <span className="text-neutral-400">
+                  <a
+                    href="mailto:dyork@typeset.us"
+                    className="hover:text-[#B8963E] transition-colors"
+                  >
+                    dyork@typeset.us
+                  </a>
                 </span>
               </li>
             </ul>
