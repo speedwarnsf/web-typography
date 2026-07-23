@@ -1,4 +1,4 @@
-/* typeset.us v3.3.1 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.3.2 — MIT © Dustin York. https://typeset.us */
 "use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;

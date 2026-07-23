@@ -1,6 +1,6 @@
 {
   "name": "typeset.us",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Paragraph compositor for the browser: beam-search line breaking with syntactic bindings, contour-shaped rag, hanging punctuation, and post-render self-verification. The engine behind typeset.us.",
   "license": "MIT",
   "author": "Dustin York (https://typeset.us)",
@@ -44,5 +44,6 @@
   "dependencies": {
     "playwright-core": "^1.58.0"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "funding": "https://typeset.us/support"
 }
