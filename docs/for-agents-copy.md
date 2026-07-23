@@ -31,8 +31,8 @@ and the assertion is an empty array.
    Version-pinned with subresource integrity:
 
    ```html
-   <script src="https://typeset.us/go@3.3.2.js"
-           integrity="sha384-iD519/Mn5x4DgOt4ym7opBt1/IHQQKBHBHGO2baemcdSIt6DwxdGpwVAOc2JSAzs" crossorigin="anonymous" defer></script>
+   <script src="https://typeset.us/go@3.3.3.js"
+           integrity="sha384-sKLG/sYxjOz5X4g5ywBAIDPYdCdkc6/rI99UCX6jRkOdPWAkx2baJ34bKYw7RMVn" crossorigin="anonymous" defer></script>
    ```
 
    Or from npm (`npm install typeset.us`):
