@@ -1,9 +1,9 @@
 {
   "version": "3.4.0",
   "files": {
-    "go@3.4.0.js": "sha384-vW5DwFWx5vSKTZHfwLWbiLLBKJL8IZU93drhNXnlnuGz3hHHO+OIcSHsfcliTmGm",
-    "typeset.min.js": "sha384-4vYiUTmWSmpLZ9DOVH9n/eS2sNlSdoRee7cSCuhuMxuGNV8PzoDgyszXEpvoFKMx",
+    "go@3.4.0.js": "sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1",
+    "typeset.min.js": "sha384-IOu1jmlPNBxu1WeobHN71Ma3DQiAvCs9httq/mB0P1as3llJQnpKj93kcmf519fB",
     "typeset.esm.js": "sha384-m4xkw9tuqMHEm9oQbWTGL/i0mm+mVN8oP3IXoI1hLDsg4vRPqHsArkRsk+M9Q6QO"
   },
-  "snippet": "<script src=\"https://typeset.us/go@3.4.0.js\" integrity=\"sha384-vW5DwFWx5vSKTZHfwLWbiLLBKJL8IZU93drhNXnlnuGz3hHHO+OIcSHsfcliTmGm\" crossorigin=\"anonymous\" defer></script>"
+  "snippet": "<script src=\"https://typeset.us/go@3.4.0.js\" integrity=\"sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1\" crossorigin=\"anonymous\" defer></script>"
 }

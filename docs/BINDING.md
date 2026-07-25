@@ -163,13 +163,8 @@ Guarded in CI (`tests/engine.spec.ts`):
 
 ## 5. Known limits
 
-- **Firefox composition determinism is unverified under load.** A test run
-  reported non-deterministic composition with a named system font. It did not
-  reproduce here — original code, 8 Firefox loads, quiet and under full CPU
-  saturation, was deterministic every time — but the report came from a machine
-  running six browser suites at once. A metrics-settled gate was added
-  defensively (`typeset.standalone.ts`); it is not a verified fix. Any CI gate
-  on rag metrics should be engine-scoped.
+- **Firefox composes non-deterministically. Confirmed, unfixed, not caused by
+  this feature.** See the section below.
 - **`New Yorker` no longer binds.** It is a demonym, not a toponym, and is not
   in the closed list. This is deliberate.
 - **The closed list is small and Anglocentric.** It covers the names that
@@ -178,3 +173,50 @@ Guarded in CI (`tests/engine.spec.ts`):
 - **Coverage, not correctness, is now the failure mode.** After the closed
   list, the residual risk is missed binds rather than wrong ones. That is the
   intended trade.
+
+---
+
+## 6. Open bug: Firefox composition is not deterministic
+
+Unrelated to phrase binding — it reproduces with the feature switched off, and
+it is present in the currently published engine. Recorded here because it was
+found during this work and because it bounds what any rag measurement in
+Firefox can claim.
+
+**Symptom.** The same page, loaded repeatedly in Firefox with no changes,
+occasionally composes differently. Rate is roughly **1 run in 30** on the
+corpus below; Chromium and WebKit are byte-identical across every run.
+
+```
+corpus: 85 paragraphs x 7 measures = 595 renderings, font "Georgia, serif"
+
+engine    variant | distinct  spread     lines seen     paragraphs not composed
+firefox   nofix   |     2     [29,1]     2880 / 2373    [1, 0]
+firefox   fixed   |     2     [29,1]     2880 / 2373    [1, 0]
+chromium  either  |     1     [30]       2373           [0]
+webkit    either  |     1     [30]       2373           [0]
+```
+
+Reproduce with `tools-firefox-determinism.mjs` (needs ≥30 reps — at a ~3%
+rate, a 10-rep run misses it about three times in four, which is how it was
+initially dismissed as unreproducible).
+
+**What it is not.** The obvious hypothesis — `document.fonts.ready` resolving
+before canvas `measureText` picks up a system face, so composition runs on
+fallback metrics — is **refuted**:
+
+1. A canvas/DOM metrics-agreement gate was implemented and A/B tested against
+   the same build. Results were identical with and without it, `[29,1]` both
+   ways. It was removed rather than shipped as decoration.
+2. Sampling the probe width at page start across 30 runs shows Georgia
+   resolving correctly every time (323.05px vs 299.43px for an absent family).
+3. The divergent run produces **more** lines (2880 vs 2373). Fallback metrics
+   here are *narrower*, which would produce fewer. The direction is wrong.
+
+Something makes composition behave as though the text were ~21% wider, across
+the whole page, in about 3% of Firefox loads. That is as far as this
+investigation got.
+
+**Consequences for anyone measuring:** scope CI rag gates per engine, and do
+not treat a single Firefox run as a baseline. The existing suite is Chromium
+and WebKit only, so it is unaffected.
