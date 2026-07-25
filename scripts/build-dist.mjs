@@ -99,19 +99,32 @@ const { createHash } = await import('node:crypto');
 const { writeFile, readdir, unlink } = await import('node:fs/promises');
 
 const goBytes = await readFile('public/go.js');
-// Remove stale versioned copies so the repo carries exactly one.
-for (const f of await readdir('public')) {
-  if (/^go@\d+\.\d+\.\d+\.js$/.test(f) && f !== `go@${V}.js`) await unlink(`public/${f}`);
-}
 await writeFile(`public/go@${V}.js`, goBytes);
 
+// A pinned URL is a PROMISE: someone put go@x.y.z.js and its integrity hash
+// into their HTML because we told them to, and it has to keep working.
+// This step used to delete every other go@*.js so the repo "carries exactly
+// one" — which meant each release 404'd every existing pin. Shipping 3.4.0
+// took go@3.3.2.js down and stopped composition on york.systems until the
+// pin was chased. Old versions are immutable artifacts now: keep them, hash
+// them, never rewrite them.
 const sri = (buf) => `sha384-${createHash('sha384').update(buf).digest('base64')}`;
+const versioned = (await readdir('public'))
+  .filter((f) => /^go@\d+\.\d+\.\d+\.js$/.test(f))
+  .sort();
+const prior = {};
+for (const f of versioned) {
+  if (f !== `go@${V}.js`) prior[f] = sri(await readFile(`public/${f}`));
+}
+void unlink; // retained import; nothing is unlinked here by design
+
 const manifest = {
   version: V,
   files: {
     [`go@${V}.js`]: sri(goBytes),
     'typeset.min.js': sri(await readFile('public/typeset.min.js')),
     'typeset.esm.js': sri(await readFile('public/typeset.esm.js')),
+    ...prior,
   },
   snippet: `<script src="https://typeset.us/go@${V}.js" integrity="${sri(goBytes)}" crossorigin="anonymous" defer></script>`,
 };
