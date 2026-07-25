@@ -93,8 +93,74 @@ const Typeset = {
       });
     };
 
+    /**
+     * Canvas and DOM must agree about text width before we compose.
+     *
+     * The compositor measures on a canvas and the browser paints in the DOM.
+     * Everything downstream assumes those two agree. document.fonts.ready
+     * does not actually promise that: it reports font LOADING, not that
+     * canvas measureText has picked the face up.
+     *
+     * DEFENSIVE, NOT A REPRODUCED FIX — be honest about the provenance. A
+     * test run reported Firefox composing non-deterministically with a named
+     * system font (8 loads, 3 distinct compositions, a paragraph failing to
+     * compose in 5). We could NOT reproduce it: original code, 8 Firefox
+     * loads with Georgia, quiet and again under full CPU saturation, was
+     * deterministic every time in all three engines. The report came from a
+     * machine running six browser suites at once, so it may have been
+     * contention, or the missing data-typeset-done flag (fixed separately,
+     * and that one WAS reproduced) making a harness read a half-composed
+     * page.
+     *
+     * This gate is kept anyway because the invariant is real and checking it
+     * is nearly free: when metrics already agree — the normal case — it costs
+     * one measurement and returns immediately.
+     */
+    const metricsAgree = (): boolean => {
+      try {
+        const sample = document.querySelector<HTMLElement>(selector);
+        if (!sample) return true; // nothing to compose — do not stall
+        const cs = getComputedStyle(sample);
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} / ${cs.lineHeight} ${cs.fontFamily}`;
+        const probe = 'Handgloves mixed 0123 — quick brown fox';
+
+        const span = document.createElement('span');
+        span.textContent = probe;
+        span.style.cssText =
+          'position:absolute;left:-99999px;top:0;white-space:pre;visibility:hidden';
+        span.style.font = font;
+        document.body.appendChild(span);
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        const domW = range.getBoundingClientRect().width;
+        span.remove();
+        if (!domW) return true; // cannot tell; do not stall the page
+
+        const ctx = document.createElement('canvas').getContext('2d');
+        if (!ctx) return true;
+        ctx.font = font;
+        const canvasW = ctx.measureText(probe).width;
+
+        return Math.abs(canvasW - domW) <= Math.max(0.5, domW * 0.002);
+      } catch {
+        return true; // never let the check itself block composition
+      }
+    };
+
     const start = () => {
-      document.fonts.ready.then(run).catch(() => setTimeout(run, 1000));
+      // Bounded: ~500ms worst case, then compose regardless. A page must
+      // never fail to typeset because a font never settled.
+      const whenMetricsSettle = (cb: () => void) => {
+        let tries = 0;
+        const tick = () => {
+          if (metricsAgree() || tries++ >= 20) cb();
+          else setTimeout(tick, 25);
+        };
+        tick();
+      };
+      document.fonts.ready
+        .then(() => whenMetricsSettle(run))
+        .catch(() => setTimeout(run, 1000));
 
       // Late-loading webfonts: compositions measured against fallback metrics
       // render wrong once the real font arrives — recompose with true metrics.

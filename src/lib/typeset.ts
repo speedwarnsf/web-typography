@@ -48,6 +48,10 @@ type Token = {
   protectedCompound?: boolean;  // e.g., "human-centric" — don't split
   emergencyBreakParts?: string[];  // for long slugs like ThePaperLanternStore
   compoundId?: string;             // shared ID for tokens in the same protected compound
+  /** Lowercased particle key if this token can OPEN a bound phrase ("san",
+   *  "new"). Precomputed once here so scoreLine does no string work per
+   *  candidate break — see bindOpenerOf. */
+  bindOpener?: string;
   /** Inline composition: run this token lives in (null/undefined = base text). */
   runId?: number | null;
   /** Composite token spanning run boundaries without whitespace. */
@@ -122,6 +126,103 @@ const LINKING_END_WORDS = new Set([
   "don't","doesn't","didn't","won't","wouldn't","can't","couldn't","shouldn't",
   "isn't","aren't","wasn't","weren't","hasn't","haven't","hadn't","mustn't",
 ]);
+// \u2500\u2500\u2500 Phrase binding \u2500\u2500\u2500
+//
+// A two-word place name reads as broken when split ("San / Francisco"). We
+// penalise that break. Two rules, because precision matters more than reach:
+//
+// OPEN  \u2014 particle + any Title-Case word. Only for particles that are not
+//         also English words, so the false-positive mode cannot exist.
+// CLOSED \u2014 exact bigrams. A literal pair cannot false-positive at all.
+//
+// This shape was forced by measurement, not preference. An open list of 15
+// particles was tested against 3.71M words of natural English and bound a
+// genuine place name in 9 of 91 firings \u2014 9.9% precision. "Mount" was 0/7
+// ("Mount Mode", "Mount Policy"), "Port" 0/4 ("Server Port The port to
+// which"), "St" 0/5, and "New" alone accounted for two thirds of all firings
+// at 8.3%. A wrong bind is worse than a missed bind, so everything that could
+// be wrong became a literal.
+const TOPONYM_OPEN = new Set(["san", "santa"]);
+
+const TOPONYM_CLOSED: Record<string, string[]> = {
+  new:   ["York", "Orleans", "Jersey", "Zealand", "Hampshire", "Mexico",
+          "Delhi", "Haven", "Brunswick", "Guinea", "Caledonia", "England"],
+  los:   ["Angeles", "Alamos", "Gatos"],
+  las:   ["Vegas", "Cruces", "Palmas"],
+  fort:  ["Worth", "Lauderdale", "Laramie", "Collins"],
+  cape:  ["Cod", "Town", "Horn", "Fear", "Canaveral"],
+  rio:   ["Grande", "Tinto"],
+  mount: ["Vernon", "Sinai", "Rushmore", "Everest"],
+  port:  ["Louis", "Elizabeth", "Arthur", "Moresby"],
+  el:    ["Paso", "Dorado", "Salvador"],
+  la:    ["Paz", "Jolla", "Plata", "Rochelle"],
+  saint: ["Louis", "Petersburg", "Paul", "John"],
+  st:    ["Louis", "Petersburg", "Paul", "John", "Andrews"],
+};
+const TOPONYM_CLOSED_MAP: Map<string, Set<string>> = new Map(
+  Object.entries(TOPONYM_CLOSED).map(([k, v]) => [k, new Set(v)]),
+);
+
+// Particles normally written with a trailing point. For these ONLY, "St." is
+// the ordinary form rather than a sentence end.
+const ABBREV_PARTICLES = new Set(["st", "mt"]);
+
+// Title-Case word, optionally with a single trailing point, and nothing else.
+// This is what rejects "New," (comma \u2014 the words are not a phrase), "NEW"
+// (ALL-CAPS was binding "ST The status"), and "new" (the adjective).
+const BIND_OPENER_SHAPE = /^\p{Lu}\p{Ll}+\.?$/u;
+// The second word must itself be Title-Case ("San Francisco", never "San of").
+const BIND_FOLLOWER_SHAPE = /^\p{Lu}\p{Ll}/u;
+// Trailing punctuation on the follower is fine — "New York," is still New York.
+const BIND_FOLLOWER_TRIM = /[^\p{L}]+$/u;
+
+/**
+ * Can this token open a bound phrase? Computed ONCE per token at tokenise
+ * time and cached on the token, because the alternative \u2014 deciding it inside
+ * scoreLine \u2014 re-derives the same answer for the same pair millions of times
+ * per pass and measured at 18% of compositor time in Chromium and 33% in
+ * Firefox, paid even when the feature is switched off.
+ */
+function bindOpenerOf(part: string): string | undefined {
+  if (!BIND_OPENER_SHAPE.test(part)) return undefined;
+  const hasDot = part.charCodeAt(part.length - 1) === 46;
+  const lc = (hasDot ? part.slice(0, -1) : part).toLowerCase();
+  // "New." is a sentence ending, and a sentence end is the single best break
+  // a compositor has \u2014 never bind across it. "St." is just an abbreviation.
+  if (hasDot && !ABBREV_PARTICLES.has(lc)) return undefined;
+  return TOPONYM_OPEN.has(lc) || TOPONYM_CLOSED_MAP.has(lc) ? lc : undefined;
+}
+
+/**
+ * Bind weights. Derived by measurement (see docs/BINDING.md), not chosen by
+ * taste; `__TYPESET_BIND__` lets the derivation harness sweep them without a
+ * rebuild.
+ *
+ * There is deliberately no numberUnit weight. It was measured, found to have
+ * no supporting evidence in any corpus, and therefore not shipped.
+ */
+interface BindWeights { toponym: number }
+// Re-derived 2026-07-24 against the fixed predicate and closed list, over 85
+// real paragraphs x 7 measures (24-78ch), in Chromium and WebKit — which
+// agreed on every cell. 1600 sits inside a plateau, [800, 2000], where the
+// feature is measurably FREE: splits 10 -> 9, short lines +0, weak line ends
+// +0, fill variance unchanged at 0.0619, and +0/+0 on a corpus built from the
+// cases the old open list used to bind wrongly.
+//
+// Higher weights do buy more: 2400 rescues a second split and 3200 a third,
+// each for +1 short line out of 2320. That is a real option, not a mistake —
+// it is declined because the rag outranks the rule here, and 1600 is the
+// largest value that costs nothing at all.
+//
+// Do not read precision into this number. The metric cannot separate any
+// value inside the plateau, so 1600 is a conservative point in a flat region,
+// not an optimum. See docs/BINDING.md for the full method and its limits.
+const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+function bindWeights(): BindWeights {
+  const o = (globalThis as { __TYPESET_BIND__?: Partial<BindWeights> }).__TYPESET_BIND__;
+  return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
+}
+
 const OPEN_PUNCT = new Set(["(", "[", "{", "\u201C", "\u2018"]);  // opening quotes/brackets
 const CLOSE_PUNCT = new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);
 const DASHES = new Set(["\u2014", "\u2013"]);  // em-dash, en-dash
@@ -255,7 +356,11 @@ function classifyWord(part: string): Omit<Token, 'width'> {
     weakEnd = true;
   }
 
-  return { text: part, kind, stickyPrev, stickyNext, weakEnd, protectedCompound, emergencyBreakParts };
+  return {
+    text: part, kind, stickyPrev, stickyNext, weakEnd, protectedCompound,
+    emergencyBreakParts,
+    bindOpener: kind === "word" ? bindOpenerOf(part) : undefined,
+  };
 }
 
 function tokenize(text: string, measurer: (text: string) => number): Token[] {
@@ -680,6 +785,50 @@ function composeParagraph(
     return false;
   }
 
+  /**
+   * Phrase binding — cost of breaking between two words that read as one unit.
+   *
+   * A COST, never a weld: at narrow measures "San Francisco" genuinely cannot
+   * fit, so the beam must stay free to pay this and break. Verified: at 12ch
+   * "San Francisco" still splits with the penalty on, exactly as it does with
+   * it off, while at 16ch — where the pair fits — the same penalty rescues it.
+   *
+   * The weight can outbid the short-line ladder's first rung (800) but never
+   * its second (2000), so a bind can shade a line slightly short but cannot
+   * drive it to the next severity. (An earlier version of this comment claimed
+   * the weight sat under 800 and could therefore never shorten a line at all.
+   * That was false while the default was 2400, and it is the kind of untrue
+   * justification this project exists not to ship.)
+   *
+   * No published authority prescribes toponym binding (checked 2026-07-24:
+   * Bringhurst, Chicago, New Hart's, SI, UAX #14 — none cover it). The
+   * mechanism is Knuth–Plass (finite additive penalties, plain.tex's graduated
+   * table); the rule and its weights are ours, derived by measurement against
+   * the real corpus rather than asserted. See docs/BINDING.md.
+   */
+  function bindPenaltyAt(breakIndex: number): number {
+    if (breakIndex <= 0 || breakIndex >= contentTokens.length) return 0;
+    const prev = contentTokens[breakIndex - 1];
+    // Precomputed at tokenise time — a property read, not a regex. Almost
+    // every break in a paragraph exits here.
+    const key = prev?.bindOpener;
+    if (!key) return 0;
+    const weight = bindWeights().toponym;
+    if (!weight) return 0;
+    const next = contentTokens[breakIndex];
+    if (!next) return 0;
+
+    // OPEN: "San" / "Santa" + any Title-Case word.
+    if (TOPONYM_OPEN.has(key)) {
+      return BIND_FOLLOWER_SHAPE.test(next.text) ? weight : 0;
+    }
+    // CLOSED: the exact partner, and nothing else.
+    const partners = TOPONYM_CLOSED_MAP.get(key);
+    if (!partners) return 0;
+    const b = next.text.replace(BIND_FOLLOWER_TRIM, '');
+    return partners.has(b) ? weight : 0;
+  }
+
   // Score a single line using lexical helpers
   const scoreLine = (
     lineTokens: Token[],
@@ -797,6 +946,12 @@ function composeParagraph(
     // Protected compound boundary break
     if (breaksProtectedCompoundAt(breakEnd)) {
       penalty += 7000;
+    }
+
+    // Bound phrase split across the break ("San / Francisco"). Finite and
+    // small by design — see bindPenaltyAt.
+    if (!isLast) {
+      penalty += bindPenaltyAt(breakEnd);
     }
 
     // Sentence-start dangling — BOTH modes. Penalize a non-last line that
@@ -1635,7 +1790,18 @@ function canCompose(element: HTMLElement): boolean {
 
 /** Restore plain (educated) text so the Phase-1 fallback can bind it. */
 function restorePlain(element: HTMLElement, raw: string): boolean {
-  safeWrite(() => { element.textContent = raw; });
+  safeWrite(() => {
+    element.textContent = raw;
+    // A fallback is a FINISHED state, not an unfinished one. Only
+    // renderFrozenLines used to set this, so every fallback:* exit left the
+    // element permanently "not done" — and anything polling the attribute
+    // (the documented readiness check, our own loadFixture in
+    // engine.spec.ts, third-party integrations) waited forever on a
+    // paragraph that had already been decided. Resize handlers clear the
+    // attribute before recomposing, so marking it here does not prevent a
+    // later retry at a new measure.
+    element.dataset.typesetDone = "1";
+  });
   return false;
 }
 
@@ -1759,6 +1925,7 @@ function composeElement(element: HTMLElement, measure: number): boolean {
   raw = educateQuotes(raw.trim());
   if (raw.length < 10) {
     element.dataset.tsOutcome = 'skipped:short';
+    element.dataset.typesetDone = "1";   // decided, not pending
     return false;
   }
   canonicalText.set(element, raw);
@@ -1766,7 +1933,13 @@ function composeElement(element: HTMLElement, measure: number): boolean {
   const measurePx = containerPxOf(element);
   if (measurePx <= 0) {
     // Usually an inline element (clientWidth 0) or display:none.
+    // Zero-width: inline, display:none, or an offscreen/hidden container.
+    // Marking this finished is what MAKES it retryable: the ResizeObserver
+    // below only re-runs elements that already carry data-typeset-done, so
+    // an unmarked element was skipped forever and never composed once it
+    // became visible. With the flag set, the 0 -> N width change picks it up.
     element.dataset.tsOutcome = 'unmeasurable';
+    element.dataset.typesetDone = "1";
     return false;
   }
 
@@ -1840,24 +2013,34 @@ function composeRichElement(element: HTMLElement, measure: number): boolean {
         element.innerHTML = html;
       });
     }
+    // Finished, same as restorePlain — see the note there.
+    safeWrite(() => { element.dataset.typesetDone = "1"; });
     return false;
   };
 
   const content = extractInlineContent(element);
   if (!content) {
     element.dataset.tsOutcome = 'phase1:inline-markup';
+    element.dataset.typesetDone = "1";   // decided, not pending
     return false; // unsupported structure — Phase 1 owns it
   }
 
   if ((element.textContent || '').trim().length < 10) {
     element.dataset.tsOutcome = 'skipped:short';
+    element.dataset.typesetDone = "1";   // decided, not pending
     return false;
   }
   if (stored === undefined) canonicalRichHTML.set(element, element.innerHTML);
 
   const measurePx = containerPxOf(element);
   if (measurePx <= 0) {
+    // Zero-width: inline, display:none, or an offscreen/hidden container.
+    // Marking this finished is what MAKES it retryable: the ResizeObserver
+    // below only re-runs elements that already carry data-typeset-done, so
+    // an unmarked element was skipped forever and never composed once it
+    // became visible. With the flag set, the 0 -> N width change picks it up.
     element.dataset.tsOutcome = 'unmeasurable';
+    element.dataset.typesetDone = "1";
     return false;
   }
 
@@ -1866,6 +2049,7 @@ function composeRichElement(element: HTMLElement, measure: number): boolean {
   rm.cleanup();
   if (!tokens.length) {
     element.dataset.tsOutcome = 'skipped:short';
+    element.dataset.typesetDone = "1";   // decided, not pending
     return false;
   }
 
