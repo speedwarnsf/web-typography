@@ -11,6 +11,10 @@ type Token = {
     protectedCompound?: boolean;
     emergencyBreakParts?: string[];
     compoundId?: string;
+    /** Lowercased particle key if this token can OPEN a bound phrase ("san",
+     *  "new"). Precomputed once here so scoreLine does no string work per
+     *  candidate break — see bindOpenerOf. */
+    bindOpener?: string;
     /** Inline composition: run this token lives in (null/undefined = base text). */
     runId?: number | null;
     /** Composite token spanning run boundaries without whitespace. */

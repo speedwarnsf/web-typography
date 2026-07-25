@@ -1,4 +1,4 @@
-/* typeset.us v3.3.3 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.4.0 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -115,6 +115,53 @@ var LINKING_END_WORDS = /* @__PURE__ */ new Set([
   "hadn't",
   "mustn't"
 ]);
+var TOPONYM_OPEN = /* @__PURE__ */ new Set(["san", "santa"]);
+var TOPONYM_CLOSED = {
+  new: [
+    "York",
+    "Orleans",
+    "Jersey",
+    "Zealand",
+    "Hampshire",
+    "Mexico",
+    "Delhi",
+    "Haven",
+    "Brunswick",
+    "Guinea",
+    "Caledonia",
+    "England"
+  ],
+  los: ["Angeles", "Alamos", "Gatos"],
+  las: ["Vegas", "Cruces", "Palmas"],
+  fort: ["Worth", "Lauderdale", "Laramie", "Collins"],
+  cape: ["Cod", "Town", "Horn", "Fear", "Canaveral"],
+  rio: ["Grande", "Tinto"],
+  mount: ["Vernon", "Sinai", "Rushmore", "Everest"],
+  port: ["Louis", "Elizabeth", "Arthur", "Moresby"],
+  el: ["Paso", "Dorado", "Salvador"],
+  la: ["Paz", "Jolla", "Plata", "Rochelle"],
+  saint: ["Louis", "Petersburg", "Paul", "John"],
+  st: ["Louis", "Petersburg", "Paul", "John", "Andrews"]
+};
+var TOPONYM_CLOSED_MAP = new Map(
+  Object.entries(TOPONYM_CLOSED).map(([k, v]) => [k, new Set(v)])
+);
+var ABBREV_PARTICLES = /* @__PURE__ */ new Set(["st", "mt"]);
+var BIND_OPENER_SHAPE = /^\p{Lu}\p{Ll}+\.?$/u;
+var BIND_FOLLOWER_SHAPE = /^\p{Lu}\p{Ll}/u;
+var BIND_FOLLOWER_TRIM = /[^\p{L}]+$/u;
+function bindOpenerOf(part) {
+  if (!BIND_OPENER_SHAPE.test(part)) return void 0;
+  const hasDot = part.charCodeAt(part.length - 1) === 46;
+  const lc = (hasDot ? part.slice(0, -1) : part).toLowerCase();
+  if (hasDot && !ABBREV_PARTICLES.has(lc)) return void 0;
+  return TOPONYM_OPEN.has(lc) || TOPONYM_CLOSED_MAP.has(lc) ? lc : void 0;
+}
+var DEFAULT_BIND_WEIGHTS = { toponym: 1600 };
+function bindWeights() {
+  const o = globalThis.__TYPESET_BIND__;
+  return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
+}
 var OPEN_PUNCT = /* @__PURE__ */ new Set(["(", "[", "{", "\u201C", "\u2018"]);
 var CLOSE_PUNCT = /* @__PURE__ */ new Set([")", "]", "}", ".", ",", ";", ":", "!", "?", "\u201D", "\u2019", "%"]);
 var DASHES = /* @__PURE__ */ new Set(["\u2014", "\u2013"]);
@@ -188,7 +235,16 @@ function classifyWord(part) {
   } else if (WEAK_END_WORDS.has(lower.replace(/[.,;:!?'"\u201D\u2019]+$/, ""))) {
     weakEnd = true;
   }
-  return { text: part, kind, stickyPrev, stickyNext, weakEnd, protectedCompound, emergencyBreakParts };
+  return {
+    text: part,
+    kind,
+    stickyPrev,
+    stickyNext,
+    weakEnd,
+    protectedCompound,
+    emergencyBreakParts,
+    bindOpener: kind === "word" ? bindOpenerOf(part) : void 0
+  };
 }
 function tokenize(text, measurer) {
   if (!text || text.trim().length === 0) return [];
@@ -495,6 +551,23 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     }
     return false;
   }
+  function bindPenaltyAt(breakIndex) {
+    if (breakIndex <= 0 || breakIndex >= contentTokens.length) return 0;
+    const prev = contentTokens[breakIndex - 1];
+    const key = prev == null ? void 0 : prev.bindOpener;
+    if (!key) return 0;
+    const weight = bindWeights().toponym;
+    if (!weight) return 0;
+    const next = contentTokens[breakIndex];
+    if (!next) return 0;
+    if (TOPONYM_OPEN.has(key)) {
+      return BIND_FOLLOWER_SHAPE.test(next.text) ? weight : 0;
+    }
+    const partners = TOPONYM_CLOSED_MAP.get(key);
+    if (!partners) return 0;
+    const b = next.text.replace(BIND_FOLLOWER_TRIM, "");
+    return partners.has(b) ? weight : 0;
+  }
   const scoreLine = (lineTokens, fill, isLast, breakEnd) => {
     let penalty = 0;
     const lexCount = lexicalWordCount(lineTokens);
@@ -556,6 +629,9 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     }
     if (breaksProtectedCompoundAt(breakEnd)) {
       penalty += 7e3;
+    }
+    if (!isLast) {
+      penalty += bindPenaltyAt(breakEnd);
     }
     if (!isLast && lastContent && !isSentenceEnd(lastContent.text)) {
       let wordsIntoSentence = -1;
@@ -1051,6 +1127,7 @@ function canCompose(element) {
 function restorePlain(element, raw) {
   safeWrite(() => {
     element.textContent = raw;
+    element.dataset.typesetDone = "1";
   });
   return false;
 }
@@ -1130,12 +1207,14 @@ function composeElement(element, measure) {
   raw = educateQuotes(raw.trim());
   if (raw.length < 10) {
     element.dataset.tsOutcome = "skipped:short";
+    element.dataset.typesetDone = "1";
     return false;
   }
   canonicalText.set(element, raw);
   const measurePx = containerPxOf(element);
   if (measurePx <= 0) {
     element.dataset.tsOutcome = "unmeasurable";
+    element.dataset.typesetDone = "1";
     return false;
   }
   const measurer = makeMeasurer(element);
@@ -1180,21 +1259,27 @@ function composeRichElement(element, measure) {
         element.innerHTML = html;
       });
     }
+    safeWrite(() => {
+      element.dataset.typesetDone = "1";
+    });
     return false;
   };
   const content = extractInlineContent(element);
   if (!content) {
     element.dataset.tsOutcome = "phase1:inline-markup";
+    element.dataset.typesetDone = "1";
     return false;
   }
   if ((element.textContent || "").trim().length < 10) {
     element.dataset.tsOutcome = "skipped:short";
+    element.dataset.typesetDone = "1";
     return false;
   }
   if (stored === void 0) canonicalRichHTML.set(element, element.innerHTML);
   const measurePx = containerPxOf(element);
   if (measurePx <= 0) {
     element.dataset.tsOutcome = "unmeasurable";
+    element.dataset.typesetDone = "1";
     return false;
   }
   const rm = makeRunMeasurer(element, content.runs);
@@ -1202,6 +1287,7 @@ function composeRichElement(element, measure) {
   rm.cleanup();
   if (!tokens.length) {
     element.dataset.tsOutcome = "skipped:short";
+    element.dataset.typesetDone = "1";
     return false;
   }
   const isHeading = /^H[1-6]$/.test(element.tagName) || !!element.closest("h1,h2,h3,h4,h5,h6");

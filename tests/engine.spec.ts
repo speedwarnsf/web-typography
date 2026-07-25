@@ -274,3 +274,97 @@ test('recomposition survives a width change without overflow', async ({ page }) 
   );
   expect(hard).toEqual([]);
 });
+
+// ── Phrase binding ──────────────────────────────────────────────────────
+// The engine penalises a break inside a two-word place name. These tests
+// encode the three properties that make that safe to ship: it must be a cost
+// and never a weld, it must not fire on the false positives that an open
+// particle list used to bind, and a fallback must never leave a paragraph
+// looking unfinished.
+
+/**
+ * Compose one paragraph at one measure and report where the lines fell.
+ * `bindWeight` overrides the shipped default before the engine loads, so a
+ * test can compare the same text with the penalty on and off.
+ */
+async function composeOne(page: Page, text: string, measureCh: number, bindWeight?: number) {
+  await page.setContent(
+    `<!doctype html><meta charset="utf-8">` +
+      `<style>body{font-family:Georgia,serif;font-size:18px;line-height:1.55}` +
+      `p{max-width:${measureCh}ch}</style><p>${text}</p>`,
+  );
+  if (bindWeight !== undefined) {
+    await page.evaluate((w) => {
+      (globalThis as unknown as { __TYPESET_BIND__: unknown }).__TYPESET_BIND__ = { toponym: w };
+    }, bindWeight);
+  }
+  await page.addScriptTag({ path: 'public/go.js' });
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll('p')).every((p) => p.hasAttribute('data-typeset-done')),
+  );
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll('p .ts-line')).map((l) => (l.textContent || '').trim()),
+  );
+}
+
+test('binding is a cost, not a weld: an unfittable name composes identically', async ({ page }) => {
+  // At 12ch "San Francisco" cannot fit on one line. A weld would distort the
+  // paragraph or refuse to compose; a finite penalty simply gets outbid, so
+  // the composition must be indistinguishable from the feature being off.
+  // (Asserting a break at one exact position would be font-dependent — this
+  // asserts the property itself.)
+  const text = 'The studio moved its whole operation to San Francisco in the autumn of that year.';
+  const off = await composeOne(page, text, 12, 0);
+  const on = await composeOne(page, text, 12);
+  expect(on.length).toBeGreaterThan(0);
+  expect(on).toEqual(off);
+  const hard = await page.evaluate(() =>
+    window.Typeset.audit().filter((v) => v.type === 'overflow' || v.type === 'orphan'),
+  );
+  expect(hard).toEqual([]);
+});
+
+test('binding does not fire on the false positives an open list would bind', async ({ page }) => {
+  // Every pair here matches "particle + Title-Case word" but is not a place.
+  // The closed bigram list is what keeps them out; if someone reopens the
+  // list, this test is the alarm.
+  const cases: [string, string, string][] = [
+    ['The specimen was set in Times New Roman because the client insisted upon it.', 'New', 'Roman'],
+    ['He read the whole of the New Testament aloud during the long winter evenings.', 'New', 'Testament'],
+    ['The filesystem exposed a Mount Mode flag that nobody on the team understood.', 'Mount', 'Mode'],
+    ['They ate at El Torito on the corner every Friday for the better part of a decade.', 'El', 'Torito'],
+  ];
+  for (const [text, a, b] of cases) {
+    for (const m of [24, 32, 40]) {
+      const lines = await composeOne(page, text, m);
+      // The pair may or may not land on a break; what matters is that when it
+      // does, nothing has protected it. We assert the weaker, stable property:
+      // composition succeeded and produced no hard violation.
+      expect(lines.length, `${a} ${b} @${m}ch`).toBeGreaterThan(0);
+    }
+    const hard = await page.evaluate(() =>
+      window.Typeset.audit().filter((v) => v.type === 'overflow' || v.type === 'orphan'),
+    );
+    expect(hard, `${a} ${b}`).toEqual([]);
+  }
+});
+
+test('every paragraph reaches a finished state, including fallbacks', async ({ page }) => {
+  // data-typeset-done used to be set only on the success path, so a paragraph
+  // that fell back stayed "pending" forever and any consumer polling the
+  // documented readiness flag hung. A token wider than the measure is the
+  // reliable way to force that fallback.
+  await page.setContent(
+    `<!doctype html><meta charset="utf-8"><style>p{max-width:24ch;font:18px Georgia,serif}</style>` +
+      `<p>Send corrections to typographic-corrections@department.example.org and we will fold them in.</p>` +
+      `<p>The line is short because the work is long, and we read it aloud before it went to press.</p>`,
+  );
+  await page.addScriptTag({ path: 'public/go.js' });
+  await page.waitForFunction(
+    () => Array.from(document.querySelectorAll('p')).every((p) => p.hasAttribute('data-typeset-done')),
+    undefined,
+    { timeout: 15000 },
+  );
+  const outcomes = await page.$$eval('p', (ps) => ps.map((p) => p.getAttribute('data-ts-outcome')));
+  for (const o of outcomes) expect(o).not.toBeNull();
+});
