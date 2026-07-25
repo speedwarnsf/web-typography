@@ -74,7 +74,35 @@ objects. `weak-line-end` at very narrow measures can be a deliberate trade —
 review item, not hard failure. `audit()` covers only composed elements;
 also check the paragraphs you targeted carry `data-ts-outcome="composed"`
 (other outcomes: `fallback:*` = self-checks failed and browser layout was
-restored; `skipped:*`).
+restored; `skipped:*`; `unmeasurable` = zero-width or hidden when the engine
+ran).
+
+Two attributes, two meanings — do not confuse them:
+
+| attribute | means |
+|---|---|
+| `data-typeset-done` | the engine has FINISHED with this element, whatever it decided |
+| `data-ts-outcome` | what it decided |
+
+Wait on `data-typeset-done`, then read `data-ts-outcome`. Before 3.4.0 the
+done flag was set only on success, so a paragraph that fell back stayed
+"pending" forever and readiness polls hung — if you wrote a wait loop against
+an older version, upgrade.
+
+Firefox composes non-deterministically on roughly 1 load in 30 (all versions;
+Chromium and WebKit do not). Scope rag gates per engine — see
+[CHANGELOG](CHANGELOG.md).
+
+## What it does to your text
+
+Beyond line breaking, the compositor binds two-word place names against a
+break — `San Francisco` stays whole where the rag allows. It is a cost, not a
+weld: where the pair cannot fit, the break still happens. The rule is
+deliberately narrow (`san`/`santa` open, exact bigrams for everything else)
+because an open particle list measured 9.9% precision over 3.71M words of
+English and bound things like "Mount Mode" and "Server Port".
+
+Method, weights, and the evidence against them: docs/BINDING.md.
 
 ## Cost (measured — docs/BENCHMARKS.md)
 

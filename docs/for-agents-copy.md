@@ -120,6 +120,23 @@ Frequently re-rendered text you cannot mark. Server-side string processing
 that expects measured composition — `typesetText` is the only pre-render API
 and does nbsp bindings only, no measurement.
 
+## What it does to your text
+
+Beyond line breaking, the compositor binds two-word place names against a
+break — `San Francisco` stays whole where the rag allows. A cost, not a weld:
+where the pair cannot fit, the break still happens. Narrow by design
+(`san`/`santa` open, exact bigrams otherwise) because an open particle list
+measured 9.9% precision over 3.71M words and bound "Mount Mode" and
+"Server Port".
+
+`data-typeset-done` means the engine has FINISHED with an element, whatever it
+decided; `data-ts-outcome` says what it decided. Wait on the first, read the
+second. Before 3.4.0 the done flag was set only on success, so fallbacks left
+readiness polls hanging forever.
+
+Firefox composes non-deterministically on ~1 load in 30 (all versions).
+Chromium and WebKit do not. Scope rag gates per engine.
+
 ## Cost (measured; `npm run bench` reproduces it)
 
 Chromium 149, Georgia 18px, a 30-paragraph page (2,190 words) at

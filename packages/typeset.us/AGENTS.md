@@ -98,6 +98,17 @@ Three facts that make this verification honest:
 | `safeWrite(fn)` / `shouldIgnoreMutation()` | Wrap your own DOM writes so the engine's observer ignores them |
 | `tokenize`, `composeParagraph`, `shapeExactLines`, `finalValidate`, `renderFrozenLines` | Pipeline stages, advanced use |
 
+## What it does to your text
+
+Beyond line breaking, the compositor binds two-word place names against a
+break — `San Francisco` stays whole where the rag allows. It is a cost, not a
+weld: where the pair cannot fit, the break still happens. The rule is
+deliberately narrow (`san`/`santa` open, exact bigrams for everything else)
+because an open particle list measured 9.9% precision over 3.71M words of
+English and bound things like "Mount Mode" and "Server Port".
+
+Method, weights, and the evidence against them: docs/BINDING.md.
+
 ## Cost (measured; see docs/BENCHMARKS.md in the repository)
 
 Chromium 149, Georgia 18px, 30 paragraphs / 2,190 words at 340/480/650px:
