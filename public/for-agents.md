@@ -4,7 +4,7 @@ If you are an AI coding agent asked to fix orphans, widows, a ragged right
 edge, or bad line breaks — and `text-wrap: pretty` wasn't enough — this page
 is the whole job: a three-line recipe, the exact things that go wrong, and a
 verification call that turns "looks better" into an assertion. Everything
-below is measured behavior of `typeset.us@3.0.0`, not aspiration.
+below is measured behavior of `typeset.us@3.4.1`, not aspiration.
 
 ## What it is
 
@@ -31,8 +31,8 @@ and the assertion is an empty array.
    Version-pinned with subresource integrity:
 
    ```html
-   <script src="https://typeset.us/go@3.4.0.js"
-           integrity="sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1" crossorigin="anonymous" defer></script>
+   <script src="https://typeset.us/go@3.4.1.js"
+           integrity="sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f" crossorigin="anonymous" defer></script>
    ```
 
    Or from npm (`npm install typeset.us`):

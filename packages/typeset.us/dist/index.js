@@ -1,4 +1,4 @@
-/* typeset.us v3.4.0 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.4.1 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -565,7 +565,7 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     }
     const partners = TOPONYM_CLOSED_MAP.get(key);
     if (!partners) return 0;
-    const b = next.text.replace(BIND_FOLLOWER_TRIM, "");
+    const b = next.text.replace(BIND_FOLLOWER_TRIM, "").replace(/[’']s$/u, "");
     return partners.has(b) ? weight : 0;
   }
   const scoreLine = (lineTokens, fill, isLast, breakEnd) => {
@@ -826,7 +826,8 @@ function renderFrozenLines(p, lines, runs) {
   safeWrite(() => {
     p.innerHTML = "";
     p.dataset.typesetDone = "1";
-    p.setAttribute("role", "text");
+    if (!runs) p.setAttribute("role", "text");
+    else if (p.getAttribute("role") === "text") p.removeAttribute("role");
     lines.forEach((line, i) => {
       const span = document.createElement("span");
       span.className = "ts-line";
@@ -1119,7 +1120,6 @@ function canCompose(element) {
     if (child.nodeType !== 1) continue;
     const el = child;
     if (el.classList && el.classList.contains("ts-line")) continue;
-    if (el.tagName === "BR") continue;
     return false;
   }
   return true;
@@ -1315,7 +1315,7 @@ function composeRichElement(element, measure) {
   return true;
 }
 function typeset(element) {
-  var _a, _b;
+  var _a, _b, _c;
   if (!element) return;
   if (typeof document !== "undefined" && !document.getElementById("ts-list-styles")) {
     const style = document.createElement("style");
@@ -1382,6 +1382,12 @@ function typeset(element) {
     document.head.appendChild(style);
   }
   if (element.tagName === "UL") element.classList.add("ts-styled");
+  if (element.tagName === "LI" && ((_a = element.parentElement) == null ? void 0 : _a.tagName) === "UL") {
+    const ul = element.parentElement;
+    if (!ul.classList.contains("ts-styled") && getComputedStyle(element).display === "list-item" && getComputedStyle(ul).listStyleType !== "none" && !element.closest('nav, [role="navigation"], [role="menu"], [role="menubar"], [role="tablist"]')) {
+      ul.classList.add("ts-styled");
+    }
+  }
   element.querySelectorAll("ul").forEach((ul) => ul.classList.add("ts-styled"));
   const measure = measureCh(element);
   if (canCompose(element)) {
@@ -1402,8 +1408,8 @@ function typeset(element) {
   for (const textNode of textNodes) {
     const original = textNode.textContent;
     if (!original || original.trim().length < 10) continue;
-    const leadingSpace = ((_a = original.match(/^\s*/)) == null ? void 0 : _a[0]) || "";
-    const trailingSpace = ((_b = original.match(/\s*$/)) == null ? void 0 : _b[0]) || "";
+    const leadingSpace = ((_b = original.match(/^\s*/)) == null ? void 0 : _b[0]) || "";
+    const trailingSpace = ((_c = original.match(/\s*$/)) == null ? void 0 : _c[0]) || "";
     const processed = typesetText(original.trim(), { measure });
     textNode.textContent = leadingSpace + processed + trailingSpace;
   }

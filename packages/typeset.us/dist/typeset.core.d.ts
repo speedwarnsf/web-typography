@@ -7,4 +7,4 @@
  * quarantined in src/lib/typeset.ts and deliberately not re-exported, so
  * they are tree-shaken out of every built artifact.
  */
-export { typeset, typesetAll, typesetText, typesetHeading, audit, measureCh, linesOverflow, linesStarved, safeWrite, shouldIgnoreMutation, tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines, } from './typeset';
+export { typeset, typesetAll, typesetText, typesetHeading, audit, measureCh, linesOverflow, linesStarved, safeWrite, shouldIgnoreMutation, tokenize, composeParagraph, shapeExactLines, finalValidate, renderFrozenLines, } from './typeset.js';

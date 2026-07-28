@@ -11,9 +11,14 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium, webkit, firefox } from '@playwright/test';
 
-const PUBLIC = process.env.HOME + '/web-typography/public';
+// Resolve from this file's location, not a hardcoded clone path — the
+// harness is committed to make the bind weight auditable from any checkout.
+// fileURLToPath, not URL.pathname: pathname is percent-encoded (a checkout
+// under "My Projects" would 404 every asset) and breaks on Windows drives.
+const PUBLIC = fileURLToPath(new URL('./public', import.meta.url));
 const ENGINES = { chromium, webkit, firefox };
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 

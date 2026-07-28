@@ -39,14 +39,13 @@ export const rules: Rule[] = [
     name: "Break Optimization",
     id: "rag",
     description:
-      "The browser breaks lines greedily\u00A0\u2014 fill until full, then wrap. This leaves prepositions stranded, articles orphaned, and sentences split mid-thought. Break optimization uses dynamic programming to evaluate every possible configuration, keeping words with their syntactic\u00A0partners.",
-    code: `export function optimizeBreaks(el: HTMLElement): void {
-  const words = el.textContent.split(/ +/);
-  const widths = words.map(w => measure(w));
-  // Knuth-Plass DP: find globally optimal breaks
-  const breaks = knuthPlass(widths, spaceWidth, containerWidth);
-  // Bind words at non-break positions with nbsp
-  applyNbspBindings(el, breaks);
+      "The browser breaks lines greedily\u00A0\u2014 fill until full, then wrap. This leaves prepositions stranded, articles orphaned, and sentences split mid-thought. The compositor runs a beam search over the break candidates, re-ranks the survivors by rag contour, and freezes the winning lines exactly as\u00A0scored.",
+    code: `// The live pipeline behind typeset(el) \u2014 real engine entry points:
+const tokens = tokenize(rawTextOf(el), measurer);
+const lines = composeParagraph(tokens, widthPx, measureCh, { isHeading });
+const shaped = shapeExactLines(lines, measureCh, widthPx, isHeading);
+if (finalValidate(shaped, measureCh, isHeading)) {
+  renderFrozenLines(el, shaped); // .ts-line spans, verified post-render
 }`,
   },
   {

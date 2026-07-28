@@ -19,8 +19,8 @@ assertion is an empty array.
    ```html
    <script src="https://typeset.us/go.js" defer></script>
    <!-- or version-pinned with subresource integrity: -->
-   <script src="https://typeset.us/go@3.4.0.js"
-           integrity="sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1" crossorigin="anonymous" defer></script>
+   <script src="https://typeset.us/go@3.4.1.js"
+           integrity="sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f" crossorigin="anonymous" defer></script>
    ```
 
    Or from npm (`npm install typeset.us`), after fonts are ready:

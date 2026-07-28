@@ -395,10 +395,8 @@ h1, h2, h3 {
 <body>
   <h1>${headingText}</h1>
   <p>${rawText}</p>
-  <script>
-  // typeset.js — include this for automatic typographic refinement
-  // Get the full script at web-typography.vercel.app/pairing-cards
-  </script>
+  <!-- Typeset — automatic typographic refinement. https://typeset.us -->
+  <script src="https://typeset.us/go.js" defer></script>
 </body>
 </html>`;
 

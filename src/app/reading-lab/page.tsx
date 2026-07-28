@@ -472,7 +472,8 @@ document.querySelectorAll('.readable-text p').forEach(typeset);
               >
                 <div
                   ref={previewRef}
-          data-type-demo
+                  data-type-demo
+                  data-no-typeset
                   style={{
                     fontSize: `${settings.fontSize}px`,
                     lineHeight: settings.lineHeight,

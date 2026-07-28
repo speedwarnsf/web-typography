@@ -172,7 +172,7 @@ export default function EssayPage() {
           <code>{'<script src="https://typeset.us/go.js" defer></script>'}</code>
         </div>
 
-        <p className="es-close" data-no-typeset>
+        <p className="es-close">
           Your site, set like a book — and it can prove it.{' '}
           <Link href="/fix">Grade your page</Link>, or{' '}
           <Link href="/install">install it</Link> in the next three minutes.

@@ -72,18 +72,53 @@ const Typeset = {
    * @param selector CSS selector for elements to compose (default: 'p')
    */
   compose(selector: string = 'p') {
-    const eligible = (p: HTMLElement): boolean => {
-      if (p.hasAttribute('data-no-typeset')) return false;
-      if ((p.textContent || '').length < 30) return false;
-      if (p.closest('[data-no-typeset], pre, code, .demo')) return false;
-      if (getComputedStyle(p).textAlign === 'center') return false;
-      return true;
+    // data-no-typeset (on the element or an ancestor) is the author's
+    // explicit "hands off" — never touched, not even to mark it decided.
+    const optedOut = (p: HTMLElement): boolean =>
+      p.hasAttribute('data-no-typeset') || !!p.closest('[data-no-typeset]');
+
+    // Every OTHER gate is a decision, and 3.4.0's contract says decisions
+    // set the flag: data-typeset-done means "the engine is finished with
+    // this element, whatever it decided". These skips used to exit silently,
+    // so anyone polling the flag across a page containing one short or
+    // centered paragraph waited forever — the exact bug class the 3.4.0
+    // readiness fix closed inside the engine, reopened at this wrapper.
+    const skipReasonOf = (p: HTMLElement): string | null => {
+      if ((p.textContent || '').length < 30) return 'skipped:short';
+      if (p.closest('pre, code, .demo')) return 'skipped:excluded';
+      if (getComputedStyle(p).textAlign === 'center') return 'skipped:centered';
+      return null;
+    };
+
+    // Width baseline for the ResizeObserver below, recorded at COMPOSE time
+    // (content-box, matching contentRect). Seeding from the first RO
+    // delivery instead is wrong in exactly the scenario this file champions:
+    // composed in a hidden tab, resized/rotated while hidden, first delivery
+    // on focus — adopting that delivery as the baseline would silently
+    // absorb the change and leave frozen lines at a stale measure.
+    const widths = new WeakMap<Element, number>();
+    const recordWidth = (p: HTMLElement) => {
+      const cs = getComputedStyle(p);
+      widths.set(p, p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
     };
 
     const runOne = (p: HTMLElement) => {
+      if (optedOut(p)) return;
       try {
-        if (eligible(p)) typeset(p);
-      } catch {}
+        const skip = skipReasonOf(p);
+        if (skip) {
+          p.dataset.tsOutcome = skip;
+          p.dataset.typesetDone = '1';
+          return;
+        }
+        typeset(p);
+      } catch {
+        // A throw is a decision too — never leave the element pending.
+        p.dataset.tsOutcome = 'fallback:error';
+        p.dataset.typesetDone = '1';
+      } finally {
+        recordWidth(p);
+      }
     };
 
     const run = () => {
@@ -116,6 +151,9 @@ const Typeset = {
           let touched = 0;
           document.querySelectorAll<HTMLElement>(selector).forEach((p) => {
             if (!p.hasAttribute('data-typeset-done')) return;
+            // An opted-out element's done flag belongs to whoever set it
+            // (the page's own composition code) — never strip it.
+            if (optedOut(p)) return;
             const fam = getComputedStyle(p).fontFamily.toLowerCase();
             if (!families.some((f) => fam.includes(f))) return;
             touched++;
@@ -128,22 +166,37 @@ const Typeset = {
 
       // Width changes (rotation, window resize): recompose to the new measure.
       if (typeof ResizeObserver !== 'undefined') {
-        const widths = new WeakMap<Element, number>();
         const ro = new ResizeObserver((entries) => {
-          if (shouldIgnoreMutation()) return;
+          // ALWAYS record widths — even for our own writes' deliveries and
+          // the initial observe() notification. Bailing out before recording
+          // left the map unseeded (prev = -1), so the first later event —
+          // including a pure height change, the case the width filter exists
+          // to ignore — read as a width change and forced a recompose of a
+          // paragraph whose measure never moved.
+          const internal = shouldIgnoreMutation();
           for (const entry of entries) {
             const el = entry.target as HTMLElement;
             const w = entry.contentRect.width;
+            const first = !widths.has(el);
             const prev = widths.get(el) ?? -1;
-            if (Math.abs(w - prev) < 2) continue;
             widths.set(el, w);
+            if (internal) continue;
+            // First sight seeds silently — EXCEPT an element composed while
+            // unmeasurable that now has width: that is the 0 → N retry the
+            // done-flag-on-every-outcome contract exists to enable.
+            if (first && !(el.dataset.tsOutcome === 'unmeasurable' && w > 0)) continue;
+            if (Math.abs(w - prev) < 2) continue;
             if (el.hasAttribute('data-typeset-done')) {
               el.removeAttribute('data-typeset-done');
               runOne(el);
             }
           }
         });
-        document.querySelectorAll<HTMLElement>(selector).forEach((p) => ro.observe(p));
+        // Opted-out elements are never observed: recomposition would strip a
+        // done flag that belongs to the page's own composition code.
+        document.querySelectorAll<HTMLElement>(selector).forEach((p) => {
+          if (!optedOut(p)) ro.observe(p);
+        });
       }
     };
 
@@ -163,7 +216,11 @@ const Typeset = {
         typeset(el);
       });
       document.querySelectorAll<HTMLElement>('[data-typeset-heading]').forEach(el => {
-        el.innerHTML = typesetHeading(el.textContent || '');
+        // typesetHeading returns plain text (unicode NBSP/NBHY, no markup).
+        // Writing it back through innerHTML re-parsed the element's own
+        // escaped text as live HTML — a script-injection sink on any page
+        // that put user-supplied text in a heading.
+        el.textContent = typesetHeading(el.textContent || '');
       });
     };
 

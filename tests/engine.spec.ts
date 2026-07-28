@@ -34,11 +34,55 @@ async function loadFixture(page: Page) {
 
 test('eligible paragraphs compose through the beam-search pipeline', async ({ page }) => {
   await loadFixture(page);
-  const outcomes = await page.$$eval('p:not([data-no-typeset])', (ps) =>
+  const outcomes = await page.$$eval('p:not([data-no-typeset]):not(.gate)', (ps) =>
     ps.map((p) => p.getAttribute('data-ts-outcome')),
   );
   expect(outcomes.length).toBeGreaterThanOrEqual(2);
   for (const outcome of outcomes) expect(outcome).toBe('composed');
+});
+
+test('wrapper skips are decided, not pending — and an author <br> survives unwelded', async ({ page }) => {
+  // 3.4.0 promised data-typeset-done on every outcome; the go.js eligibility
+  // gate reopened the hang for short/centered paragraphs (they exited before
+  // the engine ran, unmarked — loadFixture itself would time out here
+  // without the fix). And a <br> paragraph must defer to the node-preserving
+  // path: composing it through textContent discarded the author's break and
+  // welded "bay<br>and" into "bayand" with outcome "composed".
+  await loadFixture(page);
+  const gates = await page.evaluate(() => {
+    const read = (id: string) => {
+      const p = document.getElementById(id)!;
+      return {
+        done: p.hasAttribute('data-typeset-done'),
+        outcome: p.getAttribute('data-ts-outcome'),
+        brCount: p.querySelectorAll('br').length,
+      };
+    };
+    return { short: read('skip-short'), centered: read('skip-centered'), br: read('br-weld') };
+  });
+  expect(gates.short.done).toBe(true);
+  expect(gates.short.outcome).toBe('skipped:short');
+  expect(gates.centered.done).toBe(true);
+  expect(gates.centered.outcome).toBe('skipped:centered');
+  expect(gates.br.done).toBe(true);
+  expect(gates.br.outcome, 'a <br> paragraph must never take the textContent compose path').not.toBe('composed');
+  expect(gates.br.brCount, "the author's <br> must survive").toBe(1);
+});
+
+test('list styling is automatic for prose lists and never touches styled navs', async ({ page }) => {
+  // The Silver Bullet promise ("any list gets it automatically") is scoped
+  // to prose lists: browser-default markers, items rendering as list-item,
+  // outside navigation landmarks. An author-styled flex nav gaining
+  // !important padding and injected bullets is mis-styling, not typography.
+  await loadFixture(page);
+  const lists = await page.evaluate(() => ({
+    proseStyled: document.getElementById('prose-list')!.classList.contains('ts-styled'),
+    navStyled: document.getElementById('nav-list')!.classList.contains('ts-styled'),
+    navPad: getComputedStyle(document.getElementById('nav-list')!).paddingLeft,
+  }));
+  expect(lists.proseStyled, 'browser-default prose list gets the hung markers').toBe(true);
+  expect(lists.navStyled, 'author-styled nav list must never be restyled').toBe(false);
+  expect(lists.navPad, "the nav's own padding:0 must survive").toBe('0px');
 });
 
 test('audit finds no overflow and no orphan in the shipped rendering', async ({ page }) => {

@@ -34,8 +34,8 @@ Script tag (defaults to composing prose-ish elements site-wide; scope it):
         data-typeset-selector="main article p, main article li, main article blockquote"></script>
 ```
 
-Version-pinned: `https://typeset.us/go@3.4.0.js` with
-`integrity="sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1" crossorigin="anonymous"`.
+Version-pinned: `https://typeset.us/go@3.4.1.js` with
+`integrity="sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f" crossorigin="anonymous"`.
 
 Or npm:
 

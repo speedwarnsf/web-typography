@@ -40,6 +40,11 @@ export default function GlobalTypeset() {
       );
 
       bodyElements.forEach((el) => {
+        // Honor container-level opt-outs, matching Phase 2 and go.js: the
+        // selector only excludes the attribute on the element itself, which
+        // let Phase-1 bindings and quote education reach into opted-out
+        // containers (demos, tabpanels, app-managed text).
+        if (el.closest('[data-no-typeset], [data-no-smooth], pre, code, .demo, [role="tabpanel"]')) return;
         // Skip centered text entirely in Phase 1
         const textAlign = getComputedStyle(el).textAlign;
         if (textAlign === 'center') return;
@@ -81,6 +86,8 @@ export default function GlobalTypeset() {
       );
 
       headings.forEach((el) => {
+        // Same container-level opt-out as body text above.
+        if (el.closest('[data-no-typeset], [data-no-smooth], pre, code, .demo, [role="tabpanel"]')) return;
         if (!canonicalText.has(el)) {
           canonicalText.set(el, el.textContent || '');
         }
@@ -102,6 +109,16 @@ export default function GlobalTypeset() {
           }
         });
       });
+    };
+
+    // Width baseline for the ResizeObserver below, recorded at COMPOSE time
+    // (content-box, matching contentRect). Seeding from the first RO
+    // delivery instead silently absorbs any width change that lands between
+    // composition and first observation — frozen lines at a stale measure.
+    const lastWidths = new WeakMap<HTMLElement, number>();
+    const recordWidth = (p: HTMLElement) => {
+      const cs = getComputedStyle(p);
+      lastWidths.set(p, p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
     };
 
     // --- Phase 2: Compositor V2 — token-aware beam search (measurement required) ---
@@ -173,8 +190,15 @@ export default function GlobalTypeset() {
           safeWrite(() => {
             p.setAttribute('data-typeset-done', '');
           });
+        } finally {
+          recordWidth(p);
         }
       });
+
+      // Observe processed content NOW rather than at the next 5s re-observe
+      // tick — the compose-to-observation gap is where width changes were
+      // silently absorbed.
+      observeElements();
     };
 
     // --- Pipeline execution ---
@@ -226,9 +250,15 @@ export default function GlobalTypeset() {
               const isEligible = el.matches('p, li, blockquote, figcaption, h1, h2, h3, h4') &&
                 !el.hasAttribute('data-typeset-done') &&
                 !el.hasAttribute('data-no-typeset');
-              // Also check if it CONTAINS typeset-eligible children
+              // Also check if it CONTAINS typeset-eligible children — the
+              // full eligible tag set, or a container whose only new text is
+              // headings/blockquotes/figcaptions was never re-typeset.
               const hasEligibleChildren = !isEligible &&
-                el.querySelector('p:not([data-typeset-done]):not([data-no-typeset]), li:not([data-typeset-done]):not([data-no-typeset])');
+                el.querySelector(
+                  ['p', 'li', 'blockquote', 'figcaption', 'h1', 'h2', 'h3', 'h4']
+                    .map((t) => `${t}:not([data-typeset-done]):not([data-no-typeset])`)
+                    .join(', ')
+                );
               if (isEligible || hasEligibleChildren) {
                 hasNewContent = true;
                 break;
@@ -250,20 +280,30 @@ export default function GlobalTypeset() {
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
     // --- ResizeObserver for width changes ---
-    // Track last known widths to only reprocess on REAL width changes (not height changes from our own writes)
-    const lastWidths = new WeakMap<HTMLElement, number>();
-
+    // (lastWidths baseline is declared above runPhase2 and seeded at compose time.)
     resizeObserver = new ResizeObserver((entries) => {
-      if (shouldIgnoreMutation()) return;
+      // ALWAYS record widths — including for our own writes' deliveries and
+      // the initial observe() notification. Returning before recording left
+      // the map unseeded (prev = -1), so the first later event — even a pure
+      // height change, or the initial delivery for content observed at the
+      // 5s re-observe tick — read as a width change and flattened/recomposed
+      // a paragraph whose measure never moved.
+      const internal = shouldIgnoreMutation();
 
       for (const entry of entries) {
         const el = entry.target as HTMLElement;
         const newWidth = entry.contentRect.width;
+        const first = !lastWidths.has(el);
         const prevWidth = lastWidths.get(el) ?? -1;
+        lastWidths.set(el, newWidth);
+        if (internal) continue;
+        // First sight seeds silently — EXCEPT an element composed while
+        // unmeasurable that now has width: that is the 0 → N retry the
+        // done-flag-on-every-outcome contract exists to enable.
+        if (first && !(el.dataset.tsOutcome === 'unmeasurable' && newWidth > 0)) continue;
 
         // Only reprocess if WIDTH actually changed (not height from our block span conversion)
         if (Math.abs(newWidth - prevWidth) < 2) continue;
-        lastWidths.set(el, newWidth);
 
         if (el.hasAttribute('data-typeset-done')) {
           safeWrite(() => {

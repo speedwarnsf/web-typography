@@ -43,6 +43,30 @@
     <p id="rich-chip">The property <code style="background:#222;padding:1px 5px;">text-wrap: pretty</code> shipped in every engine this year, and the boxed chip in this sentence must never be split across two lines no matter how narrow the column becomes.</p>
   </div>
 
+  <!-- Wrapper-gate fixtures (3.4.1): the engine must DECIDE these — flag
+       them done with a skip outcome — never leave them pending; and an
+       author's <br> must survive with no welding across it. -->
+  <div class="col mid">
+    <p id="skip-short" class="gate">Too short to compose.</p>
+    <p id="skip-centered" class="gate" style="text-align:center">Centered text keeps its browser centering, decided not pending.</p>
+    <p id="br-weld" class="gate">The harbour lights were burning low across the bay<br>and the boats came home before the storm arrived.</p>
+  </div>
+
+  <!-- List fixtures (3.4.1): a browser-default prose list gets ts-styled
+       automatically; an author-styled nav list must NEVER be touched. -->
+  <div class="col mid">
+    <ul id="prose-list">
+      <li>The first rule of the craft is that the reader must never notice the machinery working beneath the text.</li>
+      <li>The second rule is that every measurable claim should be checkable against the rendering itself.</li>
+    </ul>
+  </div>
+  <nav>
+    <ul id="nav-list" style="list-style:none;padding:0;margin:0;display:flex;gap:16px">
+      <li>Products and pricing information for enterprise teams</li>
+      <li>Documentation</li>
+    </ul>
+  </nav>
+
   <script src="/go.js" defer></script>
 </body>
 </html>

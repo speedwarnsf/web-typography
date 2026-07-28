@@ -183,7 +183,7 @@ export default function AboutPage() {
                   Position
                 </span>{' '}
                 <span className="text-neutral-400">
-                  Art Director, Better World Advertising
+                  Art Director, Better&nbsp;World Advertising
                 </span>
               </li>
               <li className="flex flex-col sm:flex-row sm:gap-3">
@@ -191,7 +191,7 @@ export default function AboutPage() {
                   Specialization
                 </span>{' '}
                 <span className="text-neutral-400">
-                  Social marketing, public health, human rights campaigns
+                  Social marketing, public health, human&nbsp;rights campaigns
                 </span>
               </li>
               <li className="flex flex-col sm:flex-row sm:gap-3">

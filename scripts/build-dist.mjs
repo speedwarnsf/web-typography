@@ -89,6 +89,23 @@ execSync(
   { stdio: 'inherit' },
 );
 
+// NodeNext/node16 consumers require explicit extensions on relative imports
+// inside declaration files — tsc emits `from './typeset'`, which is an error
+// (TS2834) in the strictest ESM resolution the package officially supports.
+{
+  const { readdir: rd, writeFile: wf } = await import('node:fs/promises');
+  for (const f of await rd('packages/typeset.us/dist')) {
+    if (!f.endsWith('.d.ts')) continue;
+    const p = `packages/typeset.us/dist/${f}`;
+    const t = await readFile(p, 'utf8');
+    const fixed = t.replace(
+      /(from\s+['"])(\.\.?\/[^'"]+)(['"])/g,
+      (m, pre, spec, post) => (spec.endsWith('.js') ? m : `${pre}${spec}.js${post}`),
+    );
+    if (fixed !== t) await wf(p, fixed);
+  }
+}
+
 await copyFile('LICENSE', 'packages/typeset.us/LICENSE');
 
 // ── Versioned URL + SRI (the receipts) ──
@@ -99,6 +116,34 @@ const { createHash } = await import('node:crypto');
 const { writeFile, readdir, unlink } = await import('node:fs/promises');
 
 const goBytes = await readFile('public/go.js');
+
+// A published pin is IMMUTABLE. "Published" means committed: if HEAD carries
+// go@<V>.js with different bytes than this build, the engine changed without
+// a version bump — shipping would silently rewrite a pin people verify with
+// integrity hashes. Refuse. (An uncommitted go@<V>.js is release iteration
+// and may be rewritten freely.)
+try {
+  const committed = execSync(`git show HEAD:public/go@${V}.js`, {
+    encoding: 'buffer', stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  if (!committed.equals(goBytes)) {
+    console.error(`\nREFUSING to rewrite public/go@${V}.js: bytes differ from the committed pin.`);
+    console.error('The engine changed without a version bump. Bump the version in');
+    console.error('packages/typeset.us/package.json and run the build again.');
+    process.exit(1);
+  }
+} catch (e) {
+  if (e?.status === 1 || e?.status === 128) {
+    // not in HEAD (new version) or not a git checkout — nothing published to protect
+  } else if (e?.code === 'ENOENT') {
+    // git unavailable — cannot verify, do not block the build
+  } else if (typeof e?.status === 'number' && e.status !== 0) {
+    // any other git failure: treat as unpublished rather than blocking
+  } else {
+    throw e;
+  }
+}
+
 await writeFile(`public/go@${V}.js`, goBytes);
 
 // A pinned URL is a PROMISE: someone put go@x.y.z.js and its integrity hash
@@ -140,6 +185,10 @@ const substituteInto = async (path) => {
     .replaceAll('__GO_VERSION__', V)
     .replaceAll('__GO_SRI__', manifest.files[`go@${V}.js`])
     .replace(/go@\d+\.\d+\.\d+\.js/g, `go@${V}.js`)
+    // Prose references too ("measured behavior of typeset.us@X.Y.Z", the npm
+    // line in llms.txt): the pin/SRI substitutions covered the snippet but
+    // left these at 3.0.0 for four releases.
+    .replace(/typeset\.us@\d+\.\d+\.\d+/g, `typeset.us@${V}`)
     .replace(/sha384-[A-Za-z0-9+/=]+/g, manifest.files[`go@${V}.js`]);
   if (out !== text) await writeFile(path, out);
 };

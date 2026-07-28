@@ -81,6 +81,29 @@ async function composeInto(el: HTMLElement, text: string, staggerMs: number, bas
   });
 }
 
+/**
+ * Keep a self-composed block composed. data-no-typeset opts these elements
+ * out of the global pipeline (the reveal animation must own its lines), but
+ * that also opts them out of the pipeline's ResizeObserver retry — so a block
+ * that was zero-width when composeInto first ran (hidden tab, embedded pane,
+ * prerender) stayed browser-wrapped forever, on the page whose headline
+ * exists to prove composition. Watch it ourselves: recompose whenever the
+ * width genuinely changes. Once the entrance has played (v2-in), lines
+ * re-appear without stagger.
+ */
+function watchRecompose(el: HTMLElement, text: string, staggerMs: number, baseMs: number): ResizeObserver {
+  let lastWidth = el.clientWidth;
+  const ro = new ResizeObserver(() => {
+    const w = el.clientWidth;
+    if (Math.abs(w - lastWidth) < 2) return;
+    lastWidth = w;
+    const revealed = el.classList.contains('v2-in');
+    void composeInto(el, text, revealed ? 0 : staggerMs, revealed ? 0 : baseMs);
+  });
+  ro.observe(el);
+  return ro;
+}
+
 interface PanelStats {
   weak: number;
   openers: number;
@@ -174,13 +197,16 @@ function Hero({ reduced }: { reduced: boolean }) {
     const el = h1Ref.current;
     if (!el) return;
     let cancelled = false;
+    let ro: ResizeObserver | null = null;
     (async () => {
       await composeInto(el, HERO_TEXT, 140, 200);
       if (cancelled) return;
       setTimeout(() => el.classList.add('v2-in'), 60);
+      ro = watchRecompose(el, HERO_TEXT, 140, 200);
     })();
     return () => {
       cancelled = true;
+      ro?.disconnect();
     };
   }, []);
 
@@ -223,7 +249,7 @@ function Hero({ reduced }: { reduced: boolean }) {
         <div ref={tiltRef} className="v2-tilt">
           <p className="v2-kicker">Typeset.us — a new era in web typography</p>
           <h1 ref={h1Ref} data-no-typeset className="v2-h1" />
-          <p data-no-typeset className="v2-sub">{HERO_SUB}</p>
+          <p className="v2-sub">{HERO_SUB}</p>
           <div className="v2-cta-row">
             <a href="#proof" className="v2-cta">See the proof</a>
             <a href="#install" className="v2-cta v2-cta-dim">Install in one line</a>
@@ -437,7 +463,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
     <section id="proof" className="v2-section">
       <p className="v2-label">01 — The Proof</p>
       <h2 className="v2-h2">Your phone wraps text. A book sets it.</h2>
-      <p data-no-typeset className="v2-body v2-narrow">
+      <p className="v2-body v2-narrow">
         Same words, same space, both rendered by your browser right now. One is
         how every phone shows text — wherever the words happen to fall. The
         other is how every book you&rsquo;ve ever trusted was set. Then squeeze
@@ -518,7 +544,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
           )}
         </div>
 
-        <p data-no-typeset className="v2-squeeze-note">
+        <p className="v2-squeeze-note">
           Drag the slider: somewhere in there, your browser abandons a word.
           The book version never does — at any width.
         </p>
@@ -546,7 +572,7 @@ function ProofStage({ reduced }: { reduced: boolean }) {
         )}
       </div>
 
-      <p data-no-typeset className="v2-reveal">
+      <p className="v2-reveal">
         The book isn&rsquo;t a book. It&rsquo;s your browser running{' '}
         <strong>Typeset</strong> — the one-line script at the bottom of this
         page. Every paragraph you&rsquo;ve read here was set the same way.
@@ -572,9 +598,11 @@ function Manifesto() {
     if (!el) return;
     let cancelled = false;
     let io: IntersectionObserver | null = null;
+    let ro: ResizeObserver | null = null;
     (async () => {
       await composeInto(el, MANIFESTO_TEXT, 90, 60);
       if (cancelled) return;
+      ro = watchRecompose(el, MANIFESTO_TEXT, 90, 60);
       io = new IntersectionObserver(
         (entries) => {
           for (const e of entries) {
@@ -591,6 +619,7 @@ function Manifesto() {
     return () => {
       cancelled = true;
       io?.disconnect();
+      ro?.disconnect();
     };
   }, []);
 
@@ -646,11 +675,11 @@ function Closing() {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <p data-no-typeset className="v2-body v2-narrow">
+      <p className="v2-body v2-narrow">
         The same engine that set this page: beam-search composition, hanging
         punctuation, smart quotes, self-checks that fall back to the browser
-        rather than ever make your text worse. 20&nbsp;KB, no&nbsp;dependencies,
-        generated from the source you can read.
+        rather than ever make your text worse. 10&nbsp;KB over the wire,
+        no&nbsp;dependencies, generated from the source you can read.
       </p>
       <nav className="v2-links">
         <a href="/proof">The instrument</a>

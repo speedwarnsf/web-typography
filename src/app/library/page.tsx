@@ -252,7 +252,6 @@ export default function Home() {
           Web typography, set like it matters.
         </h1>
         <p
-          data-no-typeset
           className="max-w-xl text-base sm:text-lg text-neutral-400 leading-relaxed"
           style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
         >

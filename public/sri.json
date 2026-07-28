@@ -1,10 +1,11 @@
 {
-  "version": "3.4.0",
+  "version": "3.4.1",
   "files": {
-    "go@3.4.0.js": "sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1",
-    "typeset.min.js": "sha384-IOu1jmlPNBxu1WeobHN71Ma3DQiAvCs9httq/mB0P1as3llJQnpKj93kcmf519fB",
-    "typeset.esm.js": "sha384-m4xkw9tuqMHEm9oQbWTGL/i0mm+mVN8oP3IXoI1hLDsg4vRPqHsArkRsk+M9Q6QO",
-    "go@3.3.2.js": "sha384-iD519/Mn5x4DgOt4ym7opBt1/IHQQKBHBHGO2baemcdSIt6DwxdGpwVAOc2JSAzs"
+    "go@3.4.1.js": "sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f",
+    "typeset.min.js": "sha384-HOy51pCgPsYY+HGEHT6kZW+Kgim14wObQ9gjUVF0t0yG0o/RfXNUP5bFGZk49biz",
+    "typeset.esm.js": "sha384-mC+2JrwZvK9fJS+PpPhvKhZWbMQpyX2lSomLfAgpH6EN3qT0T2OQSN/j7Z0agFly",
+    "go@3.3.2.js": "sha384-iD519/Mn5x4DgOt4ym7opBt1/IHQQKBHBHGO2baemcdSIt6DwxdGpwVAOc2JSAzs",
+    "go@3.4.0.js": "sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1"
   },
-  "snippet": "<script src=\"https://typeset.us/go@3.4.0.js\" integrity=\"sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1\" crossorigin=\"anonymous\" defer></script>"
+  "snippet": "<script src=\"https://typeset.us/go@3.4.1.js\" integrity=\"sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f\" crossorigin=\"anonymous\" defer></script>"
 }

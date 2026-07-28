@@ -22,4 +22,4 @@ doesn't read.
 ## Package
 
 - [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
-  typeset.us@3.0.0, MIT — ESM, CJS, and global builds with types
+  typeset.us@3.4.1, MIT — ESM, CJS, and global builds with types

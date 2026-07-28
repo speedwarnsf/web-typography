@@ -1,5 +1,15 @@
 # typeset.us — Architecture & Known Issues
 
+> **HISTORICAL DOCUMENT (March 2026, engine v2 era).** This file describes
+> the pre-3.x system: the hand-written go.js v2, the `optimizeBreaks` /
+> `shapeRag` / `postRenderFix` pipeline, and status tables that no longer
+> reflect the shipped engine. Those passes are quarantined and tree-shaken
+> out of every distributable. For the current system see
+> [`CHANGELOG.md`](CHANGELOG.md), [`SKILL.md`](SKILL.md),
+> [`docs/BINDING.md`](docs/BINDING.md), and the engine source
+> [`src/lib/typeset.ts`](src/lib/typeset.ts). Kept for the design history —
+> the "Mobile Is the Priority" section and the dogfood log remain true.
+
 ## Project Overview
 - **Site:** typeset.us
 - **Stack:** Next.js 15, Tailwind, Vercel

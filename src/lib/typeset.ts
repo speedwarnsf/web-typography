@@ -822,10 +822,13 @@ function composeParagraph(
     if (TOPONYM_OPEN.has(key)) {
       return BIND_FOLLOWER_SHAPE.test(next.text) ? weight : 0;
     }
-    // CLOSED: the exact partner, and nothing else.
+    // CLOSED: the exact partner, and nothing else. Trailing punctuation and
+    // possessives are still the partner — "New York," and "New York’s" are
+    // both New York; the possessive ends in a letter, so the trailing-trim
+    // alone never catches it.
     const partners = TOPONYM_CLOSED_MAP.get(key);
     if (!partners) return 0;
-    const b = next.text.replace(BIND_FOLLOWER_TRIM, '');
+    const b = next.text.replace(BIND_FOLLOWER_TRIM, '').replace(/[’']s$/u, '');
     return partners.has(b) ? weight : 0;
   }
 
@@ -1313,7 +1316,15 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[], runs?: InlineRun
   safeWrite(() => {
     p.innerHTML = "";
     p.dataset.typesetDone = "1";
-    p.setAttribute("role", "text");
+    // Plain paragraphs read as one text run. Rich-composed paragraphs carry
+    // cloned <a>/<em>/<code> inside their lines — role="text" would flatten
+    // them in WebKit/VoiceOver and take the links out of the accessibility
+    // tree, so those keep their native semantics. A plain-composed element
+    // can turn rich later (content mutated in place, then recomposed): shed
+    // OUR stale role then — only the exact value this engine sets, so an
+    // author-assigned role is never touched.
+    if (!runs) p.setAttribute("role", "text");
+    else if (p.getAttribute("role") === "text") p.removeAttribute("role");
 
 
     lines.forEach((line, i) => {
@@ -1782,8 +1793,11 @@ function canCompose(element: HTMLElement): boolean {
     if (child.nodeType !== 1 /* ELEMENT_NODE */) continue;
     const el = child as HTMLElement;
     if (el.classList && el.classList.contains('ts-line')) continue; // our own prior render
-    if (el.tagName === 'BR') continue;
-    return false; // real inline markup — defer to Phase-1
+    // Real inline markup — and author <br>, whose deliberate break the plain
+    // path's textContent read would silently discard, welding "bay<br>and"
+    // into "bayand" (current renders never emit <br>, so any <br> here is
+    // the author's) — defers to the rich path / Phase-1, which preserve nodes.
+    return false;
   }
   return true;
 }
@@ -2159,8 +2173,29 @@ export function typeset(element: HTMLElement): void {
     document.head.appendChild(style);
   }
 
-  // Find ul elements and apply the refinement class
+  // Find ul elements and apply the refinement class. go.js and the site
+  // pipeline hand typeset() the <li> elements themselves, never the <ul> —
+  // without the parent hop, "any list on a page running typeset() gets it
+  // automatically" (the documented behavior) was only true for direct calls.
+  //
+  // The hop is for PROSE lists — the ones the Silver Bullet page describes.
+  // A list the author already restyled (list-style:none — navs, menus, card
+  // grids, flex/grid layouts) is design, not typography: forcing !important
+  // padding and an injected bullet onto a horizontal nav is mis-styling.
+  // Only a list still wearing browser-default markers, whose items still
+  // render as list items, outside navigation landmarks, gets the upgrade.
   if (element.tagName === 'UL') element.classList.add('ts-styled');
+  if (element.tagName === 'LI' && element.parentElement?.tagName === 'UL') {
+    const ul = element.parentElement;
+    if (
+      !ul.classList.contains('ts-styled') &&
+      getComputedStyle(element).display === 'list-item' &&
+      getComputedStyle(ul).listStyleType !== 'none' &&
+      !element.closest('nav, [role="navigation"], [role="menu"], [role="menubar"], [role="tablist"]')
+    ) {
+      ul.classList.add('ts-styled');
+    }
+  }
   element.querySelectorAll('ul').forEach(ul => ul.classList.add('ts-styled'));
 
   // Measure once for the whole element

@@ -10,6 +10,85 @@ Hashes for every published version live in
 
 ---
 
+## 3.4.1 — 2026-07-28
+
+### Fixed — author `<br>` was silently destroyed, and could weld words
+
+The plain compositor path admitted `<br>` children (a leftover allowance for
+a renderer that no longer emits them) and then read the paragraph through
+`textContent`, where `<br>` contributes nothing. A deliberate break —
+poetry, an address — was silently discarded, and `bay<br>and` composed as
+`bayand` with `data-ts-outcome="composed"`. Paragraphs containing `<br>` now
+defer to the Phase-1 path, which preserves every node.
+
+### Fixed — the readiness contract, this time at the wrapper
+
+3.4.0 promised `data-typeset-done` on every outcome, but go.js's own
+eligibility gate (short, centered, and `pre`/`code`/`.demo` paragraphs)
+rejected elements *before* the engine ran and marked nothing — so the
+documented poll still hung on any real page. Wrapper skips now record
+`skipped:short` / `skipped:excluded` / `skipped:centered` and set the flag;
+a thrown compose records `fallback:error` and sets the flag. Elements opted
+out with `data-no-typeset` (self or ancestor) remain untouched — that is the
+author's exclusion, not the engine's decision.
+
+### Fixed — spurious recomposes from unseeded width tracking
+
+The resize observers (go.js and the site pipeline) discarded whole entry
+batches while the engine's own writes were in flight, without recording
+widths. The first later event for such an element — including a pure height
+change, the exact case the width filter exists to ignore — read as a width
+change and forced a flatten-and-recompose of a paragraph whose measure never
+moved. Widths are now recorded on every delivery; first sight seeds
+silently. The one deliberate exception: an element composed while
+`unmeasurable` that arrives with real width recomposes immediately — the
+0 → N retry is the reason the flag exists.
+
+### Fixed — possessive closed bigrams never bound
+
+`New York’s` split at any weight: the follower trim only strips trailing
+punctuation, and a possessive ends in a letter. The partner lookup now also
+strips `’s`/`'s`, so `New York’s subway` binds exactly like `New York,`.
+
+### Fixed — accessibility and injection
+
+Rich-composed paragraphs no longer get `role="text"`, which flattened their
+links out of the accessibility tree in WebKit/VoiceOver. And
+`Typeset.auto()`'s heading branch no longer round-trips element text through
+`innerHTML` — escaped user text could re-enter the DOM as live markup.
+
+### Changed — hung list markers are now actually automatic, for prose lists
+
+The docs said any list on a page running typeset() gets `ts-styled`
+automatically; the engine only applied it when handed the `<ul>` itself,
+which go.js never does. `typeset()` on an `<li>` now styles its parent
+`<ul>` — but only a PROSE list: items still rendering as `list-item`,
+markers still browser-default (`list-style-type` not already `none`), and
+not inside `nav`/menu landmarks. A list the author already restyled — navs,
+menus, card grids, flex layouts — is design, not typography, and is never
+touched. Pinned versions are unaffected, as always.
+
+### Build — pins are now enforced, not just promised
+
+`build:dist` refuses to rewrite a committed `go@x.y.z.js` whose bytes
+differ — an engine change without a version bump fails the build instead of
+silently rewriting a published pin out from under its integrity hashes.
+Version substitution now also covers prose references
+(`typeset.us@x.y.z`), which had advertised 3.0.0 in the agent docs for four
+releases. Declaration files ship NodeNext-safe relative imports.
+
+### Site
+
+The homepage hero and manifesto — self-composed for the line-by-line
+reveal — now recompose when their width changes, so a load in a hidden or
+zero-width context (embedded panes, background tabs) no longer leaves the
+flagship headline browser-wrapped forever. Reading paragraphs that carried a
+blanket `data-no-typeset` are back in the pipeline, so "every paragraph on
+this page is set live by the engine" is true again, including the paragraph
+that says it.
+
+---
+
 ## 3.4.0 — 2026-07-24
 
 ### Added — phrase binding

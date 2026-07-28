@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# typeset.us
 
-## Getting Started
+**Paragraph compositor for the browser.** Beam-search line breaking with
+syntactic protection, contour-shaped rag, hanging punctuation, and
+post-render self-verification — the engine behind [typeset.us](https://typeset.us),
+running live on every page of the site it ships from.
 
-First, run the development server:
+The browser types. It doesn't read. The case, set by its own subject:
+[typeset.us/essay](https://typeset.us/essay).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Install
+
+One line, any site:
+
+```html
+<script src="https://typeset.us/go.js" defer></script>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Version-pinned with subresource integrity — the canonical snippet with the
+current hash lives in [`public/sri.json`](public/sri.json), and published
+pins are permanent: bytes never change, files are never removed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Or from npm — ESM, CJS, and global builds with types:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install typeset.us
+```
 
-## Learn More
+## Verification, not vibes
 
-To learn more about Next.js, take a look at the following resources:
+The engine grades its own output. `Typeset.audit()` returns `[]` when a page
+has no overflows, no orphaned last words, and no weak line ends — a
+machine-checkable definition of done. Paragraphs report what happened via
+`data-ts-outcome` (`composed`, `fallback:*`, `skipped:*`) and flag
+`data-typeset-done` when decided. Full integration contract for humans and
+agents: [typeset.us/for-agents](https://typeset.us/for-agents).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## This repository
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [`src/lib/typeset.ts`](src/lib/typeset.ts) — the engine. Everything shipped is generated from it.
+- [`src/app/`](src/app) — the Next.js site (typeset.us). The site runs the same engine it ships.
+- [`public/go.js`](public/go.js), `public/go@x.y.z.js`, [`public/sri.json`](public/sri.json) — generated drop-ins and their hashes (`npm run build:dist`).
+- [`packages/typeset.us/`](packages/typeset.us) — the npm package.
+- [`docs/BINDING.md`](docs/BINDING.md) — how the phrase-binding weight was derived, and what the evidence does not support.
+- [`CHANGELOG.md`](CHANGELOG.md) — what changed, including the bugs.
 
-## Deploy on Vercel
+## Develop
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev         # site at localhost:3000
+npm run build:dist  # regenerate go.js, typeset.min.js, esm + npm artifacts
+npm test            # playwright: composition gates on the shipped bundles
+npm run bench       # engine benchmarks
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT © Dustin York — [typeset.us/support](https://typeset.us/support)
