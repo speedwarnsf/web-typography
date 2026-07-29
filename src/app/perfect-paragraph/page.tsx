@@ -271,13 +271,14 @@ export default function PerfectParagraph() {
             <p className="hidden md:block font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
               Browser Default
             </p>
+            {/* The default panel is the CONTROL: no toggle may reach it.
+                The measure toggle used to set its max-width too, so flipping
+                a "refinement" visibly re-wrapped the browser side — the one
+                panel whose whole job is to never change. */}
             <p
               className="text-neutral-400 text-base sm:text-lg break-words"
               data-no-typeset
               data-no-smooth
-              style={{
-                maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
-              }}
             >
               {text}
             </p>
