@@ -1,4 +1,10 @@
 
+> **HISTORICAL (March 2026, pre-compositor).** Every issue below was
+> resolved by Compositor V2 and its successors: centered text is
+> auto-detected and skipped, the delayed re-runs are gone, and
+> `optimizeBreaks`/`shapeRag` are quarantined out of every bundle. Kept as
+> a record; see CHANGELOG.md and docs/RESEARCH.md for the current system.
+
 ## Known Issues / Future Improvements
 
 ### Centered text: skip rag smoothing

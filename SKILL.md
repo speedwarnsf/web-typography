@@ -77,8 +77,9 @@ objects. `weak-line-end` at very narrow measures can be a deliberate trade —
 review item, not hard failure. `audit()` covers only composed elements;
 also check the paragraphs you targeted carry `data-ts-outcome="composed"`
 (other outcomes: `fallback:*` = self-checks failed and browser layout was
-restored; `skipped:*`; `unmeasurable` = zero-width or hidden when the engine
-ran).
+restored; `skipped:*`, including `skipped:non-english` — since 3.5.0 the
+engine declines non-English content untouched rather than guess;
+`unmeasurable` = zero-width or hidden when the engine ran).
 
 Two attributes, two meanings — do not confuse them:
 
@@ -107,9 +108,14 @@ English and bound things like "Mount Mode" and "Server Port".
 
 Method, weights, and the evidence against them: docs/BINDING.md.
 
+Since 3.5.0, composition runs TIGHTER at wide measures (48ch and up): fill
+targets rise and auxiliary line-enders ("…the tell is") price out
+entirely, so wide columns no longer trade an extra line against the
+browser or stop visibly short of the measure.
+
 ## Cost (measured — docs/BENCHMARKS.md)
 
-1.4 ms median per paragraph, 86.4 ms for a 30-paragraph page on a desktop
-Chromium core; 7.4 ms / 421.6 ms at 4x CPU throttle. Synchronous, main
+1.6 ms median per paragraph, 92.9 ms for a 30-paragraph page on a desktop
+Chromium core; 7.1 ms / 418.5 ms at 4x CPU throttle. Synchronous, main
 thread, once per paragraph after `fonts.ready`; re-runs only on 2px+ width
 change or late font load.

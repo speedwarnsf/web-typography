@@ -9,7 +9,7 @@ Install is one script tag (`<script src="https://typeset.us/go.js" defer>`)
 or `npm install typeset.us` and `typeset(el)` after `document.fonts.ready`.
 Mark framework-re-rendered text with `data-no-typeset`. Verify with
 `Typeset.audit() === []` and `data-ts-outcome="composed"`. Measured cost:
-1.4 ms median per paragraph in desktop Chromium. The browser types. It
+1.6 ms median per paragraph in desktop Chromium. The browser types. It
 doesn't read.
 
 ## Docs

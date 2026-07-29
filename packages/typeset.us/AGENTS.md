@@ -1,6 +1,6 @@
 # AGENTS.md — typeset.us
 
-You have installed `typeset.us@3.5.0` (MIT). It is a paragraph compositor
+You have installed `typeset.us@3.5.1` (MIT). It is a paragraph compositor
 for the browser: a beam search over whole-paragraph break configurations
 (48–80 retained candidates) with syntactic protection for weak words, which
 re-measures every line it ships against the real content box and restores
@@ -28,6 +28,10 @@ Rules, in order of how often agents get them wrong:
 3. **English long-form prose only.** The weak-word lists are English; quote
    education mangles `„…“` and `« »`. Scope your selector to English
    article/main paragraphs — never UI chrome, nav, buttons, or data tables.
+   Since 3.5.0 the engine also enforces this itself: non-English content is
+   declined untouched with `data-ts-outcome="skipped:non-english"` (by
+   `lang` attribute, script, or function-word evidence — conservative, so
+   genuine English is never refused).
 4. **Exclude text users copy verbatim** (code, addresses, keys): copying
    composed text yields a `\n` at each composed line break.
 5. **Never call the legacy API** — `smoothRag`, `optimizeBreaks`,
@@ -109,9 +113,14 @@ English and bound things like "Mount Mode" and "Server Port".
 
 Method, weights, and the evidence against them: docs/BINDING.md.
 
+Since 3.5.0, composition runs TIGHTER at wide measures (48ch and up): fill
+targets rise and auxiliary line-enders ("…the tell is") price out
+entirely, so wide columns no longer trade an extra line against the
+browser or stop visibly short of the measure.
+
 ## Cost (measured; see docs/BENCHMARKS.md in the repository)
 
 Chromium 149, Georgia 18px, 30 paragraphs / 2,190 words at 340/480/650px:
-1.4 ms median per paragraph and 86.4 ms full page on a desktop core; 7.4 ms
-median and 421.6 ms full page at 4x CPU throttle. Synchronous, on the main
+1.6 ms median per paragraph and 92.9 ms full page on a desktop core; 7.1 ms
+median and 418.5 ms full page at 4x CPU throttle. Synchronous, on the main
 thread, once per paragraph after `fonts.ready`.

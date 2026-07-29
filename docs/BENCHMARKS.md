@@ -1,6 +1,6 @@
 # Benchmarks
 
-*Measured 2026-07-09 — Chromium 149.0.7827.55 via Playwright,
+*Measured 2026-07-29 — Chromium 149.0.7827.55 via Playwright,
 Georgia 18px, a 30-paragraph page of real site text at 340/480/650px measures
 (every sixth paragraph >120 tokens, exercising the BEAM=80 path). Times are for the full
 pipeline per paragraph — quote education, beam-search composition, contour re-rank, spacing
@@ -10,8 +10,8 @@ Reproduce with `npm run bench`.*
 
 | CPU | Paragraphs (composed) | Words | Median / paragraph | p95 / paragraph | Max | Full page |
 |---|---|---|---|---|---|---|
-| 1x | 30 (30) | 2190 | 1.4 ms | 10.6 ms | 10.9 ms | 86.4 ms |
-| 4x | 30 (30) | 2190 | 7.4 ms | 50.6 ms | 53.1 ms | 421.6 ms |
+| 1x | 30 (30) | 2190 | 1.6 ms | 11.4 ms | 11.5 ms | 92.9 ms |
+| 4x | 30 (30) | 2190 | 7.1 ms | 51.2 ms | 51.3 ms | 418.5 ms |
 
 ## Reading the numbers
 

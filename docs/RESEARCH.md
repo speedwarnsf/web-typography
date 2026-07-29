@@ -598,6 +598,58 @@ a production bug we shipped, found on a real phone, and root-caused.
 
 ---
 
+## Part XII: 3.5.0 — the copy became a spec (2026-07-28)
+
+Three of this release's features existed first as claims on the site. The
+audit that found them (every prose claim checked against the shipped code)
+became the requirements document; this section records the derivations.
+
+**The spacing envelope is measured, not assumed.** The fixed caps
+(-0.05/+0.0825em) encoded Tschichold's 80–133% tolerance against an ASSUMED
+quarter-em word space. Measured across ten real faces, natural spaces run
+0.20em (Source Sans, Source Serif) to 0.28em (Inter, Arial) to 0.60em
+(monos) — so the fixed caps squeezed Source Serif to 75% and stretched it
+to 140%, outside the doctrine on this site's own reading face. The envelope
+now derives per font from the measured space; for a true quarter-em face it
+reproduces the old constants exactly. The lowercase-i version of the rule
+(Part II's historical note) was measured and rejected as the gate: i-width
+to space-width ratios run 0.80 (Helvetica) to 1.34 (Source Serif), so the i
+cannot bound the envelope without forbidding contraction on most serifs.
+
+**Wide measures run tighter (≥48ch profile).** The reading profile treated
+66ch exactly like 24ch. Corpus sweep (85 paragraphs × 340/480/560/592/660px,
+Source Serif 4): extra-lines-vs-browser 480px 28→21, 560px 21→12, 660px
+12→6; average max fill +2.5–3pt; zero new orphans, weak enders, overflows,
+or fallbacks; the 340px row metric-identical. Fill target 0.90, tight
+cliffs .95/.97, candidate bar .985, short-line ladder +5pt. The essay
+demo's stall (typeset frozen at 76% reach while the browser filled 96%)
+composes 592px in 4 lines at 95% after the change.
+
+**Auxiliary line-enders price out where width allows.** linkingEndPenalty
+swept at 1600/2400/3600/5000 in the wide profile: 3600 is the smallest
+value reaching zero aux enders at every wide width (1600 left 3–5 per 85,
+2400 left 2, 5000 bought nothing — a plateau, same method as the 1600 bind
+weight). Cost: one additional extra-line paragraph in 85 at two widths.
+Narrow measures keep 1600 — the documented economics trade.
+
+**The language gate.** "English prose and nothing else" is now enforced:
+decline (`skipped:non-english`) by non-English `lang` attribute, by >30%
+non-Latin letters, or by a 30+-word Latin-script paragraph containing no
+word from a ~29-word set effectively exclusive to English ("a", "on",
+"no", "is" are deliberately absent — they collide with French, Spanish,
+and Dutch). Conservative by construction: the gate declines only on
+positive evidence, under-declining (Dutch can pass) rather than ever
+refusing genuine English. A page-level `lang="en"` is NOT a bypass — it
+describes the page, not a quoted German paragraph inside it.
+
+**One vocabulary for grader and compositor.** `audit()` counted last-line
+words with an alphanumeric filter; the compositor counts lexical tokens. A
+standalone "&" (kind: word) made "…Sophisticated / & Editorial" an orphan
+to the grader and correct setting to the compositor — /library failed its
+own audit ten times. `audit()` now counts through the shared classifier.
+
+---
+
 *This document is a living record. It will grow as the system evolves.*
 
 *"The details are not the details. They make the design." — Charles Eames*

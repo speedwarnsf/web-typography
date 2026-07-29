@@ -78,6 +78,15 @@ wherever `document` is undefined — a passing assertion in Node proves
 nothing; assert in a real browser (the engine's own CI asserts it in
 Chromium and WebKit).
 
+Since 3.5.0 the English-only scope is enforced, not just documented:
+non-English content is DECLINED before any transform touches it — by a
+non-English `lang` attribute, by majority non-Latin script, or by
+function-word evidence in a 30+-word Latin-script paragraph — and records
+`data-ts-outcome="skipped:non-english"`. The gate declines only on positive
+evidence, so genuine English is never refused; a Latin-script language whose
+function words overlap English heavily (Dutch, Scots) can slip past it, so
+scoping your selector to English content remains good practice.
+
 ## Wrong / Right
 
 ```jsx
@@ -129,6 +138,13 @@ where the pair cannot fit, the break still happens. Narrow by design
 measured 9.9% precision over 3.71M words and bound "Mount Mode" and
 "Server Port".
 
+Since 3.5.0, composition runs TIGHTER at wide measures (48ch and up): fill
+targets rise and auxiliary line-enders ("…the tell is") price out entirely,
+so wide columns no longer trade an extra line against the browser or stop
+visibly short of the measure. The word-space envelope also derives from the
+font's own measured natural space (Tschichold's 80–133%), not an assumed
+quarter-em.
+
 `data-typeset-done` means the engine has FINISHED with an element, whatever it
 decided; `data-ts-outcome` says what it decided. Wait on the first, read the
 second. Before 3.4.0 the done flag was set only on success, so fallbacks left
@@ -140,8 +156,8 @@ Chromium and WebKit do not. Scope rag gates per engine.
 ## Cost (measured; `npm run bench` reproduces it)
 
 Chromium 149, Georgia 18px, a 30-paragraph page (2,190 words) at
-340/480/650px measures: 1.4 ms median per paragraph and 86.4 ms full page on
-a desktop core; 7.4 ms median and 421.6 ms full page at 4x CPU throttle.
+340/480/650px measures: 1.6 ms median per paragraph and 92.9 ms full page on
+a desktop core; 7.1 ms median and 418.5 ms full page at 4x CPU throttle.
 Synchronous, on the main thread, once per paragraph after `fonts.ready`;
 re-runs only on 2px+ width changes or late font loads.
 

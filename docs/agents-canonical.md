@@ -140,8 +140,8 @@ Chromium and WebKit do not. Scope rag gates per engine.
 ## Performance (measured, docs/BENCHMARKS.md; reproduce with `npm run bench`)
 
 Chromium 149 via Playwright, Georgia 18px, a 30-paragraph page (2,190 words)
-at 340/480/650px measures, full go.js pipeline. Desktop (1x): 1.4 ms median
-per paragraph, 10.6 ms p95, 86.4 ms full page. 4x CPU throttle (mid-range
-phone proxy): 7.4 ms median, 50.6 ms p95, 421.6 ms full page. Synchronous, on
+at 340/480/650px measures, full go.js pipeline. Desktop (1x): 1.6 ms median
+per paragraph, 11.4 ms p95, 92.9 ms full page. 4x CPU throttle (mid-range
+phone proxy): 7.1 ms median, 51.2 ms p95, 418.5 ms full page. Synchronous, on
 the main thread, once per paragraph after `fonts.ready`; re-runs only on 2px+
 width changes or late font loads.
