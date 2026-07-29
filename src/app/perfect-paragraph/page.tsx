@@ -12,6 +12,52 @@ interface ToggleOption {
   description: string;
   cssRule?: string;
   jsRequired?: boolean;
+  /** Canvas properties (measure, leading) apply to BOTH panels — the
+   *  comparison is only honest when the column is identical and the sole
+   *  difference is the setting. */
+  shared?: boolean;
+}
+
+/** Weak words for the live tally — same vocabulary as the grader. */
+const WEAK = new Set([
+  'a', 'an', 'the', 'of', 'in', 'at', 'by', 'to', 'for', 'with', 'from', 'on',
+  'into', 'upon', 'about', 'between', 'through', 'without', 'during', 'before',
+  'after', 'against', 'among', 'within', 'beyond', 'toward', 'towards',
+  'across', 'along', 'behind', 'beneath', 'beside', 'despite', 'except',
+  'inside', 'outside', 'until', 'unlike', 'and', 'or', 'but', 'nor', 'yet',
+  'so', 'is', 'are', 'was', 'were', 'be', 'been', 'as', 'if', 'than', 'that',
+]);
+
+type PanelTally = { lines: number; weak: number; orphan: boolean };
+
+/** Measure a panel's ACTUAL rendering: rows from word-span rects, or the
+ *  engine's own frozen lines when composition is on. */
+function measurePanel(p: HTMLElement): PanelTally {
+  const frozen = Array.from(p.querySelectorAll<HTMLElement>(':scope > .ts-line'));
+  const rows: string[] = [];
+  if (frozen.length) {
+    for (const line of frozen) rows.push((line.textContent || '').trim());
+  } else {
+    const spans = Array.from(p.querySelectorAll<HTMLElement>('span[data-w]'));
+    let lastTop: number | null = null;
+    for (const s of spans) {
+      const top = s.getBoundingClientRect().top;
+      if (lastTop === null || Math.abs(top - lastTop) > 4) {
+        rows.push((s.textContent || '').trim());
+        lastTop = top;
+      } else {
+        rows[rows.length - 1] += ' ' + (s.textContent || '').trim();
+      }
+    }
+  }
+  let weak = 0;
+  rows.forEach((row, i) => {
+    if (i === rows.length - 1) return;
+    const last = (row.split(/[\s ]+/).pop() || '').replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase();
+    if (WEAK.has(last)) weak++;
+  });
+  const lastWords = (rows[rows.length - 1] || '').split(/[\s ]+/).filter((w) => /[A-Za-z0-9]/.test(w) || w === '&');
+  return { lines: rows.length, weak, orphan: rows.length > 1 && lastWords.length === 1 };
 }
 
 const TOGGLE_OPTIONS: ToggleOption[] = [
@@ -48,14 +94,16 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
   {
     id: 'lineHeight',
     label: 'Optimal line height',
-    description: 'line-height: 1.6 for comfortable reading',
+    description: 'line-height: 1.6 for comfortable reading — applied to both panels',
     cssRule: 'line-height: 1.6;',
+    shared: true,
   },
   {
     id: 'measure',
     label: 'Proper measure',
-    description: 'max-width: 51ch — optimal line length',
+    description: 'max-width: 51ch — optimal line length, applied to both panels',
     cssRule: 'max-width: 51ch;',
+    shared: true,
   },
   {
     id: 'hangingPunct',
@@ -94,37 +142,55 @@ export default function PerfectParagraph() {
   });
 
   const typesetRef = useRef<HTMLParagraphElement>(null);
+  const defaultRef = useRef<HTMLParagraphElement>(null);
+  const [tally, setTally] = useState<{ d: PanelTally; t: PanelTally } | null>(null);
 
   // Calculate refinement score
   const enabledCount = Object.values(toggles).filter(Boolean).length;
   const totalCount = Object.keys(toggles).length;
   const score = Math.round((enabledCount / totalCount) * 100);
 
-  // Apply typesetting to the right panel
+  // Apply typesetting to the right panel, then measure BOTH panels — the
+  // tallies under the panels are read from the actual rendering, so the
+  // line economy is a fact on the page, not an impression.
   useEffect(() => {
-    if (!typesetRef.current) return;
+    let cancelled = false;
+    (async () => {
+      await document.fonts.ready.catch(() => {});
+      if (cancelled || !typesetRef.current) return;
 
-    // Reset to raw text
-    const el = typesetRef.current;
-    el.innerHTML = text;
-    delete el.dataset.typesetDone;
+      const el = typesetRef.current;
+      const spanWrap = (s: string) =>
+        s.split(' ').map((w) => `<span data-w>${w}</span>`).join(' ');
 
-    const needsTypesetting = toggles.orphan || toggles.shortWord || toggles.sentenceStart || toggles.sentenceEnd;
+      delete el.dataset.typesetDone;
 
-    if (toggles.ragSmoothing) {
-      // Full V2 compositor — composition, spacing, overflow self-check.
-      // (Replaces the legacy smoothRag / postRenderFix passes entirely;
-      // running those after composition mangles the frozen lines.)
-      el.dataset.tsRaw = text;
-      typeset(el);
-      return;
-    }
+      const needsTypesetting = toggles.orphan || toggles.shortWord || toggles.sentenceStart || toggles.sentenceEnd;
 
-    if (needsTypesetting) {
-      // Bindings only — pass the real measure so rules scale to the column.
-      const measure = measureCh(el);
-      el.innerHTML = typesetText(text, { measure });
-    }
+      if (toggles.ragSmoothing) {
+        // Full V2 compositor — composition, spacing, overflow self-check.
+        el.innerHTML = text;
+        el.dataset.tsRaw = text;
+        typeset(el);
+      } else if (needsTypesetting) {
+        // Bindings only — real measure so rules scale to the column. Words
+        // are span-wrapped for measurement; NBSP-bound groups stay inside
+        // one span, which is exactly how the eye reads them.
+        const measure = measureCh(el);
+        el.innerHTML = spanWrap(
+          typesetText(text, { measure }).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        );
+      } else {
+        el.innerHTML = spanWrap(text.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+      }
+
+      if (defaultRef.current) {
+        setTally({ d: measurePanel(defaultRef.current), t: measurePanel(el) });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [text, toggles]);
 
   const handleToggle = (id: string) => {
@@ -200,7 +266,9 @@ export default function PerfectParagraph() {
           <p className="text-neutral-400 text-base sm:text-lg max-w-3xl" style={{ textWrap: "pretty" }}>
             The gap between default browser text and well-set type is vast — but
             made of small, precise choices. Toggle each layer below to see how
-            they add up to something&nbsp;exceptional.
+            they add up to something exceptional. Both panels share the same
+            column — the counts underneath are measured from the rendering, so
+            the difference you see is the setting, not the&nbsp;layout.
           </p>
         </div>
 
@@ -271,17 +339,32 @@ export default function PerfectParagraph() {
             <p className="hidden md:block font-mono text-xs uppercase tracking-[0.3em] text-neutral-500 mb-6">
               Browser Default
             </p>
-            {/* The default panel is the CONTROL: no toggle may reach it.
-                The measure toggle used to set its max-width too, so flipping
-                a "refinement" visibly re-wrapped the browser side — the one
-                panel whose whole job is to never change. */}
+            {/* The default panel is the CONTROL for the SETTING — but it
+                shares the CANVAS (measure, leading). A comparison across two
+                different columns is rigged in the browser's favor: the
+                typeset side read as a space-eater purely because it was
+                narrower and taller-leaded. Same column, same leading; the
+                only difference the eye sees is the setting itself. */}
             <p
+              ref={defaultRef}
               className="text-neutral-400 text-base sm:text-lg break-words"
               data-no-typeset
               data-no-smooth
+              style={{
+                maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
+                lineHeight: toggles.lineHeight ? '1.6' : undefined,
+              }}
             >
-              {text}
+              {text.split(' ').map((w, i, arr) => (
+                <span data-w key={i}>{w}{i < arr.length - 1 ? ' ' : ''}</span>
+              ))}
             </p>
+            {tally && (
+              <p className="mt-6 font-mono text-xs text-neutral-500" data-no-typeset>
+                {tally.d.lines} lines · {tally.d.weak} weak line-end{tally.d.weak === 1 ? '' : 's'} ·{' '}
+                {tally.d.orphan ? 'a word abandoned on the last line' : 'no abandoned last word'}
+              </p>
+            )}
           </div>
 
           {/* Right: Typeset — hidden on mobile when Default panel active */}
@@ -295,7 +378,7 @@ export default function PerfectParagraph() {
               ref={typesetRef}
               data-no-typeset
               data-no-smooth
-              className="text-neutral-200 text-base sm:text-lg leading-relaxed break-words"
+              className="text-neutral-200 text-base sm:text-lg break-words"
               style={{
                 lineHeight: toggles.lineHeight ? '1.6' : undefined,
                 maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
@@ -306,6 +389,12 @@ export default function PerfectParagraph() {
             >
               {text}
             </p>
+            {tally && (
+              <p className="mt-6 font-mono text-xs text-neutral-500" data-no-typeset>
+                <span className="text-[#B8963E]">{tally.t.lines} lines</span> · {tally.t.weak} weak line-end{tally.t.weak === 1 ? '' : 's'} ·{' '}
+                {tally.t.orphan ? 'a word abandoned on the last line' : 'no abandoned last word'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -324,11 +413,60 @@ export default function PerfectParagraph() {
 
         {/* Toggle controls */}
         <div className="mb-12">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-2">
+            The Column — applied to both panels
+          </p>
+          <p className="text-sm text-neutral-500 mb-6 max-w-2xl" data-no-typeset>
+            Width and leading are layout decisions, so they change both sides
+            equally — a comparison across two different columns would be
+            rigged. The panels differ only in the setting.
+          </p>
+          <div className="grid md:grid-cols-2 gap-4 mb-10">
+            {TOGGLE_OPTIONS.filter((o) => o.shared).map((option) => (
+              <div
+                key={option.id}
+                className="border border-neutral-800 bg-neutral-950/50 p-3 sm:p-4 hover:border-neutral-700 transition-colors"
+              >
+                <label className="flex items-start gap-4 cursor-pointer">
+                  <div className="relative flex-shrink-0 mt-1">
+                    <input
+                      type="checkbox"
+                      checked={toggles[option.id]}
+                      onChange={() => handleToggle(option.id)}
+                      className="sr-only"
+                    />
+                    <div
+                      className={`w-5 h-5 border transition-all ${
+                        toggles[option.id]
+                          ? 'bg-[#B8963E] border-[#B8963E]'
+                          : 'border-neutral-700 bg-neutral-900'
+                      }`}
+                    >
+                      {toggles[option.id] && (
+                        <svg className="w-full h-full text-black" viewBox="0 0 20 20" fill="none">
+                          <path d="M4 10l4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-neutral-200 mb-1">
+                      {option.label}
+                    </div>
+                    <div className="text-sm text-neutral-500">
+                      {option.description}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            ))}
+          </div>
+
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
-            Typographic Refinements
+            The Setting — typeset panel only
           </p>
           <div className="grid md:grid-cols-2 gap-4">
-            {TOGGLE_OPTIONS.map((option) => (
+            {TOGGLE_OPTIONS.filter((o) => !o.shared).map((option) => (
               <div
                 key={option.id}
                 className="border border-neutral-800 bg-neutral-950/50 p-3 sm:p-4 hover:border-neutral-700 transition-colors"
