@@ -17,7 +17,6 @@
  * grade (blocked fetch, no qualifying paragraphs, non-English lang)
  * return {graded:false, reason} and exit 2 — never a guessed score.
  */
-import { chromium } from 'playwright-core';
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -154,6 +153,24 @@ const PAGE_FN = ({ selector }) => {
     optedOut,
   };
 };
+
+// playwright-core is an optional peer, not a dependency: the engine in dist/
+// never touches it, so a script-tag or `import { typeset }` install should not
+// pay 8.9 MB for a grading harness it will never call. Only the CLI needs it,
+// and only here.
+let chromium;
+try {
+  ({ chromium } = await import('playwright-core'));
+} catch {
+  console.error(
+    'typeset.us audit needs playwright-core, which is an optional peer dependency:\n' +
+    '\n' +
+    '  npm i -D playwright-core\n' +
+    '\n' +
+    'It drives your installed Chrome or Edge and downloads no browsers.'
+  );
+  process.exit(2);
+}
 
 let browser;
 try {

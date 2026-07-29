@@ -1,13 +1,16 @@
 ---
-name: typeset-typography
+name: typeset-audit
 description: >-
-  Fix orphans, widows, ragged right edges, weak line endings, and bad line
-  breaks in English long-form web prose when CSS alone (text-wrap: pretty /
-  balance) isn't enough. Installs the typeset.us paragraph compositor —
-  beam-search line breaking with post-render self-verification — and proves
-  the result with a machine-checkable audit. Use when asked to fix orphans
-  or widows, smooth a ragged edge, improve typography or line breaks on
-  articles and blog posts, or when text-wrap: pretty isn't enough.
+  Audit and fix line-break quality in English long-form web prose: orphans,
+  widows, weak line endings, and ragged right edges. Unlike typography advice,
+  this is a machine-checkable gate — audit() returns [] or it names the exact
+  failing lines, and a composition that fails its own self-check restores the
+  browser's layout. Installs the typeset.us paragraph compositor (beam-search
+  line breaking with post-render self-verification) to fix what the audit finds.
+  Use when asked to check or fix orphans, widows, or bad line breaks; when
+  text-wrap: pretty or balance isn't enough; or for symptoms like "one word
+  alone on the last line", "the right edge looks ragged", or "line breaks look
+  wrong after deploy".
 ---
 
 # typeset.us

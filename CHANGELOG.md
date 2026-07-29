@@ -10,6 +10,27 @@ Hashes for every published version live in
 
 ---
 
+## 3.4.2 — 2026-07-28
+
+### Changed — `playwright-core` is now an optional peer dependency
+
+The engine in `dist/` never touches it; only the `npx typeset.us audit` CLI
+does. Declaring it a hard dependency made every `npm install typeset.us`
+pull an 8.9 MB headless-browser harness to get a 152 KB compositor — a
+silent install-time bail point for exactly the people the package is for.
+Installing for browser use now gets the engine alone.
+
+**The one user-visible break:** the CLI now requires
+`npm i -D playwright-core` (it drives your installed Chrome or Edge and
+downloads no browsers). Run without it, the CLI prints that instruction and
+exits 2 — "could not grade," per its documented contract.
+
+**No engine changes.** `go@3.4.1.js` remains the current pin; no file under
+`public/` or `dist/` changed bytes. Sites — pinned, evergreen, or
+vendored — have nothing to update.
+
+---
+
 ## 3.4.1 — 2026-07-28
 
 ### Fixed — author `<br>` was silently destroyed, and could weld words

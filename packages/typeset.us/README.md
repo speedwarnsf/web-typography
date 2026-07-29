@@ -35,6 +35,10 @@ repository).
 npm install typeset.us
 ```
 
+This installs the engine alone — 152 KB, no dependencies. The grading CLI
+(`npx typeset.us audit`) additionally needs `npm i -D playwright-core`,
+which drives your installed Chrome or Edge and downloads no browsers.
+
 ```js
 import { typeset, audit } from 'typeset.us';
 
