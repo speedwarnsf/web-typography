@@ -86,7 +86,7 @@ export default function EssayPage() {
           implementation knows what a preposition is. None will spend a line
           to keep a sentence&rsquo;s opening intact. And the spec offers no
           way to ask what it did — <code>pretty</code> is defined as
-          &ldquo;the browser may try harder,&rdquo; which cannot be tested,
+          permission for the browser to try harder, which cannot be tested,
           asserted on, or trusted with anything you care about.
         </p>
 
@@ -147,9 +147,9 @@ export default function EssayPage() {
           reads English prose and nothing else; drop it on another language
           and it will decline rather than guess. Text you copy from a
           composed paragraph carries a line break where each line ended — we
-          chose that over the worse defect of welded words. Until this week,
-          paragraphs carrying links or emphasis kept their protections but
-          not their composition; that gap is now closed, and this essay —
+          chose that over the worse defect of welded words. Until version
+          3.3, paragraphs carrying links or emphasis kept their protections
+          but not their composition; that gap is now closed, and this essay —
           links, italics, code and all — is the proof. And typeset does not
           read, either. It runs the checklist five centuries of compositors
           wrote — priced, searched, and measured — at the speed of the

@@ -49,8 +49,12 @@ const DEMO_ITEMS = [
 ];
 
 function DemoList({ variant }: { variant?: string }) {
+  // Both demo lists opt out of the engine entirely: the page claims "both
+  // lists are rendered by your browser right now", and since the engine
+  // auto-styles prose lists (3.4.1), the before side would otherwise stop
+  // being browser-default the moment the pipeline touched it.
   return (
-    <ul className={variant ? `ts-styled sb-${variant}` : undefined} style={{ margin: 0 }}>
+    <ul className={variant ? `ts-styled sb-${variant}` : undefined} style={{ margin: 0 }} data-no-typeset>
       {DEMO_ITEMS.map((item) => (
         <li key={item.slice(0, 18)}>{item}</li>
       ))}
@@ -104,8 +108,11 @@ export default function SilverBulletPage() {
             <strong>The Silver Bullet</strong> is one CSS snippet that fixes
             it everywhere: the marker hangs in the gutter, aligns to the
             x-height, and scales with your type because every unit is an{" "}
-            <code>em</code>. It ships inside the engine — any list on a page
-            running <code>typeset()</code> or go.js gets it automatically.
+            <code>em</code>. It ships inside the engine — any prose list, one
+            still wearing browser-default markers outside navigation, gets it
+            automatically on a page running <code>typeset()</code> or go.js.
+            Lists you&rsquo;ve already restyled — navs, menus, card grids —
+            are never touched.
           </p>
         </div>
 
@@ -181,7 +188,8 @@ export default function SilverBulletPage() {
             style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}
           >
             Copy it standalone, or skip it entirely — the engine injects this
-            automatically for every list on a page running typeset.
+            automatically for every browser-default prose list on a page
+            running typeset.
           </p>
           <CodeBlock code={cssCode} title="silver-bullet.css" />
         </section>

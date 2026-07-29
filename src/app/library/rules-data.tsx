@@ -52,7 +52,7 @@ if (finalValidate(shaped, measureCh, isHeading)) {
     name: "Short Word Binding",
     id: "short-words",
     description:
-      "Words like \u201Cof,\u201D \u201Cin,\u201D \u201Ca,\u201D and \u201Cthe\u201D look wrong stranded at the end of a line. Typeset binds each one to the word that follows, so they always travel\u00A0together.",
+      "Words like \u201Cof,\u201D \u201Cin,\u201D \u201Ca,\u201D and \u201Cthe\u201D look wrong stranded at the end of a line. The compositor prices every stranding and keeps these words with what follows wherever the rag can afford it \u2014 at reading measures, that is\u00A0everywhere.",
     code: `export function bindShortWords(text: string): string {
   return text.replace(
     /\\s(a|an|the|in|on|at|to|by|of|or)\\s/gi,

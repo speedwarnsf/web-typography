@@ -485,7 +485,7 @@ function performAudit(html: string): AuditResult {
       fontSizeCheck.violations.length === 0
         ? ["All body text meets minimum size (16px)"]
         : fontSizeCheck.violations.slice(0, 3),
-    recommendation: "Use minimum 16px for body text (WCAG compliance)",
+    recommendation: "Use minimum 16px for body text (widely recommended; WCAG itself sets no minimum size)",
     fix: `body {\n  font-size: 16px;\n}\n\n@media (min-width: 768px) {\n  body {\n    font-size: 18px;\n  }\n}`,
   });
 
@@ -707,7 +707,7 @@ export default function TypographicAudit() {
               className="text-neutral-400 mt-2 leading-relaxed text-sm sm:text-base"
               style={{ fontFamily: "var(--font-source-sans)" }}
             >
-              Score your typography quality \u2014 like Lighthouse, but for type
+              Score your typography quality — like Lighthouse, but for type
             </p>
           </div>
           <a
@@ -914,7 +914,7 @@ export default function TypographicAudit() {
                         <ul className="space-y-1">
                           {check.findings.map((finding, fidx) => (
                             <li key={fidx} className="text-xs text-neutral-400 font-mono break-words sm:text-sm">
-                              \u2022 {finding}
+                              • {finding}
                             </li>
                           ))}
                         </ul>

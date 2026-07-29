@@ -10,6 +10,73 @@ Hashes for every published version live in
 
 ---
 
+## 3.5.0 — 2026-07-28
+
+Three features this release exist because the site claimed them before the
+engine had them. The claims were written for an engine that kept evolving
+underneath them; the honest fix was to build the engine the copy described.
+Everything below is corpus-measured (85 paragraphs × 5 widths, Chromium,
+Source Serif 4) with the sweeps recorded in the profile comments.
+
+### Added — the spacing envelope is measured, not assumed
+
+Word-space tolerances derive from the font's own MEASURED natural space —
+Tschichold's 80–133%, the envelope InDesign adopted — instead of fixed
+constants assuming a quarter-em. The assumption was quietly wrong on real
+faces: Source Serif's space is 0.204em, so the old caps stretched it to
+140% and squeezed it to 75%, outside the doctrine on this site's own
+reading face. For a true quarter-em face the derived envelope is identical
+to the old constants; direct API callers who pass no measurement get the
+historical behavior exactly. `finalValidate`'s bounds now derive from the
+same envelope, so a line at a cap can never be composed and then silently
+rejected.
+
+### Added — a wide-measure profile (≥48ch)
+
+The reading-measure profile treated 66ch exactly like 24ch, so wide columns
+paid an extra line vs the browser on ~25% of the corpus and their longest
+line froze visibly short of the measure. Wide measures now run tighter —
+fill target 0.90, tight-line cliffs at .95/.97, candidate bar .985, the
+short-line ladder shifted up 5 points. Measured: extra-lines-vs-browser
+480px 28→21, 560px 21→12, 660px 12→6; zero new orphans, weak enders,
+overflows, or fallbacks; narrow measures byte-identical.
+
+At wide measures the profile also prices auxiliary line-enders at 3600
+(from 1600) — the smallest swept value reaching ZERO aux enders ("…The
+tell is") at every wide width, for the cost of one extra-line paragraph in
+85. Narrow measures keep the gentle 1600: the documented economics trade.
+
+### Added — the language gate
+
+The engine reads English prose and nothing else — now enforced rather than
+assumed. Non-English content is DECLINED (outcome `skipped:non-english`)
+before any transform touches it: by a non-English `lang` attribute, by
+majority non-Latin script, or by a 30+-word Latin-script paragraph carrying
+not one word from a set effectively exclusive to English. Conservative by
+construction — it declines only on positive evidence, so genuine English is
+never refused. Documented limit: languages whose function words overlap
+English heavily (Dutch, Scots) can pass the third check; the gate
+under-declines rather than guess.
+
+### Fixed — the grader and the compositor share one vocabulary
+
+`audit()` counted last-line words with an alphanumeric filter, so a
+standalone "&" was invisible and a deliberately correct
+"…Sophisticated / & Editorial" graded as an orphan — the site failed its
+own grader on /library, ten times. `audit()` now counts words through the
+same token classifier the compositor uses; the CLI's in-page check
+matches.
+
+### Site
+
+The grader detects installs (a typeset script tag in the fetched HTML) and
+says so; `/fix?url=` prefills and runs, so the badge now links to a live
+re-grade of the page it sits on. The specimen page credits real designers
+instead of "Google Fonts". The copy truth pass: every claim on the site now
+describes this engine, not a remembered or hoped-for one.
+
+---
+
 ## 3.4.2 — 2026-07-28
 
 ### Changed — `playwright-core` is now an optional peer dependency

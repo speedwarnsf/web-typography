@@ -73,15 +73,11 @@ declare function tokenize(text: string, measurer: (text: string) => number): Tok
 declare function composeParagraph(tokens: Token[], measurePx: number, measureCh: number, opts?: {
     isHeading?: boolean;
 }): FrozenLine[] | null;
-/**
- * Adjust word-spacing within fixed line membership.
- * May NOT change which words belong to which line.
- */
-declare function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number, isHeading?: boolean): FrozenLine[] | null;
+declare function shapeExactLines(lines: FrozenLine[], measureCh: number, measurePx: number, isHeading?: boolean, spaceEm?: number): FrozenLine[] | null;
 /**
  * Validate final composition before rendering.
  */
-declare function finalValidate(lines: FrozenLine[], measureCh: number, isHeading?: boolean): boolean;
+declare function finalValidate(lines: FrozenLine[], measureCh: number, isHeading?: boolean, spaceEm?: number): boolean;
 /**
  * Render exact lines as block spans (no pre-line + \n).
  */
@@ -132,14 +128,6 @@ export declare function audit(selector?: string): TypesetAuditViolation[];
  * lines; heading mode is exempt (display lines run loose by design).
  */
 export declare function linesStarved(element: HTMLElement, medianFloor?: number): boolean;
-/**
- * Apply typographic rules to a DOM element's text content.
- * Processes text nodes recursively.
- *
- * Measures the element's actual width in `ch` units so that binding rules
- * scale appropriately — narrow mobile columns won't get aggressive bindings
- * that create near-justified text with a stranded last line.
- */
 export declare function typeset(element: HTMLElement): void;
 /**
  * Apply typographic rules to all elements matching a selector.

@@ -52,6 +52,15 @@
     <p id="br-weld" class="gate">The harbour lights were burning low across the bay<br>and the boats came home before the storm arrived.</p>
   </div>
 
+  <!-- Language-gate fixtures (3.5.0): the engine reads English and nothing
+       else — non-English content is DECLINED (skipped:non-english), by
+       script, by function-word evidence, or by an explicit lang attribute. -->
+  <div class="col mid">
+    <p id="lang-de" class="gate">Der Zeilenumbruch bleibt hier vollkommen unangetastet, denn dieser Absatz wurde eindeutig nicht auf Englisch geschrieben, sondern beschreibt in ruhigen deutschen Saetzen, wie Woerter am Zeilenende haengen bleiben, wenn niemand auf sie achtet, und wie ein Programm lernen musste, solche Zeilen niemals anzufassen.</p>
+    <p id="lang-ru" class="gate">Русская типографика живёт по своим правилам, и этот абзац написан кириллицей, чтобы проверить, что движок честно отказывается его трогать.</p>
+    <p id="lang-fr" lang="fr" class="gate">Le navigateur compose le texte sans jamais le lire, et cette phrase reste exactement comme elle est.</p>
+  </div>
+
   <!-- List fixtures (3.4.1): a browser-default prose list gets ts-styled
        automatically; an author-styled nav list must NEVER be touched. -->
   <div class="col mid">

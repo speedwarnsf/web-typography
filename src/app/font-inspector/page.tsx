@@ -352,12 +352,14 @@ export default function FontInspector() {
             Drop a font file here
           </p>
           <p className="text-sm text-neutral-400">
-            .ttf, .otf, .woff, .woff2 -- or click to browse
+            .ttf, .otf, .woff -- or click to browse
           </p>
+          {/* No .woff2: opentype.js cannot parse Brotli-compressed WOFF2 —
+              every drop errored. Advertise only what actually parses. */}
           <input
             ref={fileInputRef}
             type="file"
-            accept=".ttf,.otf,.woff,.woff2"
+            accept=".ttf,.otf,.woff"
             onChange={onFileChange}
             className="hidden"
           />

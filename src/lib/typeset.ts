@@ -625,6 +625,20 @@ interface CompositorProfile {
   flatShelfPenalty: number;
   snapPenalty: number;
   maxWordSpacing: number;
+  /** Non-last lines above this fill pay the hard tight penalty (+4000). */
+  tightCliff: number;
+  /** Non-last lines above this fill pay the soft tight penalty (+1200). */
+  tightSoft: number;
+  /** Candidate lines above this fill are not generated at all. */
+  candidateBar: number;
+  /** The short-line ladder's thresholds shift by this much (wide measures
+   *  count a 0.78 line as loose; a 22ch column does not). */
+  looseShift: number;
+  /** Copula/auxiliary verb stranded at a line end ("…The tell is"). Gentle
+   *  at narrow measures — a documented economics trade — and firmer where
+   *  width allows, so reading-measure pages grade clean under audit()'s
+   *  full weak-ender vocabulary. */
+  linkingEndPenalty: number;
 }
 
 /**
@@ -639,6 +653,11 @@ function profileForMeasure(measureCh: number): CompositorProfile {
     flatShelfPenalty: 240,
     snapPenalty: 180,
     maxWordSpacing: 0.018,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600,
   };
   if (measureCh < 24) return {
     mainTarget: 0.82,
@@ -648,8 +667,13 @@ function profileForMeasure(measureCh: number): CompositorProfile {
     flatShelfPenalty: 200,
     snapPenalty: 140,
     maxWordSpacing: 0.025,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600,
   };
-  return {
+  if (measureCh < 48) return {
     // 0.85 is the documented design center (RESEARCH.md: "cubic badness
     // centered on 85% fill — the sweet spot for ragged-right"). At 0.80 the
     // compositor set ~20% looser than the browser and cost 2-3 extra lines
@@ -661,6 +685,45 @@ function profileForMeasure(measureCh: number): CompositorProfile {
     flatShelfPenalty: 160,
     snapPenalty: 100,
     maxWordSpacing: 0.035,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600,
+  };
+  // Wide measures (≥48ch) run TIGHTER — print practice, and measured need:
+  // the reading-measure profile treated 66ch exactly like 24ch, so wide
+  // columns paid an extra line vs the browser on ~25% of the corpus and
+  // their longest line froze visibly short of the measure (the essay demo
+  // at 592px: 5 lines, max fill 76%, while the browser used 4 at 96%).
+  //
+  // Derivation (2026-07-28): corpus sweep, 85 paragraphs × 340/480/560/592/
+  // 660px in Source Serif 4, stock vs this profile. Extra-lines-vs-browser:
+  // 480px 28→21, 560px 21→12, 660px 12→6; average max fill +2.5–3pt; zero
+  // fallbacks, orphans, or lines beyond the bar; the 340px row is
+  // metric-identical (narrow brackets untouched). The candidate bar rises
+  // to .985 — contraction still absorbs the overshoot, and the overflow
+  // self-check remains the backstop.
+  //
+  // linkingEndPenalty 3600: smallest swept value (1600/2400/3600/5000)
+  // reaching ZERO auxiliary line-enders at every wide width — 1600 left
+  // 3–5 per 85, 2400 left 2, 5000 bought nothing more (a plateau, same
+  // method as the 1600 bind weight). Cost: one additional extra-line
+  // paragraph out of 85 at two widths. Where width allows, a line should
+  // not end on "is" — and at these measures, width allows.
+  return {
+    mainTarget: 0.90,
+    lastTarget: 0.48,
+    weakEndPenalty: 7000,
+    orphanPenalty: 1e9,
+    flatShelfPenalty: 160,
+    snapPenalty: 100,
+    maxWordSpacing: 0.035,
+    tightCliff: 0.97,
+    tightSoft: 0.95,
+    candidateBar: 0.985,
+    looseShift: 0.05,
+    linkingEndPenalty: 3600,
   };
 }
 
@@ -692,9 +755,6 @@ function composeParagraph(
   // 2026-07-09). Now above any plausible cliff sum, below the weak-end
   // floor (7000) that short openers already get.
   const DANGLING_START_PENALTY = 5200;
-  // Gentle nudge against copula/auxiliary verbs at a line end (below the fill
-  // penalty for a sub-0.70 line, so it only bumps when the line stays full).
-  const LINKING_END_PENALTY = 1600;
 
   // Filter out pure whitespace tokens for line candidates
   const contentTokens = tokens.filter(t => t.kind !== "space");
@@ -884,14 +944,17 @@ function composeParagraph(
     penalty += (deviation < 0 ? 3000 : 1200) * deviation * deviation;
 
     // Very short non-last line
-    // Short non-last lines — progressively harsh penalties
-    if (!isLast && fill < 0.50) {
+    // Short non-last lines — progressively harsh penalties. The ladder
+    // shifts up at wide measures (profile.looseShift): a 0.78 line reads
+    // loose at 66ch in a way it does not at 30ch.
+    const ls = profile.looseShift;
+    if (!isLast && fill < 0.50 + ls) {
       penalty += 8000;
-    } else if (!isLast && fill < 0.60) {
+    } else if (!isLast && fill < 0.60 + ls) {
       penalty += 4000;
-    } else if (!isLast && fill < 0.70) {
+    } else if (!isLast && fill < 0.70 + ls) {
       penalty += 2000;
-    } else if (!isLast && fill < 0.75) {
+    } else if (!isLast && fill < 0.75 + ls) {
       penalty += 800;
     }
 
@@ -906,9 +969,9 @@ function composeParagraph(
     // on /proof. Full-ish lines are legitimate ragged-right; only genuinely
     // overfull ones pay, and the anti-justification transition scoring guards
     // against runs of them.
-    if (!isLast && fill > 0.955) {
+    if (!isLast && fill > profile.tightCliff) {
       penalty += 4000;
-    } else if (!isLast && fill > 0.93) {
+    } else if (!isLast && fill > profile.tightSoft) {
       penalty += 1200;
     }
 
@@ -938,7 +1001,7 @@ function composeParagraph(
     if (!isLast && lastLexical && LINKING_END_WORDS.has(
       lastLexical.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, "")
     )) {
-      penalty += LINKING_END_PENALTY;
+      penalty += profile.linkingEndPenalty;
     }
 
     // Extra penalty for single-letter lexical endings like "a" / "I"
@@ -1068,8 +1131,9 @@ function composeParagraph(
         // ~15% looser than the browser and cost 2-3 extra lines at 375px
         // (measured on /proof). Full-ish lines must be POSSIBLE; the long-line
         // penalty ladder and the anti-justification guard decide how many are
-        // wise. 0.97 leaves headroom so word-spacing contraction never overflows.
-        if (fill > 0.97) continue;
+        // wise. The bar leaves headroom so word-spacing contraction never
+        // overflows (.97 at reading measures, .985 wide — see profile).
+        if (fill > profile.candidateBar) continue;
 
         const linePenalty = scoreLine(lineTokens, fill, isLast, end);
         const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
@@ -1148,26 +1212,40 @@ function composeParagraph(
  * Adjust word-spacing within fixed line membership.
  * May NOT change which words belong to which line.
  */
+/**
+ * The accordion's envelope is Tschichold's tolerance — 80%..133% of the
+ * NATURAL word space, the range InDesign's justification defaults adopted
+ * verbatim — applied to the font's own MEASURED space, not an assumed
+ * quarter-em. That assumption was quietly wrong on real faces: Source
+ * Serif's space is 0.204em, so the old fixed caps (-0.05/+0.0825em)
+ * squeezed it to 75% and stretched it to 140% — outside the doctrine on
+ * this site's own reading face. Inter's is 0.281em; a mono's is 0.6em.
+ * When no measurement is provided (direct API callers), the quarter-em
+ * fallback reproduces the historical behavior exactly.
+ *
+ * Display type keeps a gentle envelope — visible word-space play at
+ * headline sizes reads pinched or gappy (the manifesto lesson).
+ * finalValidate's bounds are derived from the SAME envelope (3% / 10%
+ * headroom); deriving both from one place is what keeps compositions from
+ * being silently rejected.
+ */
+function spacingEnvelope(spaceEm: number | undefined, isHeading: boolean): { maxExpand: number; maxContract: number } {
+  const s = spaceEm && spaceEm > 0.05 && spaceEm < 1 ? spaceEm : 0.25;
+  return isHeading
+    ? { maxExpand: 0.12 * s, maxContract: 0.08 * s }
+    : { maxExpand: 0.33 * s, maxContract: 0.20 * s };
+}
+
 function shapeExactLines(
   lines: FrozenLine[],
   measureCh: number,
   measurePx: number,
-  isHeading = false
+  isHeading = false,
+  spaceEm?: number
 ): FrozenLine[] | null {
   const shapedLines: FrozenLine[] = [];
 
-  // The accordion's envelope comes from the literature, expressed against
-  // the ~0.25em natural word space of a text face (Bringhurst's quarter-em):
-  // Tschichold's tolerances — and InDesign's justification defaults, which
-  // adopted them verbatim — allow 80%..133% of natural, i.e. -0.05em to
-  // +0.0825em of adjustment. (The old +-0.03/0.04 caps expanded to only
-  // ~112% of natural — half the sanctioned authority; Dustin, 2026-07-09:
-  // "0.03em seems ineffectual".) Display type keeps a gentle envelope —
-  // visible word-space play at headline sizes reads pinched or gappy (the
-  // manifesto lesson). finalValidate's bounds are paired to these caps;
-  // change them TOGETHER or compositions get silently rejected.
-  const maxExpand = isHeading ? 0.03 : 0.0825;   // 133% of a 1/4-em space
-  const maxContract = isHeading ? 0.02 : 0.05;   // 80% of a 1/4-em space
+  const { maxExpand, maxContract } = spacingEnvelope(spaceEm, isHeading);
 
   // Global median of non-last fills — the paragraph's register.
   const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
@@ -1251,10 +1329,16 @@ function shapeExactLines(
 /**
  * Validate final composition before rendering.
  */
-function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false): boolean {
+function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false, spaceEm?: number): boolean {
   if (!lines.length) return false;
 
   const profile = profileForMeasure(measureCh);
+  // Bounds derive from the SAME per-font envelope shapeExactLines used,
+  // with 3% / 10% headroom — a line at a cap must never be composed and
+  // then silently rejected here.
+  const env = spacingEnvelope(spaceEm, isHeading);
+  const expandBound = env.maxExpand * 1.03;
+  const contractBound = env.maxContract * 1.10;
 
   const isContent = (t: Token) => t.kind !== "space";
   const isLexical = (t: Token) =>
@@ -1292,11 +1376,9 @@ function finalValidate(lines: FrozenLine[], measureCh: number, isHeading = false
       return false;
     }
 
-    // Spacing exceeds generous threshold
-    // Paired to shapeExactLines' literature envelope (+0.0825/-0.05 body):
-    // these bounds must always sit just outside the shaping caps, or every
-    // line at a cap gets composed and then silently rejected here.
-    if (lines[i].wordSpacingEm > 0.085 || lines[i].wordSpacingEm < -0.055) {
+    // Spacing exceeds the envelope (bounds derived above from the same
+    // per-font measurement shapeExactLines used).
+    if (lines[i].wordSpacingEm > expandBound || lines[i].wordSpacingEm < -contractBound) {
       return false;
     }
   }
@@ -1888,7 +1970,15 @@ export function audit(
       }
     });
     const last = lines[lines.length - 1];
-    const words = (last.textContent || '').trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+    // Count last-line words the way the COMPOSITOR counts them — via the
+    // shared token classifier — or the grader flags compositions the engine
+    // set on purpose. The alphanumeric filter dropped standalone "&", so a
+    // deliberately correct "…Sophisticated / & Editorial" graded as an
+    // orphan while the compositor (rightly) counted two words.
+    const words = (last.textContent || '').trim().split(/\s+/).filter((w) => {
+      const kind = classifyWord(w).kind;
+      return kind === 'word' || kind === 'compound' || kind === 'longSlug';
+    });
     if (lines.length > 1 && words.length === 1 && !/^H[1-6]$/.test(el.tagName)) {
       violations.push({
         element: el,
@@ -1959,6 +2049,11 @@ function composeElement(element: HTMLElement, measure: number): boolean {
 
   const measurer = makeMeasurer(element);
   const tokens = tokenize(raw, measurer);
+  // The font's own natural word space, in em — the reference the spacing
+  // envelope derives from (Tschichold's 80–133% of NATURAL, measured, not
+  // an assumed quarter-em).
+  const fontSizePx = parseFloat(getComputedStyle(element).fontSize) || 16;
+  const spaceEm = measurer(' ') / fontSizePx;
   measurer.cleanup?.();
   // Heading detection must survive the linked-headline pattern (h4 > a, the
   // most common listing markup on the web): an anchor composed in body mode
@@ -1973,8 +2068,8 @@ function composeElement(element: HTMLElement, measure: number): boolean {
     return restorePlain(element, raw);
   }
 
-  const shaped = shapeExactLines(composed, measure, measurePx, isHeading) ?? composed;
-  if (!finalValidate(shaped, measure, isHeading)) {
+  const shaped = shapeExactLines(composed, measure, measurePx, isHeading, spaceEm) ?? composed;
+  if (!finalValidate(shaped, measure, isHeading, spaceEm)) {
     element.dataset.tsOutcome = 'fallback:validate';
     return restorePlain(element, raw);
   }
@@ -2060,6 +2155,10 @@ function composeRichElement(element: HTMLElement, measure: number): boolean {
 
   const rm = makeRunMeasurer(element, content.runs);
   const tokens = richTokenize(content, rm.measure);
+  // Natural space of the paragraph's base face (runId null), in em — same
+  // reference the plain path derives its spacing envelope from.
+  const richFontSizePx = parseFloat(getComputedStyle(element).fontSize) || 16;
+  const richSpaceEm = rm.measure(' ', null) / richFontSizePx;
   rm.cleanup();
   if (!tokens.length) {
     element.dataset.tsOutcome = 'skipped:short';
@@ -2075,8 +2174,8 @@ function composeRichElement(element: HTMLElement, measure: number): boolean {
     return restoreRich();
   }
 
-  const shaped = shapeExactLines(composed, measure, measurePx, isHeading) ?? composed;
-  if (!finalValidate(shaped, measure, isHeading)) {
+  const shaped = shapeExactLines(composed, measure, measurePx, isHeading, richSpaceEm) ?? composed;
+  if (!finalValidate(shaped, measure, isHeading, richSpaceEm)) {
     element.dataset.tsOutcome = 'fallback:validate';
     return restoreRich();
   }
@@ -2103,8 +2202,74 @@ function composeRichElement(element: HTMLElement, measure: number): boolean {
  * scale appropriately — narrow mobile columns won't get aggressive bindings
  * that create near-justified text with a stranded last line.
  */
+// Words that are effectively exclusive to English among Latin-script
+// languages ("a", "on", "no", "is" collide with French/Spanish/Dutch and
+// are deliberately absent). In running English prose this set covers ~20%
+// of all tokens — thirty words with zero hits is strong evidence the text
+// is not English.
+const ENGLISH_MARKERS = new Set([
+  'the', 'of', 'and', 'that', 'it', 'for', 'with', 'this', 'from', 'they',
+  'but', 'not', 'are', 'be', 'been', 'have', 'has', 'had', 'you', 'your',
+  'which', 'their', 'would', 'there', 'what', 'when', 'who', 'will', 'than',
+]);
+
+/**
+ * The language gate. The engine reads English prose and nothing else — its
+ * word lists are English and its quote education mangles „…“ and « » — so
+ * non-English content is DECLINED (outcome `skipped:non-english`), never
+ * guessed at. Conservative on purpose: it declines only on positive
+ * evidence, so English is never wrongly refused.
+ *
+ *  1. An explicit `lang` attribute is trusted in both directions.
+ *  2. Text whose letters are >30% non-Latin script declines outright.
+ *  3. Latin-script text long enough to judge (≥30 words) declines when it
+ *     contains not one word from a set effectively exclusive to English.
+ *
+ * Documented limit: a Latin-script language whose function words overlap
+ * English heavily (Dutch, Scots) can pass rule 3 — the gate under-declines
+ * rather than ever refusing genuine English.
+ */
+function isNonEnglish(element: HTMLElement, raw: string): boolean {
+  // A non-English lang attribute is decisive. An English one is NOT a
+  // bypass: page-level lang="en" describes the page, not every paragraph —
+  // a German quotation inside an English article is exactly the content
+  // this gate exists to protect. The evidence checks below never decline
+  // genuine English, so trusting them costs an honest author nothing.
+  const lang = element.closest('[lang]')?.getAttribute('lang')?.toLowerCase() ?? '';
+  if (lang && !lang.startsWith('en')) return true;
+
+  let latin = 0;
+  let nonLatin = 0;
+  for (const ch of raw) {
+    if (!/\p{L}/u.test(ch)) continue;
+    if (/[A-ɏḀ-ỿ]/.test(ch)) latin++;
+    else nonLatin++;
+  }
+  const letters = latin + nonLatin;
+  if (letters >= 8 && nonLatin / letters > 0.3) return true;
+
+  const words = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 30) {
+    for (const w of words) {
+      if (ENGLISH_MARKERS.has(w.replace(/[^a-z]/g, ''))) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 export function typeset(element: HTMLElement): void {
   if (!element) return;
+
+  // English-only, enforced rather than assumed: decline before any
+  // transform touches the text (quote education would be the first to
+  // corrupt „…“ or « »).
+  const gateText = (element.textContent || '').trim();
+  if (gateText.length >= 10 && isNonEnglish(element, gateText)) {
+    element.dataset.tsOutcome = 'skipped:non-english';
+    element.dataset.typesetDone = '1';
+    return;
+  }
 
 
   // Inject global styles once for typeset list refinements

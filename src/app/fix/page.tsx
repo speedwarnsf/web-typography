@@ -29,6 +29,8 @@ type Graded = {
   paragraph: string;
   title: string;
   platform: Platform;
+  /** The fetched HTML carries a typeset script tag — the page runs the engine. */
+  installed: boolean;
 };
 
 type NotGraded = { reason: string; platform?: Platform };
@@ -135,8 +137,8 @@ export default function FixPage() {
     setTally({ b: measureBrowserPanel(b), t: measureTypesetPanel(t) });
   };
 
-  const gradeUrl = async () => {
-    const target = /^https?:\/\//.test(url) ? url : `https://${url}`;
+  const gradeUrlFor = async (raw: string) => {
+    const target = /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
     setResult({ state: 'loading' });
     setTally(null);
     setMode('browser');
@@ -148,6 +150,9 @@ export default function FixPage() {
         return;
       }
       const platform = detectPlatform(body.html, target);
+      // Install detection: a typeset script tag in the served HTML (the
+      // evergreen go.js, a pinned go@x.y.z.js, or the library build).
+      const installed = /<script[^>]+src="[^"]*(?:typeset\.us\/go(?:@[\d.]+)?\.js|typeset\.min\.js|typeset\.us\/typeset)[^"]*"/i.test(body.html);
       const { paragraph, title, reason } = extractParagraph(body.html);
       if (platform === 'substack') {
         setResult({ state: 'substack', title });
@@ -159,11 +164,24 @@ export default function FixPage() {
         setResult({ state: 'notgraded', why: { reason: reason!, platform: platform.key !== 'unknown' ? platform : undefined } });
         return;
       }
-      setResult({ state: 'graded', data: { paragraph, title, platform } });
+      setResult({ state: 'graded', data: { paragraph, title, platform, installed } });
     } catch {
       setResult({ state: 'notgraded', why: { reason: 'Couldn’t reach that page. Nothing was graded.' } });
     }
   };
+  const gradeUrl = () => gradeUrlFor(url);
+
+  // A badge (or any link) can hand the grader a page directly:
+  // /fix?url=https://example.com/post prefills and runs — the badge's
+  // "re-runnable claim", made runnable.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('url');
+    if (q) {
+      setUrl(q);
+      void gradeUrlFor(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Wide end = a real desktop reading measure; never overflow a phone.
   useEffect(() => {
@@ -272,6 +290,13 @@ export default function FixPage() {
               face. Squeeze the column and watch the counts. Dotted marks are
               measured, not decorative.
             </p>
+            {g.installed && (
+              <p className="fx-source fx-gold" data-no-typeset>
+                Typeset detected on this page — it ships the engine&rsquo;s
+                script, so what your readers see is already composed. The
+                panels above re-set the raw text for comparison.
+              </p>
+            )}
           </section>
 
           {tally && (

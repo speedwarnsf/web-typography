@@ -69,6 +69,68 @@ test('wrapper skips are decided, not pending — and an author <br> survives unw
   expect(gates.br.brCount, "the author's <br> must survive").toBe(1);
 });
 
+test('non-English content is declined, never guessed at', async ({ page }) => {
+  // The engine's word lists are English and its quote education mangles
+  // „…“ and « » — so the gate declines by script (Cyrillic), by
+  // function-word evidence (a 30+-word Latin-script paragraph with zero
+  // English markers), and by an explicit lang attribute. The text must be
+  // byte-untouched: no education, no bindings, no composition.
+  await loadFixture(page);
+  const langs = await page.evaluate(() => {
+    const read = (id: string) => {
+      const p = document.getElementById(id)!;
+      return {
+        outcome: p.getAttribute('data-ts-outcome'),
+        done: p.hasAttribute('data-typeset-done'),
+        tsLines: p.querySelectorAll('.ts-line').length,
+        hasNbsp: (p.textContent || '').includes(' '),
+      };
+    };
+    return { de: read('lang-de'), ru: read('lang-ru'), fr: read('lang-fr') };
+  });
+  for (const [k, v] of Object.entries(langs)) {
+    expect(v.outcome, `${k} must be declined`).toBe('skipped:non-english');
+    expect(v.done, `${k} must be decided, not pending`).toBe(true);
+    expect(v.tsLines, `${k} must not be composed`).toBe(0);
+    expect(v.hasNbsp, `${k} text must be untouched`).toBe(false);
+  }
+});
+
+test('audit counts last-line words like the compositor: "& Editorial" is not an orphan', async ({ page }) => {
+  // The grader and the compositor must share one vocabulary. A standalone
+  // ampersand is a word — "…Sophisticated / & Editorial" is correct
+  // setting the compositor chose on purpose; flagging it made the site
+  // fail its own audit() on /library.
+  await loadFixture(page);
+  const r = await page.evaluate(() => {
+    const mk = (lines: string[]) => {
+      const p = document.createElement('p');
+      p.setAttribute('data-typeset-done', '1');
+      for (const t of lines) {
+        const s = document.createElement('span');
+        s.className = 'ts-line';
+        s.style.display = 'block';
+        s.textContent = t;
+        p.appendChild(s);
+      }
+      document.body.appendChild(p);
+      return p;
+    };
+    const amp = mk(['Elegant, Sophisticated', '& Editorial']);
+    const bare = mk(['Elegant, Sophisticated and', 'Editorial']);
+    const all = window.Typeset.audit();
+    const res = {
+      amp: all.filter((v) => v.element === amp && v.type === 'orphan').length,
+      bare: all.filter((v) => v.element === bare && v.type === 'orphan').length,
+    };
+    amp.remove();
+    bare.remove();
+    return res;
+  });
+  expect(r.amp, '"& Editorial" is two words').toBe(0);
+  expect(r.bare, 'a bare single word is still an orphan').toBe(1);
+});
+
 test('list styling is automatic for prose lists and never touches styled navs', async ({ page }) => {
   // The Silver Bullet promise ("any list gets it automatically") is scoped
   // to prose lists: browser-default markers, items rendering as list-item,

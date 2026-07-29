@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About — Typeset.us",
   description:
-    "Typography governs how language is experienced. The story of why Typeset.us exists, told through 20 years of professional practice.",
+    "Typography governs how language is experienced. The story of why Typeset.us exists, told through thirty years of professional practice.",
 };
 
 export default function AboutPage() {

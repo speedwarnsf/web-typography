@@ -60,6 +60,42 @@ const GOOGLE_FONTS = [
   "Space Grotesk",
 ];
 
+/* ── Designer credits ──
+   Google Fonts is the distributor, not the designer — and a specimen sheet
+   is exactly the document where the credit must be right. */
+const GOOGLE_FONT_DESIGNERS: Record<string, string> = {
+  "Roboto": "Christian Robertson",
+  "Open Sans": "Steve Matteson",
+  "Lato": "Łukasz Dziedzic",
+  "Montserrat": "Julieta Ulanovsky",
+  "Oswald": "Vernon Adams",
+  "Source Sans Pro": "Paul D. Hunt",
+  "Raleway": "Matt McInerney, Pablo Impallari, Rodrigo Fuenzalida",
+  "PT Sans": "Alexandra Korolkova, Olga Umpeleva, Vladimir Yefimov",
+  "Merriweather": "Sorkin Type / Eben Sorkin",
+  "Poppins": "Indian Type Foundry / Jonny Pinhorn",
+  "Ubuntu": "Dalton Maag",
+  "Playfair Display": "Claus Eggers Sørensen",
+  "Nunito": "Vernon Adams",
+  "Mukta": "Ek Type",
+  "Rubik": "Hubert & Fischer",
+  "Work Sans": "Wei Huang",
+  "Inter": "Rasmus Andersson",
+  "Noto Sans": "Google & Monotype",
+  "Fira Sans": "Erik Spiekermann, Ralph du Carrois",
+  "Quicksand": "Andrew Paglinawan",
+  "Karla": "Jonny Pinhorn",
+  "Barlow": "Jeremy Tribby",
+  "Inconsolata": "Raph Levien",
+  "Source Code Pro": "Paul D. Hunt",
+  "IBM Plex Sans": "Mike Abbink & Bold Monday",
+  "DM Sans": "Colophon Foundry & Jonny Pinhorn",
+  "Libre Baskerville": "Pablo Impallari",
+  "Crimson Text": "Sebastian Kosch",
+  "Cormorant": "Christian Thalmann",
+  "Space Grotesk": "Florian Karsten",
+};
+
 /* ── OT Feature labels ── */
 const FEATURE_LABELS: Record<string, string> = {
   liga: "Standard Ligatures",
@@ -206,8 +242,10 @@ export default function TypeSpecimenGenerator() {
       setFontData({
         meta: {
           familyName: fontName,
-          designer: "Google Fonts",
-          version: "Latest",
+          designer: GOOGLE_FONT_DESIGNERS[fontName] ?? "",
+          // The CSS2 API serves no version metadata — leave it blank rather
+          // than present a placeholder as fact.
+          version: "",
           glyphCount: 0, // Unknown for Google Fonts
         },
         features: [],
@@ -304,8 +342,8 @@ export default function TypeSpecimenGenerator() {
 <body>
   <div class="section">
     <h1 class="specimen-font" style="font-size: 4rem; margin-bottom: 1rem;">${fontData.meta.familyName}</h1>
-    <p style="color: #737373; margin-bottom: 0.5rem;">Designer: ${fontData.meta.designer}</p>
-    <p style="color: #737373; margin-bottom: 0.5rem;">Version: ${fontData.meta.version}</p>
+    ${fontData.meta.designer ? `<p style="color: #737373; margin-bottom: 0.5rem;">Designer: ${fontData.meta.designer}</p>` : ""}
+    ${fontData.meta.version ? `<p style="color: #737373; margin-bottom: 0.5rem;">Version: ${fontData.meta.version}</p>` : ""}
     ${fontData.meta.glyphCount > 0 ? `<p style="color: #737373;">Glyphs: ${fontData.meta.glyphCount}</p>` : ""}
   </div>
 
@@ -478,14 +516,18 @@ export default function TypeSpecimenGenerator() {
                   {fontData.meta.familyName}
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Designer</p>
-                    <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.designer}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Version</p>
-                    <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.version}</p>
-                  </div>
+                  {fontData.meta.designer && (
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Designer</p>
+                      <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.designer}</p>
+                    </div>
+                  )}
+                  {fontData.meta.version && (
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Version</p>
+                      <p className={isDarkMode ? "text-neutral-300" : "text-neutral-700"}>{fontData.meta.version}</p>
+                    </div>
+                  )}
                   {fontData.meta.glyphCount > 0 && (
                     <div>
                       <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#B8963E] mb-1">Glyphs</p>

@@ -353,8 +353,8 @@ export default function RhetoricPage() {
         >
           Every typeface carries rhetorical weight. It persuades, positions,
           and speaks beyond the literal meaning of words. This tool maps
-          typefaces to rhetorical modes{"\u00A0\u2014"} drawn from 30{"\u00A0"}years
-          of practice in design for social{"\u00A0"}good.
+          typefaces to rhetorical modes{"\u00A0\u2014"} drawn from thirty years in
+          the trade, more than twenty of them in design for social{"\u00A0"}good.
         </p>
       </section>
 
@@ -687,11 +687,10 @@ export default function RhetoricPage() {
                 <>
                   <strong>{comparisonFonts[0].name}</strong> scores{" "}
                   {Math.abs(comparisonFonts[0].ethos - comparisonFonts[1].ethos) > 20
-                    ? "significantly higher"
-                    : "similarly"}
-                  {comparisonFonts[0].ethos > comparisonFonts[1].ethos
-                    ? " in credibility (ethos)"
-                    : ""}{" "}
+                    ? comparisonFonts[0].ethos > comparisonFonts[1].ethos
+                      ? "significantly higher in credibility (ethos)"
+                      : "significantly lower in credibility (ethos)"
+                    : "similarly"}{" "}
                   while <strong>{comparisonFonts[1].name}</strong>{" "}
                   {comparisonFonts[1].pathos > comparisonFonts[0].pathos
                     ? "creates more emotional impact (pathos)"
@@ -1024,8 +1023,9 @@ export default function RhetoricPage() {
           </p>
           <p style={{ maxWidth: "65ch" }}>
             Typography is never neutral. Every typeface choice is a rhetorical act
-            that shapes how a message lands. After 30{"\u00A0"}years of practice in social
-            marketing and design for public good, these mappings reflect real choices
+            that shapes how a message lands. After thirty years in the trade, more
+            than twenty of them in social marketing and design for public good,
+            these mappings reflect real choices
             made for campaigns on HIV/AIDS, tobacco, mental health, LGBTQ+ rights,
             and social{"\u00A0"}justice.
           </p>

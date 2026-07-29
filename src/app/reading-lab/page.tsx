@@ -154,17 +154,24 @@ export default function ReadingLab() {
       : ''
   }`;
 
-  // Build JS snippet showing which typeset rules apply at this measure
+  // Build JS snippet describing what the engine actually does at this
+  // measure. There is no rule tiering to report: every rule runs at every
+  // measure — what varies is the compositor PROFILE (fill targets, weak-end
+  // economics, spacing envelope), selected by measure.
   const m = settings.lineLength;
-  const activeRules: string[] = [];
-  if (m >= 35) activeRules.push('orphan prevention');
-  if (m >= 45) activeRules.push('sentence protection');
-  if (m >= 55) activeRules.push('short-word binding');
+  const profileNote =
+    m < 18
+      ? 'phone-narrow profile: gentlest spacing, firmest weak-end guard'
+      : m < 24
+        ? 'narrow profile: looser fill target, bounded weak-end trades'
+        : m < 48
+          ? 'reading profile: 85% fill center, full binding economics'
+          : 'wide profile: tighter fill, zero auxiliary line-enders';
 
   const generatedJS = `import { typeset } from 'typeset.us';
 
-// At ${settings.lineLength}ch measure, active rules:
-// ${activeRules.length > 0 ? activeRules.join(', ') : 'none (measure too narrow for binding rules)'}
+// At ${settings.lineLength}ch, the compositor selects its ${m < 18 ? '<18ch' : m < 24 ? '18-24ch' : m < 48 ? '24-48ch' : '48ch+'} profile —
+// ${profileNote}. Every rule runs at every measure.
 
 // One call runs the whole pipeline: quote education, beam-search
 // composition with contour re-ranking, per-line spacing, and the
@@ -247,7 +254,7 @@ document.querySelectorAll('.readable-text p').forEach(typeset);
                   className="w-full accent-[#B8963E]"
                 />
                 <p className="text-sm text-neutral-400 mt-2 font-source-sans">
-                  16px minimum for body text on screens (WCAG 2.1)
+                  16px is a widely recommended floor for body text on screens
                 </p>
               </div>
 

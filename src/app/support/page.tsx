@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-// Replace PLACEHOLDER URLs with actual Stripe Payment Links
+// Live Stripe Payment Links.
 const STRIPE_LINKS = {
   coffee_once: "https://buy.stripe.com/eVq9AU8TCecfeEXeMCfbq02",
   craft_once: "https://buy.stripe.com/3cI14o7Py3xB40jcEufbq03",

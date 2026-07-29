@@ -48,7 +48,8 @@ export default async function InstallPlatform({ params }: { params: Promise<{ pl
         like a book and re-measured against the live rendering — if the
         engine can&rsquo;t improve a paragraph, it restores the original
         rather than ship a mistake. Then prove it worked: paste your URL into{' '}
-        <Link href="/fix">the grader</Link> and watch the tally.
+        <Link href="/fix">the grader</Link> — it confirms the script is on the
+        page and re-sets your opening paragraph both ways.
       </p>
 
       <Link className="in-back" href="/install">

@@ -27,8 +27,9 @@ export default function InstallIndex() {
       <p className="in-fine">
         Prefer a pinned build with an integrity hash? Take the exact tag from{' '}
         <a href="/sri.json">sri.json</a>. Not sure it worked? Paste your URL
-        into <Link href="/fix">the grader</Link> after — it measures the live
-        page.
+        into <Link href="/fix">the grader</Link> after — it reads your page,
+        confirms the script is installed, and re-sets your opening paragraph
+        both ways.
       </p>
 
       <div className="in-grid">
@@ -54,15 +55,15 @@ export default function InstallIndex() {
         <p className="in-label">The mark</p>
         <h2>Set with typeset</h2>
         <p className="in-lede">
-          A small mark for the foot of a site that cares. It links to a live
-          re-grade of the exact page it sits on — a re-runnable claim, not a
-          sticker.
+          A small mark for the foot of a site that cares. Put your page&rsquo;s
+          own address in the link and it opens a live re-grade of the exact
+          page it sits on — a re-runnable claim, not a sticker.
         </p>
         <div className="in-badge" data-no-typeset>
           <img src="/badge.svg" alt="Set with typeset" width={132} height={28} />
         </div>
         <div className="in-snippet" data-no-typeset>
-          <code>{`<a href="https://typeset.us/fix"><img src="https://typeset.us/badge.svg" alt="Set with typeset" width="132" height="28"></a>`}</code>
+          <code>{`<a href="https://typeset.us/fix?url=https://YOUR-PAGE.example/post"><img src="https://typeset.us/badge.svg" alt="Set with typeset" width="132" height="28"></a>`}</code>
         </div>
       </section>
     </main>

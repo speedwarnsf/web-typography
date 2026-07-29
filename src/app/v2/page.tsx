@@ -15,7 +15,7 @@ const GOLD = '#B8963E';
 const HERO_TEXT = 'The web finally knows how to break lines.';
 
 const HERO_SUB =
-  'Forty years after print solved it, the browser catches up. Knuth’s mathematics, Tschichold’s tolerances, Bringhurst’s measures — running live on every paragraph of this page.';
+  'Forty-five years after print solved it, the browser catches up. Knuth’s mathematics, Tschichold’s tolerances, Bringhurst’s quarter-em — running live on every paragraph of this page.';
 
 // Chosen empirically FOR THE SITE'S BODY FACE (Source Sans 1.0625rem/1.7),
 // re-measured after the rag retune: at 262-298px the browser strands 2-4
@@ -25,7 +25,7 @@ const PROOF_TEXT =
   'Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 
 const MANIFESTO_TEXT =
-  'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing -- visible in a glance, impossible to fake.';
+  'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing -- visible at a glance, impossible to fake.';
 
 const CRAFT = [
   {
@@ -41,7 +41,7 @@ const CRAFT = [
   {
     n: '03',
     title: 'Tschichold spacing',
-    body: 'Word-space tolerances derived from the measured width of your font’s own lowercase i. No magic numbers anywhere in the system.',
+    body: 'Word-space tolerances measured from your font’s own natural space — Tschichold’s 80 to 133 percent, the envelope InDesign adopted — never assumed from a quarter-em.',
   },
   {
     n: '04',
@@ -256,7 +256,9 @@ function Hero({ reduced }: { reduced: boolean }) {
           </div>
         </div>
       </div>
-      <p className="v2-live-note">Every paragraph on this page is set live by the engine.</p>
+      {/* A UI caption, not a paragraph — a <p> here would falsify the very
+          sentence it carries (centered captions are skipped by design). */}
+      <div className="v2-live-note">Every paragraph on this page is set live by the engine.</div>
     </section>
   );
 }

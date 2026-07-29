@@ -1,6 +1,6 @@
 # AGENTS.md — typeset.us
 
-You have installed `typeset.us@3.4.2` (MIT). It is a paragraph compositor
+You have installed `typeset.us@3.5.0` (MIT). It is a paragraph compositor
 for the browser: a beam search over whole-paragraph break configurations
 (48–80 retained candidates) with syntactic protection for weak words, which
 re-measures every line it ships against the real content box and restores

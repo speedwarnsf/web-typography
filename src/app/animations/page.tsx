@@ -2927,7 +2927,7 @@ export default function AnimationsPage() {
           className="text-neutral-400 max-w-2xl leading-relaxed"
           style={{ fontFamily: "var(--font-source-sans)" }}
         >
-          17 typography animations -- from tasteful entrances to pure
+          18 typography animations -- from tasteful entrances to pure
           combinatorial chaos. Each one outputs copy-paste code.
         </p>
         <div className="mt-8 flex flex-wrap gap-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-600">

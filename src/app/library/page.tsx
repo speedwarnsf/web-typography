@@ -22,6 +22,7 @@ const GOOGLE_FONTS_URL =
   "https://fonts.googleapis.com/css2?" +
   [
     "family=Montserrat:wght@400;700",
+    "family=Courier+Prime:wght@400;700",
     "family=Lora:wght@400;700",
     "family=Plus+Jakarta+Sans:wght@400;700",
     "family=Inter:wght@400;700",
@@ -148,7 +149,7 @@ const pairingCategories: PairingCategory[] = [
     pairings: [
       p("Bebas Neue", "sans-serif", "Roboto Mono", "monospace", "Aggressive sans-serif synergizing with engineered monospace"),
       p("Space Grotesk", "sans-serif", "JetBrains Mono", "monospace", "Radical innovation for developer ecosystems"),
-      p("Oswald", "sans-serif", "Courier New", "monospace", "Hard-hitting verticality with vintage attitude"),
+      p("Oswald", "sans-serif", "Courier Prime", "monospace", "Hard-hitting verticality with vintage attitude"),
       p("League Spartan", "sans-serif", "Libre Baskerville", "serif", "Strong structured geometric heading with elegantly curved serifs"),
       p("Bebas Neue", "sans-serif", "Poppins", "sans-serif", "Dominant urgency evened out by smooth circular proportions"),
       p("Orbitron", "sans-serif", "Roboto", "sans-serif", "Mechanical space-age aesthetic softened by user-friendly letterforms"),
@@ -282,8 +283,9 @@ export default function Home() {
           Clean Text, Automatically
         </h2>
         <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mb-8 sm:mb-16 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
-          Five rules that turn raw text into clean, well-set copy. Each uses
-          non-breaking spaces to control line breaks without changing your&nbsp;content.
+          Five rules that turn raw text into clean, well-set copy. Four bind
+          words with non-breaking spaces; the fifth recomposes the paragraph
+          into frozen lines the browser can&rsquo;t re-wrap.
         </p>
 
         <div className="space-y-12">

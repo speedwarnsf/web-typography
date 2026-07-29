@@ -81,8 +81,12 @@ const PAGE_FN = ({ selector }) => {
         composedViolations.push({ type: 'weak-line-end', word: last, paragraph: excerpt });
       }
     });
+    // Word counting matches the compositor's lexical vocabulary: a
+    // standalone "&" is a word (the ampersand travels with its partner —
+    // "…Sophisticated / & Editorial" is correct setting, not an orphan);
+    // pure punctuation tokens are not.
     const lastWords = ((lines[lines.length - 1]?.textContent || '').trim().split(/\s+/) || [])
-      .filter((w) => /[A-Za-z0-9]/.test(w));
+      .filter((w) => /[A-Za-z0-9]/.test(w) || w === '&');
     if (lines.length > 1 && lastWords.length === 1) {
       composedViolations.push({ type: 'orphan', word: lastWords[0], paragraph: excerpt });
     }

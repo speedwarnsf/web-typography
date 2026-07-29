@@ -1,4 +1,4 @@
-/* typeset.us v3.4.1 — MIT © Dustin York. https://typeset.us */
+/* typeset.us v3.5.0 — MIT © Dustin York. https://typeset.us */
 
 // src/lib/typeset.ts
 var NBSP = "\xA0";
@@ -455,7 +455,12 @@ function profileForMeasure(measureCh2) {
     orphanPenalty: 1e9,
     flatShelfPenalty: 240,
     snapPenalty: 180,
-    maxWordSpacing: 0.018
+    maxWordSpacing: 0.018,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600
   };
   if (measureCh2 < 24) return {
     mainTarget: 0.82,
@@ -464,9 +469,14 @@ function profileForMeasure(measureCh2) {
     orphanPenalty: 1e9,
     flatShelfPenalty: 200,
     snapPenalty: 140,
-    maxWordSpacing: 0.025
+    maxWordSpacing: 0.025,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600
   };
-  return {
+  if (measureCh2 < 48) return {
     // 0.85 is the documented design center (RESEARCH.md: "cubic badness
     // centered on 85% fill — the sweet spot for ragged-right"). At 0.80 the
     // compositor set ~20% looser than the browser and cost 2-3 extra lines
@@ -477,7 +487,26 @@ function profileForMeasure(measureCh2) {
     orphanPenalty: 1e9,
     flatShelfPenalty: 160,
     snapPenalty: 100,
-    maxWordSpacing: 0.035
+    maxWordSpacing: 0.035,
+    tightCliff: 0.955,
+    tightSoft: 0.93,
+    candidateBar: 0.97,
+    looseShift: 0,
+    linkingEndPenalty: 1600
+  };
+  return {
+    mainTarget: 0.9,
+    lastTarget: 0.48,
+    weakEndPenalty: 7e3,
+    orphanPenalty: 1e9,
+    flatShelfPenalty: 160,
+    snapPenalty: 100,
+    maxWordSpacing: 0.035,
+    tightCliff: 0.97,
+    tightSoft: 0.95,
+    candidateBar: 0.985,
+    looseShift: 0.05,
+    linkingEndPenalty: 3600
   };
 }
 function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
@@ -487,7 +516,6 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
   const isHeading = opts.isHeading === true;
   const SENTENCE_END_BONUS = 1300;
   const DANGLING_START_PENALTY = 5200;
-  const LINKING_END_PENALTY = 1600;
   const contentTokens = tokens.filter((t) => t.kind !== "space");
   if (contentTokens.length < 2) return null;
   const normWord = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -593,21 +621,22 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     const target = isLast ? profile.lastTarget : profile.mainTarget;
     const deviation = fill - target;
     penalty += (deviation < 0 ? 3e3 : 1200) * deviation * deviation;
-    if (!isLast && fill < 0.5) {
+    const ls = profile.looseShift;
+    if (!isLast && fill < 0.5 + ls) {
       penalty += 8e3;
-    } else if (!isLast && fill < 0.6) {
+    } else if (!isLast && fill < 0.6 + ls) {
       penalty += 4e3;
-    } else if (!isLast && fill < 0.7) {
+    } else if (!isLast && fill < 0.7 + ls) {
       penalty += 2e3;
-    } else if (!isLast && fill < 0.75) {
+    } else if (!isLast && fill < 0.75 + ls) {
       penalty += 800;
     }
     if (isLast && fill < 0.3 && lexCount <= 2) {
       penalty += 4e3;
     }
-    if (!isLast && fill > 0.955) {
+    if (!isLast && fill > profile.tightCliff) {
       penalty += 4e3;
-    } else if (!isLast && fill > 0.93) {
+    } else if (!isLast && fill > profile.tightSoft) {
       penalty += 1200;
     }
     if (firstContent && (firstContent.kind === "closePunct" || firstContent.kind === "dash" || firstContent.stickyPrev)) {
@@ -622,7 +651,7 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     if (!isLast && lastLexical && LINKING_END_WORDS.has(
       lastLexical.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, "")
     )) {
-      penalty += LINKING_END_PENALTY;
+      penalty += profile.linkingEndPenalty;
     }
     if (!isLast && lastLexical && /^[A-Za-z]$/.test(lastLexical.text)) {
       penalty += profile.weakEndPenalty * 1.5;
@@ -690,7 +719,7 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
         const width = lineWidth(lineTokens);
         const fill = width / measurePx;
         const isLast = end === contentTokens.length;
-        if (fill > 0.97) continue;
+        if (fill > profile.candidateBar) continue;
         const linePenalty = scoreLine(lineTokens, fill, isLast, end);
         const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
         const transitionPenalty = scoreTransition(newLines, isLast);
@@ -743,10 +772,13 @@ function composeParagraph(tokens, measurePx, measureCh2, opts = {}) {
     wordSpacingEm: 0
   }));
 }
-function shapeExactLines(lines, measureCh2, measurePx, isHeading = false) {
+function spacingEnvelope(spaceEm, isHeading) {
+  const s = spaceEm && spaceEm > 0.05 && spaceEm < 1 ? spaceEm : 0.25;
+  return isHeading ? { maxExpand: 0.12 * s, maxContract: 0.08 * s } : { maxExpand: 0.33 * s, maxContract: 0.2 * s };
+}
+function shapeExactLines(lines, measureCh2, measurePx, isHeading = false, spaceEm) {
   const shapedLines = [];
-  const maxExpand = isHeading ? 0.03 : 0.0825;
-  const maxContract = isHeading ? 0.02 : 0.05;
+  const { maxExpand, maxContract } = spacingEnvelope(spaceEm, isHeading);
   const nonLastFills = lines.slice(0, -1).map((l) => l.fill).sort((a, b) => a - b);
   const mid = Math.floor(nonLastFills.length / 2);
   const median = nonLastFills.length === 0 ? 0.85 : nonLastFills.length % 2 === 0 ? (nonLastFills[mid - 1] + nonLastFills[mid]) / 2 : nonLastFills[mid];
@@ -784,10 +816,13 @@ function shapeExactLines(lines, measureCh2, measurePx, isHeading = false) {
   }
   return shapedLines;
 }
-function finalValidate(lines, measureCh2, isHeading = false) {
+function finalValidate(lines, measureCh2, isHeading = false, spaceEm) {
   var _a;
   if (!lines.length) return false;
   const profile = profileForMeasure(measureCh2);
+  const env = spacingEnvelope(spaceEm, isHeading);
+  const expandBound = env.maxExpand * 1.03;
+  const contractBound = env.maxContract * 1.1;
   const isContent = (t) => t.kind !== "space";
   const isLexical = (t) => t.kind === "word" || t.kind === "compound" || t.kind === "longSlug";
   for (let i = 0; i < lines.length; i++) {
@@ -812,7 +847,7 @@ function finalValidate(lines, measureCh2, isHeading = false) {
     if (lastContent && (lastContent.kind === "openPunct" || lastContent.stickyNext)) {
       return false;
     }
-    if (lines[i].wordSpacingEm > 0.085 || lines[i].wordSpacingEm < -0.055) {
+    if (lines[i].wordSpacingEm > expandBound || lines[i].wordSpacingEm < -contractBound) {
       return false;
     }
   }
@@ -1173,7 +1208,10 @@ function audit(selector = "p, li, blockquote, figcaption, h1, h2, h3, h4") {
       }
     });
     const last = lines[lines.length - 1];
-    const words = (last.textContent || "").trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+    const words = (last.textContent || "").trim().split(/\s+/).filter((w) => {
+      const kind = classifyWord(w).kind;
+      return kind === "word" || kind === "compound" || kind === "longSlug";
+    });
     if (lines.length > 1 && words.length === 1 && !/^H[1-6]$/.test(el.tagName)) {
       violations.push({
         element: el,
@@ -1219,6 +1257,8 @@ function composeElement(element, measure) {
   }
   const measurer = makeMeasurer(element);
   const tokens = tokenize(raw, measurer);
+  const fontSizePx = parseFloat(getComputedStyle(element).fontSize) || 16;
+  const spaceEm = measurer(" ") / fontSizePx;
   (_c = measurer.cleanup) == null ? void 0 : _c.call(measurer);
   const isHeading = /^H[1-6]$/.test(element.tagName) || !!element.closest("h1,h2,h3,h4,h5,h6");
   const composed = composeParagraph(tokens, measurePx, measure, { isHeading });
@@ -1226,8 +1266,8 @@ function composeElement(element, measure) {
     element.dataset.tsOutcome = "fallback:no-composition";
     return restorePlain(element, raw);
   }
-  const shaped = (_d = shapeExactLines(composed, measure, measurePx, isHeading)) != null ? _d : composed;
-  if (!finalValidate(shaped, measure, isHeading)) {
+  const shaped = (_d = shapeExactLines(composed, measure, measurePx, isHeading, spaceEm)) != null ? _d : composed;
+  if (!finalValidate(shaped, measure, isHeading, spaceEm)) {
     element.dataset.tsOutcome = "fallback:validate";
     return restorePlain(element, raw);
   }
@@ -1284,6 +1324,8 @@ function composeRichElement(element, measure) {
   }
   const rm = makeRunMeasurer(element, content.runs);
   const tokens = richTokenize(content, rm.measure);
+  const richFontSizePx = parseFloat(getComputedStyle(element).fontSize) || 16;
+  const richSpaceEm = rm.measure(" ", null) / richFontSizePx;
   rm.cleanup();
   if (!tokens.length) {
     element.dataset.tsOutcome = "skipped:short";
@@ -1296,8 +1338,8 @@ function composeRichElement(element, measure) {
     element.dataset.tsOutcome = "fallback:no-composition";
     return restoreRich();
   }
-  const shaped = (_a = shapeExactLines(composed, measure, measurePx, isHeading)) != null ? _a : composed;
-  if (!finalValidate(shaped, measure, isHeading)) {
+  const shaped = (_a = shapeExactLines(composed, measure, measurePx, isHeading, richSpaceEm)) != null ? _a : composed;
+  if (!finalValidate(shaped, measure, isHeading, richSpaceEm)) {
     element.dataset.tsOutcome = "fallback:validate";
     return restoreRich();
   }
@@ -1314,9 +1356,68 @@ function composeRichElement(element, measure) {
   element.dataset.tsRich = "1";
   return true;
 }
+var ENGLISH_MARKERS = /* @__PURE__ */ new Set([
+  "the",
+  "of",
+  "and",
+  "that",
+  "it",
+  "for",
+  "with",
+  "this",
+  "from",
+  "they",
+  "but",
+  "not",
+  "are",
+  "be",
+  "been",
+  "have",
+  "has",
+  "had",
+  "you",
+  "your",
+  "which",
+  "their",
+  "would",
+  "there",
+  "what",
+  "when",
+  "who",
+  "will",
+  "than"
+]);
+function isNonEnglish(element, raw) {
+  var _a, _b, _c;
+  const lang = (_c = (_b = (_a = element.closest("[lang]")) == null ? void 0 : _a.getAttribute("lang")) == null ? void 0 : _b.toLowerCase()) != null ? _c : "";
+  if (lang && !lang.startsWith("en")) return true;
+  let latin = 0;
+  let nonLatin = 0;
+  for (const ch of raw) {
+    if (!/\p{L}/u.test(ch)) continue;
+    if (/[A-ɏḀ-ỿ]/.test(ch)) latin++;
+    else nonLatin++;
+  }
+  const letters = latin + nonLatin;
+  if (letters >= 8 && nonLatin / letters > 0.3) return true;
+  const words = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 30) {
+    for (const w of words) {
+      if (ENGLISH_MARKERS.has(w.replace(/[^a-z]/g, ""))) return false;
+    }
+    return true;
+  }
+  return false;
+}
 function typeset(element) {
   var _a, _b, _c;
   if (!element) return;
+  const gateText = (element.textContent || "").trim();
+  if (gateText.length >= 10 && isNonEnglish(element, gateText)) {
+    element.dataset.tsOutcome = "skipped:non-english";
+    element.dataset.typesetDone = "1";
+    return;
+  }
   if (typeof document !== "undefined" && !document.getElementById("ts-list-styles")) {
     const style = document.createElement("style");
     style.id = "ts-list-styles";
