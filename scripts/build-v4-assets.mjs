@@ -30,7 +30,7 @@ await writeFile('public/for-agents.md',agent);
 await writeFile('public/v4/SKILL.md',await readFile('docs/v4/SKILL.md'));
 for (const file of ['README.md','MIGRATION.md','SUPPORT.md','LICENSE','THIRD-PARTY-LICENSES.txt','UNICODE-LICENSE.txt','for-agents.md']) await immutable(`public/releases/${version}/${file}`,await readFile('vendor/typeset-v4/'+file));
 const temp = await mkdtemp(join(tmpdir(),'typeset-v4-pack-'));
-const packed = JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',temp],{cwd:resolve('vendor/typeset-v4'),encoding:'utf8'}))[0];
+const packed = JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--cache',join(temp,'cache'),'--pack-destination',temp],{cwd:resolve('vendor/typeset-v4'),encoding:'utf8'}))[0];
 await immutable(`public/releases/${version}/${packed.filename}`,await readFile(join(temp,packed.filename)));
 const distribution = { schemaVersion:1, package:pkg.name, version, channel:'beta', artifactSHA256, npmLatestIsV4:false, packageURL:`${base}/${packed.filename}`, packageIntegrity:packed.integrity, browser:{loader:`${base}/go.js`,global:`${base}/typeset.global.js`,stylesheet:`${base}/styles.css`,loaderIntegrity:compiled.artifacts['go.js'].integrity}, artifacts:compiled.artifacts, installCommand:`npm install ${base}/${packed.filename}`, source:'https://github.com/speedwarnsf/web-typography/tree/codex/typeset-v4-launch/vendor/typeset-v4', legacy:'https://typeset.us/for-agents-v3.md' };
 const data=JSON.stringify(distribution,null,2)+'\n';
