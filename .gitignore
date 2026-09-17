@@ -49,3 +49,7 @@ output/playwright/
 output/previous-builds/
 output/release/
 packages/typeset-v4/declarations/
+output/*verification.json
+output/*-report.json
+output/spacing-finish.json
+output/promise-verification.json

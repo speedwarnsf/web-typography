@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import typeset, { typesetText, measureCh, measureLayout } from '@/lib/typeset-site';
+import typeset, { typesetText, measureCh, measureLayout, restore } from '@/lib/typeset-site';
 import CodeBlock from '@/components/CodeBlock';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park across the road. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a brass chain. Everything had its place and every place had a purpose. She believed good work came from good order, and two decades of practice had proven her right.";
@@ -89,7 +89,7 @@ const TOGGLE_OPTIONS: ToggleOption[] = [
   },
   {
     id: 'ragSmoothing',
-    label: 'Full composition (V2)',
+    label: 'Full composition (V4)',
     description: 'Beam-search line breaking with contour re-ranking and self-checked lines',
     jsRequired: true,
   },
@@ -165,15 +165,16 @@ export default function PerfectParagraph() {
       const spanWrap = (s: string) =>
         s.split(' ').map((w) => `<span data-w>${w}</span>`).join(' ');
 
+      restore(el);
       delete el.dataset.typesetDone;
 
       const needsTypesetting = toggles.orphan || toggles.shortWord || toggles.sentenceStart || toggles.sentenceEnd;
 
       if (toggles.ragSmoothing) {
-        // Full V2 compositor — composition, spacing, overflow self-check.
-        el.innerHTML = text;
+        // Compose the user's plain text without parsing it as markup.
+        el.textContent = text;
         el.dataset.tsRaw = text;
-        typeset(el);
+        typeset(el, { opticalHanging: toggles.hangingPunct });
       } else if (needsTypesetting) {
         // Bindings only — real measure so rules scale to the column. Words
         // are span-wrapped for measurement; NBSP-bound groups stay inside
@@ -238,14 +239,14 @@ export default function PerfectParagraph() {
     const hasRagSmoothing = toggles.ragSmoothing;
     const hasTypesetting = jsToggles.some(id => id !== 'ragSmoothing');
 
-    let code = `import typeset${hasTypesetting && !hasRagSmoothing ? ', { typesetText }' : ''} from '@/lib/typeset-site';\n\n`;
+    let code = `import { ${hasRagSmoothing ? 'typeset' : 'typesetText'} } from 'typeset.us';\n\n`;
     code += `const element = document.querySelector('.typeset-paragraph');\n`;
 
     if (hasRagSmoothing) {
-      code += `typeset(element); // full pipeline: composition + spacing + self-checks\n`;
+      code += `await document.fonts.ready;\ntypeset(element, { opticalHanging: ${toggles.hangingPunct} });\n`;
     } else if (hasTypesetting) {
       code += `const text = element.textContent;\n`;
-      code += `element.innerHTML = typesetText(text);\n`;
+      code += `element.textContent = typesetText(text);\n`;
     }
 
     return code;
@@ -349,7 +350,7 @@ export default function PerfectParagraph() {
                 only difference the eye sees is the setting itself. */}
             <p
               ref={defaultRef}
-              className="text-neutral-400 text-base sm:text-lg break-words"
+              className="text-neutral-400 text-base sm:text-lg"
               data-no-typeset
               data-no-smooth
               style={{
@@ -380,11 +381,10 @@ export default function PerfectParagraph() {
               ref={typesetRef}
               data-no-typeset
               data-no-smooth
-              className="text-neutral-200 text-base sm:text-lg break-words"
+              className="text-neutral-200 text-base sm:text-lg"
               style={{
                 lineHeight: toggles.lineHeight ? '1.6' : undefined,
                 maxWidth: toggles.measure ? 'min(51ch, 100%)' : undefined,
-                hangingPunctuation: toggles.hangingPunct ? 'first last' : undefined,
                 fontFeatureSettings: toggles.fontFeatures ? '"liga" 1, "onum" 1, "calt" 1' : undefined,
                 textWrap: toggles.textWrap ? 'pretty' : undefined,
               }}

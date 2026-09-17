@@ -29,6 +29,7 @@ for (const config of browsers) {
         }));
         report.samples.push({ browser: config.name, width, path, ...sample });
         check(`${config.name} ${width} ${path} no new composed overflow`, !sample.invalid.length && !sample.nested);
+        if (path === '/perfect-paragraph') check(`${config.name} ${width} paragraph demo composes`, sample.composed > 0);
         if (path === '/') {
           check(`${config.name} ${width} homepage composes`, sample.composed > 0 && sample.overflow <= 1);
           await page.getByRole('slider', { name: 'Squeeze the column width' }).focus();
