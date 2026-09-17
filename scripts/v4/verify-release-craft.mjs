@@ -60,7 +60,8 @@ for (const { name, engine, executablePath } of browsers) {
       api.restore(quote); quote.style.textAlign = 'center';
       check('centered text explicitly declines optical hanging', api.typeset(quote, options).features.hanging === 'native:hanging-layout');
       api.restore(quote); quote.style.textAlign = 'left'; quote.style.overflow = 'hidden'; quote.style.width = '1200px';
-      check('clipping explicitly declines optical hanging', api.typeset(quote, options).features.hanging === 'native:hanging-clipped');
+      const clipped = api.typeset(quote, options);
+      check('clipping explicitly declines optical hanging', clipped.features.hanging === 'native:hanging-clipped', clipped.features);
       api.restore(quote); quote.style.overflow = 'visible';
       for (const width of [160, 200, 240, 320]) {
         quote.style.width = width + 'px'; api.typeset(quote, { lineBreaks: 'unicode' }); const unstyled = api.measureLayout(quote).lines.map(l => l.text); api.restore(quote);
