@@ -14,6 +14,11 @@ const compiled = JSON.parse(manifestBytes);
 const immutable = async (path, bytes) => {
   let committed;
   try { committed = execFileSync('git',['show',`HEAD:${path}`],{stdio:['ignore','pipe','ignore']}); } catch {}
+  // Cloud uploads may omit .git; shipped pins must still be immutable.
+  if (!committed) {
+    try { committed = await readFile(path); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
   if (committed) assert.ok(committed.equals(Buffer.from(bytes)), `Refusing to alter published release file ${path}`);
   await writeFile(path,bytes);
 };
