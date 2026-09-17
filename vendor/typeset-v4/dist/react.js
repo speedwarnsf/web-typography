@@ -1,0 +1,219 @@
+"use client";
+import {
+  BREAK_ATTRIBUTE,
+  measureLayout,
+  mount,
+  opticalMarkerStyle,
+  planOpticalHanging,
+  planRichText,
+  preserveRichCopy,
+  restore,
+  richFingerprint,
+  selectionBookmark,
+  smartQuotes,
+  typeset
+} from "./shared-NF5IFKMT.js";
+
+// src/lib/typeset.release.react.tsx
+import { createElement as createElement3 } from "react";
+
+// src/lib/typeset-react.tsx
+import { createElement as createElement2, useLayoutEffect, useRef, useState } from "react";
+
+// src/lib/typeset-rich-react.tsx
+import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from "react";
+function quoteSource(children) {
+  let source = "";
+  Children.forEach(children, (child) => {
+    if (typeof child === "string" || typeof child === "number") source += String(child);
+    else if (isValidElement(child)) source += quoteSource(child.props.children);
+  });
+  return source;
+}
+function quoteTreeSupported(children) {
+  let supported = true;
+  Children.forEach(children, (child) => {
+    if (!isValidElement(child)) return;
+    if (child.props.lang && !/^en(?:-|$)/i.test(child.props.lang) || child.props["data-no-typeset"] !== void 0 || typeof child.type === "string" && !["a", "b", "strong", "em", "i", "span", "small", "u", "s", "del", "mark", "abbr", "cite"].includes(child.type) || !quoteTreeSupported(child.props.children)) supported = false;
+  });
+  return supported;
+}
+function renderChildren(children, breaks, hangs, educate) {
+  let offset = 0;
+  const educated = educate ? smartQuotes(quoteSource(children)) : null;
+  const optical = new Map(hangs.map((hang) => [hang.offset, hang.px]));
+  const visit = (nodes) => Children.map(nodes, (child) => {
+    if (typeof child === "string" || typeof child === "number") {
+      const raw = String(child);
+      const text = educated === null ? raw : educated.slice(offset, offset + raw.length);
+      const start = offset;
+      offset += text.length;
+      const stops = [.../* @__PURE__ */ new Set([...breaks, ...optical.keys()])].filter((at) => at >= start && at < offset).sort((a, b) => a - b);
+      let cursor = 0;
+      const pieces = [];
+      for (const stop of stops) {
+        const local = stop - start;
+        pieces.push(text.slice(cursor, local));
+        if (breaks.has(stop)) pieces.push(createElement("br", { key: "break-" + stop, [BREAK_ATTRIBUTE]: "", "aria-hidden": true }));
+        if (optical.has(stop)) pieces.push(createElement("span", { key: "hang-" + stop, [BREAK_ATTRIBUTE]: "", "data-ts-hang": String(stop), "aria-hidden": true, style: opticalMarkerStyle(optical.get(stop)) }));
+        cursor = local;
+      }
+      pieces.push(text.slice(cursor));
+      return pieces;
+    }
+    if (!isValidElement(child)) return child;
+    return cloneElement(child, void 0, visit(child.props.children));
+  });
+  return visit(children);
+}
+function supportedTree(children) {
+  let supported = true;
+  Children.forEach(children, (child) => {
+    if (!isValidElement(child)) return;
+    if (typeof child.type !== "string" && child.type !== Fragment) supported = false;
+    if (!supportedTree(child.props.children)) supported = false;
+  });
+  return supported;
+}
+var TypesetRichText = class extends Component {
+  constructor() {
+    super(...arguments);
+    this.state = { input: this.props.children, plan: null };
+    this.host = createRef();
+    this.frame = 0;
+    this.mounted = false;
+    this.observe = () => {
+      if (this.host.current) this.observer?.observe(this.host.current, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "lang"] });
+      for (let ancestor = this.host.current?.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        this.observer?.observe(ancestor, { attributes: true, attributeFilter: ["style", "class", "lang"] });
+      }
+    };
+    this.bindHost = () => {
+      this.releaseCopy?.();
+      this.resize?.disconnect();
+      const el = this.host.current;
+      if (!el) return;
+      this.releaseCopy = preserveRichCopy(el);
+      this.resize?.observe(el);
+      if (el.parentElement) this.resize?.observe(el.parentElement);
+    };
+    this.schedule = () => {
+      if (!this.mounted || this.frame) return;
+      this.frame = requestAnimationFrame(() => {
+        this.frame = 0;
+        this.recompose();
+      });
+    };
+    this.recompose = () => {
+      if (!this.mounted || !this.host.current) return;
+      this.observer?.disconnect();
+      const plan = planRichText(this.host.current, this.props);
+      if (!supportedTree(this.props.children)) {
+        plan.breaks = [];
+        plan.outcome = "native:react-component";
+      }
+      if (this.props.opticalHanging && (plan.outcome === "composed:rich" || plan.outcome === "native:fits")) {
+        const starts = [plan.before.lines[0]?.sourceStart || 0, ...plan.breaks];
+        const optical = planOpticalHanging(this.host.current, { ...plan.before, lines: starts.map((sourceStart) => ({ ...plan.before.lines[0], sourceStart })) });
+        plan.hangs = optical.hangs;
+        plan.hanging = optical.outcome;
+      }
+      if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
+      else this.observe();
+    };
+  }
+  static getDerivedStateFromProps(props, state) {
+    return props.children !== state.input ? { input: props.children, plan: null } : null;
+  }
+  componentDidMount() {
+    this.mounted = true;
+    const el = this.host.current;
+    this.observer = new MutationObserver(this.schedule);
+    this.resize = new ResizeObserver(this.schedule);
+    this.bindHost();
+    el.ownerDocument.fonts.addEventListener("loadingdone", this.schedule);
+    el.ownerDocument.defaultView?.addEventListener("resize", this.schedule);
+    el.ownerDocument.fonts.ready.then(this.schedule);
+    this.recompose();
+  }
+  getSnapshotBeforeUpdate() {
+    this.observer?.disconnect();
+    return this.host.current ? selectionBookmark(this.host.current) : null;
+  }
+  componentDidUpdate(previous, _state, restoreSelection) {
+    restoreSelection?.();
+    if (previous.as !== this.props.as) this.bindHost();
+    if (previous !== this.props) this.recompose();
+    else {
+      const el = this.host.current;
+      const plan = this.state.plan;
+      if (plan?.outcome === "composed:rich") {
+        const after = measureLayout(el);
+        const title = this.props.mode === "title" || this.props.mode === "heading" || !this.props.mode && /^H[1-6]$/.test(el.tagName);
+        if (el.textContent !== plan.source || after.overflow > Math.max(0.5, plan.before.overflow) || after.lines.length !== plan.widths.length || richFingerprint(el) !== plan.styleSignature || !title && !plan.before.lastSingleton && after.lastSingleton) {
+          this.setState({ plan: { ...plan, breaks: [], hangs: [], hanging: "native:hanging-verification", outcome: "native:verification" } });
+          return;
+        }
+      }
+      this.observe();
+    }
+  }
+  componentWillUnmount() {
+    this.mounted = false;
+    cancelAnimationFrame(this.frame);
+    this.observer?.disconnect();
+    this.resize?.disconnect();
+    this.host.current?.ownerDocument.fonts.removeEventListener("loadingdone", this.schedule);
+    this.host.current?.ownerDocument.defaultView?.removeEventListener("resize", this.schedule);
+    this.releaseCopy?.();
+  }
+  render() {
+    const { children, as = "p", mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, ...attributes } = this.props;
+    const plan = this.state.plan;
+    const educate = quotes === "en" && /^en(?:-|$)/i.test(this.props.lang || "") && quoteTreeSupported(children);
+    return createElement(as, {
+      ...attributes,
+      ref: this.host,
+      "data-typeset-react-rich": "",
+      "data-typeset-done": plan ? "1" : void 0,
+      "data-ts-outcome": plan?.outcome,
+      "data-ts-quotes": quotes ? educate ? "enabled" : "native:quotes-scope" : void 0,
+      "data-ts-hanging": _optical ? plan?.hanging || "native:hanging-uncomposed" : void 0
+    }, supportedTree(children) ? renderChildren(children, new Set(plan?.breaks || []), plan?.hangs || [], educate) : children);
+  }
+};
+
+// src/lib/typeset-react.tsx
+function TypesetText({ text, as = "p", mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging, ...attributes }) {
+  const ref = useRef(null);
+  const [initialText] = useState(text);
+  const options = useRef({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging };
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const controller = mount(element, "[data-typeset-react]", options.current);
+    return () => controller.disconnect();
+  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes2, opticalHanging]);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (element) typeset(element, options.current);
+    return () => {
+      if (element) restore(element);
+    };
+  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes2, opticalHanging]);
+  return createElement2(as, { ...attributes, ref, "data-typeset-react": "" }, initialText);
+}
+
+// src/lib/typeset.release.react.tsx
+function TypesetText2(props) {
+  return createElement3(TypesetText, { ...props, lineBreaks: props.lineBreaks ?? "unicode" });
+}
+function TypesetRichText2(props) {
+  return createElement3(TypesetRichText, { ...props, lineBreaks: props.lineBreaks ?? "unicode" });
+}
+export {
+  TypesetRichText2 as TypesetRichText,
+  TypesetText2 as TypesetText
+};
+//# sourceMappingURL=react.js.map

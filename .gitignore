@@ -44,3 +44,5 @@ test-rag-output/
 # Playwright artifacts
 test-results/
 playwright-report/
+.playwright-cli/
+output/playwright/

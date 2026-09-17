@@ -1,6 +1,7 @@
 ---
-name: typeset-audit
+name: typeset-legacy-v3
 description: >-
+  Legacy V3 only. For the V4 website beta, use docs/v4/SKILL.md instead.
   Audit and fix line-break quality in English long-form web prose: orphans,
   widows, weak line endings, and ragged right edges. Unlike typography advice,
   this is a machine-checkable gate — audit() returns [] or it names the exact
@@ -14,6 +15,11 @@ description: >-
 ---
 
 # typeset.us
+
+**This is the legacy V3 skill.** The new opt-in V4 release has a different
+ownership and audit contract: [V4 skill](docs/v4/SKILL.md) and
+[V4 integration instructions](https://typeset.us/for-agents.md).
+Do not apply the snippets below to a V4 integration.
 
 Paragraph compositor for the browser. Replaces greedy line breaking on
 English long-form prose with a beam search over whole-paragraph break

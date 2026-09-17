@@ -1,5 +1,25 @@
 # typeset.us
 
+## V4 website release
+
+The homepage now presents **Typeset.ts 4.0.0-beta.1**, with a live rich-text
+comparison, pinned downloads, and an agent-facing integration contract.
+[Installation and migration](https://typeset.us/v4) |
+[Agent instructions](https://typeset.us/for-agents.md).
+
+```bash
+npm install https://typeset.us/releases/4.0.0-beta.1/typeset.us-4.0.0-beta.1.tgz
+```
+
+V4 remains opt-in and is not npm latest. Its accepted compiled engine is kept in
+`vendor/typeset-v4`; `npm run build:v4` verifies and packages its pinned assets.
+`npm run build` includes that check. New pages use React adapters; legacy tools
+retain their V3 engine. See `docs/v4/LAUNCH.md` for scope and launch material.
+
+## Legacy V3
+
+The following installation and implementation notes describe V3, not V4.
+
 **Paragraph compositor for the browser.** Beam-search line breaking with
 syntactic protection, contour-shaped rag, hanging punctuation, and
 post-render self-verification — the engine behind [typeset.us](https://typeset.us),

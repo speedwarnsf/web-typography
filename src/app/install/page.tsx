@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 export default function InstallIndex() {
   return (
     <main className="in-root">
-      <p className="in-label">Install</p>
+      <p className="in-label">Legacy V3 installation</p>
+      <p className="in-fine"><strong>Looking for the new release?</strong>{' '}<Link href="/v4">Install V4 beta with the new scoped loader or React adapters.</Link> These platform guides and their script tags still install V3.</p>
       <h1>One line. Any site you own.</h1>
       <p className="in-lede">
         Typeset is a single script tag. Every platform below can carry it —

@@ -192,14 +192,13 @@ const substituteInto = async (path) => {
     .replace(/sha384-[A-Za-z0-9+/=]+/g, manifest.files[`go@${V}.js`]);
   if (out !== text) await writeFile(path, out);
 };
-for (const p of ['packages/typeset.us/AGENTS.md', 'SKILL.md', 'public/llms.txt', 'docs/for-agents-copy.md', 'docs/agents-canonical.md']) {
+for (const p of ['packages/typeset.us/AGENTS.md', 'SKILL.md', 'docs/for-agents-copy.md', 'docs/agents-canonical.md']) {
   await substituteInto(p);
 }
 
-// /for-agents.md — the canonical doc served raw from the site (agents fetch
-// markdown; llms.txt and SKILL.md point here).
+// Preserve the V3 contract separately. V4 owns the canonical /for-agents.md.
 try {
-  await copyFile('docs/for-agents-copy.md', 'public/for-agents.md');
+  await copyFile('docs/for-agents-copy.md', 'public/for-agents-v3.md');
 } catch { /* doc not present in partial builds */ }
 
 console.log(`\npackage artifacts built: packages/typeset.us v${V}`);

@@ -1,0 +1,28 @@
+{
+  "name": "typeset.us",
+  "version": "4.0.0-beta.1",
+  "private": true,
+  "description": "Measured composition for linked, styled, and changing web text. V4 beta distributed from typeset.us.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/typeset.release.d.ts",
+  "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"] } },
+  "exports": {
+    ".": { "types": "./dist/typeset.release.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./react": { "types": "./dist/typeset.release.react.d.ts", "import": "./dist/react.js" },
+    "./global": "./dist/typeset.global.js",
+    "./go": "./dist/go.js",
+    "./styles.css": "./dist/styles.css",
+    "./capabilities.json": "./capabilities.json",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "bin", "README.md", "MIGRATION.md", "SUPPORT.md", "for-agents.md", "capabilities.json", "LICENSE", "THIRD-PARTY-LICENSES.txt", "UNICODE-LICENSE.txt"],
+  "bin": { "typeset-audit": "./bin/audit.mjs" },
+  "sideEffects": ["./dist/styles.css", "./dist/typeset.global.js", "./dist/go.js"],
+  "engines": { "node": ">=22" },
+  "publishConfig": { "tag": "beta", "access": "public" },
+  "peerDependencies": { "react": "^19.2.3", "playwright": "^1.58.2" },
+  "peerDependenciesMeta": { "react": { "optional": true }, "playwright": { "optional": true } },
+  "license": "MIT"
+}

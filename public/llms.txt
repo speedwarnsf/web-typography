@@ -1,25 +1,31 @@
-# typeset.us
+# Typeset.ts V4
 
-> Paragraph compositor for the browser: beam-search line breaking with
-> syntactic protection and post-render self-verification, for English
-> long-form prose. The only typography intervention with a machine-checkable
-> definition of done: `Typeset.audit()` returns `[]`.
+> Free, MIT-licensed browser typography with markup-aware paragraph composition,
+> React-owned rendering, opt-in English smart quotes and optical hanging,
+> optional semantic list styling, and inspectable native-layout outcomes.
 
-Install is one script tag (`<script src="https://typeset.us/go.js" defer>`)
-or `npm install typeset.us` and `typeset(el)` after `document.fonts.ready`.
-Mark framework-re-rendered text with `data-no-typeset`. Verify with
-`Typeset.audit() === []` and `data-ts-outcome="composed"`. Measured cost:
-1.6 ms median per paragraph in desktop Chromium. The browser types. It
-doesn't read.
+Current website release: 4.0.0-beta.1. V4 is opt-in, not npm latest.
+Existing V3 go.js URLs and npm installations are unchanged.
+Start with the agent contract, then evaluate whether the supported scope fits.
+There is no guarantee of improvement for every page or automatic agent adoption.
 
-## Docs
+## Installation and verification
 
-- [For agents](https://typeset.us/for-agents): canonical install, scoping,
-  and verification instructions for AI coding agents
-- [Library](https://typeset.us/library): the engine's rules, constants, and
-  the measurements behind them
+- [Agent contract](https://typeset.us/for-agents.md): scope, installation, ownership, verification and rollback
+- [Release guide](https://typeset.us/v4): human-readable installation and migration
+- [Agent workflow](https://typeset.us/agents): instructions and copyable integration prompt
+- [Capabilities](https://typeset.us/v4/capabilities.json): supported features and retained-native cases
+- [Release manifest](https://typeset.us/v4/manifest.json): pinned files, integrity hashes and package URL
+- [Acceptance evidence](https://typeset.us/v4/acceptance.json): measured checks and explicit unverified areas
+- [Portable skill](https://typeset.us/v4/SKILL.md): optional agent integration guidance
+- [V3 contract](https://typeset.us/for-agents-v3.md): legacy documentation; do not mix V3 and V4 ownership
 
-## Package
+## Explore
 
-- [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
-  typeset.us@3.5.0, MIT — ESM, CJS, and global builds with types
+- [Live comparison](https://typeset.us/#proof): actual native and V4 layouts with adjustable measure
+- [Typography library](https://typeset.us/library): typography reference and legacy tools
+
+No engine telemetry, account, subscription, or API key required.
+Audit passing is not a promise of aesthetic perfection. Read native reasons and
+review items. Physical phones, spoken screen-reader interaction, representative
+hardware performance, and remote engine CI acceptance remain unverified.

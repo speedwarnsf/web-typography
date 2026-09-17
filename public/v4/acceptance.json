@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "version": "4.0.0-beta.1",
+  "artifactSHA256": "bb9724ba5951a4b9bc72508ec607a96f72184866b2559751cc1def7d03cef4f2",
+  "evidenceRecordedAt": "2026-09-17T04:27:17.187Z",
+  "status": "locally verified website beta",
+  "checks": 1342,
+  "comparisonCases": 12966,
+  "unicodeConformanceCases": 19338,
+  "browsers": ["Chromium 151.0.7922.34", "WebKit 26.5", "Firefox 151"],
+  "localBrowserAcceptance": {"checks": 78, "failed": 0, "errors": 0},
+  "macOSNativeClipboard": {"checks": 84, "failed": 0, "errors": 0, "platform": "macOS 15.6.1 browser editors"},
+  "cleanLocalWorkflow": {"pass": true, "node": "22.23.2", "ownDependencies": true, "emptyDependencyCache": true},
+  "consumer": {"next": "16.1.6", "react": "19.2.3", "packedPackageVerified": true},
+  "reproducibleCompiledArtifacts": true,
+  "performance": {"localBudgetPass": true, "configurations": 4, "samplesPerConfiguration": 30, "totalSamples": 120, "hardware": "Apple M2 Pro", "representativeDeviceEvidence": false},
+  "expectedNegative": "At 400% text size an unbreakable word exceeds the column; the audit fails honestly. Author-enabled overflow-wrap:anywhere restores native wrapping without overflow.",
+  "limitations": [
+    "No physical iOS/Android devices or mobile selection-handle testing",
+    "No verified VoiceOver/NVDA spoken interaction",
+    "Clipboard verified on macOS browser editors only, not Windows/mobile/Word/Pages",
+    "CPU throttling is not representative mobile hardware",
+    "Remote engine CI acceptance not run",
+    "Installed Safari WebDriver unavailable because remote automation is disabled; setting left unchanged"
+  ]
+}
