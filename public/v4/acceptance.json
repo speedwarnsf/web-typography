@@ -15,6 +15,15 @@
   "reproducibleCompiledArtifacts": true,
   "performance": {"localBudgetPass": true, "configurations": 4, "samplesPerConfiguration": 30, "totalSamples": 120, "hardware": "Apple M2 Pro", "representativeDeviceEvidence": false},
   "expectedNegative": "At 400% text size an unbreakable word exceeds the column; the audit fails honestly. Author-enabled overflow-wrap:anywhere restores native wrapping without overflow.",
+  "knownIntegrationLimitations": [
+    {
+      "browser": "WebKit 26.5",
+      "scope": "Website editorial rich-text demo in Georgia, 320-1920px viewports",
+      "option": "opticalHanging:true",
+      "outcome": "native:verification / native:hanging-verification",
+      "recommendation": "Leave hanging off for this composition. Standard rich-text composition works; opt-in hanging is declined honestly."
+    }
+  ],
   "limitations": [
     "No physical iOS/Android devices or mobile selection-handle testing",
     "No verified VoiceOver/NVDA spoken interaction",

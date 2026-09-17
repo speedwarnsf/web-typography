@@ -81,8 +81,10 @@ try {
             return r.left < -1 || r.right > innerWidth + 1;
           }).map(el => el.tagName + ':' + el.textContent.slice(0, 60)));
           check(!overflow.length, engine.name() + ' overflow ' + width + ' ' + path + ' ' + overflow);
+          check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No hidden page overflow');
           if (path === '/') {
             await page.waitForFunction(() => document.querySelector('#typeset-proof')?.dataset.tsOutcome);
+            check(await page.locator('#typeset-proof').getAttribute('data-ts-hanging') === null, 'Hanging is explicitly opt-in');
             check(await page.locator('#native-proof').textContent() === await page.locator('#typeset-proof').textContent(), 'Rich source preserved');
             check(await page.locator('#typeset-proof a').count() === 1 && await page.locator('#typeset-proof strong').count() === 1, 'Inline semantics preserved');
             check(await page.locator('.v4-hero-art').evaluate(img => img.complete && img.naturalWidth > 0), 'Hero bitmap loaded');
@@ -96,6 +98,13 @@ try {
       await page.setViewportSize({ width: 1440, height: 1000 });
       await page.goto(base);
       await settled(page);
+      await page.getByRole('checkbox', { name: 'Optical hanging' }).check();
+      await page.waitForFunction(() => Boolean(document.querySelector('#typeset-proof')?.dataset.tsHanging));
+      const opticalHangingOutcome = await page.locator('#typeset-proof').getAttribute('data-ts-hanging');
+      check(opticalHangingOutcome === (engine === webkit ? 'native:hanging-verification' : 'applied'), 'Known, explicit hanging outcome: ' + opticalHangingOutcome);
+      await page.locator('.v4-proof-result').getByText('Optical hanging: ' + (opticalHangingOutcome === 'applied' ? 'applied' : 'native layout retained'), { exact: true }).waitFor();
+      check(await page.locator('#native-proof').textContent() === await page.locator('#typeset-proof').textContent(), 'Craft preserves source even when retaining native');
+      await page.getByRole('checkbox', { name: 'Optical hanging' }).uncheck();
       await page.getByRole('combobox', { name: 'Passage' }).selectOption('custom');
       await page.getByRole('textbox', { name: 'Your passage' }).fill('Read the whole story. The thoughtful details make a familiar place feel different, without changing the things that made it matter.');
       await page.getByRole('slider', { name: 'Text measure' }).fill('260');
@@ -130,7 +139,7 @@ try {
       check(await page.evaluate(() => window.Typeset.auditJSON('[data-typeset]').pass), 'Installed loader audit');
       check(await page.locator('[data-typeset] a').count() === 1, 'Installed loader link preservation');
       check(!errors.length, engine.name() + ' page errors ' + errors.join('; '));
-      report.browsers.push({ engine: engine.name(), version: browser.version(), routes: 3, viewports: 5, errors });
+      report.browsers.push({ engine: engine.name(), version: browser.version(), routes: 3, viewports: 5, opticalHangingOutcome, errors });
     } finally { await browser.close(); }
   }
 } catch (error) {

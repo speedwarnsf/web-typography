@@ -53,7 +53,7 @@ HTML typography, not a fabricated product screenshot.
 
 ## Website acceptance
 
-The final local production build passed 391 checks in Chromium 151, WebKit
+The final local production build passed 457 checks in Chromium 151, WebKit
 26.5 and Firefox 151. The matrix covers all three new routes at widths 320,
 390, 768, 1440 and 1920; rich source preservation, controls, keyboard tabs,
 route ownership transitions, real cross-origin SRI loading, download hashes,
@@ -66,3 +66,15 @@ checks passed. Engine qualification remains the separate acceptance.json.
 
 Run: npm run build; npm run start -- --port 4205; npm run test:site.
 Screenshots and the detailed test report are generated in output/playwright.
+
+The demo follows the release's opt-in hanging default and displays craft
+outcomes separately. Its editorial sample applies hanging in Chromium and
+Firefox; WebKit retains native layout after hanging verification declines it.
+This integration limitation is published in acceptance.json and beside the
+demo. Standard rich composition works in all three engines. Root clipping
+inherited from the legacy site was removed only for the new routes.
+
+The existing remote V3 CI suite passed its 36 tests on this launch. This does
+not substitute for remote V4 engine qualification. A no-Git cloud-build
+simulation also verified immutable pins and rejected a deliberately corrupted
+copy of a pinned artifact.

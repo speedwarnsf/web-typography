@@ -1,4 +1,6 @@
 body:has(.v4-site){touch-action:pan-y pinch-zoom}
+html:has(.v4-site),body:has(.v4-site){overflow-x:visible}
+.v4-proof-note{max-width:850px;margin-top:18px!important;color:#56604f;font-size:14px;line-height:1.5}
 .v4-site{--v4-green:#a6ff3d;--v4-ink:#171917;--v4-line:#d8dcd6;background:#fff;color:var(--v4-ink);font-family:var(--font-source-sans),Arial,sans-serif;font-size:18px;line-height:1.5;touch-action:pan-y pinch-zoom}
 .v4-site *{letter-spacing:0;border-radius:0}
 .v4-site main{background:#fff!important;overflow:visible;user-select:text;-webkit-user-select:text}

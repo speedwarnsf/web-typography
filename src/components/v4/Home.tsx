@@ -37,7 +37,7 @@ export default function Home() {
       </div>
     </section>
     <div className="v4-release-strip"><span>Now with markup-aware composition</span><span>DOM + React</span><span>Measured. Reversible. Yours.</span></div>
-    <section id="proof" className="v4-section v4-proof"><div className="v4-section-heading"><p className="v4-eyebrow">01 / The difference is in the lines</p><h2>Same words.<br />A more considered setting.</h2><p>Not a screenshot. Both versions are rendered by your browser, with the same text, font, and available width.</p></div><LiveProof /></section>
+    <section id="proof" className="v4-section v4-proof"><div className="v4-section-heading"><p className="v4-eyebrow">01 / The difference is in the lines</p><h2>Same words.<br />A more considered setting.</h2><p>Not a screenshot. Both versions are rendered by your browser, with the same text, font, and available width.</p></div><LiveProof /><p className="v4-proof-note">Optical hanging is opt-in. WebKit retains native layout when hanging this rich-text sample fails verification; standard composition is unaffected.</p></section>
     <section id="new" className="v4-section v4-craft"><div className="v4-section-heading"><p className="v4-eyebrow">02 / New in V4</p><h2>More of the web.<br />More of the craft.</h2><p>Editorial stories. Product descriptions. Documentation. The words that carry your site deserve the same care as everything around them.</p></div>
       <div className="v4-feature-grid">{features.map(({icon: Icon,title,text},i)=><article key={title}><div className="v4-feature-index"><Icon size={23} strokeWidth={1.5} aria-hidden="true" /><span>0{i+1}</span></div><h3>{title}</h3><p>{text}</p></article>)}</div>
     </section>

@@ -11,8 +11,8 @@ export default function LiveProof() {
   const [sample, setSample] = useState<'editorial' | 'product' | 'custom'>('editorial');
   const [custom, setCustom] = useState(passages.editorial);
   const [width, setWidth] = useState(350);
-  const [hanging, setHanging] = useState(true);
-  const [details, setDetails] = useState({ nativeLines: 0, typesetLines: 0, outcome: 'Measuring' });
+  const [hanging, setHanging] = useState(false);
+  const [details, setDetails] = useState({ nativeLines: 0, typesetLines: 0, outcome: 'Measuring', craft: 'off' });
   const root = useRef<HTMLDivElement>(null);
   const text = sample === 'custom' ? custom : passages[sample];
   const children = sample === 'editorial'
@@ -29,13 +29,14 @@ export default function LiveProof() {
         const before = node.querySelector<HTMLElement>('#native-proof'), after = node.querySelector<HTMLElement>('#typeset-proof');
         if (!before || !after) return;
         const outcome = after.dataset.tsOutcome;
-        const next = { nativeLines: measureLayout(before).lines.length, typesetLines: measureLayout(after).lines.length, outcome: outcome?.startsWith('composed') ? 'Composed with V4' : outcome?.startsWith('native:') ? 'Native layout retained' : 'Measuring' };
+        const craft = !hanging ? 'off' : after.dataset.tsHanging === 'applied' ? 'applied' : after.dataset.tsHanging?.startsWith('native:') ? 'native layout retained' : 'measuring';
+        const next = { nativeLines: measureLayout(before).lines.length, typesetLines: measureLayout(after).lines.length, outcome: outcome?.startsWith('composed') ? 'Composed with V4' : outcome?.startsWith('native:') ? 'Native layout retained' : 'Measuring', craft };
         setDetails(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
       });
     };
     const mutation = new MutationObserver(update);
     const specimen = node.querySelector('#typeset-proof');
-    if (specimen) mutation.observe(specimen, { attributes: true, attributeFilter: ['data-ts-outcome', 'data-typeset-done'] });
+    if (specimen) mutation.observe(specimen, { attributes: true, attributeFilter: ['data-ts-outcome', 'data-typeset-done', 'data-ts-hanging'] });
     const resize = new ResizeObserver(update); resize.observe(node);
     document.fonts.ready.then(update); update();
     return () => { stopped = true; mutation.disconnect(); resize.disconnect(); cancelAnimationFrame(frame); };
@@ -46,6 +47,6 @@ export default function LiveProof() {
     <div className="v4-proof-columns" style={{ '--proof-measure': `${width}px` } as CSSProperties}>
       <div><div className="v4-proof-label"><span>Native browser</span><span>{details.nativeLines || '-'} lines</span></div><div className="v4-specimen"><p id="native-proof">{children}</p></div></div>
       <div><div className="v4-proof-label"><span>Typeset.ts V4</span><span>{details.typesetLines || '-'} lines</span></div><div className="v4-specimen"><TypesetRichText id="typeset-proof" lang="en" opticalHanging={hanging}>{children}</TypesetRichText></div></div>
-    </div><div className="v4-proof-result"><output aria-live="polite">{details.outcome}</output><span>Live rendering / source text preserved</span></div>
+    </div><div className="v4-proof-result"><output aria-live="polite">{details.outcome}</output><span>Optical hanging: {details.craft}</span><span>Source text preserved</span></div>
   </div>;
 }
