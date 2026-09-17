@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import typeset, { typesetText, measureCh } from '@/lib/typeset';
+import typeset, { typesetText, measureCh, measureLayout } from '@/lib/typeset-site';
 import CodeBlock from '@/components/CodeBlock';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park across the road. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a brass chain. Everything had its place and every place had a purpose. She believed good work came from good order, and two decades of practice had proven her right.";
@@ -34,8 +34,10 @@ type PanelTally = { lines: number; weak: number; orphan: boolean };
  *  engine's own frozen lines when composition is on. */
 function measurePanel(p: HTMLElement): PanelTally {
   const frozen = Array.from(p.querySelectorAll<HTMLElement>(':scope > .ts-line'));
-  const rows: string[] = [];
-  if (frozen.length) {
+  const rows: string[] = p.dataset.tsOutcome ? measureLayout(p).lines.map(line => line.text) : [];
+  if (rows.length) {
+    // V4 line markers are already measured without modifying the source.
+  } else if (frozen.length) {
     for (const line of frozen) rows.push((line.textContent || '').trim());
   } else {
     const spans = Array.from(p.querySelectorAll<HTMLElement>('span[data-w]'));
@@ -236,7 +238,7 @@ export default function PerfectParagraph() {
     const hasRagSmoothing = toggles.ragSmoothing;
     const hasTypesetting = jsToggles.some(id => id !== 'ragSmoothing');
 
-    let code = `import typeset${hasTypesetting && !hasRagSmoothing ? ', { typesetText }' : ''} from '@/lib/typeset';\n\n`;
+    let code = `import typeset${hasTypesetting && !hasRagSmoothing ? ', { typesetText }' : ''} from '@/lib/typeset-site';\n\n`;
     code += `const element = document.querySelector('.typeset-paragraph');\n`;
 
     if (hasRagSmoothing) {

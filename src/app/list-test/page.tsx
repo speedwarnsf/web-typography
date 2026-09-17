@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import typeset from "@/lib/typeset";
+import typeset from "@/lib/typeset-site";
 
 export default function ListTest() {
   const leftColRef = useRef<HTMLDivElement>(null);

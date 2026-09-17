@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import CodeBlock from "@/components/CodeBlock";
-import { typesetText, typeset } from "@/lib/typeset";
+import { typesetText, typeset } from "@/lib/typeset-site";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",

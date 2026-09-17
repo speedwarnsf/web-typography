@@ -1,0 +1,6 @@
+{
+  "name": "typeset-unicode-vendor",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@cto.af/linebreak": "4.0.3" }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import typeset from '@/lib/typeset';
+import typeset, { measureLayout } from '@/lib/typeset-site';
 
 /**
  * The Proof — live before/after on real text.
@@ -87,6 +87,10 @@ function wrapWords(p: HTMLElement): void {
 function measureLines(p: HTMLElement): LineInfo[] {
   const cs = getComputedStyle(p);
   const contentLeft = p.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
+
+  if (p.dataset.tsOutcome) {
+    return measureLayout(p).lines.map(line => ({ text: line.text, right: line.right - contentLeft }));
+  }
 
   const frozen = Array.from(p.querySelectorAll<HTMLElement>('.ts-line'));
   if (frozen.length) {
@@ -180,7 +184,7 @@ export default function ProofPage() {
       // Everything below reads layout, which forces a synchronous reflow —
       // no need to wait for a paint (and rAF never fires in hidden tabs).
       typeset(afterEl);
-      const composed = !!afterEl.querySelector('.ts-line');
+      const composed = afterEl.dataset.tsOutcome?.startsWith('composed') ?? false;
       setBefore(computeMetrics(measureLines(beforeEl), width, false));
       setAfter(computeMetrics(measureLines(afterEl), width, composed));
     };

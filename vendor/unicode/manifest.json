@@ -1,0 +1,9 @@
+{
+  "unicode": "17.0.0",
+  "library": "@cto.af/linebreak@4.0.3",
+  "hashes": {
+    "vendor/unicode/package-lock.json": "3dd97f482106f43d8c4236100d7691aeb8d2ab2887ed74e96c5a612974d5ad60",
+    "vendor/unicode/LineBreakTest.txt": "e69884e0dde6a8724873f885d68c52dc14518abf9ae4ca9e2283b8773db3b752",
+    "src/vendor/unicode-linebreak.js": "1eba23abb05de34100c9270b82b2a703ce6fc11a0f52d8800be3a684c1303b52"
+  }
+}

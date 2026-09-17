@@ -46,3 +46,6 @@ test-results/
 playwright-report/
 .playwright-cli/
 output/playwright/
+output/previous-builds/
+output/release/
+packages/typeset-v4/declarations/

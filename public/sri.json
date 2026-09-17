@@ -1,12 +1,13 @@
 {
-  "version": "3.5.0",
+  "version": "4.0.0",
   "files": {
-    "go@3.5.0.js": "sha384-RZw93n+DsSryf1jIeTMdbA4sD4b5AQ9ritormzuuoSxTmYNk7gF5vFjHJ9lE7e/l",
-    "typeset.min.js": "sha384-ZRjboek8ZjaorxGjHdWxwn7DVNdAjkh+LzNmEAj9Myuo68dwqW2x/K/C/PZLtSd8",
-    "typeset.esm.js": "sha384-Z2lZGf/vcxVUJZugfejRtzEnyDIfuNVwKGiDeXww66P4qDSwFTQoTpnvxFtkJlQ9",
     "go@3.3.2.js": "sha384-iD519/Mn5x4DgOt4ym7opBt1/IHQQKBHBHGO2baemcdSIt6DwxdGpwVAOc2JSAzs",
     "go@3.4.0.js": "sha384-ei31N3Pq+o6z/oXRjrw2EOfJFAUYlLkYGrmbTURXC10nPTbhl98Kz1lgi1RlF0o1",
-    "go@3.4.1.js": "sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f"
+    "go@3.4.1.js": "sha384-HBBfIX9fXvyySA68ApayzI0BnS4cD09Bm9JyHcC4yfDStrcXMI/yMSU9RssE0m/f",
+    "go@3.5.0.js": "sha384-RZw93n+DsSryf1jIeTMdbA4sD4b5AQ9ritormzuuoSxTmYNk7gF5vFjHJ9lE7e/l",
+    "go@4.0.0.js": "sha384-r47jRTYNK8hnzYb67ZvMbR0l3Wkt/lC80qDvMhfWkZ6rQbZn4IpUvLO0aG4YbMX3",
+    "typeset.min.js": "sha384-O8Tp6qA7FhKr9axPJ7jIMF7Dt5bA1XRrFXP75zx2tl38Et9WUvqmeTfGk/Hn7gze",
+    "typeset.esm.js": "sha384-5JCxs8oRFAn4gwX3eWy2qLikNvZCruY/AYfjq7DjhTZo8N00niG7MgF4kFp+cTaD"
   },
-  "snippet": "<script src=\"https://typeset.us/go@3.5.0.js\" integrity=\"sha384-RZw93n+DsSryf1jIeTMdbA4sD4b5AQ9ritormzuuoSxTmYNk7gF5vFjHJ9lE7e/l\" crossorigin=\"anonymous\" defer></script>"
+  "snippet": "<script src=\"https://typeset.us/go@4.0.0.js\" integrity=\"sha384-r47jRTYNK8hnzYb67ZvMbR0l3Wkt/lC80qDvMhfWkZ6rQbZn4IpUvLO0aG4YbMX3\" crossorigin=\"anonymous\" defer></script>"
 }

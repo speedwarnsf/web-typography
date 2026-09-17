@@ -5,7 +5,7 @@ import EssayModal from "./EssayModal";
 
 const typesetFullCode = (() => {
   try {
-    return readFileSync(path.join(process.cwd(), "src/lib/typeset.ts"), "utf-8");
+    return readFileSync(path.join(process.cwd(), "src/lib/v4/typeset.next.ts"), "utf-8");
   } catch {
     return "// typeset.ts — see source repository";
   }
@@ -67,9 +67,11 @@ export default function UtilityPage() {
           <CodeBlock
             code={`<script src="https://typeset.us/typeset.min.js"></script>
 <script>
-  Typeset.compose('article p, article li');  // full compositor
-  Typeset.run(document.querySelector('#intro'));  // one element
-  const clean = Typeset.text('No orphans in this string.');  // strings
+  const controller = Typeset.mount(document, '.headline, article p, article li', {
+    smartQuotes: 'en', opticalHanging: true
+  });
+  controller.ready.then(() => console.log(Typeset.auditJSON('article p')));
+  // On teardown: controller.disconnect();
 </script>`}
             title="typeset.min.js — window.Typeset"
           />
@@ -80,8 +82,11 @@ export default function UtilityPage() {
             03 — The source
           </p>
           <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
-            TypeScript, dependency-free. Both scripts above are generated from
-            this file — what you read here is exactly what runs.
+            TypeScript, dependency-free at runtime. This is the V4 engine entry;
+            its supporting modules and React adapter ship in the npm package.
+            <a href="/releases/4.0.0/README.md"> Installation</a>,{" "}
+            <a href="/releases/4.0.0/MIGRATION.md">migration</a>, and{" "}
+            <a href="/releases/3.5.1/README.md">V3 archive</a>.
           </p>
           <CodeBlock code={typesetFullCode} title="typeset.ts" />
         </section>

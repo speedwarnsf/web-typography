@@ -15,6 +15,11 @@ description: >-
 
 # typeset.us
 
+> Historical V3 integration guidance below. For the current 4.0.0 release,
+> use https://typeset.us/for-agents.md and its linked support/migration contract.
+> The old audit-array, clipboard, API and performance statements below are
+> not the V4 contract. Do not apply this archived procedure to V4.
+
 Paragraph compositor for the browser. Replaces greedy line breaking on
 English long-form prose with a beam search over whole-paragraph break
 configurations, re-measures every line it ships against the real content

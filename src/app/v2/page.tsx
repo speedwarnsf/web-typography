@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import typeset from '@/lib/typeset';
+import typeset, { measureLayout } from '@/lib/typeset-site';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -124,8 +124,15 @@ function panelStats(p: HTMLElement, width: number): PanelStats {
   const left = p.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
   let lines: { text: string; right: number }[] = [];
 
+  // Read V4's existing text nodes; measurement must not erase its break markers.
+  if (p.dataset.tsOutcome) {
+    lines = measureLayout(p).lines.map(line => ({ text: line.text, right: line.right - left }));
+  }
+
   const frozen = Array.from(p.querySelectorAll<HTMLElement>('.ts-line'));
-  if (frozen.length) {
+  if (lines.length) {
+    // Already measured without changing the composition.
+  } else if (frozen.length) {
     lines = frozen.map((span) => {
       const r = document.createRange();
       r.selectNodeContents(span);
@@ -680,7 +687,7 @@ function Closing() {
       <p className="v2-body v2-narrow">
         The same engine that set this page: beam-search composition, hanging
         punctuation, smart quotes, self-checks that fall back to the browser
-        rather than ever make your text worse. 10&nbsp;KB over the wire,
+        rather than ever make your text worse. 38&nbsp;KB gzipped,
         no&nbsp;dependencies, generated from the source you can read.
       </p>
       <nav className="v2-links">

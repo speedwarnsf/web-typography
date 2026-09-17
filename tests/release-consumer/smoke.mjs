@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import * as esm from 'typeset.us';
+import { runInNewContext } from 'node:vm';
+const require = createRequire(import.meta.url);
+const cjs = require('typeset.us');
+assert.deepEqual(Object.keys(esm).sort(), Object.keys(cjs).sort());
+for (const name of ['mount', 'restore', 'typeset', 'auditJSON', 'smartQuotes', 'styleProseLists', 'composeParagraph', 'finalValidate', 'linesOverflow', 'linesStarved', 'renderFrozenLines', 'shapeExactLines', 'tokenize']) assert.equal(typeof esm[name], 'function', name);
+const context = { window: {}, TextDecoder, atob };
+runInNewContext(readFileSync(require.resolve('typeset.us/global'), 'utf8'), context);
+assert.equal(context.window.Typeset.VERSION, esm.VERSION);
+const caps = require('typeset.us/capabilities.json');
+assert.equal(caps.version, esm.VERSION);
+console.log(JSON.stringify({ version: esm.VERSION, formats: ['ESM', 'CommonJS', 'global initialization'], exports: Object.keys(esm).length }));

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import typeset from "@/lib/typeset";
+import typeset from "@/lib/typeset-site";
 import { useRef } from "react";
 
 export default function EssayModal() {

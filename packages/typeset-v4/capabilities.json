@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "package": "typeset.us",
+  "version": "4.0.0",
+  "status": "public-release",
+  "defaults": { "lineBreaks": "unicode", "density": "compact", "spacing": true, "contour": "finished", "smartQuotes": false, "opticalHanging": false, "listStyling": "explicit" },
+  "contour": { "basis": "predicted finished widths using the rendering space policy", "beamCompletedPool": 200, "shortParagraphs": "budgeted exhaustive search", "evidence": "result.search", "comparison": "contour: natural" },
+  "spacing": { "scope": "composed, left-aligned body text", "level": "full V3 neighbor/median finish", "deltaBounds": "-20 percent to +33 percent of each measured natural space; authored spacing retained", "preserves": ["chosen breaks", "final line", "author elements", "source text"], "fallback": "retain unspaced composition and report native:spacing-verification" },
+  "languages": ["en", "fr", "de", "es"],
+  "untaggedLanguage": "neutral Latin-script preferences; no language inference",
+  "react": { "testedVersion": "19.2.3", "entry": "typeset.us/react", "customComponentChildren": "native:react-component" },
+  "node": ">=22",
+  "browserRequirements": ["Intl.Segmenter", "ResizeObserver", "MutationObserver", "FontFaceSet", "CSS text-wrap"],
+  "unsupported": ["automatic hyphenation", "soft hyphens", "mixed languages in one block", "RTL and vertical text", "editable text", "inline widgets", "boxed inline descendants", "transformed layouts"],
+  "quotes": { "mode": "explicit English", "lengthPreserving": true, "dashesAndEllipses": "not changed", "richReactRequires": "lang=en on the adapter" },
+  "opticalHanging": { "mode": "explicit", "scope": "full measured leading punctuation and raster-measured optical capitals on composed lines or fitting single lines", "capitalMaxEm": 0.08, "unsupported": ["centered or justified text", "clipped ancestors", "transformed ancestors", "author text indentation", "capital ink measurement with custom feature/variation settings unsupported by canvas"] },
+  "lists": { "entry": "styleProseLists", "stylesheet": "typeset.us/styles.css", "scope": "explicit unordered prose lists", "marker": "native ::marker", "excluded": ["navigation", "ordered lists", "custom markerless lists", "flex and grid lists"] },
+  "verification": { "cli": "typeset-audit", "api": "auditJSON", "schemaVersion": 1, "passMeans": "nonempty scope, no hard errors, no unprocessed targets", "doesNotMean": "aesthetic perfection, all targets composed, or source preservation without a before capture" },
+  "telemetry": "none",
+  "websiteLoader": { "selector": "automatic prose and headings; data-typeset-selector overrides", "smartQuotes": "en", "opticalHanging": true, "npmGoSelector": "[data-typeset]" },
+  "outstandingAcceptance": ["physical iOS and Android", "spoken VoiceOver and NVDA", "non-macOS and native-application rich clipboard", "representative-device performance"],
+  "releaseApproval": "owner-approved with documented testing limits"
+}

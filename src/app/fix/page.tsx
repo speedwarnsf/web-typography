@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import typeset from '@/lib/typeset';
+import typeset, { measureLayout } from '@/lib/typeset-site';
 import { PLATFORMS, SNIPPET, detectPlatform, type Platform } from '@/lib/platforms';
 
 const WEAK = new Set([
@@ -94,15 +94,15 @@ function measureBrowserPanel(p: HTMLElement): PanelTally {
 }
 
 function measureTypesetPanel(p: HTMLElement): PanelTally {
-  const lines = Array.from(p.querySelectorAll<HTMLElement>(':scope > .ts-line'));
+  const lines = measureLayout(p).lines;
   if (!lines.length) return { hanging: 0, orphan: false, lines: 0 };
   let hanging = 0;
   lines.forEach((line, i) => {
     if (i === lines.length - 1) return;
-    const word = (line.textContent || '').trim().split(/\s+/).pop()?.replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase() || '';
+    const word = line.text.trim().split(/\s+/).pop()?.replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase() || '';
     if (WEAK.has(word)) hanging++;
   });
-  const lastWords = (lines[lines.length - 1].textContent || '').trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+  const lastWords = lines[lines.length - 1].text.trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
   return { hanging, orphan: lines.length > 1 && lastWords.length === 1, lines: lines.length };
 }
 

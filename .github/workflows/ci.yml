@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, codex/release-4.0.0]
   pull_request:
 
 jobs:
@@ -31,8 +31,11 @@ jobs:
             echo "Quarantined legacy code leaked into a distributable"; exit 1
           fi
 
-      - name: Install Playwright browsers (Chromium + WebKit)
-        run: npx playwright install --with-deps chromium webkit
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit firefox
 
-      - name: Engine invariants — audit, composition, quarantine (both engines)
-        run: npx playwright test
+      - name: V4 craft, spacing, promise and accessibility invariants
+        run: npm run test:v4
+
+      - name: Production website build
+        run: npm run build

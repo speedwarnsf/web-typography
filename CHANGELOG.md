@@ -10,6 +10,33 @@ Hashes for every published version live in
 
 ---
 
+## 4.0.0 — 2026-09-17
+
+The next public major release after 3.5.1. Internal candidate labels are not
+part of the stable public sequence.
+
+- Markup-preserving composition for ordinary links, emphasis and styled runs.
+- Unicode break opportunities for declared English, French, German and Spanish.
+- Finished-contour ranking over a bounded pool of up to 200 complete candidates.
+- Full bounded word-spacing finish using measured natural spaces, with rollback.
+- Full-width opening punctuation and font-specific ink-measured optical capitals.
+- React text/rich-text adapters, source-preserving selection/copying, lifecycle restoration.
+- ESM, CommonJS, browser global, typed React entry, CSS and local JSON audit CLI.
+- Inspectable native fallback, coverage and feature outcomes instead of an empty-audit success claim.
+
+The existing website loader keeps its automatic prose/headings scope, with
+selector overrides and opt-outs. The npm /go entry remains explicitly scoped
+to data-typeset. Module craft options are explicit. Read MIGRATION.md before
+upgrading imperative/global integrations.
+
+All previous pins are byte-for-byte unchanged. The complete previous stable
+package, browser assets and source are archived under /releases/3.5.1/.
+The original site's layout and four craft promises are retained.
+
+Released with owner approval within SUPPORT.md's declared range; physical
+mobile devices, spoken screen readers, other native clipboard applications
+and representative-device performance remain independent acceptance work.
+
 ## 3.5.1 — 2026-07-28
 
 Documentation only; no engine changes — `go@3.5.0.js` remains the current

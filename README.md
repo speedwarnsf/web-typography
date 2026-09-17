@@ -23,24 +23,26 @@ pins are permanent: bytes never change, files are never removed.
 Or from npm — ESM, CJS, and global builds with types:
 
 ```bash
-npm install typeset.us
+npm install typeset.us@4.0.0
 ```
 
 ## Verification, not vibes
 
-The engine grades its own output. `Typeset.audit()` returns `[]` when a page
-has no overflows, no orphaned last words, and no weak line ends — a
-machine-checkable definition of done. Paragraphs report what happened via
-`data-ts-outcome` (`composed`, `fallback:*`, `skipped:*`) and flag
-`data-typeset-done` when decided. Full integration contract for humans and
-agents: [typeset.us/for-agents](https://typeset.us/for-agents).
+`Typeset.auditJSON(selector)` reports safety, coverage, native decisions and
+feature outcomes. A pass requires a nonempty scope with no hard errors or
+unprocessed targets; it is not aesthetic certification. Headings, captions,
+list text and ordinary rich prose can all be targeted. The React adapters own
+framework-updated text. Full contract: [typeset.us/for-agents](https://typeset.us/for-agents).
+Read [migration](packages/typeset-v4/MIGRATION.md) and
+[support](packages/typeset-v4/SUPPORT.md), including outstanding device testing.
 
 ## This repository
 
-- [`src/lib/typeset.ts`](src/lib/typeset.ts) — the engine. Everything shipped is generated from it.
+- [`src/lib/v4/`](src/lib/v4) — the approved V4 engine and adapters. The old source remains preserved separately.
 - [`src/app/`](src/app) — the Next.js site (typeset.us). The site runs the same engine it ships.
 - [`public/go.js`](public/go.js), `public/go@x.y.z.js`, [`public/sri.json`](public/sri.json) — generated drop-ins and their hashes (`npm run build:dist`).
-- [`packages/typeset.us/`](packages/typeset.us) — the npm package.
+- [`packages/typeset-v4/`](packages/typeset-v4) — the current npm package.
+- [`public/releases/3.5.1/`](public/releases/3.5.1) — archived npm, browser and source artifacts; the old browser pin remains 3.5.0.
 - [`docs/BINDING.md`](docs/BINDING.md) — how the phrase-binding weight was derived, and what the evidence does not support.
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed, including the bugs.
 
@@ -49,8 +51,8 @@ agents: [typeset.us/for-agents](https://typeset.us/for-agents).
 ```bash
 npm run dev         # site at localhost:3000
 npm run build:dist  # regenerate go.js, typeset.min.js, esm + npm artifacts
-npm test            # playwright: composition gates on the shipped bundles
-npm run bench       # engine benchmarks
+npm test            # current release: craft, spacing, promise and accessibility gates
+npm run bench       # historical V3 benchmark; not a V4 performance claim
 ```
 
 MIT © Dustin York — [typeset.us/support](https://typeset.us/support)

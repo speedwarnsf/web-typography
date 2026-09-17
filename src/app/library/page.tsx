@@ -10,7 +10,7 @@ const SAMPLE_TEXT =
 
 const typesetFullCode = (() => {
   try {
-    return readFileSync(path.join(process.cwd(), "src/lib/typeset.ts"), "utf-8");
+    return readFileSync(path.join(process.cwd(), "src/lib/v4/typeset.next.ts"), "utf-8");
   } catch {
     return "// typeset.ts — see source repository";
   }

@@ -1,16 +1,16 @@
 # typeset.us
 
-> Paragraph compositor for the browser: beam-search line breaking with
-> syntactic protection and post-render self-verification, for English
-> long-form prose. The only typography intervention with a machine-checkable
-> definition of done: `Typeset.audit()` returns `[]`.
+> Typeset 4.0.0: measured composition for titles, prose and ordinary rich text.
+> Unicode break opportunities, optical hanging, full bounded spacing finish,
+> markup-preserving DOM rendering, React adapters and post-render verification.
 
-Install is one script tag (`<script src="https://typeset.us/go.js" defer>`)
-or `npm install typeset.us` and `typeset(el)` after `document.fonts.ready`.
-Mark framework-re-rendered text with `data-no-typeset`. Verify with
-`Typeset.audit() === []` and `data-ts-outcome="composed"`. Measured cost:
-1.6 ms median per paragraph in desktop Chromium. The browser types. It
-doesn't read.
+Install: npm install typeset.us@4.0.0. For static HTML, use
+<script src="https://typeset.us/go@4.0.0.js" defer></script> and override
+data-typeset-selector to choose text. For React-owned content use
+TypesetText or TypesetRichText from typeset.us/react, never overlapping mounts.
+auditJSON reports errors, reviews, coverage, native retention and feature
+outcomes. A passing safety audit is not a claim of perfect aesthetics.
+Declared languages: en/fr/de/es; untagged Latin has neutral preferences.
 
 ## Docs
 
@@ -22,4 +22,9 @@ doesn't read.
 ## Package
 
 - [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
-  typeset.us@3.5.0, MIT — ESM, CJS, and global builds with types
+  typeset.us@4.0.0, MIT: ESM, CJS, browser global, React and declarations
+- [Capabilities](https://typeset.us/capabilities.json): machine-readable support contract
+- [Migration](https://typeset.us/releases/4.0.0/MIGRATION.md): ownership, options and rollback
+- [Support](https://typeset.us/releases/4.0.0/SUPPORT.md): tested range and outstanding acceptance
+- [Integrity](https://typeset.us/sri.json): immutable browser pins
+- [V3 archive](https://typeset.us/releases/3.5.1/): old source, npm and browser assets

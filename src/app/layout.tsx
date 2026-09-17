@@ -31,7 +31,7 @@ import {
   Caveat,
 } from "next/font/google";
 import "./globals.css";
-import GlobalTypeset from "@/components/GlobalTypeset";
+import GlobalTypeset from "@/components/TypesetV4";
 import BackToTop from "@/components/BackToTop";
 import CommandPalette from "@/components/CommandPalette";
 import SectionFooter from "@/components/SectionFooter";
@@ -70,6 +70,7 @@ const permanentMarker = Permanent_Marker({ subsets: ["latin"], weight: "400", va
 const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://typeset.us'),
   title: "Typeset — A New Era in Web Typography",
   description:
     "The web finally knows how to break lines. Watch the proof, live: beam-search composition, hanging punctuation, and Tschichold spacing — set by its own engine, in your browser.",
@@ -104,6 +105,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PrevNextStrip />
           <SectionFooter />
+          <footer className="px-6 py-6 text-center text-xs text-neutral-500" data-no-typeset>
+            <a href="/releases/4.0.0/">Typeset 4.0.0</a>
+            {' / '}<a href="/releases/3.5.1/">V3 archive</a>
+          </footer>
           <BackToTop />
         </div>
         <GlobalTypeset />

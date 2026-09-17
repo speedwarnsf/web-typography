@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import typeset, { typesetText } from "@/lib/typeset";
+import typeset, { typesetText } from "@/lib/typeset-site";
 import CodeBlock from "@/components/CodeBlock";
 
 interface TypographySettings {
