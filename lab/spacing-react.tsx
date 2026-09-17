@@ -5,6 +5,7 @@ import { TypesetRichText, TypesetText } from '../src/lib/v4/typeset.release.reac
 function Fixture() {
   const [revision, setRevision] = useState(0);
   const [spacing, setSpacing] = useState(true);
+  const [tracking, setTracking] = useState(true);
   const [visible, setVisible] = useState(true);
   const [clicks, setClicks] = useState(0);
   const text = revision ? 'The exhibition has moved to another room, where visitors can listen to the stories behind each print. A conversation with the artist begins at the end of the afternoon.'
@@ -12,13 +13,14 @@ function Fixture() {
   return <>
     <button onClick={() => setRevision(value => value + 1)}>Update source</button>
     <button onClick={() => setSpacing(value => !value)}>Toggle finish</button>
+    <button onClick={() => setTracking(value => !value)}>Toggle tracking</button>
     <button onClick={() => setVisible(value => !value)}>Toggle mount</button>
     <output id="clicks">{clicks}</output>
     {visible && <>
-      <TypesetRichText id="rich" spacing={spacing} lang="en">
+      <TypesetRichText id="rich" spacing={spacing} tracking={tracking} opticalHanging lang="en" style={{ overflow: 'hidden', padding: '24px', boxSizing: 'border-box' }}>
         {text.slice(0, 36)}<strong>{text.slice(36, 88)}</strong><a href="#linked" onClick={event => {event.preventDefault();setClicks(value => value + 1);}}><em>{text.slice(88, 128)}</em></a>{text.slice(128)}
       </TypesetRichText>
-      <TypesetText id="plain" spacing={spacing} lang="en" text={text}/>
+      <TypesetText id="plain" spacing={spacing} tracking={tracking} lang="en" text={text}/>
     </>}
   </>;
 }

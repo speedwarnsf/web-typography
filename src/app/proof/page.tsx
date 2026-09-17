@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import typeset, { measureLayout } from '@/lib/typeset-site';
+import typeset, { measureLayout, restore } from '@/lib/typeset-site';
+import { withDemoMeasurement } from '@/lib/typeset-demo';
+import { strandedOpener } from '@/lib/v4/phrase-boundaries';
 
 /**
  * The Proof — live before/after on real text.
@@ -39,10 +41,6 @@ const WEAK_ENDERS = new Set([
   'being', 'has', 'have', 'had',
 ]);
 
-// "…split mid-thought. At" — a line that crosses a sentence boundary and ends
-// on the opening word of the next sentence.
-const STRANDED_OPENER = /[.!?]["'”’)\]]*\s+["'“‘(\[]*[A-Z][A-Za-z’']*$/;
-
 interface LineInfo {
   text: string;
   right: number; // px from the column's content left edge to the line's rightmost ink
@@ -55,7 +53,7 @@ interface PanelMetrics {
   strandedOpeners: number;
   ragRangePct: number; // max fill − min fill across non-last lines, in points
   stairsteps: number;  // adjacent non-last lines differing by more than 10% fill
-  composed: boolean;   // after-panel only: did the V2 compositor produce frozen lines?
+  outcome: string;
 }
 
 const lastWordOf = (line: string): string => {
@@ -69,56 +67,14 @@ const lastWordOf = (line: string): string => {
 const lexicalCount = (line: string): number =>
   line.trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length;
 
-/** Replace a plain-text paragraph's content with per-word spans so rendered lines can be detected. */
-function wrapWords(p: HTMLElement): void {
-  const text = p.textContent || '';
-  p.textContent = '';
-  const words = text.split(/\s+/).filter(Boolean);
-  words.forEach((w, i) => {
-    const span = document.createElement('span');
-    span.setAttribute('data-w', '');
-    span.textContent = w;
-    p.appendChild(span);
-    if (i < words.length - 1) p.appendChild(document.createTextNode(' '));
-  });
-}
-
-/** Measure the actually-rendered lines of a panel. Works for frozen .ts-line output and plain wrapped text. */
+/** Range measurements leave the browser baseline's text nodes untouched. */
 function measureLines(p: HTMLElement): LineInfo[] {
   const cs = getComputedStyle(p);
   const contentLeft = p.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
-
-  if (p.dataset.tsOutcome) {
-    return measureLayout(p).lines.map(line => ({ text: line.text, right: line.right - contentLeft }));
-  }
-
-  const frozen = Array.from(p.querySelectorAll<HTMLElement>('.ts-line'));
-  if (frozen.length) {
-    return frozen.map((span) => {
-      const range = document.createRange();
-      range.selectNodeContents(span);
-      const r = range.getBoundingClientRect();
-      return { text: span.textContent || '', right: r.right - contentLeft };
-    });
-  }
-
-  // Plain text (browser panel, or engine fallback path): wrap words, group by row.
-  if (!p.querySelector('span[data-w]')) wrapWords(p);
-  const lines: { words: string[]; right: number; top: number }[] = [];
-  for (const span of Array.from(p.querySelectorAll<HTMLElement>('span[data-w]'))) {
-    const r = span.getBoundingClientRect();
-    const current = lines[lines.length - 1];
-    if (!current || Math.abs(r.top - current.top) > 4) {
-      lines.push({ words: [span.textContent || ''], right: r.right - contentLeft, top: r.top });
-    } else {
-      current.words.push(span.textContent || '');
-      current.right = Math.max(current.right, r.right - contentLeft);
-    }
-  }
-  return lines.map((l) => ({ text: l.words.join(' '), right: l.right }));
+  return measureLayout(p).lines.map(line => ({ text: line.text, right: line.right - contentLeft }));
 }
 
-function computeMetrics(lines: LineInfo[], width: number, composed: boolean): PanelMetrics {
+function computeMetrics(lines: LineInfo[], width: number, outcome: string): PanelMetrics {
   const fills = lines.map((l) => l.right / width);
   const nonLastFills = fills.slice(0, -1);
   const nonLastLines = lines.slice(0, -1);
@@ -127,7 +83,7 @@ function computeMetrics(lines: LineInfo[], width: number, composed: boolean): Pa
   let strandedOpeners = 0;
   for (const l of nonLastLines) {
     if (WEAK_ENDERS.has(lastWordOf(l.text))) weakEnders++;
-    if (STRANDED_OPENER.test(l.text.trim())) strandedOpeners++;
+    if (strandedOpener(l.text)) strandedOpeners++;
   }
 
   let stairsteps = 0;
@@ -144,7 +100,7 @@ function computeMetrics(lines: LineInfo[], width: number, composed: boolean): Pa
       ? Math.round((Math.max(...nonLastFills) - Math.min(...nonLastFills)) * 100)
       : 0,
     stairsteps,
-    composed,
+    outcome,
   };
 }
 
@@ -153,6 +109,8 @@ export default function ProofPage() {
   const [width, setWidth] = useState(375);
   const [fontCss, setFontCss] = useState(FONTS[0].css);
   const [pretty, setPretty] = useState(false);
+  const [tracking, setTracking] = useState(true);
+  const [hanging, setHanging] = useState(true);
   const [mobileView, setMobileView] = useState<'browser' | 'typeset'>('typeset');
   const [before, setBefore] = useState<PanelMetrics | null>(null);
   const [after, setAfter] = useState<PanelMetrics | null>(null);
@@ -175,25 +133,23 @@ export default function ProofPage() {
       if (!beforeEl || !afterEl) return;
 
       beforeEl.textContent = text;
-      // data-ts-raw is the engine's canonical-text override — it makes re-runs
-      // with edited text deterministic (the WeakMap cache would return stale text).
-      afterEl.dataset.tsRaw = text;
+      restore(afterEl);
       afterEl.textContent = text;
-      delete afterEl.dataset.typesetDone;
 
       // Everything below reads layout, which forces a synchronous reflow —
       // no need to wait for a paint (and rAF never fires in hidden tabs).
-      typeset(afterEl);
-      const composed = afterEl.dataset.tsOutcome?.startsWith('composed') ?? false;
-      setBefore(computeMetrics(measureLines(beforeEl), width, false));
-      setAfter(computeMetrics(measureLines(afterEl), width, composed));
+      withDemoMeasurement([beforeEl, afterEl], () => {
+        const result = typeset(afterEl, { tracking, opticalHanging: hanging });
+        setBefore(computeMetrics(measureLines(beforeEl), beforeEl.getBoundingClientRect().width, 'native'));
+        setAfter(computeMetrics(measureLines(afterEl), afterEl.getBoundingClientRect().width, result.outcome));
+      });
     };
 
     run();
     return () => {
       cancelled = true;
     };
-  }, [text, width, fontCss, pretty]);
+  }, [text, width, fontCss, pretty, tracking, hanging]);
 
   const paragraphStyle: React.CSSProperties = {
     fontFamily: fontCss,
@@ -232,10 +188,11 @@ export default function ProofPage() {
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         {/* Text input */}
-        <label className="block font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-2">
+        <label htmlFor="proof-text" className="block font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-2">
           Your paragraph
         </label>
         <textarea
+          id="proof-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
@@ -250,7 +207,7 @@ export default function ProofPage() {
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-500 mb-2">
               Column width — {width}px
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {WIDTH_PRESETS.map((w) => (
                 <button
                   key={w.px}
@@ -310,6 +267,14 @@ export default function ProofPage() {
               Give the browser text-wrap: pretty
             </span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer pb-2">
+            <input type="checkbox" checked={tracking} onChange={e => setTracking(e.target.checked)} className="accent-[#B8963E]" />
+            <span className="font-mono text-xs text-neutral-400">Line tracking</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer pb-2">
+            <input type="checkbox" checked={hanging} onChange={e => setHanging(e.target.checked)} className="accent-[#B8963E]" />
+            <span className="font-mono text-xs text-neutral-400">Optical hanging</span>
+          </label>
         </div>
 
         {/* Mobile view toggle — stacked panels two screens apart are not a
@@ -337,12 +302,12 @@ export default function ProofPage() {
         </div>
 
         {/* Panels */}
-        <div className="mt-4 lg:mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="mt-4 lg:mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6" data-proof-panels>
           {/* Browser */}
           <div
-            className={`border border-neutral-800 bg-neutral-950/40 ${
-              mobileView === 'browser' ? 'block' : 'hidden'
-            } lg:block`}
+            className={`min-w-0 col-start-1 row-start-1 lg:col-start-1 border border-neutral-800 bg-neutral-950/40 ${
+              mobileView === 'browser' ? 'visible' : 'invisible pointer-events-none'
+            } lg:visible lg:pointer-events-auto`}
             style={{ borderRadius: 0 }}
           >
             <div className="px-4 py-3 border-b border-neutral-800 flex items-baseline justify-between">
@@ -352,7 +317,7 @@ export default function ProofPage() {
               <span className="font-mono text-[10px] text-neutral-600">{width}px</span>
             </div>
             <div className="p-4 sm:p-6 overflow-x-auto">
-              <div style={{ width: `${width}px`, borderRight: '1px dashed #3f3f3f' }}>
+              <div style={{ width: `${width}px`, boxSizing: 'content-box', borderRight: '1px dashed #3f3f3f' }}>
                 <p
                   ref={beforeRef}
                   data-no-typeset
@@ -364,20 +329,20 @@ export default function ProofPage() {
 
           {/* Typeset */}
           <div
-            className={`border border-[#B8963E]/40 bg-neutral-950/40 ${
-              mobileView === 'typeset' ? 'block' : 'hidden'
-            } lg:block`}
+            className={`min-w-0 col-start-1 row-start-1 lg:col-start-2 border border-[#B8963E]/40 bg-neutral-950/40 ${
+              mobileView === 'typeset' ? 'visible' : 'invisible pointer-events-none'
+            } lg:visible lg:pointer-events-auto`}
             style={{ borderRadius: 0 }}
           >
             <div className="px-4 py-3 border-b border-neutral-800 flex items-baseline justify-between">
               <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#B8963E]">
                 Typeset engine
-                {after && !after.composed ? ' — binding fallback' : ''}
+                {after && !after.outcome.startsWith('composed') ? ` — ${after.outcome}` : ''}
               </span>
               <span className="font-mono text-[10px] text-neutral-600">{width}px</span>
             </div>
             <div className="p-4 sm:p-6 overflow-x-auto">
-              <div style={{ width: `${width}px`, borderRight: '1px dashed #3f3f3f' }}>
+              <div style={{ width: `${width}px`, boxSizing: 'content-box', borderRight: '1px dashed #3f3f3f' }}>
                 <p ref={afterRef} data-no-typeset style={paragraphStyle} />
               </div>
             </div>
@@ -408,8 +373,8 @@ export default function ProofPage() {
                   b={after.weakEnders}
                 />
                 <AuditRow
-                  label="Sentence openers stranded at line ends"
-                  hint="a new sentence's first word left dangling"
+                  label="Sentence or clause openers stranded at line ends"
+                  hint="the first word of a new thought left dangling"
                   a={before.strandedOpeners}
                   b={after.strandedOpeners}
                 />

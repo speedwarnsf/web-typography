@@ -15,7 +15,7 @@ for(const {name,engine,executablePath} of browsers){
     const page=await browser.newPage({viewport:{width:1440,height:1000}});
     page.on('pageerror',error=>report.errors.push({browser:name,error:error.message}));
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:24px}p{font:20px/1.5 Georgia;text-wrap:wrap;margin:0}a{color:#176650}</style></head><body></body></html>');
-    await page.addScriptTag({path:'packages/typeset-v4/dist/typeset.global.js'});
+    await page.addScriptTag({path:process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js'});
     const evaluated=await page.evaluate(({proof,paragraphs})=>{
       const api=window.Typeset,checks=[],cases=[];
       const check=(label,pass,detail)=>checks.push({label,pass:!!pass,...(detail!==undefined&&{detail})});
@@ -101,6 +101,13 @@ for(const {name,engine,executablePath} of browsers){
     await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.tsSpacing==='applied'&&document.querySelector('#plain')?.dataset.tsSpacing==='applied');
     const check=(label,pass)=>report.checks.push({browser:name,label,pass:!!pass});
     check('React adapters apply default finish',true);
+    await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.tsTracking==='applied'&&document.querySelector('#plain')?.dataset.tsTracking==='applied');
+    check('React adapters apply tracking',true);
+    await page.getByRole('button',{name:'Toggle tracking',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.tsTracking==='off');
+    check('React tracking toggle preserves word-space finish',await page.locator('[data-ts-track]').count()===0&&await page.locator('[data-ts-space]').count()>0);
+    await page.getByRole('button',{name:'Toggle tracking',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.tsTracking==='applied');
     const link=await page.locator('#rich a').elementHandle();
     await page.locator('#rich a').click();
     check('React link handler fires once',await page.locator('#clicks').textContent()==='1');

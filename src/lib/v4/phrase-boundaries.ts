@@ -8,6 +8,14 @@ const word = (text: string) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?
 const ends = (text: string) => /[.,;:!?)]["'”’]*$/u.test(text);
 const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
 
+/** A colon can introduce a thought without introducing a new sentence. */
+export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text);
+export function strandedOpener(line: string): boolean {
+  const words = line.trim().split(/\s+/u);
+  return words.length > 1 && proseBoundary(words.at(-2)!)
+    && /^["'\u201C\u2018(\[]*[A-Za-z][A-Za-z'\u2019-]*$/u.test(words.at(-1)!);
+}
+
 /** Retain naturally aligned sentences only when there is no geometric defect. */
 export function retainSentenceLayout(source: string, before: LayoutMetrics, chosenEnds: readonly number[]): boolean {
   if (before.overflow > .5 || before.lines.length < 2 || before.lines.some(l => l.words < 2)

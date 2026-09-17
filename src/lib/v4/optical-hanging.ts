@@ -1,8 +1,9 @@
 import type { LayoutMetrics } from './layout-metrics';
-import { opticalInkPull } from './optical-ink';
+import { opticalInkPull, opticalInkOverhang } from './optical-ink';
 import { spacingMarkerStyle } from './spacing-finish';
+import { hangingRoom, fitsHangingRoom } from './clipping';
 
-export interface OpticalHang { offset: number; px: number }
+export interface OpticalHang { offset: number; px: number; overhang?: number }
 export interface OpticalPlan { outcome: string; hangs: OpticalHang[] }
 const punctuation = new Set(['\u201c', '\u2018', '"', "'", '(', '[', '{', '\u00ab', '\u00bf', '\u00a1']);
 const opticalLetters = /^[A-Zoc]$/;
@@ -12,12 +13,8 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
   const cs = getComputedStyle(element);
   if (cs.direction !== 'ltr' || cs.writingMode !== 'horizontal-tb' || !['left', 'start'].includes(cs.textAlign)
     || cs.textIndent !== '0px') return { outcome: 'native:hanging-layout', hangs: [] };
-  for (let el: HTMLElement | null = element; el; el = el.parentElement) {
-    const style = getComputedStyle(el);
-    if (style.overflowX !== 'visible' || style.clipPath !== 'none' || style.transform !== 'none') {
-      return { outcome: 'native:hanging-clipped', hangs: [] };
-    }
-  }
+  const room = hangingRoom(element);
+  if (!room.supported) return { outcome: 'native:hanging-clipped', hangs: [] };
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const runs: { node: Text; start: number; end: number }[] = [];
   let node: Node | null;
@@ -29,6 +26,7 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
   const range = element.ownerDocument.createRange();
   const cache = new Map<string, number | null>();
   let unmeasurable = false;
+  let clipped = 0;
   const hangs = layout.lines.flatMap(line => {
     const run = runs.find(r => r.start <= line.sourceStart && r.end > line.sourceStart);
     if (!run) return [];
@@ -36,7 +34,8 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
     const char = run.node.data[local];
     const style = getComputedStyle(run.node.parentElement!);
     range.setStart(run.node, local); range.setEnd(run.node, local + 1);
-    const advance = range.getBoundingClientRect().width;
+    const glyph = range.getBoundingClientRect();
+    const advance = glyph.width;
     const displayed = style.textTransform === 'uppercase' ? char.toUpperCase() : style.textTransform === 'lowercase' ? char.toLowerCase() : char;
     let px = punctuation.has(char) ? advance : 0;
     if (!punctuation.has(char) && opticalLetters.test(displayed)) {
@@ -47,9 +46,14 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
       if (pull === null) unmeasurable = true;
       else px = pull;
     }
-    return px > 0 && Number.isFinite(px) ? [{ offset: line.sourceStart, px }] : [];
+    if (!(px > 0 && Number.isFinite(px))) return [];
+    const overhang = room.clips.length ? opticalInkOverhang(element.ownerDocument, style, displayed, advance) : 0;
+    if (overhang === null) { unmeasurable = true; return []; }
+    if (!fitsHangingRoom(room, glyph, px, overhang)) { clipped++; return []; }
+    return [{ offset: line.sourceStart, px, overhang }];
   });
-  return unmeasurable ? { outcome: 'native:hanging-font', hangs: [] } : { outcome: hangs.length ? 'applied' : 'unchanged', hangs };
+  return unmeasurable ? { outcome: 'native:hanging-font', hangs: [] }
+    : { outcome: hangs.length ? clipped ? 'applied:partial' : 'applied' : clipped ? 'native:hanging-clipped' : 'unchanged', hangs };
 }
 
 export function opticalMarkerStyle(px: number): Record<string, string> {
@@ -66,6 +70,11 @@ export function opticalVerified(element: HTMLElement, before: LayoutMetrics, aft
       const content = getComputedStyle(marker, pseudo).content;
       return content && !['none', 'normal', '""'].includes(content);
     });
+  })) return false;
+  const room = hangingRoom(element);
+  if (!room.supported || after.lines.some(line => {
+    const hang = hangs.find(hang => hang.offset === line.sourceStart);
+    return hang && !fitsHangingRoom(room, new DOMRect(line.left, line.top, line.width, line.bottom - line.top), 0, hang.overhang);
   })) return false;
   return after.lines.every((line, index) => {
     const previous = before.lines[index], hang = hangs.find(hang => hang.offset === previous.sourceStart)?.px || 0;

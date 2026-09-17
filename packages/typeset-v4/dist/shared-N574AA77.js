@@ -1,3 +1,49 @@
+// src/lib/v4/phrase-boundaries.ts
+var determiners = /* @__PURE__ */ new Set(["a", "an", "the", "my", "your", "our", "their", "his", "her", "its"]);
+var stops = /* @__PURE__ */ new Set(["a", "an", "the", "this", "that", "these", "those", "and", "or", "but", "nor", "so", "yet", "if", "as", "than", "of", "to", "in", "on", "at", "by", "for", "with", "from", "after", "before", "through", "into", "over", "under", "between", "without", "about", "around", "is", "are", "was", "were", "be", "been", "being", "has", "have", "had", "can", "could", "will", "would", "should", "may", "might", "must", "which", "who", "how", "we", "you", "they", "it"]);
+var modifiers = /* @__PURE__ */ new Set(["new", "old", "first", "last", "next", "previous", "second", "third", "small", "large", "little", "long", "short", "different", "same", "other", "final", "whole", "single"]);
+var word = (text) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, "");
+var ends = (text) => /[.,;:!?)]["'”’]*$/u.test(text);
+var sentences = new Intl.Segmenter("en", { granularity: "sentence" });
+var proseBoundary = (text) => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text);
+function strandedOpener(line) {
+  const words = line.trim().split(/\s+/u);
+  return words.length > 1 && proseBoundary(words.at(-2)) && /^["'\u201C\u2018(\[]*[A-Za-z][A-Za-z'\u2019-]*$/u.test(words.at(-1));
+}
+function retainSentenceLayout(source, before, chosenEnds) {
+  if (before.overflow > 0.5 || before.lines.length < 2 || before.lines.some((l) => l.words < 2) || before.lines.some((l, i2) => l.width / before.width < (i2 === before.lines.length - 1 ? 0.35 : 0.65))) return false;
+  const boundaries = Array.from(sentences.segment(source), (s) => s.index + s.segment.trimEnd().length);
+  if (boundaries.length < 2) return false;
+  const lineEnds = new Set(before.lines.map((l) => l.sourceEnd));
+  return boundaries.every((end) => lineEnds.has(end)) && boundaries.some((end) => !chosenEnds.includes(end));
+}
+function englishPhraseGroups(texts, width, measure) {
+  const words = texts.map(word);
+  const lexical = (index) => /^[a-z]+(?:['’-][a-z]+)*$/u.test(words[index] || "") && !stops.has(words[index]);
+  const modifier = (index) => modifiers.has(words[index]) || /(?:ed|ive|ous|ful|less)$/u.test(words[index] || "");
+  const groups = [];
+  for (let start = 0; start < words.length - 1; start++) {
+    if (!determiners.has(words[start]) || ends(texts[start]) || !lexical(start + 1)) continue;
+    let end = start + 2;
+    if (!ends(texts[start + 1]) && modifier(start + 1) && lexical(start + 2)) end++;
+    if (measure(start, end) <= width) groups.push({ start, end, kind: "nominal" });
+    if (start >= 2 && words[start - 2] === "to" && lexical(start - 1) && !ends(texts[start - 2]) && !ends(texts[start - 1]) && measure(start - 2, end) <= width) {
+      groups.push({ start: start - 2, end, kind: "infinitive" });
+    }
+  }
+  return groups;
+}
+function phraseBreakCosts(texts, groups, title) {
+  const costs = Array(texts.length + 1).fill(0);
+  for (const group of groups) {
+    if (title && group.kind === "nominal") costs[group.start + 1] = 480;
+    if (!title && group.kind === "infinitive" && group.end === texts.length) {
+      for (let end = group.start + 1; end < group.end; end++) costs[end] = Math.max(costs[end], 7e3);
+    }
+  }
+  return costs;
+}
+
 // src/lib/v4/typeset.ts
 var NBSP = "\xA0";
 var NBHY = "\u2011";
@@ -487,12 +533,12 @@ function createParagraphProblem(tokens, measurePx, measureCh2, opts = {}) {
     if (opts.englishLexical !== false && !isLast) {
       penalty += bindPenaltyAt(breakEnd);
     }
-    if (opts.englishLexical !== false && !isLast && lastContent && !isSentenceEnd(lastContent.text)) {
+    if (opts.englishLexical !== false && !isLast && lastContent && !proseBoundary(lastContent.text)) {
       let wordsIntoSentence = -1;
       for (const t of lineTokens) {
         if (t === lastContent) break;
         if (t.kind === "space") continue;
-        if (isSentenceEnd(t.text)) wordsIntoSentence = 0;
+        if (proseBoundary(t.text)) wordsIntoSentence = 0;
         else if (wordsIntoSentence >= 0) wordsIntoSentence++;
       }
       if (wordsIntoSentence === 0) {
@@ -1056,6 +1102,25 @@ var OPT_SHORT_BIND = new Set(
   "a an the of in to at by on or is it if no so as we do be".split(" ")
 );
 
+// src/lib/v4/inline-box.ts
+function inlineBoxInsets(style) {
+  const values = [
+    style.paddingLeft,
+    style.paddingRight,
+    style.marginLeft,
+    style.marginRight,
+    style.borderLeftWidth,
+    style.borderRightWidth
+  ].map((value) => parseFloat(value) || 0);
+  return {
+    left: values[0] + values[2] + values[4],
+    right: values[1] + values[3] + values[5],
+    marginLeft: values[2],
+    marginRight: values[3],
+    supported: values.every((value) => value >= 0) && style.getPropertyValue("box-decoration-break") !== "clone" && style.getPropertyValue("-webkit-box-decoration-break") !== "clone"
+  };
+}
+
 // src/lib/v4/layout-metrics.ts
 function contentWidth(element) {
   const cs = getComputedStyle(element);
@@ -1065,15 +1130,45 @@ function contentWidth(element) {
 function measureLayout(element) {
   const cs = getComputedStyle(element);
   const box = element.getBoundingClientRect();
-  const width = contentWidth(element);
+  const width = Math.max(0, box.width - parseFloat(cs.paddingLeft || "0") - parseFloat(cs.paddingRight || "0") - parseFloat(cs.borderLeftWidth || "0") - parseFloat(cs.borderRightWidth || "0"));
   const left = box.left + parseFloat(cs.borderLeftWidth || "0") + parseFloat(cs.paddingLeft || "0");
   const right = left + width;
   const lines = [];
+  if (cs.display !== "contents" && !element.getClientRects().length) {
+    return { lines, width, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 };
+  }
   const source = element.textContent || "";
   const lineEnds = /* @__PURE__ */ new Map();
   let sourceOffset = 0;
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const range = element.ownerDocument.createRange();
+  if (element.childNodes.length === 1 && element.firstChild?.nodeType === Node.TEXT_NODE && source.trim() && !element.closest('script, style, [hidden], [aria-hidden="true"]')) {
+    const start = source.search(/\S/u), end = source.trimEnd().length;
+    range.setStart(element.firstChild, start);
+    range.setEnd(element.firstChild, end);
+    const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+    if (rects.length === 1) {
+      const rect = rects[0], text = source.slice(start, end).replace(/\s+/gu, " ");
+      return {
+        width,
+        lines: [{
+          text,
+          sourceStart: start,
+          sourceEnd: end,
+          words: text.split(" ").length,
+          width: rect.width,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom
+        }],
+        overflow: Math.max(0, rect.right - right, left - rect.left),
+        firstSingleton: false,
+        lastSingleton: false,
+        rag: 0
+      };
+    }
+  }
   const segmenter = new Intl.Segmenter(void 0, { granularity: "grapheme" });
   let node;
   while (node = walker.nextNode()) {
@@ -1120,6 +1215,25 @@ function measureLayout(element) {
         line.bottom = Math.max(line.bottom, rect.bottom);
         line.width = line.right - line.left;
       }
+    }
+  }
+  for (const inline of element.querySelectorAll("*")) {
+    if (inline.hasAttribute("data-ts-break") || inline.closest('[hidden], [aria-hidden="true"]')) continue;
+    const style = getComputedStyle(inline);
+    if (style.display !== "inline") continue;
+    const insets = inlineBoxInsets(style);
+    if (!insets.left && !insets.right) continue;
+    const rects = Array.from(inline.getClientRects()).filter((rect) => rect.width && rect.height);
+    for (const [index, rect] of rects.entries()) {
+      const line = lines.reduce((best, candidate) => {
+        const overlap = Math.min(candidate.bottom, rect.bottom) - Math.max(candidate.top, rect.top);
+        const bestOverlap = best ? Math.min(best.bottom, rect.bottom) - Math.max(best.top, rect.top) : 0;
+        return overlap > bestOverlap ? candidate : best;
+      }, void 0);
+      if (!line) continue;
+      line.left = Math.min(line.left, rect.left - (index === 0 ? insets.marginLeft : 0));
+      line.right = Math.max(line.right, rect.right + (index === rects.length - 1 ? insets.marginRight : 0));
+      line.width = line.right - line.left;
     }
   }
   lines.sort((a, b2) => a.top - b2.top);
@@ -2015,17 +2129,24 @@ function tokenForUnit(unit, language) {
 }
 
 // src/lib/v4/space-policy.ts
-function finishSpaceDeltas(widths, measure, spaces) {
+function finishTargets(widths, measure) {
   const fills = widths.slice(0, -1).map((width) => width / measure).sort((a, b2) => a - b2);
   const mid = Math.floor(fills.length / 2);
   const median = fills.length % 2 ? fills[mid] : (fills[mid - 1] + fills[mid]) / 2;
   return widths.map((width, index) => {
-    const gaps = spaces[index] || [];
-    if (index === widths.length - 1 || !gaps.length) return gaps.map(() => 0);
+    if (index === widths.length - 1) return width;
     const neighbors = [widths[index - 1], index < widths.length - 2 ? widths[index + 1] : void 0].filter((value) => value !== void 0);
     const local = neighbors.length ? neighbors.reduce((sum, value) => sum + value / measure, 0) / neighbors.length : median;
     const target = Math.max(0.7, Math.min(0.965, 0.5 * local + 0.5 * median));
-    const desired = (measure * target - width) / gaps.length;
+    return measure * target;
+  });
+}
+function finishSpaceDeltas(widths, measure, spaces) {
+  const targets = finishTargets(widths, measure);
+  return widths.map((width, index) => {
+    const gaps = spaces[index] || [];
+    if (index === widths.length - 1 || !gaps.length) return gaps.map(() => 0);
+    const desired = (targets[index] - width) / gaps.length;
     return gaps.map((natural) => Number.isFinite(natural) && natural > 0 && desired >= -0.4 * natural ? Math.max(-0.2 * natural, Math.min(0.33 * natural, desired)) : 0);
   });
 }
@@ -2277,50 +2398,10 @@ function composeTitle(tokens, width, measure, policy = {}) {
   });
 }
 
-// src/lib/v4/phrase-boundaries.ts
-var determiners = /* @__PURE__ */ new Set(["a", "an", "the", "my", "your", "our", "their", "his", "her", "its"]);
-var stops = /* @__PURE__ */ new Set(["a", "an", "the", "this", "that", "these", "those", "and", "or", "but", "nor", "so", "yet", "if", "as", "than", "of", "to", "in", "on", "at", "by", "for", "with", "from", "after", "before", "through", "into", "over", "under", "between", "without", "about", "around", "is", "are", "was", "were", "be", "been", "being", "has", "have", "had", "can", "could", "will", "would", "should", "may", "might", "must", "which", "who", "how", "we", "you", "they", "it"]);
-var modifiers = /* @__PURE__ */ new Set(["new", "old", "first", "last", "next", "previous", "second", "third", "small", "large", "little", "long", "short", "different", "same", "other", "final", "whole", "single"]);
-var word = (text) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, "");
-var ends = (text) => /[.,;:!?)]["'”’]*$/u.test(text);
-var sentences = new Intl.Segmenter("en", { granularity: "sentence" });
-function retainSentenceLayout(source, before, chosenEnds) {
-  if (before.overflow > 0.5 || before.lines.length < 2 || before.lines.some((l) => l.words < 2) || before.lines.some((l, i2) => l.width / before.width < (i2 === before.lines.length - 1 ? 0.35 : 0.65))) return false;
-  const boundaries = Array.from(sentences.segment(source), (s) => s.index + s.segment.trimEnd().length);
-  if (boundaries.length < 2) return false;
-  const lineEnds = new Set(before.lines.map((l) => l.sourceEnd));
-  return boundaries.every((end) => lineEnds.has(end)) && boundaries.some((end) => !chosenEnds.includes(end));
-}
-function englishPhraseGroups(texts, width, measure) {
-  const words = texts.map(word);
-  const lexical = (index) => /^[a-z]+(?:['’-][a-z]+)*$/u.test(words[index] || "") && !stops.has(words[index]);
-  const modifier = (index) => modifiers.has(words[index]) || /(?:ed|ive|ous|ful|less)$/u.test(words[index] || "");
-  const groups = [];
-  for (let start = 0; start < words.length - 1; start++) {
-    if (!determiners.has(words[start]) || ends(texts[start]) || !lexical(start + 1)) continue;
-    let end = start + 2;
-    if (!ends(texts[start + 1]) && modifier(start + 1) && lexical(start + 2)) end++;
-    if (measure(start, end) <= width) groups.push({ start, end, kind: "nominal" });
-    if (start >= 2 && words[start - 2] === "to" && lexical(start - 1) && !ends(texts[start - 2]) && !ends(texts[start - 1]) && measure(start - 2, end) <= width) {
-      groups.push({ start: start - 2, end, kind: "infinitive" });
-    }
-  }
-  return groups;
-}
-function phraseBreakCosts(texts, groups, title) {
-  const costs = Array(texts.length + 1).fill(0);
-  for (const group of groups) {
-    if (title && group.kind === "nominal") costs[group.start + 1] = 480;
-    if (!title && group.kind === "infinitive" && group.end === texts.length) {
-      for (let end = group.start + 1; end < group.end; end++) costs[end] = Math.max(costs[end], 7e3);
-    }
-  }
-  return costs;
-}
-
 // src/lib/v4/paragraph-rhythm.ts
 function retainParagraphRhythm(source, before, proposedWidths) {
   const { lines, width, overflow } = before;
+  if (lines.slice(0, -1).some((line) => strandedOpener(line.text))) return false;
   if (!Number.isFinite(width) || width <= 0 || overflow > 0.5 || lines.length < 4 || proposedWidths.length !== lines.length || lines.some((l) => l.words < 2 || !Number.isFinite(l.width) || l.width < 0 || l.width > width + 0.5) || proposedWidths.some((w2) => !Number.isFinite(w2) || w2 < 0 || w2 > width + 0.5)) return false;
   const last = lines.at(-1);
   if (last.words < 3 || last.width / width < 0.4 || last.width / width > 0.8) return false;
@@ -2338,10 +2419,13 @@ function retainParagraphRhythm(source, before, proposedWidths) {
 }
 
 // src/lib/v4/optical-ink.ts
-function opticalInkPull(doc, style, char, advance) {
-  if (style.fontVariationSettings !== "normal" || style.fontFeatureSettings !== "normal" || style.fontVariant !== "normal" || !["none", "normal", ""].includes(style.fontSizeAdjust)) return null;
+function supportedFont(style) {
   const size = parseFloat(style.fontSize);
-  if (!Number.isFinite(size) || size <= 0 || size > 256) return null;
+  return style.fontVariationSettings === "normal" && style.fontFeatureSettings === "normal" && style.fontVariant === "normal" && ["none", "normal", ""].includes(style.fontSizeAdjust) && Number.isFinite(size) && size > 0 && size <= 256;
+}
+function setCanvasFont(context, style) {
+  if (!supportedFont(style)) return false;
+  const size = parseFloat(style.fontSize);
   const stretches = {
     "50%": "ultra-condensed",
     "62.5%": "extra-condensed",
@@ -2354,7 +2438,26 @@ function opticalInkPull(doc, style, char, advance) {
     "200%": "ultra-expanded"
   };
   const stretch = stretches[style.fontStretch] || Object.values(stretches).find((value) => value === style.fontStretch);
-  if (!stretch) return null;
+  if (!stretch) return false;
+  context.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
+  context.fontStretch = stretch;
+  context.fontKerning = style.fontKerning;
+  context.textAlign = "left";
+  context.textBaseline = "alphabetic";
+  return true;
+}
+function opticalInkOverhang(doc, style, char, advance) {
+  if (!supportedFont(style)) return null;
+  const context = doc.createElement("canvas").getContext("2d");
+  if (!context || !setCanvasFont(context, style)) return null;
+  const metrics = context.measureText(char);
+  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) - advance) > 1.01 || !Number.isFinite(metrics.actualBoundingBoxLeft)) return null;
+  return Math.max(0, metrics.actualBoundingBoxLeft);
+}
+function opticalInkPull(doc, style, char, advance) {
+  if (!supportedFont(style)) return null;
+  const size = parseFloat(style.fontSize);
+  if (!Number.isFinite(size) || size <= 0 || size > 256) return null;
   const scale = 4, pad = Math.ceil(size), side = Math.ceil(size * 4 * scale);
   const canvas = doc.createElement("canvas");
   canvas.width = side;
@@ -2362,11 +2465,7 @@ function opticalInkPull(doc, style, char, advance) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) return null;
   context.scale(scale, scale);
-  context.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
-  context.fontStretch = stretch;
-  context.fontKerning = style.fontKerning;
-  context.textAlign = "left";
-  context.textBaseline = "alphabetic";
+  if (!setCanvasFont(context, style)) return null;
   const metrics = context.measureText(char);
   const tracking = parseFloat(style.letterSpacing) || 0;
   if (Math.abs(metrics.width + tracking - advance) > 1.01) return null;
@@ -2391,18 +2490,69 @@ function opticalInkPull(doc, style, char, advance) {
   }
 }
 
+// src/lib/v4/geometry.ts
+function preservesAdvances(style) {
+  if (style.scale && !["none", "1", "1 1", "1 1 1"].includes(style.scale)) return false;
+  if (style.rotate && !["none", "0deg"].includes(style.rotate)) return false;
+  const translation = style.translate?.split(/\s+/u);
+  if (translation?.length === 3 && parseFloat(translation[2]) !== 0) return false;
+  if (!style.transform || style.transform === "none") return true;
+  try {
+    const matrix = new DOMMatrixReadOnly(style.transform);
+    return matrix.is2D && matrix.a === 1 && matrix.b === 0 && matrix.c === 0 && matrix.d === 1;
+  } catch {
+    return false;
+  }
+}
+
+// src/lib/v4/clipping.ts
+function hangingRoom(element) {
+  const clips = [];
+  for (let el = element; el; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (!preservesAdvances(style) || style.clipPath !== "none" || style.clip && style.clip !== "auto" || style.maskImage && style.maskImage !== "none") return { clips, supported: false };
+    const paint = /\b(paint|strict|content)\b/u.test(style.contain);
+    if (style.overflowX === "visible" && !paint) continue;
+    const rect = el.getBoundingClientRect();
+    const border = parseFloat(style.borderLeftWidth) || 0;
+    let left = rect.left + Math.max(border, el.clientLeft);
+    const top = rect.top + el.clientTop, bottom = top + el.clientHeight;
+    const clipMargin = style.getPropertyValue("overflow-clip-margin").trim();
+    if ((style.overflowX === "clip" || paint) && clipMargin) {
+      const values = clipMargin.split(/\s+/u);
+      const edge = values.find((value) => value.endsWith("-box")) || "padding-box";
+      const length = values.find((value) => /^\d*\.?\d+px$/u.test(value));
+      if (values.some((value) => value !== edge && value !== length)) return { clips, supported: false };
+      if (edge === "content-box") left += parseFloat(style.paddingLeft) || 0;
+      else if (edge === "border-box") left -= border;
+      left -= parseFloat(length || "0");
+    }
+    const radius = (value) => {
+      const parts = value.split(/\s+/u);
+      return Math.max(...parts.map((part) => part.endsWith("%") ? parseFloat(part) / 100 * Math.max(rect.width, rect.height) : parseFloat(part) || 0));
+    };
+    clips.push({ left, top, bottom, topRadius: radius(style.borderTopLeftRadius), bottomRadius: radius(style.borderBottomLeftRadius) });
+  }
+  return { clips, supported: true };
+}
+function fitsHangingRoom(room, glyph, px, overhang = 0) {
+  return room.supported && room.clips.every((clip) => {
+    const corner = Math.max(
+      glyph.top < clip.top + clip.topRadius ? clip.topRadius : 0,
+      glyph.bottom > clip.bottom - clip.bottomRadius ? clip.bottomRadius : 0
+    );
+    return glyph.left - px - overhang >= clip.left + corner + 0.25;
+  });
+}
+
 // src/lib/v4/optical-hanging.ts
 var punctuation = /* @__PURE__ */ new Set(["\u201C", "\u2018", '"', "'", "(", "[", "{", "\xAB", "\xBF", "\xA1"]);
 var opticalLetters = /^[A-Zoc]$/;
 function planOpticalHanging(element, layout) {
   const cs = getComputedStyle(element);
   if (cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb" || !["left", "start"].includes(cs.textAlign) || cs.textIndent !== "0px") return { outcome: "native:hanging-layout", hangs: [] };
-  for (let el = element; el; el = el.parentElement) {
-    const style = getComputedStyle(el);
-    if (style.overflowX !== "visible" || style.clipPath !== "none" || style.transform !== "none") {
-      return { outcome: "native:hanging-clipped", hangs: [] };
-    }
-  }
+  const room = hangingRoom(element);
+  if (!room.supported) return { outcome: "native:hanging-clipped", hangs: [] };
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const runs = [];
   let node;
@@ -2415,6 +2565,7 @@ function planOpticalHanging(element, layout) {
   const range = element.ownerDocument.createRange();
   const cache = /* @__PURE__ */ new Map();
   let unmeasurable = false;
+  let clipped = 0;
   const hangs = layout.lines.flatMap((line) => {
     const run = runs.find((r2) => r2.start <= line.sourceStart && r2.end > line.sourceStart);
     if (!run) return [];
@@ -2423,7 +2574,8 @@ function planOpticalHanging(element, layout) {
     const style = getComputedStyle(run.node.parentElement);
     range.setStart(run.node, local);
     range.setEnd(run.node, local + 1);
-    const advance = range.getBoundingClientRect().width;
+    const glyph = range.getBoundingClientRect();
+    const advance = glyph.width;
     const displayed = style.textTransform === "uppercase" ? char.toUpperCase() : style.textTransform === "lowercase" ? char.toLowerCase() : char;
     let px = punctuation.has(char) ? advance : 0;
     if (!punctuation.has(char) && opticalLetters.test(displayed)) {
@@ -2446,9 +2598,19 @@ function planOpticalHanging(element, layout) {
       if (pull === null) unmeasurable = true;
       else px = pull;
     }
-    return px > 0 && Number.isFinite(px) ? [{ offset: line.sourceStart, px }] : [];
+    if (!(px > 0 && Number.isFinite(px))) return [];
+    const overhang = room.clips.length ? opticalInkOverhang(element.ownerDocument, style, displayed, advance) : 0;
+    if (overhang === null) {
+      unmeasurable = true;
+      return [];
+    }
+    if (!fitsHangingRoom(room, glyph, px, overhang)) {
+      clipped++;
+      return [];
+    }
+    return [{ offset: line.sourceStart, px, overhang }];
   });
-  return unmeasurable ? { outcome: "native:hanging-font", hangs: [] } : { outcome: hangs.length ? "applied" : "unchanged", hangs };
+  return unmeasurable ? { outcome: "native:hanging-font", hangs: [] } : { outcome: hangs.length ? clipped ? "applied:partial" : "applied" : clipped ? "native:hanging-clipped" : "unchanged", hangs };
 }
 function opticalMarkerStyle(px) {
   return spacingMarkerStyle(-px);
@@ -2464,6 +2626,11 @@ function opticalVerified(element, before, after, hangs) {
       return content && !["none", "normal", '""'].includes(content);
     });
   })) return false;
+  const room = hangingRoom(element);
+  if (!room.supported || after.lines.some((line) => {
+    const hang = hangs.find((hang2) => hang2.offset === line.sourceStart);
+    return hang && !fitsHangingRoom(room, new DOMRect(line.left, line.top, line.width, line.bottom - line.top), 0, hang.overhang);
+  })) return false;
   return after.lines.every((line, index) => {
     const previous = before.lines[index], hang = hangs.find((hang2) => hang2.offset === previous.sourceStart)?.px || 0;
     return line.sourceStart === previous.sourceStart && line.sourceEnd === previous.sourceEnd && Math.abs(line.width - previous.width) <= 0.75 && Math.abs(line.left + hang - previous.left) <= 0.75 && Math.abs(line.top - previous.top) <= 0.75;
@@ -2472,7 +2639,7 @@ function opticalVerified(element, before, after, hangs) {
 
 // src/lib/v4/rich-text.ts
 var BREAK_ATTRIBUTE = "data-ts-break";
-var inlineTags = /* @__PURE__ */ new Set(["A", "B", "STRONG", "EM", "I", "SPAN", "SMALL", "U", "S", "DEL", "MARK", "ABBR", "CITE"]);
+var inlineTags = /* @__PURE__ */ new Set(["A", "B", "STRONG", "EM", "I", "SPAN", "SMALL", "U", "S", "DEL", "MARK", "ABBR", "CITE", "CODE"]);
 var wordPattern = /[^\s\u00a0\u202f]+(?:[\u00a0\u202f][^\s\u00a0\u202f]+)*/gu;
 function richLayoutVerified(plan, after) {
   const starts = [plan.source.search(/\S/u), ...plan.breaks];
@@ -2532,9 +2699,9 @@ function unsupported(element) {
     if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return "native:rich-excluded";
     const cs = getComputedStyle(el);
     if (cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb" || el !== element && cs.unicodeBidi !== "normal" || cs.visibility !== "visible") return "native:rich-direction";
-    if (cs.whiteSpace !== "normal" || cs.transform !== "none" || cs.textIndent !== "0px") return "native:rich-whitespace";
+    if (cs.whiteSpace !== "normal" || !preservesAdvances(cs) || cs.textIndent !== "0px") return "native:rich-whitespace";
     if (el !== element && (cs.display !== "inline" || cs.position !== "static" || cs.verticalAlign !== "baseline")) return "native:rich-layout";
-    if (el !== element && ["paddingLeft", "paddingRight", "marginLeft", "marginRight", "borderLeftWidth", "borderRightWidth"].some((key) => parseFloat(cs[key]) !== 0)) return "native:rich-box";
+    if (el !== element && !inlineBoxInsets(cs).supported) return "native:rich-box";
     for (const pseudo of ["::before", "::after"]) {
       const content = getComputedStyle(el, pseudo).content;
       if (content && content !== "none" && content !== "normal" && content !== '""') return "native:rich-decorated";
@@ -2542,12 +2709,14 @@ function unsupported(element) {
   }
   return null;
 }
-function planRichText(element, options = {}) {
+function planRichText(element, options = {}, nativeLayout) {
   const source = element.textContent || "";
   const markers = Array.from(element.querySelectorAll("[" + BREAK_ATTRIBUTE + "]"));
   const restoreMarkers = markers.map((marker) => override(marker, { display: "none" }));
+  const tracking = Array.from(element.querySelectorAll("[data-ts-track]"));
+  restoreMarkers.push(...tracking.map((wrapper) => override(wrapper, { "letter-spacing": "inherit", "word-spacing": "inherit" })));
   try {
-    const before = measureLayout(element);
+    const before = !markers.length && nativeLayout ? nativeLayout : measureLayout(element);
     const search = [];
     const result = (outcome, breaks2 = [], widths = [], constraint) => ({
       source,
@@ -2570,7 +2739,7 @@ function planRichText(element, options = {}) {
       if (languageOf(el.closest("[lang]")?.getAttribute("lang")) !== analysis.language) return result("native:mixed-language");
       const cs = getComputedStyle(el);
       if (cs.hyphens === "auto") return result("native:auto-hyphens");
-      if (cs.wordBreak !== "normal" || !["auto", "normal"].includes(cs.lineBreak) || cs.overflowWrap !== "normal") return result("native:break-policy");
+      if (cs.wordBreak !== "normal" || !["auto", "normal"].includes(cs.lineBreak) || !["normal", "break-word"].includes(cs.overflowWrap)) return result("native:break-policy");
     }
     if (getComputedStyle(element).display === "inline") return result("native:inline");
     const reason = unsupported(element);
@@ -2606,6 +2775,17 @@ function planRichText(element, options = {}) {
       }
     }
     const range = element.ownerDocument.createRange();
+    const leadingInsets = /* @__PURE__ */ new Map(), trailingInsets = /* @__PURE__ */ new Map();
+    for (const el of element.querySelectorAll("*")) {
+      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+      const insets = inlineBoxInsets(getComputedStyle(el));
+      if (!insets.left && !insets.right) continue;
+      const children = runs.filter((run) => el.contains(run.node));
+      if (!children.length) continue;
+      const start = children[0].start, end = children.at(-1).end;
+      leadingInsets.set(start, (leadingInsets.get(start) || 0) + insets.left);
+      trailingInsets.set(end, (trailingInsets.get(end) || 0) + insets.right);
+    }
     const restoreWhiteSpace = [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE)).map((el) => override(el, { "white-space": "nowrap", "text-wrap": "nowrap" }));
     let edges;
     try {
@@ -2634,16 +2814,17 @@ function planRichText(element, options = {}) {
     });
     const nativeSpans = new Map(before.lines.map((line) => [line.sourceStart + ":" + line.sourceEnd, line]));
     const measureRange = (start, end) => {
-      const width = edges[end - 1].right - edges[start].left;
-      if (width <= before.width || width > before.width + 0.5) return width;
       const last = words[end - 1];
+      const width = edges[end - 1].right - edges[start].left + (leadingInsets.get(words[start].index) || 0) + (trailingInsets.get(last.index + last.text.length) || 0);
+      if (width <= before.width || width > before.width + 0.5) return width;
       const witness = nativeSpans.get(words[start].index + ":" + (last.index + last.text.length));
       return witness && witness.width <= before.width + 0.5 && Math.abs(witness.width - width) <= 0.5 ? Math.min(before.width, witness.width) : width;
     };
     const breakPenalty = (end) => words[end - 1].hyphen ? 1600 : 0;
     const title = options.mode === "title" || options.mode === "heading" || !options.mode && /^H[1-6]$/.test(element.tagName);
     const clamp = parseInt(getComputedStyle(element).getPropertyValue("-webkit-line-clamp"), 10);
-    const allowance = !title && (before.lastSingleton || options.density === "editorial") ? 1 : 0;
+    const openerRepair = options.density !== "compact" && (!analysis || analysis.language === "en") && before.lines.slice(0, -1).some((line) => strandedOpener(line.text));
+    const allowance = !title && (before.lastSingleton || options.density === "editorial" || openerRepair) ? 1 : 0;
     const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
     const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
     const contourWidths = !title && options.contour === "finished" && ["left", "start"].includes(getComputedStyle(element).textAlign) ? finishedContour(element, words, before.width) : void 0;
@@ -2826,8 +3007,9 @@ function preserveRichCopy(element) {
       const html = ranges.map((range) => {
         const fragment = range.cloneContents();
         fragment.querySelectorAll("[" + BREAK_ATTRIBUTE + "]").forEach((marker) => marker.remove());
+        fragment.querySelectorAll("[data-ts-track]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
         for (const el of fragment.querySelectorAll("*")) {
-          for (const attribute of ["data-ts-outcome", "data-typeset-done", "data-ts-quotes", "data-ts-hanging", "data-ts-spacing"]) el.removeAttribute(attribute);
+          for (const attribute of ["data-ts-outcome", "data-typeset-done", "data-ts-quotes", "data-ts-hanging", "data-ts-spacing", "data-ts-tracking"]) el.removeAttribute(attribute);
           if (el instanceof HTMLAnchorElement && el.hasAttribute("href")) {
             try {
               el.href = new URL(el.getAttribute("href"), doc.baseURI).href;
@@ -2865,7 +3047,7 @@ function preserveRichCopy(element) {
   };
 }
 function richFingerprint(element) {
-  return [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE)).map((el) => {
+  return [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE) && !el.hasAttribute("data-ts-track")).map((el) => {
     const cs = getComputedStyle(el);
     return [
       cs.font,
@@ -2974,8 +3156,131 @@ function applySmartQuotes(element) {
   } };
 }
 
+// src/lib/v4/tracking-finish.ts
+var TRACK_ATTRIBUTE = "data-ts-track";
+var MAX_TRACKING_EM = 0.01;
+var resolvedSpacing = (value) => value === "normal" ? 0 : /^-?(?:\d+\.?\d*|\.\d+)px$/u.test(value) ? parseFloat(value) : NaN;
+function textRuns2(element) {
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const runs = [];
+  let node, offset = 0;
+  while (node = walker.nextNode()) {
+    const text = node;
+    runs.push({ node: text, start: offset, end: offset + text.length });
+    offset += text.length;
+  }
+  return runs;
+}
+function planTrackingFinish(element, layout, targets) {
+  const result = (outcome, runs2 = []) => ({ outcome, runs: runs2, before: layout, targets });
+  const style = getComputedStyle(element);
+  if (style.direction !== "ltr" || style.writingMode !== "horizontal-tb" || !["left", "start"].includes(style.textAlign)) return result("native:tracking-layout");
+  const source = element.textContent || "", texts = textRuns2(element);
+  const segmenter = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+  const runs = [];
+  let unsupported2 = false;
+  for (const [line, box] of layout.lines.slice(0, -1).entries()) {
+    const desired = targets[line] - box.width;
+    if (!Number.isFinite(desired) || Math.abs(desired) < 0.25) continue;
+    if ([...box.text].some((char) => /\p{L}/u.test(char) && !/\p{Script=Latin}/u.test(char))) {
+      unsupported2 = true;
+      continue;
+    }
+    const pieces = [];
+    for (const text of texts) {
+      const start = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
+      if (end <= start || text.node.parentElement?.closest("code, kbd, samp")) continue;
+      const parent = text.node.parentElement;
+      if (!parent) continue;
+      const cs = getComputedStyle(parent), fontSize = parseFloat(cs.fontSize);
+      const letterSpacing = resolvedSpacing(cs.letterSpacing), wordSpacing = resolvedSpacing(cs.wordSpacing);
+      if (!(fontSize > 0) || !Number.isFinite(letterSpacing) || !Number.isFinite(wordSpacing)) return result("native:tracking-measurement");
+      const count = [...segmenter.segment(source.slice(start, end))].filter((part) => !/^\s+$/u.test(part.segment)).length;
+      const previous = pieces.at(-1);
+      let adjacent = previous?.last.nextSibling || null;
+      while (adjacent instanceof HTMLElement && adjacent.hasAttribute("data-ts-space")) adjacent = adjacent.nextSibling;
+      if (previous && adjacent === text.node && previous.end === start) {
+        previous.end = end;
+        previous.count += count;
+        previous.last = text.node;
+      } else pieces.push({ start, end, line, px: 0, fontSize, letterSpacing, wordSpacing, last: text.node, count });
+    }
+    const capacity = pieces.reduce((sum, run) => sum + run.count * run.fontSize, 0);
+    if (!capacity) continue;
+    const em = Math.max(-MAX_TRACKING_EM, Math.min(MAX_TRACKING_EM, desired / capacity));
+    for (const { last: _last, count, ...run } of pieces) if (count) runs.push({ ...run, px: run.fontSize * em });
+  }
+  if (runs.length > 256) return result("native:tracking-budget");
+  return result(runs.length ? "applied" : unsupported2 ? "native:tracking-script" : "unchanged", runs);
+}
+function trackingStyle(run) {
+  return {
+    all: "unset",
+    display: "inline",
+    letterSpacing: run.letterSpacing + run.px + "px",
+    // CSS tracking also affects spaces. Compensate so the word-space finish
+    // retains its measured 80-133% envelope instead of paying for tracking twice.
+    wordSpacing: run.wordSpacing - run.px + "px"
+  };
+}
+function renderTracking(element, plan) {
+  const restoreSelection = selectionBookmark(element), texts = textRuns2(element);
+  const splits = /* @__PURE__ */ new Map();
+  const split = (head, at2) => {
+    const tail = head.splitText(at2), parts = splits.get(head) || [head];
+    parts.splice(1, 0, tail);
+    splits.set(head, parts);
+    return tail;
+  };
+  for (const run of [...plan.runs].reverse()) {
+    const a = texts.find((text) => text.start <= run.start && text.end > run.start);
+    const b2 = texts.find((text) => text.start < run.end && text.end >= run.end);
+    if (!a || !b2 || a.node.parentNode !== b2.node.parentNode) continue;
+    const end = run.end - b2.start;
+    if (end < b2.node.length) split(b2.node, end);
+    const first = run.start > a.start ? split(a.node, run.start - a.start) : a.node;
+    const last = a.node === b2.node ? first : b2.node;
+    const wrapper = element.ownerDocument.createElement("span");
+    wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
+    Object.assign(wrapper.style, trackingStyle(run));
+    first.before(wrapper);
+    for (let node = first; node; ) {
+      const next = node.nextSibling;
+      wrapper.append(node);
+      if (node === last) break;
+      node = next;
+    }
+  }
+  restoreSelection();
+  const releaseCopy = preserveRichCopy(element);
+  return { nodes: [element], cleanup() {
+    const restoreSelection2 = selectionBookmark(element);
+    element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
+    for (const [head, parts] of splits) if (element.contains(head)) for (const part of parts.slice(1)) {
+      if (head.nextSibling !== part) break;
+      head.appendData(part.data);
+      part.remove();
+    }
+    releaseCopy();
+    restoreSelection2();
+  } };
+}
+function trackingVerified(element, plan, after) {
+  const wrappers = Array.from(element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]"));
+  if (wrappers.length !== plan.runs.length || after.lines.length !== plan.before.lines.length || Math.abs(after.width - plan.before.width) > 0.5 || after.overflow > Math.max(0.5, plan.before.overflow)) return false;
+  if (wrappers.some((wrapper) => {
+    const run = plan.runs.find((run2) => run2.start === Number(wrapper.getAttribute(TRACK_ATTRIBUTE)));
+    const cs = getComputedStyle(wrapper);
+    return !run || Math.abs(parseFloat(cs.letterSpacing) - run.letterSpacing - run.px) > 1e-3 || Math.abs(parseFloat(cs.wordSpacing) - run.wordSpacing + run.px) > 1e-3 || cs.display !== "inline" || cs.position !== "static" || cs.visibility !== "visible" || ["::before", "::after"].some((pseudo) => !["none", "normal", '""', ""].includes(getComputedStyle(wrapper, pseudo).content));
+  })) return false;
+  return after.lines.every((line, index) => {
+    const before = plan.before.lines[index], adjusted = plan.runs.some((run) => run.line === index);
+    return line.sourceStart === before.sourceStart && line.sourceEnd === before.sourceEnd && Math.abs(line.left - before.left) <= 0.5 && Math.abs(line.top - before.top) <= 0.5 && Math.abs(line.bottom - before.bottom) <= 0.5 && (adjusted ? Math.abs(plan.targets[index] - line.width) < Math.abs(plan.targets[index] - before.width) - 0.02 : Math.abs(line.width - before.width) <= 0.5);
+  });
+}
+
 // src/lib/v4/typeset.next.ts
-var VERSION = "4.0.0";
+var VERSION = "4.1.0";
 var states = /* @__PURE__ */ new WeakMap();
 var measurements = /* @__PURE__ */ new WeakMap();
 var fontVersions = /* @__PURE__ */ new WeakMap();
@@ -3058,6 +3363,7 @@ function signature(el, options) {
     options.smartQuotes,
     options.opticalHanging,
     options.spacing,
+    options.tracking,
     options.contour,
     context,
     getComputedStyle(el, "::before").content,
@@ -3082,6 +3388,7 @@ function restore(element) {
   if (!state) return;
   const restoreSelection = selectionBookmark(element);
   state.optical?.cleanup();
+  state.tracking?.cleanup();
   state.spacing?.cleanup();
   if (state.rich) state.rich.cleanup();
   else if (ownsOutput(element, state) && !state.nodes.every((node, i2) => element.childNodes[i2] === node)) element.replaceChildren(...state.nodes);
@@ -3094,6 +3401,7 @@ function restore(element) {
   delete element.dataset.tsQuotes;
   delete element.dataset.tsHanging;
   delete element.dataset.tsSpacing;
+  delete element.dataset.tsTracking;
 }
 function makeMeasurer2(element) {
   const cs = getComputedStyle(element);
@@ -3203,7 +3511,7 @@ function typeset(element, options = {}) {
   const started = performance.now();
   const mode = modeOf(element, options);
   if (element.closest("[data-typeset-react-rich]")) return { outcome: "skipped:framework", mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
-  if (element.closest(excluded) || element.closest("[data-ts-generated], [data-ts-probe], .ts-line")) {
+  if (element.closest(excluded) || element.closest("[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line")) {
     return { outcome: "skipped:excluded", mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
   const prior = states.get(element);
@@ -3213,6 +3521,7 @@ function typeset(element, options = {}) {
     const restoreSelection = selectionBookmark(element);
     const unchanged = ownsOutput(element, prior);
     prior.optical?.cleanup();
+    prior.tracking?.cleanup();
     prior.spacing?.cleanup();
     resetStyles(element, prior);
     if (prior.rich) prior.rich.cleanup();
@@ -3243,13 +3552,17 @@ function typeset(element, options = {}) {
   const finish = (outcome, constraint) => {
     let optical;
     let spacing;
+    let tracking;
+    let targets;
     const features = {
       quotes: quotes?.outcome || "off",
       hanging: options.opticalHanging ? "native:hanging-uncomposed" : "off",
-      spacing: options.spacing === false ? "off" : mode !== "body" ? "native:spacing-mode" : "native:spacing-uncomposed"
+      spacing: options.spacing === false ? "off" : mode !== "body" ? "native:spacing-mode" : "native:spacing-uncomposed",
+      tracking: options.tracking === false || options.spacing === false ? "off" : mode !== "body" ? "native:tracking-mode" : "native:tracking-uncomposed"
     };
     if (options.spacing !== false && mode === "body" && outcome === "composed:rich") {
       const plan = planSpacingFinish(element, measureLayout(element));
+      targets = finishTargets(plan.before.lines.map((line) => line.width), plan.before.width);
       const fingerprint = richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
@@ -3262,6 +3575,19 @@ function typeset(element, options = {}) {
       }
     } else if (options.spacing !== false && mode === "body" && outcome === "composed") {
       features.spacing = Array.from(element.querySelectorAll(".ts-line")).some((line) => parseFloat(line.style.wordSpacing)) ? "applied" : "unchanged";
+    }
+    if (targets && options.tracking !== false && ["applied", "unchanged"].includes(features.spacing)) {
+      const plan = planTrackingFinish(element, measureLayout(element), targets);
+      const fingerprint = richFingerprint(element);
+      features.tracking = plan.outcome;
+      if (plan.runs.length) {
+        tracking = renderTracking(element, plan);
+        if (element.textContent !== source || richFingerprint(element) !== fingerprint || !trackingVerified(element, plan, measureLayout(element))) {
+          tracking.cleanup();
+          tracking = void 0;
+          features.tracking = "native:tracking-verification";
+        }
+      }
     }
     if (options.opticalHanging && (outcome === "composed:rich" || outcome === "native:fits")) {
       const layout = measureLayout(element);
@@ -3283,6 +3609,7 @@ function typeset(element, options = {}) {
     element.dataset.tsQuotes = features.quotes;
     element.dataset.tsHanging = features.hanging;
     element.dataset.tsSpacing = features.spacing;
+    element.dataset.tsTracking = features.tracking;
     const result = { outcome, mode, before, after: measureLayout(element), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...constraint && { constraint }, ...search && { search }, features };
     states.set(element, {
       nodes,
@@ -3298,7 +3625,8 @@ function typeset(element, options = {}) {
       hadStyle,
       quotes,
       optical,
-      spacing
+      spacing,
+      tracking
     });
     return result;
   };
@@ -3310,7 +3638,7 @@ function typeset(element, options = {}) {
   if (cs.writingMode !== "horizontal-tb" || cs.direction !== "ltr") return finish("native:direction");
   for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
-    if (style.transform !== "none" || style.zoom && style.zoom !== "1" && style.zoom !== "normal") return finish("native:transformed");
+    if (!preservesAdvances(style) || style.zoom && style.zoom !== "1" && style.zoom !== "normal") return finish("native:transformed");
   }
   for (const pseudo of ["::before", "::after"]) {
     const content = getComputedStyle(element, pseudo).content;
@@ -3322,7 +3650,7 @@ function typeset(element, options = {}) {
   if (cs.overflow !== "visible" && cs.textOverflow === "ellipsis") return finish("native:clamped");
   if (cs.display === "inline") return finish("native:inline");
   if (options.lineBreaks === "unicode" || options.opticalHanging || options.smartQuotes || element.children.length || nodes.some((node) => node.nodeType !== Node.TEXT_NODE)) {
-    const plan = planRichText(element, { ...options, mode });
+    const plan = planRichText(element, { ...options, mode }, before);
     search = plan.search;
     if (plan.outcome !== "composed:rich") return finish(plan.outcome, plan.constraint);
     rich = renderRichText(element, plan.breaks);
@@ -3396,13 +3724,13 @@ function typesetAll(selector = defaults, options = {}) {
   return Array.from(document.querySelectorAll(selector), (el) => typeset(el, options));
 }
 function auditReport(selector = defaults) {
-  const report = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {} }, issues: [] };
+  const report = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
   for (const element of document.querySelectorAll(selector)) {
     if (element.closest("[data-ts-generated], [data-ts-probe]")) continue;
     report.examined++;
     const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? "excluded" : "unprocessed");
     report.outcomes[outcome] = (report.outcomes[outcome] || 0) + 1;
-    for (const [feature, value] of [["quotes", element.dataset.tsQuotes], ["hanging", element.dataset.tsHanging], ["spacing", element.dataset.tsSpacing]]) {
+    for (const [feature, value] of [["quotes", element.dataset.tsQuotes], ["hanging", element.dataset.tsHanging], ["spacing", element.dataset.tsSpacing], ["tracking", element.dataset.tsTracking]]) {
       const status = value || "off";
       report.features[feature][status] = (report.features[feature][status] || 0) + 1;
     }
@@ -3416,6 +3744,7 @@ function auditReport(selector = defaults) {
       const word2 = line.text.trim().split(/\s+/u).at(-1) || "";
       const language = languageOf(element.closest("[lang]")?.getAttribute("lang"));
       if (language === "und" ? isWeakEnding(word2) : language !== "invalid" && languageWeakEnding(word2, language)) add("weak-line-end", "review", "Line " + (index + 1) + ' ends on "' + word2 + '"');
+      if (["en", "und"].includes(language) && strandedOpener(line.text)) add("stranded-opener", "review", "Line " + (index + 1) + " leaves a sentence or clause opener at its end");
     }
     const state = states.get(element);
     if (state && state.output !== element.textContent) add("stale-output", "error", "Content changed since the last composition");
@@ -3464,61 +3793,106 @@ function auditJSON(selector = defaults) {
 function mount(root = document, selector = defaults, options = {}) {
   const owned = /* @__PURE__ */ new Set();
   const pending = /* @__PURE__ */ new Set();
+  const nearby = /* @__PURE__ */ new Set();
   let stopped = false;
   let fontsReady = false;
   let timer;
+  let idle;
   const stats = { passes: 0, compositions: 0, maxBatchMs: 0 };
   let resolveReady = () => {
   };
   const ready = new Promise((resolve) => {
     resolveReady = resolve;
   });
-  const select = () => {
-    const elements = Array.from(root.querySelectorAll(selector));
-    if (root instanceof HTMLElement && root.matches(selector)) elements.unshift(root);
-    return elements.filter((el) => !el.closest(excluded) && !el.closest("[data-ts-generated], [data-ts-probe], .ts-line"));
+  const select = (within = root) => {
+    const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
+    const elements = Array.from(scope.querySelectorAll(selector));
+    if (scope instanceof HTMLElement && scope.matches(selector)) elements.unshift(scope);
+    return elements.filter((el) => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest("[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line"));
+  };
+  const viewport = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const el = entry.target;
+      if (entry.isIntersecting) nearby.add(el);
+      else nearby.delete(el);
+      viewport?.unobserve(el);
+    }
+  }, { rootMargin: "400px" });
+  const discover = (within = root) => {
+    for (const el of select(within)) {
+      if (!pending.has(el)) viewport?.observe(el);
+      pending.add(el);
+    }
   };
   const schedule = () => {
-    if (stopped || !fontsReady || timer !== void 0) return;
-    timer = setTimeout(flush, 32);
+    if (stopped || !fontsReady || timer !== void 0 || idle !== void 0 || !pending.size) return;
+    if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(flush, { timeout: 200 });
+    else timer = setTimeout(() => flush(), 16);
   };
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       const target = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
-      for (const el of owned) if (target && (el.contains(target) || target.contains(el))) pending.add(el);
+      for (let el = target; el && (el === root || root.contains(el)); el = el.parentElement) {
+        if (owned.has(el)) pending.add(el);
+      }
+      if (record.type === "attributes" && target) {
+        discover(target);
+        if (target.closest(excluded)) {
+          for (const el of owned) if (target.contains(el)) pending.add(el);
+        }
+      }
+      if (record.type === "childList") {
+        for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
+        if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
+        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) for (const el of owned) {
+          if (node.contains(el) && !root.contains(el)) {
+            owned.delete(el);
+            pending.delete(el);
+            nearby.delete(el);
+            viewport?.unobserve(el);
+            unwatch(el);
+          }
+        }
+      }
     }
-    for (const el of select()) if (!owned.has(el)) pending.add(el);
     schedule();
   });
+  const observedWidths = /* @__PURE__ */ new WeakMap();
+  const watched = /* @__PURE__ */ new Map();
   const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver((entries) => {
     for (const entry of entries) {
-      for (const el of owned) {
-        if (el !== entry.target && el.parentElement !== entry.target) continue;
-        const state = states.get(el);
-        if (!state || state.signature !== signature(el, options)) pending.add(el);
-      }
+      const previous = observedWidths.get(entry.target);
+      observedWidths.set(entry.target, entry.contentRect.width);
+      if (previous !== void 0 && Math.abs(previous - entry.contentRect.width) <= 0.01) continue;
+      for (const el of watched.get(entry.target) || []) pending.add(el);
     }
     if (pending.size) schedule();
   });
-  const watched = /* @__PURE__ */ new Map();
   const parents = /* @__PURE__ */ new Map();
   const watch = (el) => {
     parents.set(el, el.parentElement);
     for (const target of [el, el.parentElement]) {
       if (!target) continue;
-      const count = watched.get(target) || 0;
-      if (!count) resize?.observe(target);
-      watched.set(target, count + 1);
+      let dependents = watched.get(target);
+      if (!dependents) {
+        dependents = /* @__PURE__ */ new Set();
+        watched.set(target, dependents);
+        observedWidths.set(target, contentWidth(target));
+        resize?.observe(target);
+      }
+      dependents.add(el);
     }
   };
   const unwatch = (el) => {
+    if (!parents.has(el)) return;
     for (const target of [el, parents.get(el)]) {
       if (!target) continue;
-      const count = (watched.get(target) || 1) - 1;
-      if (!count) {
+      const dependents = watched.get(target);
+      dependents?.delete(el);
+      if (!dependents?.size) {
         resize?.unobserve(target);
         watched.delete(target);
-      } else watched.set(target, count);
+      }
     }
     parents.delete(el);
   };
@@ -3528,30 +3902,39 @@ function mount(root = document, selector = defaults, options = {}) {
       observer.observe(ancestor, { attributes: true, attributeFilter: ["class", "style", "lang"] });
     }
   }
-  function flush() {
+  function flush(deadline) {
     timer = void 0;
+    idle = void 0;
     if (stopped) return;
     observer.disconnect();
     const start = performance.now();
     stats.passes++;
-    for (const el of owned) {
+    function* work() {
+      for (const el of nearby) if (pending.has(el)) yield el;
+      yield* pending;
+    }
+    for (const el of work()) {
+      pending.delete(el);
+      nearby.delete(el);
+      viewport?.unobserve(el);
       if (!(root === el || root.contains(el))) {
         owned.delete(el);
+        nearby.delete(el);
+        viewport?.unobserve(el);
         unwatch(el);
-        pending.delete(el);
-      } else if (parents.get(el) !== el.parentElement) {
-        unwatch(el);
-        watch(el);
+        continue;
       }
-    }
-    for (const el of pending) {
-      pending.delete(el);
-      if (!(root === el || root.contains(el))) continue;
       if (el.closest(excluded)) {
         restore(el);
         owned.delete(el);
+        nearby.delete(el);
+        viewport?.unobserve(el);
         unwatch(el);
         continue;
+      }
+      if (owned.has(el) && parents.get(el) !== el.parentElement) {
+        unwatch(el);
+        watch(el);
       }
       const result = typeset(el, options);
       if (result.changed) stats.compositions++;
@@ -3559,7 +3942,7 @@ function mount(root = document, selector = defaults, options = {}) {
         owned.add(el);
         watch(el);
       }
-      if (performance.now() - start >= 8) break;
+      if (performance.now() - start >= 8 || deadline && deadline.timeRemaining() <= 1) break;
     }
     stats.maxBatchMs = Math.max(stats.maxBatchMs, performance.now() - start);
     observe();
@@ -3568,7 +3951,11 @@ function mount(root = document, selector = defaults, options = {}) {
   }
   const refresh = () => {
     if (stopped) return;
-    for (const el of select()) pending.add(el);
+    discover();
+    schedule();
+  };
+  const resized = () => {
+    for (const el of owned) pending.add(el);
     schedule();
   };
   const fontsChanged = () => {
@@ -3584,12 +3971,13 @@ function mount(root = document, selector = defaults, options = {}) {
       return;
     }
     fontsReady = true;
-    for (const el of select()) pending.add(el);
-    flush();
+    discover();
+    schedule();
+    if (!pending.size) resolveReady();
   });
   observe();
   document.fonts.addEventListener("loadingdone", fontsChanged);
-  window.addEventListener("resize", refresh);
+  window.addEventListener("resize", resized);
   return {
     ready,
     refresh,
@@ -3597,13 +3985,16 @@ function mount(root = document, selector = defaults, options = {}) {
     disconnect(restoreContent = true) {
       stopped = true;
       if (timer !== void 0) clearTimeout(timer);
+      if (idle !== void 0) window.cancelIdleCallback(idle);
       observer.disconnect();
       resize?.disconnect();
+      viewport?.disconnect();
       document.fonts.removeEventListener("loadingdone", fontsChanged);
-      window.removeEventListener("resize", refresh);
+      window.removeEventListener("resize", resized);
       if (restoreContent) for (const el of owned) restore(el);
       owned.clear();
       pending.clear();
+      nearby.clear();
       watched.clear();
       parents.clear();
       resolveReady();
@@ -3626,6 +4017,7 @@ export {
   linesStarved,
   contentWidth,
   measureLayout,
+  finishTargets,
   planSpacingFinish,
   spacingMarkerStyle,
   spacingVerified,
@@ -3641,6 +4033,10 @@ export {
   preserveRichCopy,
   richFingerprint,
   smartQuotes,
+  TRACK_ATTRIBUTE,
+  planTrackingFinish,
+  trackingStyle,
+  trackingVerified,
   VERSION,
   restore,
   typeset,
@@ -3650,4 +4046,4 @@ export {
   auditJSON,
   mount
 };
-//# sourceMappingURL=shared-SFY7ROYZ.js.map
+//# sourceMappingURL=shared-N574AA77.js.map

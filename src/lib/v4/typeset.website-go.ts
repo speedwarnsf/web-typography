@@ -8,6 +8,7 @@ const options = {
   smartQuotes: script?.dataset.typesetSmartQuotes === 'false' ? false as const : 'en' as const,
   opticalHanging: script?.dataset.typesetOpticalHanging !== 'false',
   spacing: script?.dataset.typesetSpacing !== 'false',
+  tracking: script?.dataset.typesetTracking !== 'false',
 };
 window.Typeset = api;
 window.TypesetReady = new Promise<void>(resolve => {

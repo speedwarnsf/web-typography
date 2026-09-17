@@ -84,8 +84,8 @@ export default function UtilityPage() {
           <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
             TypeScript, dependency-free at runtime. This is the V4 engine entry;
             its supporting modules and React adapter ship in the npm package.
-            <a href="/releases/4.0.0/README.md"> Installation</a>,{" "}
-            <a href="/releases/4.0.0/MIGRATION.md">migration</a>, and{" "}
+            <a href="/releases/4.1.0/README.md"> Installation</a>,{" "}
+            <a href="/releases/4.1.0/MIGRATION.md">migration</a>, and{" "}
             <a href="/releases/3.5.1/README.md">V3 archive</a>.
           </p>
           <CodeBlock code={typesetFullCode} title="typeset.ts" />

@@ -34,7 +34,7 @@ try {
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
       page.on('pageerror', error => report.errors.push({ browser: name, message: error.message }));
-      page.on('console', message => { if (message.type() === 'error') report.errors.push({ browser: name, message: message.text() }); });
+      page.on('console', message => { if (message.type() === 'error') report.errors.push({ browser: name, message: message.text(), location: message.location() }); });
       const response = await page.goto(base);
       const html = await response.text();
       check('SSR includes educated source and semantic markup', html.includes('\u201cA room for looking closely,\u201d') && html.includes('<strong>the curator</strong>'));

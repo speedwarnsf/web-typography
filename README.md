@@ -23,7 +23,7 @@ pins are permanent: bytes never change, files are never removed.
 Or from npm — ESM, CJS, and global builds with types:
 
 ```bash
-npm install typeset.us@4.0.0
+npm install typeset.us@4.1.0
 ```
 
 ## Verification, not vibes
@@ -51,7 +51,7 @@ Read [migration](packages/typeset-v4/MIGRATION.md) and
 ```bash
 npm run dev         # site at localhost:3000
 npm run build:dist  # regenerate go.js, typeset.min.js, esm + npm artifacts
-npm test            # current release: craft, spacing, promise and accessibility gates
+npm test            # current release: craft, spacing, tracking, clipping, lifecycle and accessibility
 npm run bench       # historical V3 benchmark; not a V4 performance claim
 ```
 

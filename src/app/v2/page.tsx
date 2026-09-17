@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import typeset, { measureLayout } from '@/lib/typeset-site';
+import typeset, { measureLayout, restore } from '@/lib/typeset-site';
+import { withDemoMeasurement } from '@/lib/typeset-demo';
+import { strandedOpener } from '@/lib/v4/phrase-boundaries';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -116,7 +118,6 @@ const WEAK = new Set([
   'a', 'i', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'and', 'or',
   'but', 'nor', 'so', 'as', 'is', 'are', 'was', 'were', 'has', 'have', 'had',
 ]);
-const OPENER = /[.!?]["'”’)\]]*\s+["'“‘(\[]*[A-Z][A-Za-z’']*$/;
 
 /** Measure the actually-rendered lines of a panel and audit them. */
 function panelStats(p: HTMLElement, width: number): PanelStats {
@@ -175,7 +176,7 @@ function panelStats(p: HTMLElement, width: number): PanelStats {
       .replace(/^[^A-Za-z0-9]+/g, '')
       .toLowerCase();
     if (WEAK.has(lastWord)) weak++;
-    if (OPENER.test(l.text.trim())) openers++;
+    else if (strandedOpener(l.text)) openers++;
   }
   const nf = fills.slice(0, -1);
   const lastWords = (lines[lines.length - 1]?.text || '')
@@ -314,7 +315,7 @@ function annotateBrowserFlaws(p: HTMLElement): WorstFlaw | null {
     }
     if (!isLastRow) {
       const lineText = row.spans.map((s) => s.textContent).join(' ');
-      if (OPENER.test(lineText.trim())) {
+      if (strandedOpener(lineText)) {
         lastSpan.classList.add('v2-flaw');
         consider({ span: lastSpan, kind: 'weak', word: raw });
       }
@@ -370,28 +371,27 @@ function ProofStage({ reduced }: { reduced: boolean }) {
       const stack = stackRef.current;
       if (!b || !t) return;
       b.textContent = PROOF_TEXT;
-      t.dataset.tsRaw = PROOF_TEXT;
+      restore(t);
       t.textContent = PROOF_TEXT;
-      delete t.dataset.typesetDone;
-      typeset(t);
-      setStats({ b: panelStats(b, width), t: panelStats(t, width) });
-      const worst = annotateBrowserFlaws(b);
-      const panelBottom = Math.max(b.offsetHeight, t.offsetHeight);
-      if (worst && stack) {
-        const sr = stack.getBoundingClientRect();
-        const wr = worst.span.getBoundingClientRect();
-        // Below the panel (never over the text), x-aligned under the flaw.
-        setCallout({
-          top: panelBottom + 16,
-          left: Math.max(0, Math.min(wr.left - sr.left, width - 190)),
-          text: FLAW_CAPTIONS[worst.kind](worst.word),
-        });
-      } else {
-        setCallout(null);
-      }
-      if (stack) {
-        stack.style.minHeight = `${panelBottom + (worst ? 96 : 20)}px`;
-      }
+      withDemoMeasurement([b, t], () => {
+        typeset(t);
+        setStats({ b: panelStats(b, width), t: panelStats(t, width) });
+        const worst = annotateBrowserFlaws(b);
+        const panelBottom = Math.max(b.offsetHeight, t.offsetHeight);
+        if (worst && stack) {
+          const sr = stack.getBoundingClientRect();
+          const wr = worst.span.getBoundingClientRect();
+          // Below the panel (never over the text), x-aligned under the flaw.
+          setCallout({
+            top: panelBottom + 16,
+            left: Math.max(0, Math.min(wr.left - sr.left, width - 190)),
+            text: FLAW_CAPTIONS[worst.kind](worst.word),
+          });
+        } else {
+          setCallout(null);
+        }
+        if (stack) stack.style.minHeight = `${panelBottom + (worst ? 96 : 20)}px`;
+      });
     })();
     return () => {
       cancelled = true;

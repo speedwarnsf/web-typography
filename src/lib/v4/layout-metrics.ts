@@ -1,3 +1,5 @@
+import { inlineBoxInsets } from './inline-box';
+
 export interface MeasuredLine {
   text: string;
   sourceStart: number;
@@ -31,15 +33,33 @@ export function contentWidth(element: HTMLElement): number {
 export function measureLayout(element: HTMLElement): LayoutMetrics {
   const cs = getComputedStyle(element);
   const box = element.getBoundingClientRect();
-  const width = contentWidth(element);
+  const width = Math.max(0, box.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
+    - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0'));
   const left = box.left + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.paddingLeft || '0');
   const right = left + width;
   const lines: MeasuredLine[] = [];
+  if (cs.display !== 'contents' && !element.getClientRects().length) {
+    return { lines, width, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 };
+  }
   const source = element.textContent || '';
   const lineEnds = new Map<MeasuredLine, number>();
   let sourceOffset = 0;
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const range = element.ownerDocument.createRange();
+  // A single rendered run needs one Range read, not one read per word.
+  // Multiline and styled text continue through the full fragment mapper.
+  if (element.childNodes.length === 1 && element.firstChild?.nodeType === Node.TEXT_NODE
+    && source.trim() && !element.closest('script, style, [hidden], [aria-hidden="true"]')) {
+    const start = source.search(/\S/u), end = source.trimEnd().length;
+    range.setStart(element.firstChild, start); range.setEnd(element.firstChild, end);
+    const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
+    if (rects.length === 1) {
+      const rect = rects[0], text = source.slice(start, end).replace(/\s+/gu, ' ');
+      return { width, lines: [{ text, sourceStart: start, sourceEnd: end, words: text.split(' ').length,
+        width: rect.width, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }],
+        overflow: Math.max(0, rect.right - right, left - rect.left), firstSingleton: false, lastSingleton: false, rag: 0 };
+    }
+  }
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   let node: Node | null;
   while ((node = walker.nextNode())) {
@@ -95,6 +115,27 @@ export function measureLayout(element: HTMLElement): LayoutMetrics {
         line.bottom = Math.max(line.bottom, rect.bottom);
         line.width = line.right - line.left;
       }
+    }
+  }
+  // A text Range omits padding/borders at inline fragment edges. Include
+  // those real boxes so composition and overflow checks account for code chips.
+  for (const inline of element.querySelectorAll<HTMLElement>('*')) {
+    if (inline.hasAttribute('data-ts-break') || inline.closest('[hidden], [aria-hidden="true"]')) continue;
+    const style = getComputedStyle(inline);
+    if (style.display !== 'inline') continue;
+    const insets = inlineBoxInsets(style);
+    if (!insets.left && !insets.right) continue;
+    const rects = Array.from(inline.getClientRects()).filter(rect => rect.width && rect.height);
+    for (const [index, rect] of rects.entries()) {
+      const line = lines.reduce<MeasuredLine | undefined>((best, candidate) => {
+        const overlap = Math.min(candidate.bottom, rect.bottom) - Math.max(candidate.top, rect.top);
+        const bestOverlap = best ? Math.min(best.bottom, rect.bottom) - Math.max(best.top, rect.top) : 0;
+        return overlap > bestOverlap ? candidate : best;
+      }, undefined);
+      if (!line) continue;
+      line.left = Math.min(line.left, rect.left - (index === 0 ? insets.marginLeft : 0));
+      line.right = Math.max(line.right, rect.right + (index === rects.length - 1 ? insets.marginRight : 0));
+      line.width = line.right - line.left;
     }
   }
   lines.sort((a, b) => a.top - b.top);

@@ -3,8 +3,10 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 
 const base = process.env.SITE_URL || 'http://127.0.0.1:4210';
-const integrity = JSON.parse(await readFile('public/sri.json', 'utf8')).files['go@4.0.0.js'];
-const report = { base, checks: [], errors: [], thirdPartyErrors: [], samples: [] };
+const { version } = JSON.parse(await readFile('public/release.json', 'utf8'));
+const pin = `go@${version}.js`;
+const integrity = JSON.parse(await readFile('public/sri.json', 'utf8')).files[pin];
+const report = { base, version, checks: [], errors: [], thirdPartyErrors: [], samples: [] };
 const check = (name, value) => { report.checks.push({ name, passed: !!value }); assert.ok(value, name); };
 await mkdir('output/playwright', { recursive: true });
 for (const config of browsers) {
@@ -22,7 +24,7 @@ for (const config of browsers) {
       for (const path of ['/', '/proof', '/utility', '/perfect-paragraph', '/essay', '/pairing-cards']) {
         const response = await page.goto(base + path);
         check(`${config.name} ${width} ${path} responds (${response.status()})`, [200, 304].includes(response.status()));
-        await page.waitForFunction(() => window.Typeset?.VERSION === '4.0.0');
+        await page.waitForFunction(version => window.Typeset?.VERSION === version, version);
         await page.evaluate(() => window.TypesetReady);
         await page.waitForTimeout(450);
         const sample = await page.evaluate(() => ({
@@ -48,11 +50,13 @@ for (const config of browsers) {
           await page.getByRole('link', { name: 'Try it on your own text' }).click();
           await page.waitForURL('**/proof');
           await page.evaluate(() => window.TypesetReady);
-          check(`${config.name} client navigation`, await page.evaluate(() => Typeset.VERSION === '4.0.0'));
+          check(`${config.name} client navigation`, await page.evaluate(version => Typeset.VERSION === version, version));
         }
+        // Let route prefetches settle before forcing another full navigation.
+        await page.waitForLoadState('networkidle');
       }
     }
-    for (const path of ['/releases/3.5.1/', '/releases/4.0.0/']) {
+    for (const path of ['/releases/3.5.1/', '/releases/4.0.0/', `/releases/${version}/`]) {
       const response = await page.goto(base + path);
       check(`${config.name} archive ${path}`, [200, 304].includes(response.status()));
       const docs = page.getByRole('link', { name: path.includes('3.5.1') ? 'Original package documentation' : 'Installation and selector targeting' });
@@ -62,20 +66,20 @@ for (const config of browsers) {
     }
     const text = 'A thoughtful title about the neighborhood gallery and the people who made it possible';
     for (const explicit of [false, true]) {
-      await page.goto(base + '/releases/4.0.0/');
+      await page.goto(base + `/releases/${version}/`);
       await page.setContent(`<html lang="en"><style>h2,figcaption,p{width:280px;font:20px/1.5 Georgia;text-wrap:wrap}</style><h2 class="chosen">${text}</h2><figcaption class="chosen">Read <a href="#notes">the neighborhood gallery notes</a> and discover how the collection grew over the years.</figcaption><p id="body">${text}</p><p data-no-typeset id="excluded">${text}</p></html>`);
       await page.evaluate(() => { window.originalLink = document.querySelector('a'); window.originalText = document.body.textContent; });
-      await page.evaluate(({ base, explicit, integrity }) => new Promise((resolve, reject) => {
+      await page.evaluate(({ base, explicit, integrity, pin }) => new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = base + '/go@4.0.0.js';
+        script.src = base + '/' + pin;
         script.integrity = integrity; script.crossOrigin = 'anonymous';
-        if (explicit) script.dataset.typesetSelector = '.chosen';
+        if (explicit) { script.dataset.typesetSelector = '.chosen'; script.dataset.typesetTracking = 'false'; }
         script.onload = resolve; script.onerror = reject; document.head.append(script);
-      }), { base, explicit, integrity });
+      }), { base, explicit, integrity, pin });
       await page.evaluate(() => window.TypesetReady);
-      const targets = await page.evaluate(() => ({ version: Typeset.VERSION, title: document.querySelector('h2').dataset.tsOutcome, caption: document.querySelector('figcaption').dataset.tsOutcome, body: document.querySelector('#body').dataset.tsOutcome, excluded: document.querySelector('#excluded').dataset.tsOutcome, link: originalLink === document.querySelector('a'), source: originalText === document.body.textContent }));
-      check(`${config.name} loader targets titles and captions ${explicit}`, targets.version === '4.0.0' && targets.title && targets.caption);
-      check(`${config.name} loader scope and identity ${explicit}`, !targets.excluded && targets.link && targets.source && (explicit ? !targets.body : !!targets.body));
+      const targets = await page.evaluate(() => ({ version: Typeset.VERSION, title: document.querySelector('h2').dataset.tsOutcome, caption: document.querySelector('figcaption').dataset.tsOutcome, tracking: document.querySelector('figcaption').dataset.tsTracking, body: document.querySelector('#body').dataset.tsOutcome, excluded: document.querySelector('#excluded').dataset.tsOutcome, link: originalLink === document.querySelector('a'), source: originalText === document.body.textContent }));
+      check(`${config.name} loader targets titles and captions ${explicit}`, targets.version === version && targets.title && targets.caption);
+      check(`${config.name} loader scope and identity ${explicit}`, (!explicit || targets.tracking === 'off') && !targets.excluded && targets.link && targets.source && (explicit ? !targets.body : !!targets.body));
       await page.evaluate(() => window.TypesetReady.then(controller => controller.disconnect()));
     }
   } finally { await browser.close(); }

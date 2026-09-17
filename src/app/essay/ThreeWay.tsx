@@ -9,7 +9,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import typeset, { measureLayout } from '@/lib/typeset-site';
+import typeset, { measureLayout, restore } from '@/lib/typeset-site';
+import { withDemoMeasurement } from '@/lib/typeset-demo';
+import { strandedOpener } from '@/lib/v4/phrase-boundaries';
 
 // Chosen empirically (scripts/screen-demo-text.mjs, 18 widths, production
 // face): browser-set it fails at 12/18 widths and orphans at 5; typeset
@@ -50,7 +52,7 @@ function measureSpans(p: HTMLElement, mark: boolean): Tally {
   rows.forEach((row, i) => {
     const last = row.spans[row.spans.length - 1];
     const word = (last.textContent || '').trim().replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase();
-    if (i < rows.length - 1 && WEAK.has(word)) {
+    if (i < rows.length - 1 && (WEAK.has(word) || strandedOpener(row.spans.map(span => span.textContent).join(' ')))) {
       hanging++;
       if (mark) last.classList.add('es-flaw');
     }
@@ -69,7 +71,7 @@ function measureComposed(p: HTMLElement): Tally {
   lines.forEach((line, i) => {
     if (i === lines.length - 1) return;
     const word = line.text.trim().split(/\s+/).pop()?.replace(/[^A-Za-z0-9’']+$/g, '').toLowerCase() || '';
-    if (WEAK.has(word)) hanging++;
+    if (WEAK.has(word) || strandedOpener(line.text)) hanging++;
   });
   const lastWords = lines[lines.length - 1].text.trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
   return { hanging, orphan: lines.length > 1 && lastWords.length === 1, lines: lines.length };
@@ -117,14 +119,15 @@ export default function ThreeWay() {
       if (!b || !pr || !t) return;
       b.innerHTML = spanHtml;
       pr.innerHTML = spanHtml;
-      t.dataset.tsRaw = DEMO_TEXT;
+      restore(t);
       t.textContent = DEMO_TEXT;
-      delete t.dataset.typesetDone;
-      typeset(t);
-      setTallies({
-        browser: measureSpans(b, true),
-        pretty: measureSpans(pr, true),
-        typeset: measureComposed(t),
+      withDemoMeasurement([b, pr, t], () => {
+        typeset(t);
+        setTallies({
+          browser: measureSpans(b, true),
+          pretty: measureSpans(pr, true),
+          typeset: measureComposed(t),
+        });
       });
     })();
     return () => {

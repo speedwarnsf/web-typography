@@ -1,25 +1,49 @@
-/** Locate the optical left contour from the actual rasterized font.
- * Compare to H in the same face so sidebearings and serifs are not guessed. */
-export function opticalInkPull(doc: Document, style: CSSStyleDeclaration, char: string, advance: number): number | null {
-  if (style.fontVariationSettings !== 'normal' || style.fontFeatureSettings !== 'normal'
-    || style.fontVariant !== 'normal' || !['none', 'normal', ''].includes(style.fontSizeAdjust)) return null;
+function supportedFont(style: CSSStyleDeclaration): boolean {
   const size = parseFloat(style.fontSize);
-  if (!Number.isFinite(size) || size <= 0 || size > 256) return null;
+  return style.fontVariationSettings === 'normal' && style.fontFeatureSettings === 'normal'
+    && style.fontVariant === 'normal' && ['none', 'normal', ''].includes(style.fontSizeAdjust)
+    && Number.isFinite(size) && size > 0 && size <= 256;
+}
+
+function setCanvasFont(context: CanvasRenderingContext2D, style: CSSStyleDeclaration): boolean {
+  if (!supportedFont(style)) return false;
+  const size = parseFloat(style.fontSize);
   const stretches: Record<string, CanvasFontStretch> = {
     '50%': 'ultra-condensed', '62.5%': 'extra-condensed', '75%': 'condensed', '87.5%': 'semi-condensed',
     '100%': 'normal', '112.5%': 'semi-expanded', '125%': 'expanded', '150%': 'extra-expanded', '200%': 'ultra-expanded',
   };
   const stretch = stretches[style.fontStretch] || Object.values(stretches).find(value => value === style.fontStretch);
-  if (!stretch) return null;
+  if (!stretch) return false;
+  context.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
+  context.fontStretch = stretch;
+  context.fontKerning = style.fontKerning as CanvasFontKerning;
+  context.textAlign = 'left'; context.textBaseline = 'alphabetic';
+  return true;
+}
+
+/** Ink can extend left of its advance box, especially in an italic face. */
+export function opticalInkOverhang(doc: Document, style: CSSStyleDeclaration, char: string, advance: number): number | null {
+  if (!supportedFont(style)) return null;
+  const context = doc.createElement('canvas').getContext('2d');
+  if (!context || !setCanvasFont(context, style)) return null;
+  const metrics = context.measureText(char);
+  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) - advance) > 1.01
+    || !Number.isFinite(metrics.actualBoundingBoxLeft)) return null;
+  return Math.max(0, metrics.actualBoundingBoxLeft);
+}
+
+/** Locate the optical left contour from the actual rasterized font.
+ * Compare to H in the same face so sidebearings and serifs are not guessed. */
+export function opticalInkPull(doc: Document, style: CSSStyleDeclaration, char: string, advance: number): number | null {
+  if (!supportedFont(style)) return null;
+  const size = parseFloat(style.fontSize);
+  if (!Number.isFinite(size) || size <= 0 || size > 256) return null;
   const scale = 4, pad = Math.ceil(size), side = Math.ceil(size * 4 * scale);
   const canvas = doc.createElement('canvas'); canvas.width = side; canvas.height = side;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return null;
   context.scale(scale, scale);
-  context.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
-  context.fontStretch = stretch;
-  context.fontKerning = style.fontKerning as CanvasFontKerning;
-  context.textAlign = 'left'; context.textBaseline = 'alphabetic';
+  if (!setCanvasFont(context, style)) return null;
   const metrics = context.measureText(char);
   const tracking = parseFloat(style.letterSpacing) || 0;
   // Canvas does not expose every CSS shaping control. Never silently align

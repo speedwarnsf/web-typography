@@ -11,8 +11,12 @@ import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
 import { languageOf, languageWeakEnding } from './break-opportunities';
+import { strandedOpener } from './phrase-boundaries';
+import { preservesAdvances } from './geometry';
+import { finishTargets } from './space-policy';
+import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 
-export const VERSION = '4.0.0';
+export const VERSION = '4.1.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 export interface Options {
   /** Opt-in Unicode 17 break opportunities; default preserves the legacy path. */
@@ -23,13 +27,16 @@ export interface Options {
   opticalHanging?: boolean;
   /** Full bounded word-space finish on composed body text. On by default. */
   spacing?: boolean;
+  /** Bounded per-line tracking after word-space finishing. On with spacing. */
+  tracking?: boolean;
   /** Re-rank the finished rag or retain the historical natural-width ranking. */
   contour?: 'natural' | 'finished';
   mode?: Mode;
   keep?: readonly string[];
   maxLines?: number;
   /** Compact preserves native line count, except one extra line to fix an
-   * orphan. Editorial permits one additional line for prose phrasing. */
+   * orphan. Editorial permits one additional line for prose phrasing.
+   * When omitted, a stranded sentence/clause opener can also earn one line. */
   density?: 'compact' | 'editorial';
   /** Current author text. Framework adapters should pass this on updates. */
   text?: string;
@@ -43,7 +50,7 @@ export interface Result {
   durationMs: number;
   constraint?: RichPlan['constraint'];
   search?: RichPlan['search'];
-  features?: { quotes: string; hanging: string; spacing: string };
+  features?: { quotes: string; hanging: string; spacing: string; tracking: string };
 }
 interface State {
   nodes: Node[];
@@ -60,6 +67,7 @@ interface State {
   quotes?: QuoteTransform;
   optical?: RichOutput;
   spacing?: RichOutput;
+  tracking?: RichOutput;
 }
 const states = new WeakMap<HTMLElement, State>();
 const measurements = new WeakMap<Document, Map<string, Map<string, number>>>();
@@ -108,7 +116,7 @@ function signature(el: HTMLElement, options: Options): string {
     cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.direction,
     cs.writingMode, cs.display, cs.textWrap, cs.hyphens, cs.wordBreak, cs.lineBreak, cs.overflowWrap, cs.getPropertyValue('-webkit-line-clamp'),
     el.closest('[lang]')?.getAttribute('lang'), el.dataset.typesetMode,
-    options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.contour,
+    options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour,
     context, getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content,
     el.querySelector(':not([data-ts-break]):not(.ts-line)') ? richFingerprint(el) : '',
   ]);
@@ -135,6 +143,7 @@ export function restore(element: HTMLElement): void {
   if (!state) return;
   const restoreSelection = selectionBookmark(element);
   state.optical?.cleanup();
+  state.tracking?.cleanup();
   state.spacing?.cleanup();
   if (state.rich) state.rich.cleanup();
   else if (ownsOutput(element, state) && !state.nodes.every((node, i) => element.childNodes[i] === node)) element.replaceChildren(...state.nodes);
@@ -147,6 +156,7 @@ export function restore(element: HTMLElement): void {
   delete element.dataset.tsQuotes;
   delete element.dataset.tsHanging;
   delete element.dataset.tsSpacing;
+  delete element.dataset.tsTracking;
 }
 
 /** Exact DOM measurements inherit font features, axes, tracking and transforms. */
@@ -245,7 +255,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const started = performance.now();
   const mode = modeOf(element, options);
   if (element.closest('[data-typeset-react-rich]')) return { outcome: 'skipped:framework', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
-  if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], .ts-line')) {
+  if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
   const prior = states.get(element);
@@ -255,6 +265,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     const restoreSelection = selectionBookmark(element);
     const unchanged = ownsOutput(element, prior);
     prior.optical?.cleanup();
+    prior.tracking?.cleanup();
     prior.spacing?.cleanup();
     resetStyles(element, prior);
     if (prior.rich) prior.rich.cleanup();
@@ -287,10 +298,14 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
     let optical: RichOutput | undefined;
     let spacing: RichOutput | undefined;
+    let tracking: RichOutput | undefined;
+    let targets: number[] | undefined;
     const features = { quotes: quotes?.outcome || 'off', hanging: options.opticalHanging ? 'native:hanging-uncomposed' : 'off',
-      spacing: options.spacing === false ? 'off' : mode !== 'body' ? 'native:spacing-mode' : 'native:spacing-uncomposed' };
+      spacing: options.spacing === false ? 'off' : mode !== 'body' ? 'native:spacing-mode' : 'native:spacing-uncomposed',
+      tracking: options.tracking === false || options.spacing === false ? 'off' : mode !== 'body' ? 'native:tracking-mode' : 'native:tracking-uncomposed' };
     if (options.spacing !== false && mode === 'body' && outcome === 'composed:rich') {
       const plan = planSpacingFinish(element, measureLayout(element));
+      targets = finishTargets(plan.before.lines.map(line => line.width), plan.before.width);
       const fingerprint = richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
@@ -301,6 +316,17 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       }
     } else if (options.spacing !== false && mode === 'body' && outcome === 'composed') {
       features.spacing = Array.from(element.querySelectorAll<HTMLElement>('.ts-line')).some(line => parseFloat(line.style.wordSpacing)) ? 'applied' : 'unchanged';
+    }
+    if (targets && options.tracking !== false && ['applied', 'unchanged'].includes(features.spacing)) {
+      const plan = planTrackingFinish(element, measureLayout(element), targets);
+      const fingerprint = richFingerprint(element);
+      features.tracking = plan.outcome;
+      if (plan.runs.length) {
+        tracking = renderTracking(element, plan);
+        if (element.textContent !== source || richFingerprint(element) !== fingerprint || !trackingVerified(element, plan, measureLayout(element))) {
+          tracking.cleanup(); tracking = undefined; features.tracking = 'native:tracking-verification';
+        }
+      }
     }
     if (options.opticalHanging && (outcome === 'composed:rich' || outcome === 'native:fits')) {
       const layout = measureLayout(element);
@@ -320,12 +346,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     element.dataset.tsQuotes = features.quotes;
     element.dataset.tsHanging = features.hanging;
     element.dataset.tsSpacing = features.spacing;
+    element.dataset.tsTracking = features.tracking;
     const result: Result = { outcome, mode, before, after: measureLayout(element), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
     states.set(element, {
       nodes, outputNodes: Array.from(element.childNodes), source, output: element.textContent || '', markup: element.innerHTML, styles,
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
       signature: signature(element, options), result,
-      rich, hadStyle, quotes, optical, spacing,
+      rich, hadStyle, quotes, optical, spacing, tracking,
     });
     return result;
   };
@@ -337,7 +364,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (cs.writingMode !== 'horizontal-tb' || cs.direction !== 'ltr') return finish('native:direction');
   for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
-    if (style.transform !== 'none' || (style.zoom && style.zoom !== '1' && style.zoom !== 'normal')) return finish('native:transformed');
+    if (!preservesAdvances(style) || (style.zoom && style.zoom !== '1' && style.zoom !== 'normal')) return finish('native:transformed');
   }
   for (const pseudo of ['::before', '::after']) {
     const content = getComputedStyle(element, pseudo).content;
@@ -349,7 +376,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (cs.overflow !== 'visible' && cs.textOverflow === 'ellipsis') return finish('native:clamped');
   if (cs.display === 'inline') return finish('native:inline');
   if (options.lineBreaks === 'unicode' || options.opticalHanging || options.smartQuotes || element.children.length || nodes.some(node => node.nodeType !== Node.TEXT_NODE)) {
-    const plan = planRichText(element, { ...options, mode });
+    const plan = planRichText(element, { ...options, mode }, before);
     search = plan.search;
     if (plan.outcome !== 'composed:rich') return finish(plan.outcome, plan.constraint);
     rich = renderRichText(element, plan.breaks);
@@ -434,17 +461,17 @@ export interface AuditIssue { element: HTMLElement; type: string; severity: 'err
 export interface AuditReport {
   examined: number;
   outcomes: Record<string, number>;
-  features: Record<'quotes' | 'hanging' | 'spacing', Record<string, number>>;
+  features: Record<'quotes' | 'hanging' | 'spacing' | 'tracking', Record<string, number>>;
   issues: AuditIssue[];
 }
 export function auditReport(selector = defaults): AuditReport {
-  const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {} }, issues: [] };
+  const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
     if (element.closest('[data-ts-generated], [data-ts-probe]')) continue;
     report.examined++;
     const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? 'excluded' : 'unprocessed');
     report.outcomes[outcome] = (report.outcomes[outcome] || 0) + 1;
-    for (const [feature, value] of [['quotes', element.dataset.tsQuotes], ['hanging', element.dataset.tsHanging], ['spacing', element.dataset.tsSpacing]] as const) {
+    for (const [feature, value] of [['quotes', element.dataset.tsQuotes], ['hanging', element.dataset.tsHanging], ['spacing', element.dataset.tsSpacing], ['tracking', element.dataset.tsTracking]] as const) {
       const status = value || 'off';
       report.features[feature][status] = (report.features[feature][status] || 0) + 1;
     }
@@ -458,6 +485,7 @@ export function auditReport(selector = defaults): AuditReport {
       const word = line.text.trim().split(/\s+/u).at(-1) || '';
       const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
       if (language === 'und' ? isWeakEnding(word) : language !== 'invalid' && languageWeakEnding(word, language)) add('weak-line-end', 'review', 'Line ' + (index + 1) + ' ends on "' + word + '"');
+      if (['en', 'und'].includes(language) && strandedOpener(line.text)) add('stranded-opener', 'review', 'Line ' + (index + 1) + ' leaves a sentence or clause opener at its end');
     }
     const state = states.get(element);
     if (state && state.output !== element.textContent) add('stale-output', 'error', 'Content changed since the last composition');
@@ -511,56 +539,95 @@ export interface Controller {
 export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
   const owned = new Set<HTMLElement>();
   const pending = new Set<HTMLElement>();
+  const nearby = new Set<HTMLElement>();
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let idle: number | undefined;
   const stats = { passes: 0, compositions: 0, maxBatchMs: 0 };
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
-  const select = () => {
-    const elements = Array.from(root.querySelectorAll<HTMLElement>(selector));
-    if (root instanceof HTMLElement && root.matches(selector)) elements.unshift(root);
-    return elements.filter(el => !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], .ts-line'));
+  const select = (within: ParentNode = root) => {
+    const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
+    const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
+    if (scope instanceof HTMLElement && scope.matches(selector)) elements.unshift(scope);
+    return elements.filter(el => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line'));
+  };
+  const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const el = entry.target as HTMLElement;
+      if (entry.isIntersecting) nearby.add(el); else nearby.delete(el);
+      // One viewport snapshot per queued job. Watching thousands of finished
+      // elements through every reflow costs more than the scheduling saves.
+      viewport?.unobserve(el);
+    }
+  }, { rootMargin: '400px' });
+  const discover = (within: ParentNode = root) => {
+    for (const el of select(within)) {
+      if (!pending.has(el)) viewport?.observe(el);
+      pending.add(el);
+    }
   };
   const schedule = () => {
-    if (stopped || !fontsReady || timer !== undefined) return;
-    timer = setTimeout(flush, 32);
+    if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
+    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(flush, { timeout: 200 });
+    else timer = setTimeout(() => flush(), 16);
   };
   const observer = new MutationObserver(records => {
     for (const record of records) {
       const target = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
-      for (const el of owned) if (target && (el.contains(target) || target.contains(el))) pending.add(el);
+      for (let el = target; el && (el === root || root.contains(el)); el = el.parentElement) {
+        if (owned.has(el)) pending.add(el);
+      }
+      if (record.type === 'attributes' && target) {
+        // An ancestor's styles can affect its entire subtree, but a clock tick
+        // or an unrelated inserted node must not rescan the whole document.
+        discover(target);
+        if (target.closest(excluded)) for (const el of owned) if (target.contains(el)) pending.add(el);
+      }
+      if (record.type === 'childList') {
+        for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
+        if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
+        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) for (const el of owned) {
+          if (node.contains(el) && !root.contains(el)) {
+            owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el);
+          }
+        }
+      }
     }
-    for (const el of select()) if (!owned.has(el)) pending.add(el);
     schedule();
   });
+  const observedWidths = new WeakMap<Element, number>();
+  const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
     for (const entry of entries) {
-      for (const el of owned) {
-        if (el !== entry.target && el.parentElement !== entry.target) continue;
-        const state = states.get(el);
-        if (!state || state.signature !== signature(el, options)) pending.add(el);
-      }
+      const previous = observedWidths.get(entry.target);
+      observedWidths.set(entry.target, entry.contentRect.width);
+      if (previous !== undefined && Math.abs(previous - entry.contentRect.width) <= .01) continue;
+      for (const el of watched.get(entry.target) || []) pending.add(el);
     }
     if (pending.size) schedule();
   });
-  const watched = new Map<Element, number>();
   const parents = new Map<HTMLElement, HTMLElement | null>();
   const watch = (el: HTMLElement) => {
     parents.set(el, el.parentElement);
     for (const target of [el, el.parentElement]) {
       if (!target) continue;
-      const count = watched.get(target) || 0;
-      if (!count) resize?.observe(target);
-      watched.set(target, count + 1);
+      let dependents = watched.get(target);
+      if (!dependents) {
+        dependents = new Set(); watched.set(target, dependents);
+        observedWidths.set(target, contentWidth(target)); resize?.observe(target);
+      }
+      dependents.add(el);
     }
   };
   const unwatch = (el: HTMLElement) => {
+    if (!parents.has(el)) return;
     for (const target of [el, parents.get(el)]) {
       if (!target) continue;
-      const count = (watched.get(target) || 1) - 1;
-      if (!count) { resize?.unobserve(target); watched.delete(target); }
-      else watched.set(target, count);
+      const dependents = watched.get(target);
+      dependents?.delete(el);
+      if (!dependents?.size) { resize?.unobserve(target); watched.delete(target); }
     }
     parents.delete(el);
   };
@@ -570,27 +637,27 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang'] });
     }
   }
-  function flush() {
+  function flush(deadline?: IdleDeadline) {
     timer = undefined;
+    idle = undefined;
     if (stopped) return;
     observer.disconnect();
     const start = performance.now();
     stats.passes++;
-    for (const el of owned) {
-      if (!(root === el || root.contains(el))) {
-        owned.delete(el); unwatch(el); pending.delete(el);
-      } else if (parents.get(el) !== el.parentElement) {
-        unwatch(el); watch(el);
-      }
+    function* work() {
+      for (const el of nearby) if (pending.has(el)) yield el;
+      yield* pending;
     }
-    for (const el of pending) {
+    for (const el of work()) {
       pending.delete(el);
-      if (!(root === el || root.contains(el))) continue;
-      if (el.closest(excluded)) { restore(el); owned.delete(el); unwatch(el); continue; }
+      nearby.delete(el); viewport?.unobserve(el);
+      if (!(root === el || root.contains(el))) { owned.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); continue; }
+      if (el.closest(excluded)) { restore(el); owned.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); continue; }
+      if (owned.has(el) && parents.get(el) !== el.parentElement) { unwatch(el); watch(el); }
       const result = typeset(el, options);
       if (result.changed) stats.compositions++;
       if (!owned.has(el)) { owned.add(el); watch(el); }
-      if (performance.now() - start >= 8) break;
+      if (performance.now() - start >= 8 || (deadline && deadline.timeRemaining() <= 1)) break;
     }
     stats.maxBatchMs = Math.max(stats.maxBatchMs, performance.now() - start);
     observe();
@@ -599,7 +666,11 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   }
   const refresh = () => {
     if (stopped) return;
-    for (const el of select()) pending.add(el);
+    discover();
+    schedule();
+  };
+  const resized = () => {
+    for (const el of owned) pending.add(el);
     schedule();
   };
   const fontsChanged = () => {
@@ -612,22 +683,24 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   document.fonts.ready.then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
-    for (const el of select()) pending.add(el);
-    flush();
+    discover();
+    schedule();
+    if (!pending.size) resolveReady();
   });
   observe();
   document.fonts.addEventListener('loadingdone', fontsChanged);
-  window.addEventListener('resize', refresh);
+  window.addEventListener('resize', resized);
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
       stopped = true;
       if (timer !== undefined) clearTimeout(timer);
-      observer.disconnect(); resize?.disconnect();
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+      observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
       document.fonts.removeEventListener('loadingdone', fontsChanged);
-      window.removeEventListener('resize', refresh);
+      window.removeEventListener('resize', resized);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear();
+      owned.clear(); pending.clear(); nearby.clear();
       watched.clear(); parents.clear();
       resolveReady();
     },

@@ -6,15 +6,17 @@ import { measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import type { Options } from './typeset.next';
 import { analyzeBreaks, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
-import { englishPhraseGroups, phraseBreakCosts, retainSentenceLayout } from './phrase-boundaries';
+import { englishPhraseGroups, phraseBreakCosts, retainSentenceLayout, strandedOpener } from './phrase-boundaries';
 import { retainParagraphRhythm } from './paragraph-rhythm';
 import { opticalMarkerStyle } from './optical-hanging';
 import type { OpticalHang } from './optical-hanging';
 import { spacingMarkerStyle } from './spacing-finish';
+import { inlineBoxInsets } from './inline-box';
+import { preservesAdvances } from './geometry';
 import type { SpaceAdjustment } from './spacing-finish';
 
 export const BREAK_ATTRIBUTE = 'data-ts-break';
-const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE']);
+const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE', 'CODE']);
 const wordPattern = /[^\s\u00a0\u202f]+(?:[\u00a0\u202f][^\s\u00a0\u202f]+)*/gu;
 interface TextRun { node: Text; start: number; end: number }
 interface Point { node: Node; offset: number }
@@ -105,9 +107,9 @@ function unsupported(element: HTMLElement): string | null {
     if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return 'native:rich-excluded';
     const cs = getComputedStyle(el);
     if (cs.direction !== 'ltr' || cs.writingMode !== 'horizontal-tb' || (el !== element && cs.unicodeBidi !== 'normal') || cs.visibility !== 'visible') return 'native:rich-direction';
-    if (cs.whiteSpace !== 'normal' || cs.transform !== 'none' || cs.textIndent !== '0px') return 'native:rich-whitespace';
+    if (cs.whiteSpace !== 'normal' || !preservesAdvances(cs) || cs.textIndent !== '0px') return 'native:rich-whitespace';
     if (el !== element && (cs.display !== 'inline' || cs.position !== 'static' || cs.verticalAlign !== 'baseline')) return 'native:rich-layout';
-    if (el !== element && ['paddingLeft', 'paddingRight', 'marginLeft', 'marginRight', 'borderLeftWidth', 'borderRightWidth'].some(key => parseFloat(cs[key as keyof CSSStyleDeclaration] as string) !== 0)) return 'native:rich-box';
+    if (el !== element && !inlineBoxInsets(cs).supported) return 'native:rich-box';
     for (const pseudo of ['::before', '::after']) {
       const content = getComputedStyle(el, pseudo).content;
       if (content && content !== 'none' && content !== 'normal' && content !== '""') return 'native:rich-decorated';
@@ -117,12 +119,14 @@ function unsupported(element: HTMLElement): string | null {
 }
 
 /** Read the real styled DOM. No clone can reproduce contextual selectors reliably. */
-export function planRichText(element: HTMLElement, options: Options = {}): RichPlan {
+export function planRichText(element: HTMLElement, options: Options = {}, nativeLayout?: RichPlan['before']): RichPlan {
   const source = element.textContent || '';
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));
+  const tracking = Array.from(element.querySelectorAll<HTMLElement>('[data-ts-track]'));
+  restoreMarkers.push(...tracking.map(wrapper => override(wrapper, { 'letter-spacing': 'inherit', 'word-spacing': 'inherit' })));
   try {
-    const before = measureLayout(element);
+    const before = !markers.length && nativeLayout ? nativeLayout : measureLayout(element);
     const search: ParagraphSearchEvidence[] = [];
     const result = (outcome: string, breaks: number[] = [], widths: number[] = [], constraint?: RichConstraint): RichPlan => ({ source, before, outcome, breaks, widths, ...(constraint && { constraint }),
       styleSignature: outcome === 'composed:rich' ? richFingerprint(element) : '', ...(search.length && { search }) });
@@ -137,7 +141,9 @@ export function planRichText(element: HTMLElement, options: Options = {}): RichP
       if (languageOf(el.closest('[lang]')?.getAttribute('lang')) !== analysis!.language) return result('native:mixed-language');
       const cs = getComputedStyle(el);
       if (cs.hyphens === 'auto') return result('native:auto-hyphens');
-      if (cs.wordBreak !== 'normal' || !['auto', 'normal'].includes(cs.lineBreak) || cs.overflowWrap !== 'normal') return result('native:break-policy');
+      // break-word adds emergency opportunities only. Normal opportunities
+      // remain valid; overlong runs still retain native layout below.
+      if (cs.wordBreak !== 'normal' || !['auto', 'normal'].includes(cs.lineBreak) || !['normal', 'break-word'].includes(cs.overflowWrap)) return result('native:break-policy');
     }
     if (getComputedStyle(element).display === 'inline') return result('native:inline');
     const reason = unsupported(element);
@@ -173,6 +179,17 @@ export function planRichText(element: HTMLElement, options: Options = {}): RichP
       }
     }
     const range = element.ownerDocument.createRange();
+    const leadingInsets = new Map<number, number>(), trailingInsets = new Map<number, number>();
+    for (const el of element.querySelectorAll<HTMLElement>('*')) {
+      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+      const insets = inlineBoxInsets(getComputedStyle(el));
+      if (!insets.left && !insets.right) continue;
+      const children = runs.filter(run => el.contains(run.node));
+      if (!children.length) continue;
+      const start = children[0].start, end = children.at(-1)!.end;
+      leadingInsets.set(start, (leadingInsets.get(start) || 0) + insets.left);
+      trailingInsets.set(end, (trailingInsets.get(end) || 0) + insets.right);
+    }
     const restoreWhiteSpace = [element, ...element.querySelectorAll<HTMLElement>('*')].filter(el => !el.hasAttribute(BREAK_ATTRIBUTE))
       .map(el => override(el, { 'white-space': 'nowrap', 'text-wrap': 'nowrap' }));
     let edges: { left: number; right: number }[];
@@ -199,9 +216,10 @@ export function planRichText(element: HTMLElement, options: Options = {}): RichP
     content.forEach((token, i) => { token.width = edges[i].right - edges[i].left; });
     const nativeSpans = new Map(before.lines.map(line => [line.sourceStart + ':' + line.sourceEnd, line]));
     const measureRange = (start: number, end: number) => {
-      const width = edges[end - 1].right - edges[start].left;
-      if (width <= before.width || width > before.width + .5) return width;
       const last = words[end - 1];
+      const width = edges[end - 1].right - edges[start].left
+        + (leadingInsets.get(words[start].index) || 0) + (trailingInsets.get(last.index + last.text.length) || 0);
+      if (width <= before.width || width > before.width + .5) return width;
       const witness = nativeSpans.get(words[start].index + ':' + (last.index + last.text.length));
       // Only an identical native line can witness a borderline fit. This is
       // not extra room for arbitrary spans; rendering still verifies the plan.
@@ -211,7 +229,9 @@ export function planRichText(element: HTMLElement, options: Options = {}): RichP
     const breakPenalty = (end: number) => words[end - 1].hyphen ? 1600 : 0;
     const title = options.mode === 'title' || options.mode === 'heading' || (!options.mode && /^H[1-6]$/.test(element.tagName));
     const clamp = parseInt(getComputedStyle(element).getPropertyValue('-webkit-line-clamp'), 10);
-    const allowance = !title && (before.lastSingleton || options.density === 'editorial') ? 1 : 0;
+    const openerRepair = options.density !== 'compact' && (!analysis || analysis.language === 'en')
+      && before.lines.slice(0, -1).some(line => strandedOpener(line.text));
+    const allowance = !title && (before.lastSingleton || options.density === 'editorial' || openerRepair) ? 1 : 0;
     const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
     const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
     const contourWidths = !title && options.contour === 'finished' && ['left', 'start'].includes(getComputedStyle(element).textAlign)
@@ -390,8 +410,9 @@ export function preserveRichCopy(element: HTMLElement): () => void {
       const html = ranges.map(range => {
         const fragment = range.cloneContents();
         fragment.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
+        fragment.querySelectorAll('[data-ts-track]').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
         for (const el of fragment.querySelectorAll('*')) {
-          for (const attribute of ['data-ts-outcome', 'data-typeset-done', 'data-ts-quotes', 'data-ts-hanging', 'data-ts-spacing']) el.removeAttribute(attribute);
+          for (const attribute of ['data-ts-outcome', 'data-typeset-done', 'data-ts-quotes', 'data-ts-hanging', 'data-ts-spacing', 'data-ts-tracking']) el.removeAttribute(attribute);
           // Relative links must still point to the source document after paste.
           if (el instanceof HTMLAnchorElement && el.hasAttribute('href')) {
             try { el.href = new URL(el.getAttribute('href')!, doc.baseURI).href; } catch { /* Preserve invalid author URLs as authored. */ }
@@ -428,7 +449,7 @@ export function preserveRichCopy(element: HTMLElement): () => void {
 }
 
 export function richFingerprint(element: HTMLElement): string {
-  return [element, ...element.querySelectorAll<HTMLElement>('*')].filter(el => !el.hasAttribute(BREAK_ATTRIBUTE)).map(el => {
+  return [element, ...element.querySelectorAll<HTMLElement>('*')].filter(el => !el.hasAttribute(BREAK_ATTRIBUTE) && !el.hasAttribute('data-ts-track')).map(el => {
     const cs = getComputedStyle(el);
     return [cs.font, cs.fontFeatureSettings, cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontKerning,
       cs.fontVariant, cs.fontSizeAdjust, cs.fontSynthesis, cs.textRendering, cs.lineHeight, cs.letterSpacing,

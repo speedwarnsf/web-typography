@@ -10,6 +10,28 @@ Hashes for every published version live in
 
 ---
 
+## 4.1.0 - 2026-09-17
+
+The next public release after 4.0.0. Private 4.0.1-dev labels are not public pins.
+
+- Bounded per-line tracking after word spacing, preserving chosen breaks,
+  final lines, source text, links and emphasis. Verified rollback and explicit
+  tracking controls in DOM, React and script loaders.
+- Incremental mount discovery, initially visible-text priority and yielded
+  batches; real text, font and width changes still recompose.
+- Optical hanging inside supported clipped containers when the full glyph fits.
+  Partial application and unsupported font/clip contexts are reported honestly.
+- Context-measured sliced inline-code boxes and pure 2D translation support.
+- Sentence/clause-opener classification and default body line allowance repair
+  the reported stranded "By" and "rule: fill" cases.
+- Proof/essay comparisons measure active geometry and restore before source
+  replacement; tracking, clipping, inline-code and controller regression suites.
+
+Existing 4.0.0 and v3 pins/archives remain unchanged. Read the migration and
+support contracts before upgrading. No SceneF integration changes are included.
+The scheduler reduces redundant work, not all layout cost; external device,
+spoken screen-reader and representative-device acceptance limits remain.
+
 ## 4.0.0 — 2026-09-17
 
 The next public major release after 3.5.1. Internal candidate labels are not

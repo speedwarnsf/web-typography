@@ -1,8 +1,10 @@
 import type { LayoutMetrics } from './layout-metrics';
+import { strandedOpener } from './phrase-boundaries';
 
 /** Preserve an already even paragraph only when recomposition clearly disrupts it. */
 export function retainParagraphRhythm(source: string, before: LayoutMetrics, proposedWidths: readonly number[]): boolean {
   const { lines, width, overflow } = before;
+  if (lines.slice(0, -1).some(line => strandedOpener(line.text))) return false;
   if (!Number.isFinite(width) || width <= 0 || overflow > .5 || lines.length < 4
     || proposedWidths.length !== lines.length || lines.some(l => l.words < 2 || !Number.isFinite(l.width) || l.width < 0 || l.width > width + .5)
     || proposedWidths.some(w => !Number.isFinite(w) || w < 0 || w > width + .5)) return false;

@@ -18,7 +18,7 @@ for (const { name, engine, executablePath } of browsers) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     page.on('pageerror', error => report.errors.push({ browser: name, error: error.message }));
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:32px;font:20px/1.4 Georgia;color:#171717;background:white}p{width:240px;margin:0 0 24px;text-wrap:wrap}a{color:#176650}</style></head><body></body></html>');
-    await page.addScriptTag({ path: 'packages/typeset-v4/dist/typeset.global.js' });
+    await page.addScriptTag({ path: process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js' });
     await page.addStyleTag({ path: 'packages/typeset-v4/dist/styles.css' });
     const checks = await page.evaluate(async () => {
       const api = window.Typeset, checks = [];

@@ -12,6 +12,9 @@ import type { LayoutMetrics } from './layout-metrics';
 import type { OpticalHang } from './optical-hanging';
 import { planSpacingFinish, spacingMarkerStyle, spacingVerified } from './spacing-finish';
 import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
+import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
+import type { TrackingPlan, TrackingRun } from './tracking-finish';
+import { finishTargets } from './space-policy';
 
 export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 'dangerouslySetInnerHTML'> {
   children: ReactNode;
@@ -24,9 +27,10 @@ export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 
   smartQuotes?: Options['smartQuotes'];
   opticalHanging?: Options['opticalHanging'];
   spacing?: Options['spacing'];
+  tracking?: Options['tracking'];
   contour?: Options['contour'];
 }
-interface RenderPlan extends RichPlan { hangs?: OpticalHang[]; hanging?: string; spacing?: SpacingPlan; beforeHanging?: LayoutMetrics }
+interface RenderPlan extends RichPlan { hangs?: OpticalHang[]; hanging?: string; spacing?: SpacingPlan; tracking?: TrackingPlan; beforeHanging?: LayoutMetrics }
 interface State { input: ReactNode; plan: RenderPlan | null }
 
 function quoteSource(children: ReactNode): string {
@@ -49,7 +53,24 @@ function quoteTreeSupported(children: ReactNode): boolean {
   return supported;
 }
 
-function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], educate: boolean): ReactNode {
+function trackingForTree(plan: TrackingPlan, children: ReactNode): TrackingPlan {
+  let offset = 0;
+  const runs: TrackingRun[] = [];
+  const visit = (nodes: ReactNode) => Children.forEach(nodes, child => {
+    if (typeof child === 'string' || typeof child === 'number') {
+      const end = offset + String(child).length;
+      for (const run of plan.runs) {
+        const start = Math.max(offset, run.start), stop = Math.min(end, run.end);
+        if (stop > start) runs.push({ ...run, start, end: stop });
+      }
+      offset = end;
+    } else if (isValidElement<{ children?: ReactNode }>(child)) visit(child.props.children);
+  });
+  visit(children);
+  return { ...plan, runs };
+}
+
+function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean): ReactNode {
   let offset = 0;
   const educated = educate ? smartQuotes(quoteSource(children)) : null;
   const optical = new Map(hangs.map(hang => [hang.offset, hang.px]));
@@ -59,18 +80,31 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       const raw = String(child);
       const text = educated === null ? raw : educated.slice(offset, offset + raw.length);
       const start = offset; offset += text.length;
-      const stops = [...new Set([...breaks, ...optical.keys(), ...spacing.keys()])].filter(at => at >= start && at < offset).sort((a, b) => a - b);
+      const stops = [...new Set([...breaks, ...optical.keys(), ...spacing.keys(), ...tracks.flatMap(run => [run.start, run.end])])].filter(at => at >= start && at < offset).sort((a, b) => a - b);
       let cursor = 0;
       const pieces: ReactNode[] = [];
+      let active: TrackingRun | undefined;
+      let tracked: ReactNode[] = [];
+      const flush = () => {
+        if (active && tracked.length) pieces.push(createElement('span', { key: 'track-' + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active) }, ...tracked));
+        active = undefined; tracked = [];
+      };
+      const append = (piece: ReactNode, at: number, marker = false) => {
+        if (piece === '') return;
+        const run = tracks.find(run => run.start <= at && at < run.end);
+        if (marker || run !== active) flush();
+        active = marker ? undefined : run;
+        if (active) tracked.push(piece); else pieces.push(piece);
+      };
       for (const stop of stops) {
         const local = stop - start;
-        pieces.push(text.slice(cursor, local));
-        if (breaks.has(stop)) pieces.push(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true }));
-        if (optical.has(stop)) pieces.push(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }));
-        if (spacing.has(stop)) pieces.push(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }));
+        append(text.slice(cursor, local), start + cursor);
+        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true }), stop, true);
+        if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
+        if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
         cursor = local;
       }
-      pieces.push(text.slice(cursor));
+      append(text.slice(cursor), start + cursor); flush();
       return pieces;
     }
     if (!isValidElement<{ children?: ReactNode }>(child)) return child;
@@ -135,16 +169,25 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
         const invalid = el.textContent !== plan.source || after.overflow > .5 || (plan.outcome === 'composed:rich' &&
           ((!plan.spacing && !richLayoutVerified(plan, after)) || after.lines.length !== plan.widths.length || richFingerprint(el) !== plan.styleSignature))
           || (!title && !plan.before.lastSingleton && after.lastSingleton);
-        if (plan.spacing?.adjustments.length && (invalid || !spacingVerified(el, plan.spacing, after))) {
-          this.setState({ plan: { ...plan, spacing: { ...plan.spacing, outcome: 'native:spacing-verification', adjustments: [] } } });
+        if (plan.spacing?.adjustments.length && (invalid || !spacingVerified(el, plan.spacing, plan.tracking?.before || plan.beforeHanging || after))) {
+          this.setState({ plan: { ...plan, tracking: undefined, spacing: { ...plan.spacing, outcome: 'native:spacing-verification', adjustments: [] } } });
           return;
         }
         if (invalid) {
-          this.setState({ plan: { ...plan, breaks: [], hangs: [], spacing: undefined, hanging: 'native:hanging-verification', outcome: 'native:verification' } });
+          this.setState({ plan: { ...plan, breaks: [], hangs: [], spacing: undefined, tracking: undefined, hanging: 'native:hanging-verification', outcome: 'native:verification' } });
           return;
         }
         if (!plan.spacing && this.props.spacing !== false && !title && plan.outcome === 'composed:rich') {
           this.setState({ plan: { ...plan, spacing: planSpacingFinish(el, after) } });
+          return;
+        }
+        if (plan.tracking?.runs.length && !trackingVerified(el, plan.tracking, plan.beforeHanging || after)) {
+          this.setState({ plan: { ...plan, tracking: { ...plan.tracking, outcome: 'native:tracking-verification', runs: [] }, hangs: [], hanging: undefined, beforeHanging: undefined } });
+          return;
+        }
+        if (!plan.tracking && this.props.tracking !== false && plan.spacing && ['applied', 'unchanged'].includes(plan.spacing.outcome)) {
+          const targets = finishTargets(plan.spacing.before.lines.map(line => line.width), plan.spacing.before.width);
+          this.setState({ plan: { ...plan, tracking: trackingForTree(planTrackingFinish(el, after, targets), this.props.children) } });
           return;
         }
         if (this.props.opticalHanging && !plan.hanging) {
@@ -191,13 +234,14 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     else this.observe();
   };
   render(): ReactElement {
-    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, contour: _contour, ...attributes } = this.props;
+    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;
     const plan = this.state.plan;
     const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);
     return createElement(as, { ...attributes, ref: this.host, 'data-typeset-react-rich': '', 'data-typeset-done': plan ? '1' : undefined,
       'data-ts-outcome': plan?.outcome, 'data-ts-quotes': quotes ? educate ? 'enabled' : 'native:quotes-scope' : undefined,
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,
-      'data-ts-spacing': _spacing === false ? 'off' : plan?.spacing?.outcome || 'native:spacing-uncomposed' },
-    supportedTree(children) ? renderChildren(children, new Set(plan?.breaks || []), plan?.hangs || [], plan?.spacing?.adjustments || [], educate) : children);
+      'data-ts-spacing': _spacing === false ? 'off' : plan?.spacing?.outcome || 'native:spacing-uncomposed',
+      'data-ts-tracking': _tracking === false || _spacing === false ? 'off' : plan?.tracking?.outcome || 'native:tracking-uncomposed' },
+    supportedTree(children) ? renderChildren(children, new Set(plan?.breaks || []), plan?.hangs || [], plan?.spacing?.adjustments || [], plan?.tracking?.runs || [], educate) : children);
   }
 }

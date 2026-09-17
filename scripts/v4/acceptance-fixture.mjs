@@ -16,7 +16,7 @@ export async function acceptanceFixture() {
   document.querySelector('#apply').onclick=compose;document.querySelector('#restore').onclick=()=>{window.controller?.disconnect();document.querySelectorAll('[data-compose]').forEach(p=>Typeset.restore(p));};
   window.activations=0;document.querySelector('#first a').addEventListener('click',()=>window.activations++);
   </script></body></html>`;
-  const files = { '/typeset.js': ['packages/typeset-v4/dist/typeset.global.js', 'text/javascript'], '/styles.css': ['packages/typeset-v4/dist/styles.css', 'text/css'], '/font.woff2': ['lab/fraunces-latin-variable.woff2', 'font/woff2'] };
+  const files = { '/typeset.js': [process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js', 'text/javascript'], '/styles.css': ['packages/typeset-v4/dist/styles.css', 'text/css'], '/font.woff2': ['lab/fraunces-latin-variable.woff2', 'font/woff2'] };
   const server = createServer(async (req, res) => {
     try {
       const file = files[new URL(req.url, 'http://localhost').pathname];

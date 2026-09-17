@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, codex/release-4.0.0]
+    branches: [master, 'codex/release-*']
   pull_request:
 
 jobs:
@@ -34,8 +34,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit firefox
 
-      - name: V4 craft, spacing, promise and accessibility invariants
+      - name: Craft, spacing, tracking, clipping, lifecycle and accessibility invariants
         run: npm run test:v4
 
       - name: Production website build
         run: npm run build
+
+      - name: Fresh packed npm consumer and TypeScript contracts
+        run: node scripts/v4/verify-package.mjs
+
+      - name: Packed React consumer in three browsers
+        run: node scripts/v4/verify-consumer-browser.mjs

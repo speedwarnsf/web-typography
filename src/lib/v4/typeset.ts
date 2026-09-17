@@ -1,5 +1,7 @@
 'use client';
 
+import { proseBoundary } from './phrase-boundaries';
+
 /**
  * typeset.ts — Typographic refinement utility
  * 
@@ -1053,7 +1055,7 @@ export function createParagraphProblem(
     // sentence (e.g. "…public good. That"). The bump-down alternative wins
     // whenever the shortened previous line's fill penalty stays under this, so
     // it only fires "where width allows" and never overrides orphanPenalty.
-    if (opts.englishLexical !== false && !isLast && lastContent && !isSentenceEnd(lastContent.text)) {
+  if (opts.englishLexical !== false && !isLast && lastContent && !proseBoundary(lastContent.text)) {
       // Distance matters (2026-07-09, the essay's odd-rag regression): the
       // sin is a new sentence's OPENING stranded at the line end ("…word.
       // Books"), not a line that merely carries a boundary and reads on.
@@ -1066,7 +1068,7 @@ export function createParagraphProblem(
       for (const t of lineTokens) {
         if (t === lastContent) break;
         if (t.kind === "space") continue;
-        if (isSentenceEnd(t.text)) wordsIntoSentence = 0;
+      if (proseBoundary(t.text)) wordsIntoSentence = 0;
         else if (wordsIntoSentence >= 0) wordsIntoSentence++;
       }
       if (wordsIntoSentence === 0) {

@@ -1,0 +1,10 @@
+import type { Options, Result, Controller, RichPlan } from './typeset.next.js';
+export * from './typeset.next.js';
+export { smartQuotes } from './smart-quotes.js';
+export { styleProseLists } from './prose-lists.js';
+export type { ListStyleResult } from './prose-lists.js';
+export { composeParagraph, finalValidate, linesOverflow, linesStarved, renderFrozenLines, shapeExactLines, tokenize } from './typeset.js';
+export declare function typeset(element: HTMLElement, options?: Options): Result;
+export declare function typesetAll(selector?: string, options?: Options): Result[];
+export declare function mount(root?: ParentNode, selector?: string, options?: Options): Controller;
+export declare function planRichText(element: HTMLElement, options?: Options): RichPlan;

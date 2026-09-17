@@ -18,6 +18,7 @@ export interface TypesetTextProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   smartQuotes?: Options['smartQuotes'];
   opticalHanging?: Options['opticalHanging'];
   spacing?: Options['spacing'];
+  tracking?: Options['tracking'];
   contour?: Options['contour'];
 }
 
@@ -26,21 +27,21 @@ export interface TypesetTextProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
  * its text subtree. The stable initial child also supplies readable SSR.
  * Inline interactive children belong outside this plain-text adapter.
  */
-export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, contour, ...attributes }: TypesetTextProps) {
+export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, ...attributes }: TypesetTextProps) {
   const ref = useRef<HTMLElement>(null);
   const [initialText] = useState(text);
-  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, contour });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, contour };
+  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const controller = mount(element, '[data-typeset-react]', options.current);
     return () => controller.disconnect();
-  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, contour]);
+  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
   useLayoutEffect(() => {
     const element = ref.current;
     if (element) typeset(element, options.current);
     return () => { if (element) restore(element); };
-  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, contour]);
+  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
   return createElement(as, { ...attributes, ref, 'data-typeset-react': '' }, initialText);
 }

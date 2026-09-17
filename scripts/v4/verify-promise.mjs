@@ -24,7 +24,7 @@ for(const config of browsers){
     page.on('pageerror',error=>report.errors.push({browser:config.name,error:error.message}));
     page.on('console',message=>{if(['warning','error'].includes(message.type()))report.errors.push({browser:config.name,error:message.text()});});
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:24px}p{font:20px/1.5 Georgia;width:340px;margin:0 0 12px;text-wrap:wrap}a{color:#176650}</style></head><body></body></html>');
-    await page.addScriptTag({path:'packages/typeset-v4/dist/typeset.global.js'});
+    await page.addScriptTag({path:process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js'});
     await page.addScriptTag({content:helpers.outputFiles[0].text});
     await page.evaluate(async bytes=>{
       const face=new FontFace('PromiseSpecimen',`url(data:font/woff2;base64,${bytes})`);
