@@ -7,6 +7,7 @@ import { releaseIdentity } from './release-evidence.mjs';
 const report={...await releaseIdentity(),checks:[],samples:[],errors:[],browsers:{}};
 const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize} from './src/lib/v4/typeset';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
 const texts=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
+const specimenFont=(await readFile('lab/fraunces-latin-variable.woff2')).toString('base64');
 const react=await build({stdin:{contents:`
 import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{TypesetRichText}from'./src/lib/v4/typeset.release.react';
 function Fixture(){const[bad,setBad]=useState(false),[count,setCount]=useState(0);return <>
@@ -25,6 +26,10 @@ for(const config of browsers){
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:24px}p{font:20px/1.5 Georgia;width:340px;margin:0 0 12px;text-wrap:wrap}a{color:#176650}</style></head><body></body></html>');
     await page.addScriptTag({path:'packages/typeset-v4/dist/typeset.global.js'});
     await page.addScriptTag({content:helpers.outputFiles[0].text});
+    await page.evaluate(async bytes=>{
+      const face=new FontFace('PromiseSpecimen',`url(data:font/woff2;base64,${bytes})`);
+      document.fonts.add(face);await face.load();await document.fonts.ready;
+    },specimenFont);
     const result=await page.evaluate(texts=>{
       const api=window.Typeset,internals=window.Internals,checks=[],samples=[];
       const check=(label,pass,detail)=>checks.push({label,pass:!!pass,detail});
@@ -81,7 +86,9 @@ for(const config of browsers){
       const synthetic=[{tokens:[{text:'one'},{text:'two'}],width:100,fill:.5},{tokens:[{text:'three'},{text:'four'}],width:160,fill:.8},{tokens:[{text:'five'}],width:40,fill:.2}];
       for(const missing of [undefined,0,NaN,Infinity,-1])check('no guessed space '+missing,api.shapeExactLines(synthetic,20,200,false,missing,20).every(line=>line.wordSpacingEm===0));
       let composed=0,changed=0;
-      for(const text of texts.slice(0,25))for(const width of [240,340,560]){
+      // A real bundled font keeps this coverage assertion independent of OS font aliases.
+      p.style.fontFamily='PromiseSpecimen';
+      for(const text of texts.slice(0,25))for(const width of [220,240,280,320,340,400,480,560]){
         p.style.width=width+'px';p.textContent=text;
         const natural=api.typeset(p,{contour:'natural'});api.restore(p);
         const finished=api.typeset(p);
@@ -94,7 +101,7 @@ for(const config of browsers){
         api.restore(p);
       }
       check('finished ranking exercised on real text',composed>40&&changed>0,{composed,changed});
-      p.style.width='340px';p.textContent=texts[0];
+      p.style.fontFamily='Georgia';p.style.width='340px';p.textContent=texts[0];
       const plan=internals.planRichText(p,{lineBreaks:'unicode'}),composition=api.typeset(p,{spacing:false,contour:'natural'});
       if(composition.outcome==='composed:rich'){
         const after=api.measureLayout(p);check('valid actual lines verify',internals.richLayoutVerified(plan,after));

@@ -53,3 +53,4 @@ output/*verification.json
 output/*-report.json
 output/spacing-finish.json
 output/promise-verification.json
+output/

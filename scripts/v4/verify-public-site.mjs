@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 
 const base = process.env.SITE_URL || 'http://127.0.0.1:4210';
+const integrity = JSON.parse(await readFile('public/sri.json', 'utf8')).files['go@4.0.0.js'];
 const report = { base, checks: [], errors: [], samples: [] };
 const check = (name, value) => { report.checks.push({ name, passed: !!value }); assert.ok(value, name); };
 await mkdir('output/playwright', { recursive: true });
@@ -59,12 +60,13 @@ for (const config of browsers) {
       await page.goto(base + '/releases/4.0.0/');
       await page.setContent(`<html lang="en"><style>h2,figcaption,p{width:280px;font:20px/1.5 Georgia;text-wrap:wrap}</style><h2 class="chosen">${text}</h2><figcaption class="chosen">Read <a href="#notes">the neighborhood gallery notes</a> and discover how the collection grew over the years.</figcaption><p id="body">${text}</p><p data-no-typeset id="excluded">${text}</p></html>`);
       await page.evaluate(() => { window.originalLink = document.querySelector('a'); window.originalText = document.body.textContent; });
-      await page.evaluate(({ base, explicit }) => new Promise((resolve, reject) => {
+      await page.evaluate(({ base, explicit, integrity }) => new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = base + '/go@4.0.0.js';
+        script.integrity = integrity; script.crossOrigin = 'anonymous';
         if (explicit) script.dataset.typesetSelector = '.chosen';
         script.onload = resolve; script.onerror = reject; document.head.append(script);
-      }), { base, explicit });
+      }), { base, explicit, integrity });
       await page.evaluate(() => window.TypesetReady);
       const targets = await page.evaluate(() => ({ version: Typeset.VERSION, title: document.querySelector('h2').dataset.tsOutcome, caption: document.querySelector('figcaption').dataset.tsOutcome, body: document.querySelector('#body').dataset.tsOutcome, excluded: document.querySelector('#excluded').dataset.tsOutcome, link: originalLink === document.querySelector('a'), source: originalText === document.body.textContent }));
       check(`${config.name} loader targets titles and captions ${explicit}`, targets.version === '4.0.0' && targets.title && targets.caption);
