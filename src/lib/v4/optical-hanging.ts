@@ -47,7 +47,14 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
       else px = pull;
     }
     if (!(px > 0 && Number.isFinite(px))) return [];
-    const overhang = room.clips.length ? opticalInkOverhang(element.ownerDocument, style, displayed, advance) : 0;
+    let overhang: number | null = 0;
+    if (room.clips.length) {
+      const text = run.node.data.slice(local).match(/^\S{1,64}(?=\s|$)/u)?.[0] || char;
+      range.setEnd(run.node, local + text.length);
+      const contextualAdvance = range.getBoundingClientRect().width;
+      const transformed = style.textTransform === 'uppercase' ? text.toUpperCase() : style.textTransform === 'lowercase' ? text.toLowerCase() : text;
+      overhang = opticalInkOverhang(element.ownerDocument, style, displayed, advance, { text: transformed, advance: contextualAdvance });
+    }
     if (overhang === null) { unmeasurable = true; return []; }
     if (!fitsHangingRoom(room, glyph, px, overhang)) { clipped++; return []; }
     return [{ offset: line.sourceStart, px, overhang }];

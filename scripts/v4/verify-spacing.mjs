@@ -2,6 +2,7 @@ import { browsers } from './browsers.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { releaseIdentity } from './release-evidence.mjs';
 import { build } from 'esbuild';
+import { fixtureFont } from './font-fixture.mjs';
 
 const proof='Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 const paragraphs=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
@@ -95,6 +96,7 @@ for(const {name,engine,executablePath} of browsers){
       const pathname=new URL(route.request().url()).pathname;
       if(pathname==='/lab/spacing-react.html')return route.fulfill({contentType:'text/html',body:fixtureHTML});
       if(pathname==='/lab/dist/spacing-react.js')return route.fulfill({contentType:'text/javascript',body:fixtureBundle.outputFiles[0].text});
+      if(pathname==='/lab/fraunces-latin-variable.woff2')return route.fulfill({contentType:'font/woff2',body:fixtureFont});
       return route.fulfill({status:404,body:'Not found'});
     });
     await page.goto('http://typeset-spacing.test/lab/spacing-react.html');

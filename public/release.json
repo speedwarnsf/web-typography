@@ -8,9 +8,9 @@
   "manifest": "/releases/4.1.0/manifest.json",
   "loader": {
     "url": "/go@4.1.0.js",
-    "integrity": "sha384-RRB5QBwSp9ATzuiUxAM4OHOwBN2HhhaN5spJWcI/4M8jhl2OflBnxN8OQ0PMLkC8",
-    "bytes": 101957,
-    "gzipBytes": 41560
+    "integrity": "sha384-1qkfdbQ3CL7UETIwu/QMq2Ks57EAwlWBP/GaBuCggdpl7mBVlIeZAgyaZfyAHsmB",
+    "bytes": 102297,
+    "gzipBytes": 41682
   },
   "validation": "See SUPPORT.md for verified coverage and outstanding device acceptance."
 }

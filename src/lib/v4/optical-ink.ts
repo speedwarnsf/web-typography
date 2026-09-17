@@ -22,12 +22,16 @@ function setCanvasFont(context: CanvasRenderingContext2D, style: CSSStyleDeclara
 }
 
 /** Ink can extend left of its advance box, especially in an italic face. */
-export function opticalInkOverhang(doc: Document, style: CSSStyleDeclaration, char: string, advance: number): number | null {
+export function opticalInkOverhang(doc: Document, style: CSSStyleDeclaration, char: string, advance: number,
+  measuredContext?: { text: string; advance: number }): number | null {
   if (!supportedFont(style)) return null;
   const context = doc.createElement('canvas').getContext('2d');
   if (!context || !setCanvasFont(context, style)) return null;
-  const metrics = context.measureText(char);
-  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) - advance) > 1.01
+  // A glyph Range includes kerning with its following letter (notably quotes
+  // before A). Compare the same styled word fragment, not an isolated glyph.
+  const witness = measuredContext && !/\p{M}/u.test(measuredContext.text) ? measuredContext : { text: char, advance };
+  const metrics = context.measureText(witness.text);
+  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) * Array.from(witness.text).length - witness.advance) > 1.01
     || !Number.isFinite(metrics.actualBoundingBoxLeft)) return null;
   return Math.max(0, metrics.actualBoundingBoxLeft);
 }

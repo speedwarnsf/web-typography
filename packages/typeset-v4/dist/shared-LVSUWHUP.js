@@ -2446,12 +2446,13 @@ function setCanvasFont(context, style) {
   context.textBaseline = "alphabetic";
   return true;
 }
-function opticalInkOverhang(doc, style, char, advance) {
+function opticalInkOverhang(doc, style, char, advance, measuredContext) {
   if (!supportedFont(style)) return null;
   const context = doc.createElement("canvas").getContext("2d");
   if (!context || !setCanvasFont(context, style)) return null;
-  const metrics = context.measureText(char);
-  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) - advance) > 1.01 || !Number.isFinite(metrics.actualBoundingBoxLeft)) return null;
+  const witness = measuredContext && !/\p{M}/u.test(measuredContext.text) ? measuredContext : { text: char, advance };
+  const metrics = context.measureText(witness.text);
+  if (Math.abs(metrics.width + (parseFloat(style.letterSpacing) || 0) * Array.from(witness.text).length - witness.advance) > 1.01 || !Number.isFinite(metrics.actualBoundingBoxLeft)) return null;
   return Math.max(0, metrics.actualBoundingBoxLeft);
 }
 function opticalInkPull(doc, style, char, advance) {
@@ -2599,7 +2600,14 @@ function planOpticalHanging(element, layout) {
       else px = pull;
     }
     if (!(px > 0 && Number.isFinite(px))) return [];
-    const overhang = room.clips.length ? opticalInkOverhang(element.ownerDocument, style, displayed, advance) : 0;
+    let overhang = 0;
+    if (room.clips.length) {
+      const text = run.node.data.slice(local).match(/^\S{1,64}(?=\s|$)/u)?.[0] || char;
+      range.setEnd(run.node, local + text.length);
+      const contextualAdvance = range.getBoundingClientRect().width;
+      const transformed = style.textTransform === "uppercase" ? text.toUpperCase() : style.textTransform === "lowercase" ? text.toLowerCase() : text;
+      overhang = opticalInkOverhang(element.ownerDocument, style, displayed, advance, { text: transformed, advance: contextualAdvance });
+    }
     if (overhang === null) {
       unmeasurable = true;
       return [];
@@ -4046,4 +4054,4 @@ export {
   auditJSON,
   mount
 };
-//# sourceMappingURL=shared-N574AA77.js.map
+//# sourceMappingURL=shared-LVSUWHUP.js.map

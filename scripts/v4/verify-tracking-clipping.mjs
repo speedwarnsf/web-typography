@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
+import { installFixtureFont } from './font-fixture.mjs';
 
 const bundle = await readFile(process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js', 'utf8');
 const report = { checks: [], cases: [], errors: [] };
@@ -9,6 +10,7 @@ for (const { name, engine, executablePath } of browsers) {
     const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
     await page.setContent('<html lang="en"><style>body{margin:32px}p{margin:0;font:20px/1.5 Georgia}a{color:green}strong{font-weight:700}</style><body></body></html>');
     await page.addScriptTag({ content: bundle });
+    await installFixtureFont(page);
     const result = await page.evaluate(() => {
       const api = window.Typeset, checks = [], cases = [];
       const check = (label, pass, detail) => checks.push({ label, pass: !!pass, detail });
@@ -62,7 +64,11 @@ for (const { name, engine, executablePath } of browsers) {
         const output = p.innerHTML; check('idempotent ' + label, !api.typeset(p).changed && p.innerHTML === output);
         const selection = getSelection(), range = document.createRange(); range.selectNodeContents(p); selection.removeAllRanges(); selection.addRange(range);
         const copy = new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() }); p.dispatchEvent(copy);
-        check('copy source ' + label, copy.clipboardData.getData('text/plain') === text && !copy.clipboardData.getData('text/html').includes('data-ts-'));
+        if (r.outcome === 'composed:rich') {
+          check('copy source ' + label, copy.clipboardData.getData('text/plain') === text && !copy.clipboardData.getData('text/html').includes('data-ts-'));
+        } else {
+          check('native copy remains browser-owned ' + label, !copy.defaultPrevented && selection.toString() === text && !p.querySelector('[data-ts-track]'));
+        }
         selection.removeAllRanges();
         cases.push({ label, tracking: r.features.tracking, wrappers: wrappers.length, before: base.after.lines.map(line => line.width), after: r.after.lines.map(line => line.width) });
         api.restore(p); check('exact restoration ' + label, p.innerHTML === original && p.firstChild === first && (!link || p.querySelector('a') === link)); p.remove();
@@ -119,7 +125,7 @@ for (const { name, engine, executablePath } of browsers) {
         { name: 'masked container', css: 'padding:24px;mask-image:linear-gradient(black,transparent);', expected: 'native:hanging-clipped' },
       ]) {
         const parent = document.createElement('section'); parent.style.cssText = sample.css + 'width:300px;margin-bottom:10px;background:#eee;';
-        const p = document.createElement('p'); p.style.cssText = sample.self || ''; p.textContent = '\u201cA short quotation.\u201d'; parent.append(p); document.body.append(parent);
+        const p = document.createElement('p'); p.style.cssText = sample.self || ''; p.style.fontFamily = 'TypesetFixture'; p.textContent = '\u201cA short quotation.\u201d'; parent.append(p); document.body.append(parent);
         const original = p.innerHTML, style = parent.getAttribute('style');
         const r = api.typeset(p, { opticalHanging: true });
         check('clipping geometry: ' + sample.name, r.features.hanging === sample.expected, r.features.hanging);
@@ -132,6 +138,8 @@ for (const { name, engine, executablePath } of browsers) {
     report.cases.push(...result.cases.map(sample => ({ browser: name, ...sample })));
     await page.setContent('<html lang="en"><style>body{margin:40px;background:white;color:black}section{width:280px;padding:24px;overflow:hidden;border:1px solid #777}p{margin:0;font:italic 24px/1.5 Georgia}</style><body><section><p>\u201cA short quotation.\u201d</p></section></body></html>');
     await page.addScriptTag({ content: bundle });
+    await installFixtureFont(page);
+    await page.locator('p').evaluate(el => el.style.fontFamily = 'TypesetFixture');
     const outcome = await page.evaluate(() => window.Typeset.typeset(document.querySelector('p'), { opticalHanging: true }).features.hanging);
     const clipped = await page.screenshot({ path: `output/playwright/hanging-clipped-${name}.png` });
     await page.locator('section').evaluate(el => el.style.overflow = 'visible');

@@ -9,7 +9,7 @@ await new Promise(resolve => stale.listen(0, '127.0.0.1', resolve));
 let result;
 try {
   result = await new Promise((resolve, reject) => {
-    const child = spawn('node', ['scripts/verify-consumer-browser.mjs'], { env: { ...process.env, CONSUMER_PORT: String(stale.address().port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('node', ['scripts/v4/verify-consumer-browser.mjs'], { env: { ...process.env, CONSUMER_PORT: String(stale.address().port) }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk);
     const timeout = setTimeout(() => child.kill('SIGTERM'), 15000);

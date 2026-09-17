@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { smartQuotes } from '../../packages/typeset-v4/dist/index.js';
 import { releaseIdentity } from './release-evidence.mjs';
+import { installFixtureFont } from './font-fixture.mjs';
 
 assert.equal(smartQuotes('"Read Jane\'s notes," she said.'), '\u201cRead Jane\u2019s notes,\u201d she said.');
 assert.equal(smartQuotes('A 6\' 2" frame, a 12" print, and the \'90s.'), 'A 6\' 2" frame, a 12" print, and the \u201990s.');
@@ -20,6 +21,7 @@ for (const { name, engine, executablePath } of browsers) {
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:32px;font:20px/1.4 Georgia;color:#171717;background:white}p{width:240px;margin:0 0 24px;text-wrap:wrap}a{color:#176650}</style></head><body></body></html>');
     await page.addScriptTag({ path: process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js' });
     await page.addStyleTag({ path: 'packages/typeset-v4/dist/styles.css' });
+    await installFixtureFont(page);
     const checks = await page.evaluate(async () => {
       const api = window.Typeset, checks = [];
       const check = (label, pass, detail) => checks.push({ label, pass: !!pass, detail });
@@ -59,10 +61,10 @@ for (const { name, engine, executablePath } of browsers) {
       const noFeatures = api.typeset(quote); check('punctuation and margins unchanged by default', quote.textContent.startsWith('"') && noFeatures.features.quotes === 'off' && !quote.querySelector('[data-ts-hang]'));
       api.restore(quote); quote.style.textAlign = 'center';
       check('centered text explicitly declines optical hanging', api.typeset(quote, options).features.hanging === 'native:hanging-layout');
-      api.restore(quote); quote.style.textAlign = 'left'; quote.style.overflow = 'hidden'; quote.style.width = '1200px';
+      api.restore(quote); quote.style.textAlign = 'left'; quote.style.overflow = 'hidden'; quote.style.width = '1200px'; quote.style.fontFamily = 'TypesetFixture';
       const clipped = api.typeset(quote, options);
       check('clipping explicitly declines optical hanging', clipped.features.hanging === 'native:hanging-clipped', clipped.features);
-      api.restore(quote); quote.style.overflow = 'visible';
+      api.restore(quote); quote.style.overflow = 'visible'; quote.style.fontFamily = 'Georgia';
       for (const width of [160, 200, 240, 320]) {
         quote.style.width = width + 'px'; api.typeset(quote, { lineBreaks: 'unicode' }); const unstyled = api.measureLayout(quote).lines.map(l => l.text); api.restore(quote);
         const r = api.typeset(quote, { lineBreaks: 'unicode', opticalHanging: true });

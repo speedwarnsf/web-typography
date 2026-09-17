@@ -45,3 +45,14 @@ jobs:
 
       - name: Packed React consumer in three browsers
         run: node scripts/v4/verify-consumer-browser.mjs
+
+      - name: Reject stale consumer previews
+        run: node scripts/v4/verify-consumer-identity.mjs
+
+      - name: Retain acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typeset-acceptance
+          path: output/*.json
+          retention-days: 14

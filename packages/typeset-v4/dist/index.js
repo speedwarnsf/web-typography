@@ -25,7 +25,7 @@ import {
   typesetAll,
   typesetHeading,
   typesetText
-} from "./shared-N574AA77.js";
+} from "./shared-LVSUWHUP.js";
 
 // src/lib/v4/prose-lists.ts
 var owners = /* @__PURE__ */ new WeakMap();
