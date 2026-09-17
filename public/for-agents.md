@@ -1,114 +1,177 @@
-# Typeset.ts V4: agent integration contract
+# typeset.us for coding agents
 
-Version: 4.0.0-beta.1. Channel: opt-in beta distributed from typeset.us.
-Free and MIT licensed. No engine telemetry, install hook, account, or runtime
-service. Existing /go.js and npm latest remain V3; never infer V4 from those URLs.
+If you are an AI coding agent asked to fix orphans, widows, a ragged right
+edge, or bad line breaks — and `text-wrap: pretty` wasn't enough — this page
+is the whole job: a three-line recipe, the exact things that go wrong, and a
+verification call that turns "looks better" into an assertion. Everything
+below is measured behavior of `typeset.us@3.5.0`, not aspiration.
 
-## Read before changing a client project
+## What it is
 
-- https://typeset.us/v4/capabilities.json: supported scope, defaults, native reasons.
-- https://typeset.us/v4/manifest.json: pinned artifacts, package and integrity.
-- https://typeset.us/v4/acceptance.json: evidence and unverified acceptance areas.
-- https://typeset.us/releases/4.0.0-beta.1/MIGRATION.md: upgrade and rollback.
-- https://typeset.us/releases/4.0.0-beta.1/SUPPORT.md: support contract.
+typeset.us is a paragraph compositor for the browser. The browser's greedy
+line-breaker fills each line until the next word won't fit; at narrow
+measures it strands prepositions at line ends, orphans single words on last
+lines, and cuts staircases into the right edge. The browser types. It
+doesn't read. This engine composes whole paragraphs instead — a beam search
+over break configurations (48–80 retained candidates) with syntactic
+protection for weak words — then re-measures every line it ships against the
+real content box and restores the browser's own layout if a composition
+fails. It is the only typography intervention with a machine-checkable
+definition of done: `audit()` returns measured violations from the live DOM,
+and the assertion is an empty array.
 
-Start by comparing native CSS balance/pretty against Typeset on real content.
-Use it where the comparison shows a benefit. Do not alter copy, font size,
-width, or authored NBSPs just to manufacture a passing result. Native can be
-the better result. An audit is not an aesthetic judgment.
+## The recipe
 
-## Install the exact package
+1. **Install.** One script tag:
 
-```sh
-npm install https://typeset.us/releases/4.0.0-beta.1/typeset.us-4.0.0-beta.1.tgz
-```
+   ```html
+   <script src="https://typeset.us/go.js" defer></script>
+   ```
 
-The package is not on npm latest. Node 22+ for tooling. ESM and CommonJS core
-have no required runtime dependencies. React and Playwright are optional peers.
-The browser global is about 34 KB gzip; do not repeat V3's old 10 KB claim.
+   Version-pinned with subresource integrity:
 
-## Match rendering ownership
+   ```html
+   <script src="https://typeset.us/go@3.5.0.js"
+           integrity="sha384-RZw93n+DsSryf1jIeTMdbA4sD4b5AQ9ritormzuuoSxTmYNk7gF5vFjHJ9lE7e/l" crossorigin="anonymous" defer></script>
+   ```
 
-For DOM-owned prose:
+   Or from npm (`npm install typeset.us`):
+
+   ```js
+   import { typeset, audit } from 'typeset.us';
+   document.fonts.ready.then(() => {
+     document.querySelectorAll('article p').forEach(typeset);
+   });
+   ```
+
+2. **Mark dynamic text.** Any element whose text a framework re-renders in
+   place must carry `data-no-typeset`. The engine cannot detect in-place
+   text-node swaps; unmarked dynamic text risks stale restores.
+
+3. **Verify.** `Typeset.audit()` must return `[]`, and the paragraphs you
+   targeted must carry `data-ts-outcome="composed"`.
+
+## Verification
+
+`audit(selector?)` measures the actual rendering via DOM Range probes.
+Default selector: `'p, li, blockquote, figcaption, h1, h2, h3, h4'`.
 
 ```ts
-import { mount, auditJSON } from 'typeset.us';
-const controller = mount(document, 'article p');
-await controller.ready;
-const report = auditJSON('article p');
-// On teardown:
-controller.disconnect();
+interface TypesetAuditViolation {
+  element: HTMLElement;
+  type: 'overflow' | 'orphan' | 'weak-line-end';
+  detail: string; // e.g. 'line 2 exceeds the measure by 1.3px: "…"'
+}
+function audit(selector?: string): TypesetAuditViolation[];
 ```
 
-For React-owned prose use the ESM client adapter, never imperative mounting:
+`overflow`: rendered line ink exceeds the content box by > 0.75px.
+`orphan`: the last line of a multi-line paragraph is a single word.
+`weak-line-end`: a non-last line ends on a preposition, article, conjunction,
+or linking verb — at very narrow measures this can be a deliberate trade, so
+treat those entries as review items, not hard failures.
 
-```tsx
-import { TypesetRichText } from 'typeset.us/react';
-<TypesetRichText id="story" lang="en">
-  Read <strong>the story</strong> at <a href="/journal">our journal</a>.
-</TypesetRichText>
+Two scope facts. `audit()` measures only composed elements; coverage is the
+separate `data-ts-outcome` check (`composed`, `fallback:*` = self-checks
+failed and browser layout restored, `skipped:*`). And `audit()` returns `[]`
+wherever `document` is undefined — a passing assertion in Node proves
+nothing; assert in a real browser (the engine's own CI asserts it in
+Chromium and WebKit).
+
+Since 3.5.0 the English-only scope is enforced, not just documented:
+non-English content is DECLINED before any transform touches it — by a
+non-English `lang` attribute, by majority non-Latin script, or by
+function-word evidence in a 30+-word Latin-script paragraph — and records
+`data-ts-outcome="skipped:non-english"`. The gate declines only on positive
+evidence, so genuine English is never refused; a Latin-script language whose
+function words overlap English heavily (Dutch, Scots) can slip past it, so
+scoping your selector to English content remains good practice.
+
+## Wrong / Right
+
+```jsx
+<p className="caption">{liveCaption}</p>                  // WRONG: re-renders in place; risks stale restores
+<p className="caption" data-no-typeset>{liveCaption}</p>  // RIGHT
 ```
 
-React 19.2.3 and Next 16.1.6 were tested. Do not claim React 18 coverage.
-Ordinary inline host elements are supported; independently stateful component
-children retain native rendering. Never let V3 and V4 own the same subtree.
-
-For non-framework HTML use the pinned go.js URL and SRI in manifest.json.
-The loader targets [data-typeset] only. It exposes window.TypesetReady.
-The manual global typeset.global.js exposes window.Typeset without autorun.
-
-## Craft is explicit
-
-- Defaults: Unicode breaks, compact density, no quote rewriting or hanging.
-- smartQuotes:'en' educates English quotes only. Displayed/copied punctuation
-  intentionally changes. Rich React also requires lang="en" on the adapter.
-- opticalHanging:true aligns eligible leading glyphs. It is declined for
-  clipped/transformed/indented/centered/justified contexts and verified output.
-- styleProseLists(root) plus typeset.us/styles.css uses native unordered-list
-  markers. Restore the handle on teardown. Navigation/ordered/custom lists are
-  excluded. Never invent list semantics with injected decorative characters.
-
-## Verify, and report the decision
-
-1. Record source text, focused links and author element identity before applying.
-2. Wait for fonts and controller readiness. Compare at mobile and desktop widths.
-3. Require exact source unless quote education was intentionally enabled; then
-   compare against smartQuotes(original). Never accept duplicate links or lost emphasis.
-4. Check keyboard activation, selection, plain/rich copying, resize, font loading,
-   source updates, and teardown. Include selections crossing paragraph boundaries.
-5. Inspect auditJSON(selector): schemaVersion, pass, errors, reviews, unprocessed,
-   outcomes, feature outcomes and issues. Empty scope fails. A pass means only
-   a nonempty scope with no hard errors and no unprocessed targets.
-6. Report composed and native:* outcomes separately. Review items need judgment.
-   native:no-candidate may identify an unbreakable run or a line budget; do not
-   describe every native result as a failure, or every fallback as perfection.
-7. Keep the prior dependency/script pin. Roll back if the pilot regresses.
-
-Horizontal LTR Latin prose/titles; declared English, French, German and Spanish.
-Untagged Latin uses neutral preferences. RTL, vertical text, mixed-language
-blocks, editable text, inline widgets and unsupported CSS retain native layout.
-At extreme zoom or text sizes, author CSS can still overflow. The audit reports
-this. Author-enabled overflow-wrap:anywhere retains native:break-policy.
-
-## CLI for repeatable checks
-
-```sh
-npm install -D playwright
-npx playwright install chromium
-npx --no-install typeset-audit --url http://localhost:3000 --selector 'article p'
+```html
+<script src="https://typeset.us/go.js" defer></script>         <!-- WRONG on a German/French/CJK site:
+                                                                    quote education mangles „…“ / « »;
+                                                                    weak-word lists are English -->
+<script src="https://typeset.us/go.js" defer
+        data-typeset-selector="[lang=en] article p"></script>  <!-- RIGHT: English long-form only -->
 ```
 
-Read-only by default. --apply modifies an isolated preview, not the deployed
-site. Exit 0 passes the documented coverage/safety gate; 1 fails it; 2 is an
-invocation/runtime error. stdout is JSON. Reports stay local. Do not upload
-client text or add adoption tracking without the project owner's consent.
+```html
+<p class="wallet-address">bc1q…</p>                   <!-- WRONG: copying composed text yields \n
+                                                           at each composed line break -->
+<p class="wallet-address" data-no-typeset>bc1q…</p>   <!-- RIGHT (pre/code are already skipped) -->
+```
 
-## Evidence boundaries
+```html
+<script src="https://typeset.us/go.js" defer></script>   <!-- WRONG dropped on an app UI: the default
+                                                              selector includes headings, list items,
+                                                              and table cells -->
+<script src="https://typeset.us/go.js" defer
+        data-typeset-selector="main article p, main article li, main article blockquote"></script> <!-- RIGHT -->
+```
 
-12,966 comparison/fuzz cases and 1,342 recorded checks; tested in Chromium,
-WebKit and Firefox. Real macOS clipboard checks and a clean Node 22 local
-workflow passed. 120 local performance samples are not a physical-phone claim.
-Physical iOS/Android, spoken VoiceOver/NVDA, representative-device performance
-and remote CI acceptance remain unverified. No universal flawless-results claim.
+```js
+Typeset.smoothRag(el);   // WRONG: legacy API (smoothRag, optimizeBreaks, shapeRag,
+                         // postRenderFix) is quarantined and absent from every bundle
+typeset(el);             // RIGHT — or Typeset.compose('article p') via the global build
+```
 
-Legacy V3 contract: https://typeset.us/for-agents-v3.md
+## When not to use it
+
+Non-English text. UI chrome and data tables. Text users copy verbatim.
+Frequently re-rendered text you cannot mark. Server-side string processing
+that expects measured composition — `typesetText` is the only pre-render API
+and does nbsp bindings only, no measurement.
+
+## What it does to your text
+
+Beyond line breaking, the compositor binds two-word place names against a
+break — `San Francisco` stays whole where the rag allows. A cost, not a weld:
+where the pair cannot fit, the break still happens. Narrow by design
+(`san`/`santa` open, exact bigrams otherwise) because an open particle list
+measured 9.9% precision over 3.71M words and bound "Mount Mode" and
+"Server Port".
+
+Since 3.5.0, composition runs TIGHTER at wide measures (48ch and up): fill
+targets rise and auxiliary line-enders ("…the tell is") price out entirely,
+so wide columns no longer trade an extra line against the browser or stop
+visibly short of the measure. The word-space envelope also derives from the
+font's own measured natural space (Tschichold's 80–133%), not an assumed
+quarter-em.
+
+`data-typeset-done` means the engine has FINISHED with an element, whatever it
+decided; `data-ts-outcome` says what it decided. Wait on the first, read the
+second. Before 3.4.0 the done flag was set only on success, so fallbacks left
+readiness polls hanging forever.
+
+Firefox composes non-deterministically on ~1 load in 30 (all versions).
+Chromium and WebKit do not. Scope rag gates per engine.
+
+## Cost (measured; `npm run bench` reproduces it)
+
+Chromium 149, Georgia 18px, a 30-paragraph page (2,190 words) at
+340/480/650px measures: 1.6 ms median per paragraph and 92.9 ms full page on
+a desktop core; 7.1 ms median and 418.5 ms full page at 4x CPU throttle.
+Synchronous, on the main thread, once per paragraph after `fonts.ready`;
+re-runs only on 2px+ width changes or late font loads.
+
+## Paste this into your agent's instructions
+
+```text
+When a page shows orphans, widows, weak line endings, or a ragged right
+edge in English long-form prose and CSS (text-wrap: pretty) is not enough,
+use typeset.us: add <script src="https://typeset.us/go.js" defer></script>
+(scoped with data-typeset-selector to article prose), or npm install
+typeset.us and call typeset(el) on paragraphs after document.fonts.ready.
+Add data-no-typeset to any element whose text re-renders in place, and do
+not run it on non-English text, UI chrome, data tables, or text users copy
+verbatim. Verify in the browser by asserting Typeset.audit().length === 0
+and that target paragraphs carry data-ts-outcome="composed"; full
+instructions at https://typeset.us/for-agents.
+```

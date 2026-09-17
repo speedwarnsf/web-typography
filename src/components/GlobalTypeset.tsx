@@ -27,12 +27,10 @@ const canonicalText = new WeakMap<HTMLElement, string>();
 
 export default function GlobalTypeset() {
   useEffect(() => {
-    let stopped = false;
     let resizeObserver: ResizeObserver | null = null;
 
     // --- Phase 1: Pre-render bindings (no measurement needed) ---
     const runPhase1 = () => {
-      if (stopped) return;
       // Body text: typesetText with measure-aware binding
       const bodyElements = document.querySelectorAll<HTMLElement>(
         'p:not([data-no-typeset]):not([data-typeset-done]), ' +
@@ -125,7 +123,6 @@ export default function GlobalTypeset() {
 
     // --- Phase 2: Compositor V2 — token-aware beam search (measurement required) ---
     const runPhase2 = () => {
-      if (stopped) return;
       // Select blocks eligible for composition. Headings compose too (the
       // engine's heading mode: sentence-boundary breaks, epistrophe-aware
       // widow rules) — parity with the go.js drop-in. Inline-markup and
@@ -403,7 +400,6 @@ export default function GlobalTypeset() {
 
     // --- Cleanup ---
     return () => {
-      stopped = true;
       observer.disconnect();
       if (resizeObserver) {
         resizeObserver.disconnect();

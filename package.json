@@ -3,25 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run build:v4",
     "dev": "next dev",
-    "prebuild": "npm run build:v4",
     "build": "next build",
     "start": "next start",
     "build:dist": "node scripts/build-dist.mjs",
-    "build:v4": "node scripts/build-v4-assets.mjs",
     "test": "playwright test",
-    "test:site": "node scripts/check-v4-site.mjs",
     "bench": "node scripts/bench.mjs"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.0",
-    "lucide-react": "^1.46.0",
     "next": "16.1.6",
     "opentype.js": "^1.3.4",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "typeset.us": "file:vendor/typeset-v4"
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

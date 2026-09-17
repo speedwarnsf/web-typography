@@ -87,8 +87,6 @@ export const sections: SiteSection[] = [
     id: "build",
     name: "Build",
     pages: [
-      { slug: "/v4", name: "Typeset V4", shortName: "V4", description: "Install the V4 beta and read the migration guide" },
-      { slug: "/agents", name: "For Agents", shortName: "Agents", description: "Pinned installation, capabilities, and verification" },
       {
         slug: "/utility",
         name: "The Utility",

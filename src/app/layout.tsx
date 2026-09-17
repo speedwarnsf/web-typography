@@ -1,4 +1,4 @@
-import SiteChrome from '@/components/SiteChrome';
+import NtfyTracker from '@/components/NtfyTracker';
 import type { Metadata } from "next";
 import {
   Playfair_Display,
@@ -31,6 +31,14 @@ import {
   Caveat,
 } from "next/font/google";
 import "./globals.css";
+import GlobalTypeset from "@/components/GlobalTypeset";
+import BackToTop from "@/components/BackToTop";
+import CommandPalette from "@/components/CommandPalette";
+import SectionFooter from "@/components/SectionFooter";
+import PrevNextStrip from "@/components/PrevNextStrip";
+import GlyphField from "@/components/chrome/GlyphField";
+import ScrollHairline from "@/components/chrome/ScrollHairline";
+import BloomMenu from "@/components/chrome/BloomMenu";
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans", display: "swap" });
@@ -62,7 +70,6 @@ const permanentMarker = Permanent_Marker({ subsets: ["latin"], weight: "400", va
 const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://typeset.us'),
   title: "Typeset — A New Era in Web Typography",
   description:
     "The web finally knows how to break lines. Watch the proof, live: beam-search composition, hanging punctuation, and Tschichold spacing — set by its own engine, in your browser.",
@@ -71,6 +78,7 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -84,11 +92,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" style={{ backgroundColor: '#050505' }}>
       <body className={`${fontVars} antialiased bg-transparent text-neutral-200`} style={{ backgroundColor: 'transparent' }}>
-        <SiteChrome position="top" />
+        <NtfyTracker />
+        {/* The new-era chrome: glyph-field texture drawn from the engine's
+            own alphabet (replaces the letterpress photo), gold reading
+            hairline, and the bloom menu — on every page. */}
+        <GlyphField />
+        <ScrollHairline />
+        <BloomMenu />
         <div className="relative" style={{ zIndex: 2 }}>
+          <CommandPalette />
           {children}
-          <SiteChrome position="bottom" />
+          <PrevNextStrip />
+          <SectionFooter />
+          <BackToTop />
         </div>
+        <GlobalTypeset />
       </body>
     </html>
   );
