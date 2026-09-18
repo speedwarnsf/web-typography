@@ -69,7 +69,7 @@ const files = {};
 for (const file of (await readdir('public')).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).sort()) files[file] = sri(await readFile(`public/${file}`));
 for (const file of ['typeset.min.js', 'typeset.esm.js']) files[file] = sri(await readFile(`public/${file}`));
 await writeFile('public/sri.json', JSON.stringify({ version, files, snippet: `<script src="https://typeset.us/go@${version}.js" integrity="${sri(go)}" crossorigin="anonymous" defer></script>` }, null, 2) + '\n');
-await writeFile('public/release.json', JSON.stringify({ version, previous: '4.0.0', previousBrowserPin: '4.0.0', package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: '/releases/4.0.0/README.md', manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+await writeFile('public/release.json', JSON.stringify({ version, previous: '4.1.0', previousBrowserPin: '4.1.0', package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: '/releases/4.1.0/README.md', manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
 await copyFile(`${root}/for-agents.md`, 'public/for-agents.md');
 await copyFile(`${root}/capabilities.json`, 'public/capabilities.json');
 console.log(`Built typeset.us@${version}, immutable archive, npm tarball and website aliases (${gzipSync(go).length} bytes gzip).`);

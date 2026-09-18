@@ -1,11 +1,11 @@
 # typeset.us
 
-> Typeset 4.1.0: measured composition for titles, prose and ordinary rich text.
+> Typeset 4.2.0: measured composition for titles, prose and ordinary rich text.
 > Unicode breaks, bounded word spacing and per-line tracking, clipped hanging,
 > incremental scheduling, markup-preserving rendering and post-render verification.
 
-Install: npm install typeset.us@4.1.0. For static HTML, use
-<script src="https://typeset.us/go@4.1.0.js" defer></script> and override
+Install: npm install typeset.us@4.2.0. For static HTML, use
+<script src="https://typeset.us/go@4.2.0.js" defer></script> and override
 data-typeset-selector to choose text. For React-owned content use
 TypesetText or TypesetRichText from typeset.us/react, never overlapping mounts.
 auditJSON reports errors, reviews, coverage, native retention and feature
@@ -22,9 +22,9 @@ Declared languages: en/fr/de/es; untagged Latin has neutral preferences.
 ## Package
 
 - [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
-  typeset.us@4.1.0, MIT: ESM, CJS, browser global, React and declarations
+  typeset.us@4.2.0, MIT: ESM, CJS, browser global, React and declarations
 - [Capabilities](https://typeset.us/capabilities.json): machine-readable support contract
-- [Migration](https://typeset.us/releases/4.1.0/MIGRATION.md): ownership, options and rollback
-- [Support](https://typeset.us/releases/4.1.0/SUPPORT.md): tested range and outstanding acceptance
+- [Migration](https://typeset.us/releases/4.2.0/MIGRATION.md): ownership, options and rollback
+- [Support](https://typeset.us/releases/4.2.0/SUPPORT.md): tested range and outstanding acceptance
 - [Integrity](https://typeset.us/sri.json): immutable browser pins
 - [V3 archive](https://typeset.us/releases/3.5.1/): old source, npm and browser assets

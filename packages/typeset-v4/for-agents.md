@@ -1,6 +1,6 @@
-# Typeset 4.1.0: agent integration contract
+# Typeset 4.2.0: agent integration contract
 
-Status: public release 4.1.0, following 4.0.0. Install typeset.us@4.1.0 with
+Status: public release 4.2.0, following 4.1.0. Install typeset.us@4.2.0 with
 project-owner approval and retain the prior dependency/deployment for rollback.
 No telemetry, install hook, or automatic registration is included.
 
@@ -23,6 +23,18 @@ For React: import TypesetText or TypesetRichText from 'typeset.us/react'.
 Locally targeted React: 19.2.3. Never imperatively mount
 a framework-owned subtree or overlap controllers. Custom stateful children
 remain native:react-component.
+
+4.2 coordinates same-target mounts within one engine instance: first claim
+wins, waiting controllers take over after release, and stats.overlappingTargets
+reports waiting targets. This is a safeguard, not permission to overlap selectors,
+compose a parent and child, or load multiple engine copies. Audit the actual
+selector intersection. Do not confuse a tabular-number class with an instruction
+to exclude every word in its container. Mark text roles explicitly when needed.
+
+Ordinary inline white-space:nowrap groups are respected without excluding the
+surrounding paragraph. Preformatted whitespace, overlong protected groups and
+unsupported inline layout still have explicit native outcomes. Declared English
+has bounded capitalized name/designator preferences, not general name recognition.
 
 ## Explicit craft options
 
@@ -94,7 +106,7 @@ Read MIGRATION.md and SUPPORT.md inside this package. Keep the prior version pin
 the pilot passes. New globals use window.Typeset; go.js targets [data-typeset]
 explicitly. Restore or disconnect DOM ownership, unmount React, restore list
 styling, and revert the recorded dependency/deployment to roll back.
-The website go@4.1.0.js preserves the broad automatic prose/headings scope and
+The website go@4.2.0.js preserves the broad automatic prose/headings scope and
 craft defaults of the previous website loader. Override its selector with
 data-typeset-selector; exclude content with data-no-typeset. npm /go remains
 explicitly scoped to [data-typeset]. All old website pins remain immutable.

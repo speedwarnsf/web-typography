@@ -107,7 +107,8 @@ function unsupported(element: HTMLElement): string | null {
     if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return 'native:rich-excluded';
     const cs = getComputedStyle(el);
     if (cs.direction !== 'ltr' || cs.writingMode !== 'horizontal-tb' || (el !== element && cs.unicodeBidi !== 'normal') || cs.visibility !== 'visible') return 'native:rich-direction';
-    if (cs.whiteSpace !== 'normal' || !preservesAdvances(cs) || cs.textIndent !== '0px') return 'native:rich-whitespace';
+    if ((cs.whiteSpace !== 'normal' && !(el !== element && cs.whiteSpace === 'nowrap'))
+      || !preservesAdvances(cs) || cs.textIndent !== '0px') return 'native:rich-whitespace';
     if (el !== element && (cs.display !== 'inline' || cs.position !== 'static' || cs.verticalAlign !== 'baseline')) return 'native:rich-layout';
     if (el !== element && !inlineBoxInsets(cs).supported) return 'native:rich-box';
     for (const pseudo of ['::before', '::after']) {
@@ -168,6 +169,24 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
       return parts;
     });
     if (words.length > 500 || source.length > 12000) return result('native:budget');
+    // A nonwrapping inline phrase removes only its own internal opportunities.
+    // It must not prevent composition of the surrounding paragraph or links.
+    const noWrapRuns: { start: number; end: number }[] = [];
+    for (const run of runs) {
+      if (getComputedStyle(run.node.parentElement!).whiteSpace !== 'nowrap') continue;
+      const previous = noWrapRuns.at(-1);
+      if (previous?.end === run.start) previous.end = run.end;
+      else noWrapRuns.push({ start: run.start, end: run.end });
+    }
+    for (let i = words.length - 2; i >= 0; i--) {
+      const end = words[i].index + words[i].text.length;
+      const next = words[i + 1];
+      if (noWrapRuns.some(run => run.start <= end && run.end > next.index)) {
+        words[i].text = source.slice(words[i].index, next.index + next.text.length);
+        words[i].hyphen = next.hyphen;
+        words.splice(i + 1, 1);
+      }
+    }
     if (unicode) {
       // Respect a descendant's hyphens:none even when the host permits them.
       for (let i = words.length - 2; i >= 0; i--) {
@@ -273,9 +292,18 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
         };
         if (phrased && attachmentCost(phrased) < originalCost) {
           const originalWords = wordCounts(lines), proposedWords = wordCounts(phrased);
+          // A substantial location/name on the last line is a valid title
+          // ending when the alternative splits a recognized proper-name group.
+          let originalEnd = 0;
+          const repairsName = lines.slice(0, -1).some(line => {
+            originalEnd += line.tokens.length;
+            return groups.some(group => group.kind === 'name' && group.start < originalEnd && group.end > originalEnd);
+          });
+          const nameTail = repairsName && proposedWords.at(-1) === 1
+            && phrased.at(-1)!.width >= before.width * .4;
           const stranded = title && ((proposedWords[0] === 1 && originalWords[0] > 1)
-            || (proposedWords.at(-1) === 1 && originalWords.at(-1)! > 1)
-            || proposedWords.filter(n => n === 1).length > originalWords.filter(n => n === 1).length);
+            || (!nameTail && proposedWords.at(-1) === 1 && originalWords.at(-1)! > 1)
+            || (!nameTail && proposedWords.filter(n => n === 1).length > originalWords.filter(n => n === 1).length));
           if (!stranded) lines = phrased;
         }
       }

@@ -1,8 +1,11 @@
 {
   "schemaVersion": 1,
   "package": "typeset.us",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "status": "public-release",
+  "mountOwnership": { "scope": "same target, same engine instance", "policy": "first claim owns; waiting controllers take over after release", "diagnostic": "controller.stats.overlappingTargets", "integration": "use disjoint text roots and one engine copy" },
+  "inlineNoWrap": { "supported": "ordinary white-space:nowrap inline phrases within wrapping rich text", "preserves": ["protected break boundaries", "styled descendants", "source and author elements"], "overflow": "native:no-candidate with unbreakable-run constraint" },
+  "nameGrouping": { "language": "declared English", "scope": "capitalized names followed by street or institution designators", "policy": "bounded soft preference; substantial final location words allowed in titles", "limit": "not a semantic parser or arbitrary brand recognition" },
   "defaults": { "lineBreaks": "unicode", "density": "compact with one-line default body allowance for stranded sentence/clause openers; explicit compact/maxLines respected", "spacing": true, "tracking": true, "contour": "finished", "smartQuotes": false, "opticalHanging": false, "listStyling": "explicit" },
   "contour": { "basis": "predicted finished widths using the rendering space policy", "beamCompletedPool": 200, "shortParagraphs": "budgeted exhaustive search", "evidence": "result.search", "comparison": "contour: natural" },
   "spacing": { "scope": "composed, left-aligned body text", "level": "full V3 neighbor/median finish", "deltaBounds": "-20 percent to +33 percent of each measured natural space; authored spacing retained", "preserves": ["chosen breaks", "final line", "author elements", "source text"], "fallback": "retain unspaced composition and report native:spacing-verification" },

@@ -2,6 +2,33 @@
 var determiners = /* @__PURE__ */ new Set(["a", "an", "the", "my", "your", "our", "their", "his", "her", "its"]);
 var stops = /* @__PURE__ */ new Set(["a", "an", "the", "this", "that", "these", "those", "and", "or", "but", "nor", "so", "yet", "if", "as", "than", "of", "to", "in", "on", "at", "by", "for", "with", "from", "after", "before", "through", "into", "over", "under", "between", "without", "about", "around", "is", "are", "was", "were", "be", "been", "being", "has", "have", "had", "can", "could", "will", "would", "should", "may", "might", "must", "which", "who", "how", "we", "you", "they", "it"]);
 var modifiers = /* @__PURE__ */ new Set(["new", "old", "first", "last", "next", "previous", "second", "third", "small", "large", "little", "long", "short", "different", "same", "other", "final", "whole", "single"]);
+var nameHeads = /* @__PURE__ */ new Set([
+  "street",
+  "avenue",
+  "boulevard",
+  "road",
+  "lane",
+  "drive",
+  "court",
+  "square",
+  "parkway",
+  "terrace",
+  "cinema",
+  "cinemas",
+  "theater",
+  "theaters",
+  "theatre",
+  "theatres",
+  "gallery",
+  "galleries",
+  "museum",
+  "library",
+  "university",
+  "college",
+  "hospital",
+  "hotel"
+]);
+var capitalized = (text) => /^[('"\u2018\u201c]*\p{Lu}[\p{L}'\u2019-]*[.,;:!?!)"'\u201d\u2019]*$/u.test(text);
 var word = (text) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, "");
 var ends = (text) => /[.,;:!?)]["'”’]*$/u.test(text);
 var sentences = new Intl.Segmenter("en", { granularity: "sentence" });
@@ -23,6 +50,11 @@ function englishPhraseGroups(texts, width, measure) {
   const modifier = (index) => modifiers.has(words[index]) || /(?:ed|ive|ous|ful|less)$/u.test(words[index] || "");
   const groups = [];
   for (let start = 0; start < words.length - 1; start++) {
+    if (lexical(start) && !ends(texts[start]) && capitalized(texts[start]) && capitalized(texts[start + 1]) && nameHeads.has(words[start + 1]) && measure(start, start + 2) <= width) {
+      groups.push({ start, end: start + 2, kind: "name" });
+    }
+  }
+  for (let start = 0; start < words.length - 1; start++) {
     if (!determiners.has(words[start]) || ends(texts[start]) || !lexical(start + 1)) continue;
     let end = start + 2;
     if (!ends(texts[start + 1]) && modifier(start + 1) && lexical(start + 2)) end++;
@@ -36,6 +68,7 @@ function englishPhraseGroups(texts, width, measure) {
 function phraseBreakCosts(texts, groups, title) {
   const costs = Array(texts.length + 1).fill(0);
   for (const group of groups) {
+    if (group.kind === "name") costs[group.start + 1] = Math.max(costs[group.start + 1], title ? 1800 : 7e3);
     if (title && group.kind === "nominal") costs[group.start + 1] = 480;
     if (!title && group.kind === "infinitive" && group.end === texts.length) {
       for (let end = group.start + 1; end < group.end; end++) costs[end] = Math.max(costs[end], 7e3);
@@ -2707,7 +2740,7 @@ function unsupported(element) {
     if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return "native:rich-excluded";
     const cs = getComputedStyle(el);
     if (cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb" || el !== element && cs.unicodeBidi !== "normal" || cs.visibility !== "visible") return "native:rich-direction";
-    if (cs.whiteSpace !== "normal" || !preservesAdvances(cs) || cs.textIndent !== "0px") return "native:rich-whitespace";
+    if (cs.whiteSpace !== "normal" && !(el !== element && cs.whiteSpace === "nowrap") || !preservesAdvances(cs) || cs.textIndent !== "0px") return "native:rich-whitespace";
     if (el !== element && (cs.display !== "inline" || cs.position !== "static" || cs.verticalAlign !== "baseline")) return "native:rich-layout";
     if (el !== element && !inlineBoxInsets(cs).supported) return "native:rich-box";
     for (const pseudo of ["::before", "::after"]) {
@@ -2771,6 +2804,22 @@ function planRichText(element, options = {}, nativeLayout) {
       return parts;
     });
     if (words.length > 500 || source.length > 12e3) return result("native:budget");
+    const noWrapRuns = [];
+    for (const run of runs) {
+      if (getComputedStyle(run.node.parentElement).whiteSpace !== "nowrap") continue;
+      const previous = noWrapRuns.at(-1);
+      if (previous?.end === run.start) previous.end = run.end;
+      else noWrapRuns.push({ start: run.start, end: run.end });
+    }
+    for (let i2 = words.length - 2; i2 >= 0; i2--) {
+      const end = words[i2].index + words[i2].text.length;
+      const next = words[i2 + 1];
+      if (noWrapRuns.some((run) => run.start <= end && run.end > next.index)) {
+        words[i2].text = source.slice(words[i2].index, next.index + next.text.length);
+        words[i2].hyphen = next.hyphen;
+        words.splice(i2 + 1, 1);
+      }
+    }
     if (unicode) {
       for (let i2 = words.length - 2; i2 >= 0; i2--) {
         const point = pointAt(runs, words[i2].index + words[i2].text.length - 1);
@@ -2890,7 +2939,13 @@ function planRichText(element, options = {}, nativeLayout) {
         };
         if (phrased && attachmentCost(phrased) < originalCost) {
           const originalWords = wordCounts(lines), proposedWords = wordCounts(phrased);
-          const stranded = title && (proposedWords[0] === 1 && originalWords[0] > 1 || proposedWords.at(-1) === 1 && originalWords.at(-1) > 1 || proposedWords.filter((n) => n === 1).length > originalWords.filter((n) => n === 1).length);
+          let originalEnd = 0;
+          const repairsName = lines.slice(0, -1).some((line) => {
+            originalEnd += line.tokens.length;
+            return groups.some((group) => group.kind === "name" && group.start < originalEnd && group.end > originalEnd);
+          });
+          const nameTail = repairsName && proposedWords.at(-1) === 1 && phrased.at(-1).width >= before.width * 0.4;
+          const stranded = title && (proposedWords[0] === 1 && originalWords[0] > 1 || !nameTail && proposedWords.at(-1) === 1 && originalWords.at(-1) > 1 || !nameTail && proposedWords.filter((n) => n === 1).length > originalWords.filter((n) => n === 1).length);
           if (!stranded) lines = phrased;
         }
       }
@@ -3288,8 +3343,10 @@ function trackingVerified(element, plan, after) {
 }
 
 // src/lib/v4/typeset.next.ts
-var VERSION = "4.1.0";
+var VERSION = "4.2.0";
 var states = /* @__PURE__ */ new WeakMap();
+var mountOwners = /* @__PURE__ */ new WeakMap();
+var mountWaiters = /* @__PURE__ */ new WeakMap();
 var measurements = /* @__PURE__ */ new WeakMap();
 var fontVersions = /* @__PURE__ */ new WeakMap();
 var fontIds = /* @__PURE__ */ new WeakMap();
@@ -3799,6 +3856,9 @@ function auditJSON(selector = defaults) {
   };
 }
 function mount(root = document, selector = defaults, options = {}) {
+  const identity = /* @__PURE__ */ Symbol("typeset-mount");
+  const claimed = /* @__PURE__ */ new Set();
+  const blocked = /* @__PURE__ */ new Map();
   const owned = /* @__PURE__ */ new Set();
   const pending = /* @__PURE__ */ new Set();
   const nearby = /* @__PURE__ */ new Set();
@@ -3806,12 +3866,57 @@ function mount(root = document, selector = defaults, options = {}) {
   let fontsReady = false;
   let timer;
   let idle;
-  const stats = { passes: 0, compositions: 0, maxBatchMs: 0 };
+  const stats = { passes: 0, compositions: 0, maxBatchMs: 0, get overlappingTargets() {
+    return blocked.size;
+  } };
   let resolveReady = () => {
   };
   const ready = new Promise((resolve) => {
     resolveReady = resolve;
   });
+  const eligible = (el) => (el === root || root.contains(el)) && el.matches(selector) && !el.closest(excluded);
+  const stopWaiting = (el) => {
+    const wake = blocked.get(el);
+    if (!wake) return;
+    const waiters = mountWaiters.get(el);
+    waiters?.delete(wake);
+    if (!waiters?.size) mountWaiters.delete(el);
+    blocked.delete(el);
+  };
+  const claim = (el) => {
+    const owner = mountOwners.get(el);
+    if (owner && owner !== identity) {
+      if (!blocked.has(el)) {
+        const wake = () => {
+          blocked.delete(el);
+          if (!stopped && eligible(el)) {
+            enqueue(el);
+            schedule();
+          }
+        };
+        blocked.set(el, wake);
+        let waiters = mountWaiters.get(el);
+        if (!waiters) {
+          waiters = /* @__PURE__ */ new Set();
+          mountWaiters.set(el, waiters);
+        }
+        waiters.add(wake);
+      }
+      return false;
+    }
+    stopWaiting(el);
+    mountOwners.set(el, identity);
+    claimed.add(el);
+    return true;
+  };
+  const release = (el) => {
+    claimed.delete(el);
+    if (mountOwners.get(el) !== identity) return;
+    mountOwners.delete(el);
+    const waiters = mountWaiters.get(el);
+    mountWaiters.delete(el);
+    for (const wake of waiters || []) wake();
+  };
   const select = (within = root) => {
     const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
     const elements = Array.from(scope.querySelectorAll(selector));
@@ -3826,11 +3931,13 @@ function mount(root = document, selector = defaults, options = {}) {
       viewport?.unobserve(el);
     }
   }, { rootMargin: "400px" });
+  const enqueue = (el) => {
+    if (!claim(el)) return;
+    if (!pending.has(el)) viewport?.observe(el);
+    pending.add(el);
+  };
   const discover = (within = root) => {
-    for (const el of select(within)) {
-      if (!pending.has(el)) viewport?.observe(el);
-      pending.add(el);
-    }
+    for (const el of select(within)) enqueue(el);
   };
   const schedule = () => {
     if (stopped || !fontsReady || timer !== void 0 || idle !== void 0 || !pending.size) return;
@@ -3852,14 +3959,16 @@ function mount(root = document, selector = defaults, options = {}) {
       if (record.type === "childList") {
         for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
         if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
-        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) for (const el of owned) {
-          if (node.contains(el) && !root.contains(el)) {
+        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) {
+          for (const el of claimed) if (node.contains(el) && !root.contains(el)) {
             owned.delete(el);
             pending.delete(el);
             nearby.delete(el);
             viewport?.unobserve(el);
             unwatch(el);
+            release(el);
           }
+          for (const el of blocked.keys()) if (node.contains(el) && !root.contains(el)) stopWaiting(el);
         }
       }
     }
@@ -3927,17 +4036,15 @@ function mount(root = document, selector = defaults, options = {}) {
       viewport?.unobserve(el);
       if (!(root === el || root.contains(el))) {
         owned.delete(el);
-        nearby.delete(el);
-        viewport?.unobserve(el);
         unwatch(el);
+        release(el);
         continue;
       }
-      if (el.closest(excluded)) {
+      if (!eligible(el)) {
         restore(el);
         owned.delete(el);
-        nearby.delete(el);
-        viewport?.unobserve(el);
         unwatch(el);
+        release(el);
         continue;
       }
       if (owned.has(el) && parents.get(el) !== el.parentElement) {
@@ -4005,6 +4112,8 @@ function mount(root = document, selector = defaults, options = {}) {
       nearby.clear();
       watched.clear();
       parents.clear();
+      for (const el of blocked.keys()) stopWaiting(el);
+      for (const el of claimed) release(el);
       resolveReady();
     }
   };
@@ -4054,4 +4163,4 @@ export {
   auditJSON,
   mount
 };
-//# sourceMappingURL=shared-LVSUWHUP.js.map
+//# sourceMappingURL=shared-S3WC6GW6.js.map

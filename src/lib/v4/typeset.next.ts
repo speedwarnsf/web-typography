@@ -16,7 +16,7 @@ import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 
-export const VERSION = '4.1.0';
+export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 export interface Options {
   /** Opt-in Unicode 17 break opportunities; default preserves the legacy path. */
@@ -70,6 +70,9 @@ interface State {
   tracking?: RichOutput;
 }
 const states = new WeakMap<HTMLElement, State>();
+// Controllers share composition state, so only one may write a given target.
+const mountOwners = new WeakMap<HTMLElement, symbol>();
+const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
 const measurements = new WeakMap<Document, Map<string, Map<string, number>>>();
 const fontVersions = new WeakMap<Document, { epoch: number }>();
 const fontIds = new WeakMap<FontFace, number>();
@@ -532,11 +535,14 @@ export interface Controller {
   ready: Promise<void>;
   refresh: () => void;
   disconnect: (restoreContent?: boolean) => void;
-  stats: { passes: number; compositions: number; maxBatchMs: number };
+  stats: { passes: number; compositions: number; maxBatchMs: number; readonly overlappingTargets: number };
 }
 
 /** One lifecycle owner per mount. Observers are disconnected during our writes. */
 export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
+  const identity = Symbol('typeset-mount');
+  const claimed = new Set<HTMLElement>();
+  const blocked = new Map<HTMLElement, () => void>();
   const owned = new Set<HTMLElement>();
   const pending = new Set<HTMLElement>();
   const nearby = new Set<HTMLElement>();
@@ -544,9 +550,46 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let idle: number | undefined;
-  const stats = { passes: 0, compositions: 0, maxBatchMs: 0 };
+  const stats = { passes: 0, compositions: 0, maxBatchMs: 0, get overlappingTargets() { return blocked.size; } };
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
+  const eligible = (el: HTMLElement) => (el === root || root.contains(el)) && el.matches(selector) && !el.closest(excluded);
+  const stopWaiting = (el: HTMLElement) => {
+    const wake = blocked.get(el);
+    if (!wake) return;
+    const waiters = mountWaiters.get(el);
+    waiters?.delete(wake);
+    if (!waiters?.size) mountWaiters.delete(el);
+    blocked.delete(el);
+  };
+  const claim = (el: HTMLElement): boolean => {
+    const owner = mountOwners.get(el);
+    if (owner && owner !== identity) {
+      if (!blocked.has(el)) {
+        const wake = () => {
+          blocked.delete(el);
+          if (!stopped && eligible(el)) { enqueue(el); schedule(); }
+        };
+        blocked.set(el, wake);
+        let waiters = mountWaiters.get(el);
+        if (!waiters) { waiters = new Set(); mountWaiters.set(el, waiters); }
+        waiters.add(wake);
+      }
+      return false;
+    }
+    stopWaiting(el);
+    mountOwners.set(el, identity);
+    claimed.add(el);
+    return true;
+  };
+  const release = (el: HTMLElement) => {
+    claimed.delete(el);
+    if (mountOwners.get(el) !== identity) return;
+    mountOwners.delete(el);
+    const waiters = mountWaiters.get(el);
+    mountWaiters.delete(el);
+    for (const wake of waiters || []) wake();
+  };
   const select = (within: ParentNode = root) => {
     const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
@@ -562,11 +605,13 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       viewport?.unobserve(el);
     }
   }, { rootMargin: '400px' });
+  const enqueue = (el: HTMLElement) => {
+    if (!claim(el)) return;
+    if (!pending.has(el)) viewport?.observe(el);
+    pending.add(el);
+  };
   const discover = (within: ParentNode = root) => {
-    for (const el of select(within)) {
-      if (!pending.has(el)) viewport?.observe(el);
-      pending.add(el);
-    }
+    for (const el of select(within)) enqueue(el);
   };
   const schedule = () => {
     if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
@@ -588,10 +633,11 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (record.type === 'childList') {
         for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
         if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
-        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) for (const el of owned) {
-          if (node.contains(el) && !root.contains(el)) {
-            owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el);
+        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) {
+          for (const el of claimed) if (node.contains(el) && !root.contains(el)) {
+            owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
           }
+          for (const el of blocked.keys()) if (node.contains(el) && !root.contains(el)) stopWaiting(el);
         }
       }
     }
@@ -651,8 +697,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of work()) {
       pending.delete(el);
       nearby.delete(el); viewport?.unobserve(el);
-      if (!(root === el || root.contains(el))) { owned.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); continue; }
-      if (el.closest(excluded)) { restore(el); owned.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); continue; }
+      if (!(root === el || root.contains(el))) { owned.delete(el); unwatch(el); release(el); continue; }
+      if (!eligible(el)) { restore(el); owned.delete(el); unwatch(el); release(el); continue; }
       if (owned.has(el) && parents.get(el) !== el.parentElement) { unwatch(el); watch(el); }
       const result = typeset(el, options);
       if (result.changed) stats.compositions++;
@@ -702,6 +748,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (restoreContent) for (const el of owned) restore(el);
       owned.clear(); pending.clear(); nearby.clear();
       watched.clear(); parents.clear();
+      for (const el of blocked.keys()) stopWaiting(el);
+      for (const el of claimed) release(el);
       resolveReady();
     },
   };

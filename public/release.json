@@ -1,16 +1,16 @@
 {
-  "version": "4.1.0",
-  "previous": "4.0.0",
-  "previousBrowserPin": "4.0.0",
-  "package": "typeset.us@4.1.0",
-  "download": "/releases/4.1.0/typeset.us-4.1.0.tgz",
-  "archive": "/releases/4.0.0/README.md",
-  "manifest": "/releases/4.1.0/manifest.json",
+  "version": "4.2.0",
+  "previous": "4.1.0",
+  "previousBrowserPin": "4.1.0",
+  "package": "typeset.us@4.2.0",
+  "download": "/releases/4.2.0/typeset.us-4.2.0.tgz",
+  "archive": "/releases/4.1.0/README.md",
+  "manifest": "/releases/4.2.0/manifest.json",
   "loader": {
-    "url": "/go@4.1.0.js",
-    "integrity": "sha384-1qkfdbQ3CL7UETIwu/QMq2Ks57EAwlWBP/GaBuCggdpl7mBVlIeZAgyaZfyAHsmB",
-    "bytes": 102297,
-    "gzipBytes": 41682
+    "url": "/go@4.2.0.js",
+    "integrity": "sha384-tkknhNlGYpl3OhmUPpILx1r4vXTJbULNnaDd+18njII4hj9w6a7ZVnwNjw+SlG52",
+    "bytes": 104076,
+    "gzipBytes": 42285
   },
   "validation": "See SUPPORT.md for verified coverage and outstanding device acceptance."
 }

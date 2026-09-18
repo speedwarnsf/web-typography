@@ -1,9 +1,12 @@
 /** Conservative English attachments, not a general syntactic parser. */
 import type { LayoutMetrics } from './layout-metrics';
-export interface PhraseGroup { start: number; end: number; kind: 'nominal' | 'infinitive' }
+export interface PhraseGroup { start: number; end: number; kind: 'nominal' | 'infinitive' | 'name' }
 const determiners = new Set(['a', 'an', 'the', 'my', 'your', 'our', 'their', 'his', 'her', 'its']);
 const stops = new Set(['a', 'an', 'the', 'this', 'that', 'these', 'those', 'and', 'or', 'but', 'nor', 'so', 'yet', 'if', 'as', 'than', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'with', 'from', 'after', 'before', 'through', 'into', 'over', 'under', 'between', 'without', 'about', 'around', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'has', 'have', 'had', 'can', 'could', 'will', 'would', 'should', 'may', 'might', 'must', 'which', 'who', 'how', 'we', 'you', 'they', 'it']);
 const modifiers = new Set(['new', 'old', 'first', 'last', 'next', 'previous', 'second', 'third', 'small', 'large', 'little', 'long', 'short', 'different', 'same', 'other', 'final', 'whole', 'single']);
+const nameHeads = new Set(['street', 'avenue', 'boulevard', 'road', 'lane', 'drive', 'court', 'square', 'parkway', 'terrace',
+  'cinema', 'cinemas', 'theater', 'theaters', 'theatre', 'theatres', 'gallery', 'galleries', 'museum', 'library', 'university', 'college', 'hospital', 'hotel']);
+const capitalized = (text: string) => /^[('"\u2018\u201c]*\p{Lu}[\p{L}'\u2019-]*[.,;:!?!)"'\u201d\u2019]*$/u.test(text);
 const word = (text: string) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, '');
 const ends = (text: string) => /[.,;:!?)]["'”’]*$/u.test(text);
 const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
@@ -32,6 +35,12 @@ export function englishPhraseGroups(texts: readonly string[], width: number, mea
   const modifier = (index: number) => modifiers.has(words[index]) || /(?:ed|ive|ous|ful|less)$/u.test(words[index] || '');
   const groups: PhraseGroup[] = [];
   for (let start = 0; start < words.length - 1; start++) {
+    if (lexical(start) && !ends(texts[start]) && capitalized(texts[start]) && capitalized(texts[start + 1])
+      && nameHeads.has(words[start + 1]) && measure(start, start + 2) <= width) {
+      groups.push({ start, end: start + 2, kind: 'name' });
+    }
+  }
+  for (let start = 0; start < words.length - 1; start++) {
     if (!determiners.has(words[start]) || ends(texts[start]) || !lexical(start + 1)) continue;
     let end = start + 2;
     if (!ends(texts[start + 1]) && modifier(start + 1) && lexical(start + 2)) end++;
@@ -48,6 +57,7 @@ export function englishPhraseGroups(texts: readonly string[], width: number, mea
 export function phraseBreakCosts(texts: readonly string[], groups: readonly PhraseGroup[], title: boolean): number[] {
   const costs = Array<number>(texts.length + 1).fill(0);
   for (const group of groups) {
+    if (group.kind === 'name') costs[group.start + 1] = Math.max(costs[group.start + 1], title ? 1800 : 7000);
     if (title && group.kind === 'nominal') costs[group.start + 1] = 480;
     if (!title && group.kind === 'infinitive' && group.end === texts.length) {
       for (let end = group.start + 1; end < group.end; end++) costs[end] = Math.max(costs[end], 7000);

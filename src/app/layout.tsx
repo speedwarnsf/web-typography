@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PrevNextStrip />
           <SectionFooter />
           <footer className="px-6 py-6 text-center text-xs text-neutral-500" data-no-typeset>
-            <a href="/releases/4.1.0/">Typeset 4.1.0</a>
+            <a href="/releases/4.2.0/">Typeset 4.2.0</a>
             {' / '}<a href="/releases/3.5.1/">V3 archive</a>
           </footer>
           <BackToTop />
