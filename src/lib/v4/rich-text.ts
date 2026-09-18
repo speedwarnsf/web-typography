@@ -352,6 +352,13 @@ export interface RichOutput { cleanup: () => void; nodes: Node[] }
  * are reversible; their original head object is retained for restoration. */
 export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
   const restoreSelection = selectionBookmark(element);
+  const originalStyle = element.getAttribute('style');
+  const wrapStyle = element.style.getPropertyValue('text-wrap-style');
+  const wrapPriority = element.style.getPropertyPriority('text-wrap-style');
+  // Browser pretty/balance must not re-break an already composed source span.
+  // Keep ordinary wrapping as the overflow safety net, and own only this property.
+  if (breaks.length) element.style.setProperty('text-wrap-style', 'auto', 'important');
+  const renderedStyle = element.getAttribute('style');
   const runs = textRuns(element);
   const markers: HTMLElement[] = [];
   const splits = new Map<Text, Split>();
@@ -402,6 +409,14 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
           if (head.nextSibling !== part || part.parentNode !== head.parentNode) break;
           head.appendData(part.data); part.remove();
         }
+      }
+      if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
+        && element.style.getPropertyPriority('text-wrap-style') === 'important') {
+        if (element.getAttribute('style') === renderedStyle) {
+          if (originalStyle === null) element.removeAttribute('style');
+          else element.setAttribute('style', originalStyle);
+        } else if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
+        else element.style.removeProperty('text-wrap-style');
       }
       releaseCopy();
       restoreSelection();

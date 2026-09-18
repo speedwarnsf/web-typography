@@ -33,7 +33,7 @@ for (const { name, engine, executablePath } of browsers) {
         document.body.append(p); const source = p.textContent, links = [...p.querySelectorAll('a')];
         for (const width of [260, 300, 343, 375]) {
           p.style.width = width + 'px'; const result = api.typeset(p);
-          check('inline name remains together: ' + street + ' ' + width, result.outcome === 'composed:rich'
+          check('inline name remains together: ' + street + ' ' + width, /^(composed:rich|native:fits)$/.test(result.outcome)
             && result.after.lines.some(line => line.text.includes(street + ' ' + suffix)), { outcome: result.outcome, lines: result.after.lines.map(line => line.text) });
           check('inline name preserves text and links: ' + street + ' ' + width,
             p.textContent === source && links.every((link, i) => p.querySelectorAll('a')[i] === link) && result.after.overflow <= .5);

@@ -2987,6 +2987,11 @@ function planRichText(element, options = {}, nativeLayout) {
 }
 function renderRichText(element, breaks, hangs = [], spaces = []) {
   const restoreSelection = selectionBookmark(element);
+  const originalStyle = element.getAttribute("style");
+  const wrapStyle = element.style.getPropertyValue("text-wrap-style");
+  const wrapPriority = element.style.getPropertyPriority("text-wrap-style");
+  if (breaks.length) element.style.setProperty("text-wrap-style", "auto", "important");
+  const renderedStyle = element.getAttribute("style");
   const runs = textRuns(element);
   const markers = [];
   const splits = /* @__PURE__ */ new Map();
@@ -3035,6 +3040,13 @@ function renderRichText(element, breaks, hangs = [], spaces = []) {
           head.appendData(part.data);
           part.remove();
         }
+      }
+      if (breaks.length && element.style.getPropertyValue("text-wrap-style") === "auto" && element.style.getPropertyPriority("text-wrap-style") === "important") {
+        if (element.getAttribute("style") === renderedStyle) {
+          if (originalStyle === null) element.removeAttribute("style");
+          else element.setAttribute("style", originalStyle);
+        } else if (wrapStyle) element.style.setProperty("text-wrap-style", wrapStyle, wrapPriority);
+        else element.style.removeProperty("text-wrap-style");
       }
       releaseCopy();
       restoreSelection2();
@@ -4163,4 +4175,4 @@ export {
   auditJSON,
   mount
 };
-//# sourceMappingURL=shared-S3WC6GW6.js.map
+//# sourceMappingURL=shared-Z54Y7DIZ.js.map

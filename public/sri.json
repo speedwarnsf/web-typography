@@ -7,9 +7,9 @@
     "go@3.5.0.js": "sha384-RZw93n+DsSryf1jIeTMdbA4sD4b5AQ9ritormzuuoSxTmYNk7gF5vFjHJ9lE7e/l",
     "go@4.0.0.js": "sha384-r47jRTYNK8hnzYb67ZvMbR0l3Wkt/lC80qDvMhfWkZ6rQbZn4IpUvLO0aG4YbMX3",
     "go@4.1.0.js": "sha384-1qkfdbQ3CL7UETIwu/QMq2Ks57EAwlWBP/GaBuCggdpl7mBVlIeZAgyaZfyAHsmB",
-    "go@4.2.0.js": "sha384-tkknhNlGYpl3OhmUPpILx1r4vXTJbULNnaDd+18njII4hj9w6a7ZVnwNjw+SlG52",
-    "typeset.min.js": "sha384-6t6XGjc0fJg7Zs6c8E4k2y3jJvEQXIYXNNYj+I/e8BZFiw3dNPPNOkVOKacPmwx3",
-    "typeset.esm.js": "sha384-uxB8B1HSpzTZZCfcrhhX2zSUyc0y0BI13uydVohlvCxNShQqkG4zWP34PxfrThG/"
+    "go@4.2.0.js": "sha384-KpyXtkC1KXixYXRIvrZCP7VPGJ2BcKJ07LeCuQpFXQms/QwY033ti1+QWU/XFD/a",
+    "typeset.min.js": "sha384-PdoWlvxvd4cZ2NEjYC6iyz6N2JPWSw7QdhgjQ0RoJDpqN+L5uQkIwPef3XkX1fKD",
+    "typeset.esm.js": "sha384-4sUmIknOHZlJzs9uvOV8UDsOEiHYKVQVBdkBgpXmcZZsU1BylWsu/YBYt1KQZMZM"
   },
-  "snippet": "<script src=\"https://typeset.us/go@4.2.0.js\" integrity=\"sha384-tkknhNlGYpl3OhmUPpILx1r4vXTJbULNnaDd+18njII4hj9w6a7ZVnwNjw+SlG52\" crossorigin=\"anonymous\" defer></script>"
+  "snippet": "<script src=\"https://typeset.us/go@4.2.0.js\" integrity=\"sha384-KpyXtkC1KXixYXRIvrZCP7VPGJ2BcKJ07LeCuQpFXQms/QwY033ti1+QWU/XFD/a\" crossorigin=\"anonymous\" defer></script>"
 }
