@@ -25,7 +25,10 @@ in a staging directory, then writes `packages/typeset-v4/dist`,
 `public/releases/x.y.z/`, the pins `go@x.y.z.js`, `typeset@x.y.z.min.js` and
 `typeset@x.y.z.esm.js`, the aliases (`go@<major>.js`; `go.js` and the other
 unversioned files only for 4.x), `sri.json`, `release.json`, and appends the
-release to the ledger `public/releases/published.json`.
+release to the ledger `public/releases/published.json`. It also drops the
+entries in `scripts/v4/known-failures.json` that were waiting for this cut
+(for example the 4.2.0 `sri.json` keys), so the tagged commit's
+`test:release` does not report them as XPASS.
 
 Review the diff, commit it, push, and wait for CI.
 

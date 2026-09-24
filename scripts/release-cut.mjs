@@ -211,6 +211,13 @@ try {
     await place('public/sri.json', JSON.stringify(await sriIndex({ root, version, go, advisories }), null, 2) + '\n');
     const pins = (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).map(f => f.slice(3, -3)).filter(v => compareVersions(v, version) < 0).sort(compareVersions);
     await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length, npm: `typeset.us@${version}/dist/auto.js` }, aliases: { [`/go@${major}.js`]: `latest ${major}.x; no integrity hash`, '/go.js': `latest ${EVERGREEN_MAJOR}.x only; for trying Typeset out` }, advisories, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+    // Checks expected to fail until this cut (scripts/v4/known-failures.json)
+    // pass once its files are written; drop those entries so test:release on
+    // the tag does not report them as XPASS.
+    const knownPath = join(root, 'scripts/v4/known-failures.json');
+    const known = JSON.parse(await readFile(knownPath, 'utf8').catch(() => '{"entries":[]}'));
+    const remaining = (known.entries ?? []).filter((/** @type {{ awaiting?: string }} */ entry) => entry.awaiting !== `the ${version} release cut`);
+    if (known.entries && remaining.length !== known.entries.length) await place('scripts/v4/known-failures.json', JSON.stringify({ ...known, entries: remaining }, null, 2) + '\n');
     // 6. Append the new release to the ledger. It records the tarball that
     //    must be published: npm publish public/releases/<v>/<tarball>.
     const nextLedger = await readLedger(root);
