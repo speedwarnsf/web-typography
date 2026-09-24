@@ -259,7 +259,7 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     if (!this.staleFrame) this.staleFrame = requestAnimationFrame(() => {
       this.staleFrame = 0;
       const el = this.host.current, plan = this.state.plan;
-      if (el && plan?.widths.length && contentWidth(el) < Math.max(...plan.widths) - .5) el.setAttribute('data-ts-stale', '');
+      if (el && plan?.widths.length && contentWidth(el) < Math.max(...plan.widths) - .01) el.setAttribute('data-ts-stale', '');
     });
   };
   private schedule = () => {

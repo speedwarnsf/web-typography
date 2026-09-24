@@ -644,6 +644,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   // size has held for RESIZE_SETTLE_MS; meanwhile any that would wrap twice
   // show their native wrapping ([data-ts-stale]).
   const resizing = new Set<HTMLElement>();
+  // Offscreen blocks a resize left for later: composed when they come within a viewport.
+  const deferred = new Set<HTMLElement>();
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
   let guardFrame = 0;
   let stopped = false;
@@ -698,18 +700,29 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line'));
   };
   const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+    let near = false;
     for (const entry of entries) {
       const el = entry.target as HTMLElement;
       if (entry.isIntersecting) nearby.add(el); else nearby.delete(el);
+      if (deferred.has(el)) {
+        // Deferred work is watched until the block comes within a viewport.
+        if (!entry.isIntersecting) continue;
+        deferred.delete(el);
+        enqueue(el, KEY);
+      }
       // One viewport snapshot per queued job. Watching thousands of finished
       // elements through every reflow costs more than the scheduling saves.
       viewport?.unobserve(el);
+      if (entry.isIntersecting && pending.has(el)) near = true;
     }
-  }, { rootMargin: '400px' });
+    // Visible work waits for no idle period.
+    if (near) schedule();
+  }, { rootMargin: '100% 0px' });
   const enqueue = (el: HTMLElement, job = CONTENT) => {
     if (!claim(el)) return;
     const queued = pending.get(el);
-    if (queued === undefined) viewport?.observe(el);
+    if (queued === undefined && !nearby.has(el)) viewport?.observe(el);
+    if (job & CONTENT) deferred.delete(el);
     pending.set(el, (queued || 0) | job);
   };
   /** Queue matching elements this controller does not own yet. */
@@ -723,7 +736,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     return found;
   };
   const drop = (el: HTMLElement) => {
-    owned.delete(el); pending.delete(el); nearby.delete(el); hidden.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
+    owned.delete(el); pending.delete(el); nearby.delete(el); hidden.delete(el); deferred.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
   };
   const onScreen = (el: HTMLElement) => {
     const box = el.getBoundingClientRect();
@@ -748,20 +761,29 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       const widest = states.get(el)?.widest;
       if (!widest || el.hasAttribute('data-ts-stale')) continue;
       const width = boxOf(el).w;
-      if (width > 0 && width < widest - .5) stale.push(el);
+      if (width > 0 && width < widest - .01) stale.push(el);
     }
     for (const el of stale) el.setAttribute('data-ts-stale', '');
   };
+  /** The size has held: recompose what is on or near the screen now, and
+   * leave offscreen blocks (stale or not) until they come near. */
   const settle = () => {
     settleTimer = undefined;
     if (stopped) return;
-    for (const el of resizing) if (owned.has(el)) enqueue(el, KEY);
+    const height = view?.innerHeight ?? 0;
+    for (const el of resizing) {
+      if (!owned.has(el)) continue;
+      const box = el.getBoundingClientRect();
+      if (!viewport || (box.bottom > -height && box.top < 2 * height)) { nearby.add(el); enqueue(el, KEY); }
+      else { deferred.add(el); viewport.observe(el); }
+    }
     resizing.clear();
     schedule();
   };
   /** A block's width is changing: recompose once it settles, not every frame. */
   const resizeStarted = (el: HTMLElement) => {
     resizing.add(el);
+    if (deferred.delete(el)) viewport?.unobserve(el);
     if (settleTimer !== undefined) clearTimeout(settleTimer);
     settleTimer = setTimeout(settle, RESIZE_SETTLE_MS);
     // Widths the observers cannot see change ahead of layout (a stylesheet
@@ -782,8 +804,19 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     return changed;
   };
+  /** Work near the viewport runs in the next task; idle callbacks are only for
+   * offscreen work, since a busy page may leave no idle time at all. */
   const schedule = () => {
-    if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
+    if (stopped || !fontsReady || !pending.size) return;
+    let near = false;
+    for (const el of nearby) if (pending.has(el)) { near = true; break; }
+    if (near) {
+      if (timer !== undefined) return;
+      if (idle !== undefined) { cancelIdleCallback(idle); idle = undefined; }
+      timer = setTimeout(() => flush(), 0);
+      return;
+    }
+    if (timer !== undefined || idle !== undefined) return;
     if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(flush, { timeout: 200 });
     else timer = setTimeout(() => flush(), 16);
   };
@@ -832,10 +865,20 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   });
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
   const sizes = new WeakMap<Element, { w: number; h: number }>();
+  // Layout sizes, like the ResizeObserver's: a transform (a scale animation)
+  // changes a box's rectangle but not the width its lines were composed for.
   const boxOf = (el: Element) => {
-    const cs = getComputedStyle(el), rect = el.getBoundingClientRect();
-    return { w: Math.max(0, rect.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0')),
-      h: Math.max(0, rect.height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0') - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0')) };
+    const cs = getComputedStyle(el);
+    let w = parseFloat(cs.width), h = parseFloat(cs.height);
+    if (Number.isNaN(w) || Number.isNaN(h)) {
+      const rect = el.getBoundingClientRect();
+      w = rect.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0');
+      h = rect.height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0') - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0');
+    } else if (cs.boxSizing === 'border-box') {
+      w -= parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0') + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.borderRightWidth || '0');
+      h -= parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0') + parseFloat(cs.borderTopWidth || '0') + parseFloat(cs.borderBottomWidth || '0');
+    }
+    return { w: Math.max(0, w), h: Math.max(0, h) };
   };
   const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
@@ -935,11 +978,14 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       const job = pending.get(el);
       if (job === undefined) continue;
       pending.delete(el);
-      // Superseded: a width still changing is recomposed once it settles.
-      if (resizing.has(el) && !(job & CONTENT)) continue;
+      // Superseded: a width still changing is recomposed once it settles, and
+      // offscreen text a resize deferred is recomposed when it comes near.
+      if ((resizing.has(el) || deferred.has(el)) && !(job & CONTENT)) continue;
       nearby.delete(el); viewport?.unobserve(el);
       process(el, job);
-      if (performance.now() - start >= 8 || (deadline && deadline.timeRemaining() <= 1)) break;
+      // An idle callback that fired on its timeout reports no time remaining;
+      // it still gets the 8 ms budget, or a busy page composes one block per 200 ms.
+      if (performance.now() - start >= 8 || (deadline && !deadline.didTimeout && deadline.timeRemaining() <= 1)) break;
     }
     stats.maxBatchMs = Math.max(stats.maxBatchMs, performance.now() - start);
     observe();
@@ -1012,7 +1058,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (settleTimer !== undefined) clearTimeout(settleTimer);
       if (guardFrame) view?.cancelAnimationFrame(guardFrame);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear();
+      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear(); deferred.clear();
       watched.clear(); parents.clear();
       for (const el of blocked.keys()) stopWaiting(el);
       for (const el of claimed) release(el);

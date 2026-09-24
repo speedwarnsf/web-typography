@@ -61,6 +61,13 @@ Hashes for every published version live in
   event, or in the next animation frame for changes no observer sees). Print
   shows native wrapping and pauses composition. `--ts-break-display` and
   `data-ts-stale` are supported hooks; see SUPPORT.md.
+- The scheduler no longer starves on a busy page. An idle callback that fires
+  on its 200 ms timeout gets the full 8 ms budget instead of one block, and
+  text near the viewport is composed in the next task rather than waiting for
+  idle time: with 12 ms of script per frame, visible paragraphs compose in
+  about 125 ms and 60 paragraphs in about 3 s (4.2.0: about 2 s and 13 s).
+  After a resize, blocks on or within a viewport of the screen are
+  recomposed; offscreen blocks wait until they come near.
 
 ### Rendering changes
 
