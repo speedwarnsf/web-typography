@@ -9,6 +9,8 @@
 //   lines from public/sri.json; pinned snippets in the docs carry
 //   crossorigin and the right integrity (before the cut, the placeholder
 //   release-cut fills).
+// - community: contributor files and issue forms exist and ask for what a
+//   report needs (`--network` also reads GitHub's community profile).
 //
 // Later sections are added by the other docs items. TODO(docs-sync) anchors
 // are counted and listed; release-cut refuses to cut while any remain.
@@ -124,6 +126,26 @@ try {
       return released ? integrity !== sri.files[`go@${version}.js`] : integrity !== 'sha384-FILLED-BY-RELEASE-CUT';
     }).map(m => m[0]);
     check('stability', `${file}: every pinned loader snippet has crossorigin and the right integrity (${released ? 'from sri.json' : 'the release-cut placeholder for ' + target})`, wrong.length === 0, wrong);
+  }
+  // community (D6): the files GitHub's community profile looks for, and issue
+  // forms that ask for what a bad-break report needs.
+  const exists = async (/** @type {string} */ path) => readFile(path).then(() => true, () => false);
+  const community = ['README.md', 'LICENSE', 'CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'SECURITY.md', '.github/pull_request_template.md', '.github/ISSUE_TEMPLATE/bad-break.yml', '.github/ISSUE_TEMPLATE/integration-question.yml', 'ROADMAP.md'];
+  const absent = [];
+  for (const file of community) if (!await exists(file)) absent.push(file);
+  check('community', 'README, LICENSE, code of conduct, contributing guide, security policy, issue forms, PR template and roadmap exist', absent.length === 0, absent);
+  const form = await readFile('.github/ISSUE_TEMPLATE/bad-break.yml', 'utf8').catch(() => '');
+  const ids = [...form.matchAll(/^\s+id: (\w+)$/gm)].map(m => m[1]);
+  check('community', 'the bad-break form asks for URL, width, font, browser, version, auditJSON and a screenshot', ['url', 'width', 'font', 'browser', 'version', 'audit', 'screenshot'].every(id => ids.includes(id)) && /render: json/.test(form), ids);
+  const contributing = await readFile('CONTRIBUTING.md', 'utf8').catch(() => '');
+  check('community', 'CONTRIBUTING.md covers setup, build:dist, test:v4 with --only, and attaching auditJSON', /npm ci/.test(contributing) && /build:dist/.test(contributing) && /--only/.test(contributing) && /auditJSON/.test(contributing));
+  const coc = await readFile('CODE_OF_CONDUCT.md', 'utf8').catch(() => '');
+  check('community', 'CODE_OF_CONDUCT.md adopts the Contributor Covenant and names a contact', /Contributor Covenant/.test(coc) && /@typeset\.us/.test(coc));
+  if (process.argv.includes('--network')) {
+    // After these files reach the default branch: GitHub's own score.
+    let health = null;
+    try { health = Number(execFileSync('gh', ['api', 'repos/speedwarnsf/web-typography/community/profile', '--jq', '.health_percentage'], { encoding: 'utf8', timeout: 30000 }).trim()); } catch {}
+    check('community', "GitHub's community profile scores at least 85%", health !== null && health >= 85, health);
   }
 } catch (error) {
   errors.push(String(/** @type {Error} */ (error).stack || error));

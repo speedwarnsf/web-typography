@@ -85,6 +85,16 @@ Hashes for every published version live in
   docs/ops/vercel-firewall.md has the firewall bypass that stops bot
   challenges on these paths; it is applied in the Vercel project, not here.
 
+### Contributing
+
+- CONTRIBUTING.md (setup, building the candidate, running and narrowing the
+  suites, attaching `auditJSON` to a report), CODE_OF_CONDUCT.md (the
+  Contributor Covenant 2.1), ROADMAP.md (what 4.4 and 5.0 hold, and why each
+  waits), a "Bad line break" issue form that asks for the URL, width, font,
+  browser, version, `auditJSON` output and a screenshot, an integration
+  question form, and a pull request template with the rendering-change
+  checklist.
+
 ### Stability
 
 - STABILITY.md states what a version number promises: API names,
