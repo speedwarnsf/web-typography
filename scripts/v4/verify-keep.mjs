@@ -8,9 +8,11 @@
 // absent from the text changes nothing, including whether a well-set native
 // paragraph is retained. (Output with keep omitted is held byte-identical to
 // 4.2.0 by verify-golden.)
+import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 import { releaseIdentity } from './release-evidence.mjs';
+import { reactUnderTest } from './candidate.mjs';
 
 const watchdog = setTimeout(() => { console.error('verify-keep: watchdog after 170 s'); process.exit(3); }, 170_000);
 watchdog.unref();
@@ -26,6 +28,15 @@ const RETAIN = [
   'We keep your records private. We never sell them. You can export or delete everything at any time from the settings page of the app.',
   'Breathing slowly through the nose calms the nervous system and helps you fall asleep. Try four counts in, hold for seven, and eight counts out before bed each night.',
 ];
+// Both React adapters take keep as a prop, at widths where plain composition splits a phrase.
+const react = await build({ stdin: { contents: `
+import React from 'react'; import { createRoot } from 'react-dom/client';
+import { TypesetText, TypesetRichText } from './src/lib/v4/typeset.release.react';
+const keep = ${JSON.stringify(KEEP)};
+createRoot(document.getElementById('root')!).render(<>{[200, 260, 280, 360].map(width => <React.Fragment key={width}>
+  <TypesetText id={'plain-' + width} style={{ width }} text={${JSON.stringify(BODY)}} keep={keep} />
+  <TypesetRichText id={'rich-' + width} style={{ width }} keep={keep}>${RICH}</TypesetRichText>
+</React.Fragment>)}</>);`, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, format: 'iife', target: 'es2022', plugins: [reactUnderTest()] });
 const report = { ...await releaseIdentity(), checks: /** @type {any[]} */ ([]), errors: /** @type {any[]} */ ([]), browsers: /** @type {Record<string, string>} */ ({}) };
 
 for (const { name, engine, executablePath } of browsers) {
@@ -107,6 +118,18 @@ for (const { name, engine, executablePath } of browsers) {
     const titles = rows.filter(row => row.kind === 'title' && row.split.length < row.plainSplit.length);
     check('keep is exercised where plain composition splits a phrase', body.length >= 3 && titles.length >= 1,
       { body: body.map(row => [row.width, row.plainSplit]), titles: titles.map(row => [row.width, row.plainSplit, row.split]) });
+
+    await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:24px}p{font:18px/1.5 Georgia,serif;margin:0 0 12px}a{color:#176650}</style></head><body><div id="root"></div></body></html>');
+    await page.addScriptTag({ content: bundle });
+    await page.addScriptTag({ content: react.outputFiles[0].text });
+    await page.waitForFunction(() => [...document.querySelectorAll('#root p')].length === 8 && [...document.querySelectorAll('#root p')].every(p => /** @type {HTMLElement} */ (p).dataset.tsOutcome));
+    await page.waitForTimeout(150);
+    const adapters = await page.evaluate(KEEP => [...document.querySelectorAll('#root p')].map(p => {
+      const lines = window.Typeset.measureLayout(p).lines.map((/** @type {any} */ line) => line.text.toLowerCase().replace(/[^\p{L} ]/gu, ''));
+      const split = KEEP.filter(phrase => lines.slice(0, -1).some((line, i) => line.endsWith(' ' + phrase.split(' ')[0]) && lines[i + 1].startsWith(phrase.split(' ')[1])));
+      return { id: p.id, outcome: /** @type {HTMLElement} */ (p).dataset.tsOutcome, split };
+    }), KEEP);
+    for (const row of adapters) check(`React ${row.id.replace(/-.*/, '') === 'plain' ? 'TypesetText' : 'TypesetRichText'} ${row.id.replace(/^\w+-/, '')}px keeps every phrase`, !row.split.length && /^(composed|native:)/.test(row.outcome), row);
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack) }); }
   finally { await browser.close(); }
 }
