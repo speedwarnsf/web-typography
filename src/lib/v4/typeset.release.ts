@@ -2,6 +2,8 @@ import { typeset as compose, typesetAll as composeAll, mount as mountCore, planR
 import type { Options, Result, Controller, RichPlan } from './typeset.next';
 export * from './typeset.next';
 export { smartQuotes } from './smart-quotes';
+export { OUTCOMES } from './outcomes';
+export type { Outcome, FeatureStatus, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
 export { styleProseLists } from './prose-lists';
 export type { ListStyleResult } from './prose-lists';
 // Retained for v3 advanced consumers; new integrations should use the owned adapters.

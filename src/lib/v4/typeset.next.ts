@@ -15,42 +15,79 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
+import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
+/**
+ * Composition options. Defaults are those of the typeset.us package entry
+ * points (typeset, typesetAll, mount, planRichText and the React adapters).
+ * The same options are accepted by every entry point.
+ */
 export interface Options {
-  /** Opt-in Unicode 17 break opportunities; default preserves the legacy path. */
+  /** Where lines may break. Default `'unicode'`: Unicode 17 line-break
+   * opportunities with English, French, German and Spanish preferences from
+   * the declared `lang`. `'legacy'` is the earlier English-only research path,
+   * kept for comparison; it is not identical to 3.x. */
   lineBreaks?: 'legacy' | 'unicode';
-  /** Explicit English text transformation. Off unless requested. */
+  /** Default `false`. `'en'` converts straight quotes and apostrophes to curly
+   * ones in declared-English text (quotes only; same length, so offsets and
+   * copying stay aligned). Changes the copied text. */
   smartQuotes?: 'en' | false;
-  /** Reversible leading punctuation/capital alignment. Off unless requested. */
+  /** Default `false`. `true` hangs opening punctuation and measured capitals
+   * into the left margin, reversibly, when the glyph fits inside any clip. */
   opticalHanging?: boolean;
-  /** Full bounded word-space finish on composed body text. On by default. */
+  /** Default `true`. Adjusts word spaces on composed, left-aligned body text
+   * within -20% to +33% of their natural width. `false` also turns off
+   * `tracking`. */
   spacing?: boolean;
-  /** Bounded per-line tracking after word-space finishing. On with spacing. */
+  /** Default `true` (while `spacing` is on). Adjusts letter spacing by at most
+   * 0.01em per line after word spacing. `false` keeps word spacing only. */
   tracking?: boolean;
-  /** Re-rank the finished rag or retain the historical natural-width ranking. */
+  /** Default `'finished'`: ranks candidates by their predicted rag after
+   * spacing. `'natural'` ranks by natural widths, the earlier ranking, kept
+   * for comparison. */
   contour?: 'natural' | 'finished';
+  /** Default `'body'`, or `'title'` inside h1-h6; also read from
+   * `data-typeset-mode`. `'title'` and `'heading'` balance short display text
+   * and never add a line; `'body'` composes paragraphs; `'ui'` never composes
+   * (outcome `native:ui`). */
   mode?: Mode;
+  /** Default none. Phrases whose words should stay on one line, such as
+   * `['New York']`. Title and heading composition strongly avoids breaking
+   * inside them; in body text a non-empty `keep` stops Typeset from keeping
+   * the browser's lines as they are.
+   * TODO(docs-sync): C14 extends keep to body-text breaks; update this line. */
   keep?: readonly string[];
+  /** Default none. The most lines a composition may use; a result that needs
+   * more is declined with `native:line-budget`. */
   maxLines?: number;
-  /** Compact preserves native line count, except one extra line to fix an
-   * orphan. Editorial permits one additional line for prose phrasing.
-   * When omitted, a stranded sentence/clause opener can also earn one line. */
+  /** Default (omitted): body text keeps the browser's line count, or uses one
+   * more line to repair a one-word last line or a stranded sentence or
+   * clause opener. `'compact'`: one more line only to repair a one-word last
+   * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
-  /** Current author text. Framework adapters should pass this on updates. */
+  /** Current author text. Framework adapters pass this on updates. */
   text?: string;
 }
+/** What typeset() did to one element. `outcome` is also written to
+ * `data-ts-outcome`; OUTCOMES.md explains every value. */
 export interface Result {
-  outcome: string;
+  /** One of OUTCOMES; typed so that a future code still compiles. */
+  outcome: Outcome | (string & {});
   mode: Mode;
+  /** Line boxes before and after, as measured in the browser. */
   before: LayoutMetrics;
   after: LayoutMetrics;
+  /** True when the DOM was changed (composed, or quotes converted). */
   changed: boolean;
   durationMs: number;
+  /** Why no candidate fitted, when outcome is `native:no-candidate`. */
   constraint?: RichPlan['constraint'];
+  /** Candidate-search evidence for rich composition. */
   search?: RichPlan['search'];
-  features?: { quotes: string; hanging: string; spacing: string; tracking: string };
+  /** Finishing-feature statuses (also `data-ts-quotes`, `-hanging`, `-spacing`, `-tracking`). */
+  features?: { quotes: QuoteStatus | (string & {}); hanging: HangingStatus | (string & {}); spacing: SpacingStatus | (string & {}); tracking: TrackingStatus | (string & {}) };
 }
 interface State {
   nodes: Node[];

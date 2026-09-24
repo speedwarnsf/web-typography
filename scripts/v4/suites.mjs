@@ -23,6 +23,7 @@ export const SUITES = [
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
   { name: 'verify-cli', report: 'output/cli-verification.json' },
   { name: 'verify-site-index', report: 'output/site-index.json', note: 'sri.json lists only immutable pins; cache headers; firewall bypass' },
+  { name: 'verify-docs', report: 'output/docs-verification.json', note: 'docs match the code and the release (outcomes, options, install lines, links)' },
   { name: 'verify-release-trust', report: 'output/release-trust.json', note: 'pinned workflows, provenance publishing, SECURITY.md, advisories, release notes' },
   { name: 'verify-package-contents', report: 'output/package-contents.json', note: 'the package the next release would publish' },
   { name: 'verify-budgets', report: 'output/budget-verification.json', note: 'gzip size budgets (runtime budgets: --runtime, nightly)' },

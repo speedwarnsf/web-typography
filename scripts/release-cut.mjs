@@ -63,6 +63,13 @@ const npmCache = await mkdtemp(join(tmpdir(), 'typeset-release-npm-'));
   const changelog = await readFile(join(root, 'CHANGELOG.md'), 'utf8').catch(() => '');
   const heading = changelog.split('\n').find(line => line.startsWith(`## ${version} `) || line === `## ${version}`);
   precondition(`CHANGELOG.md has a dated "## ${version}" section`, !!heading && /^## \S+ - \d{4}-\d{2}-\d{2}$/.test(heading), heading ?? null);
+  // Docs written ahead of integration carry TODO(docs-sync) anchors; none may ship.
+  const anchors = [];
+  for (const file of ['packages/typeset-v4/README.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/for-agents.md', 'packages/typeset-v4/OUTCOMES.md', 'src/lib/v4/outcomes.ts', 'src/lib/v4/typeset.next.ts', 'CHANGELOG.md']) {
+    const text = await readFile(join(root, file), 'utf8').catch(() => '');
+    if (text.includes('TODO(docs-sync)')) anchors.push(file);
+  }
+  precondition('no TODO(docs-sync) anchors in the docs that ship', anchors.length === 0, anchors);
 }
 if (!dryRun) {
   const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();

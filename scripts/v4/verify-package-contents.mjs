@@ -86,7 +86,7 @@ try {
   const vendored = createHash('sha256').update(await readFile('src/vendor/unicode-linebreak.js')).digest('hex');
   check('vendor manifest records the vendored line-break bundle with its license header', vendor.hashes['src/vendor/unicode-linebreak.js'] === vendored, { recorded: vendor.hashes['src/vendor/unicode-linebreak.js'], actual: vendored });
 
-  check('packed file list includes the CLI, docs and dist', ['bin/audit.mjs', 'README.md', 'SUPPORT.md', 'MIGRATION.md', 'for-agents.md', 'capabilities.json', 'dist/manifest.json', 'dist/styles.css'].every(path => files.has(path)), [...files.keys()]);
+  check('packed file list includes the CLI, docs and dist', ['bin/audit.mjs', 'README.md', 'SUPPORT.md', 'MIGRATION.md', 'SECURITY.md', 'OUTCOMES.md', 'for-agents.md', 'capabilities.json', 'dist/manifest.json', 'dist/styles.css'].every(path => files.has(path)), [...files.keys()]);
   check('nothing from the repository leaks into the package', [...files.keys()].every(path => !/^(?:output|src|node_modules|\.env|scripts)/.test(path)), [...files.keys()]);
   const report = { version: staged.version, dist: artifacts.dist, tarball: packed.filename, entryCount: packed.entryCount, unpackedSize: packed.unpackedSize, size: packed.size, files: Object.fromEntries(files), checks, errors };
   await mkdir('output', { recursive: true });

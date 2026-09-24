@@ -21,6 +21,20 @@ Hashes for every published version live in
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
 
+### API (additive)
+
+- `OUTCOMES` lists every outcome code; the `Outcome`, `FeatureStatus`,
+  `QuoteStatus`, `HangingStatus`, `SpacingStatus` and `TrackingStatus` types
+  name them. `Result.outcome` and `Result.features` use these types while
+  still accepting any string, so existing code compiles unchanged.
+  OUTCOMES.md (also in the package and at docs/outcomes.md) says what each of
+  the 38 outcomes and 32 feature statuses means, whether it is expected, and
+  what to do, grouped as composed, nothing to improve, unsupported content,
+  couldn't improve safely and not processed.
+- Every option documents its default in the type declarations. The
+  `lineBreaks` comment said the default was the legacy path; the package
+  default is `'unicode'`.
+
 ### Installation and packaging
 
 - The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no

@@ -24,7 +24,7 @@
     "./capabilities.json": "./capabilities.json",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "bin", "README.md", "AGENTS.md", "MIGRATION.md", "SUPPORT.md", "SECURITY.md", "for-agents.md", "capabilities.json", "LICENSE", "THIRD-PARTY-LICENSES.txt", "UNICODE-LICENSE.txt"],
+  "files": ["dist", "bin", "README.md", "AGENTS.md", "MIGRATION.md", "SUPPORT.md", "SECURITY.md", "OUTCOMES.md", "for-agents.md", "capabilities.json", "LICENSE", "THIRD-PARTY-LICENSES.txt", "UNICODE-LICENSE.txt"],
   "bin": { "typeset-audit": "./bin/audit.mjs" },
   "sideEffects": ["./dist/styles.css", "./dist/typeset.global.js", "./dist/go.js", "./dist/auto.js"],
   "publishConfig": { "tag": "latest", "access": "public" },
