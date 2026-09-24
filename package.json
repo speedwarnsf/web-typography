@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "build:dist": "node scripts/build-public-release.mjs",
+    "build:dist": "node scripts/build-candidate.mjs",
+    "build:candidate": "node scripts/build-candidate.mjs",
+    "release:cut": "node scripts/release-cut.mjs",
+    "verify:ledger": "node scripts/v4/verify-ledger.mjs",
     "test:v4": "node scripts/v4/verify-release.mjs",
     "test": "node scripts/v4/verify-release.mjs",
     "bench": "node scripts/bench.mjs"

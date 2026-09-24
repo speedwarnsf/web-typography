@@ -40,7 +40,8 @@ Read [migration](packages/typeset-v4/MIGRATION.md) and
 
 - [`src/lib/v4/`](src/lib/v4) — the approved V4 engine and adapters. The old source remains preserved separately.
 - [`src/app/`](src/app) — the Next.js site (typeset.us). The site runs the same engine it ships.
-- [`public/go.js`](public/go.js), `public/go@x.y.z.js`, [`public/sri.json`](public/sri.json) — generated drop-ins and their hashes (`npm run build:dist`).
+- [`public/go.js`](public/go.js), `public/go@x.y.z.js`, [`public/sri.json`](public/sri.json) — generated drop-ins and their hashes, written only by `npm run release:cut`.
+- [`public/releases/published.json`](public/releases/published.json) — the append-only ledger of every published artifact; `npm run verify:ledger` fails if any of them changes.
 - [`packages/typeset-v4/`](packages/typeset-v4) — the current npm package.
 - [`public/releases/3.5.1/`](public/releases/3.5.1) — archived npm, browser and source artifacts; the old browser pin remains 3.5.0.
 - [`docs/BINDING.md`](docs/BINDING.md) — how the phrase-binding weight was derived, and what the evidence does not support.
@@ -50,7 +51,8 @@ Read [migration](packages/typeset-v4/MIGRATION.md) and
 
 ```bash
 npm run dev         # site at localhost:3000
-npm run build:dist  # regenerate go.js, typeset.min.js, esm + npm artifacts
+npm run build:dist  # candidate build from src into output/candidate/; never writes packages/ or public/
+npm run release:cut -- --version x.y.z --summary "…"  # the only step that writes a release (try --dry-run)
 npm test            # current release: craft, spacing, tracking, clipping, lifecycle and accessibility
 npm run bench       # historical V3 benchmark; not a V4 performance claim
 ```

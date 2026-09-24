@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, 'codex/release-*']
+    branches: [master, 'codex/release-*', 'release/**']
   pull_request:
 
 jobs:
@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The ledger's append-only check compares with earlier commits and tags.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -19,15 +22,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Published artifacts are immutable
+        env:
+          LEDGER_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          node scripts/v4/verify-ledger.mjs
+          node scripts/v4/verify-immutable-4.2.mjs
+          node scripts/v4/verify-ledger-guards.mjs
+
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Build distributables from the engine
-        run: npm run build:dist
+      - name: Candidate build from the engine sources
+        run: npm run build:candidate
+
+      - name: The candidate build writes nothing outside output/
+        run: git diff --exit-code && test -z "$(git status --porcelain)"
 
       - name: Distributables must be tree-shaken clean of the legacy API
         run: |
-          if grep -q "smoothRag\|postRenderFix\|shapeRag\|optimizeBreaks" public/go.js public/typeset.min.js public/typeset.esm.js; then
+          if grep -q "smoothRag\|postRenderFix\|shapeRag\|optimizeBreaks" output/candidate/site/go.js output/candidate/site/typeset.min.js output/candidate/site/typeset.esm.js; then
             echo "Quarantined legacy code leaked into a distributable"; exit 1
           fi
 
