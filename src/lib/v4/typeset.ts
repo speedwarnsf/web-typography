@@ -778,12 +778,13 @@ export interface ParagraphProblem {
   /** Scores the line tokens.slice(end - lineTokens.length, end) at `fill`. */
   scoreLine: (tokens: Token[], fill: number, last: boolean, end: number) => number;
   scoreTransition: (lines: { fill: number }[], last: boolean) => number;
-  /** Optional fast paths with identical results: scoreLine for the line
-   * [start, end) at its measured fill, the break penalty at `end`, and
-   * scoreTransition given the line count and the newest three fills. */
-  lineScore?: (start: number, end: number) => number;
-  breakCost?: (end: number) => number;
-  transition?: (lines: number, fill: number, previousFill: number, earlierFill: number, last: boolean) => number;
+  /** What the search calls, with results identical to the above: scoreLine
+   * for the line [start, end) at its measured fill (computed once per line),
+   * the break penalty at `end`, and scoreTransition given the line count and
+   * the newest three fills. */
+  lineScore: (start: number, end: number) => number;
+  breakCost: (end: number) => number;
+  transition: (lines: number, fill: number, previousFill: number, earlierFill: number, last: boolean) => number;
 }
 
 /** Internal scoring model shared by the compositor and offline search tests. */
@@ -1259,7 +1260,7 @@ interface SearchNode {
 
 /** Exact for small graphs within budget; bounded beam search otherwise. */
 export function searchParagraph(problem: ParagraphProblem, limits: { exactStates?: number; exactTokens?: number } = {}): ParagraphSearchResult {
-  const { tokens: contentTokens, candidateBar, minRemaining, widthBetween, scoreLine, scoreTransition } = problem;
+  const { tokens: contentTokens, candidateBar, minRemaining, widthBetween, lineScore, breakCost, transition } = problem;
   const { options: opts, measurePx, beamWidth: BEAM } = problem;
   const n = contentTokens.length;
   const linesOf = (node: SearchNode): ParagraphLine[] => {
@@ -1269,13 +1270,8 @@ export function searchParagraph(problem: ParagraphProblem, limits: { exactStates
     }
     return lines.reverse();
   };
-  // The problem's own fast paths when it has them; the general interface otherwise.
-  const lineScore = problem.lineScore
-    ?? ((start: number, end: number) => scoreLine(contentTokens.slice(start, end), widthBetween(start, end) / measurePx, end === n, end));
-  const breakCost = problem.breakCost ?? ((end: number) => opts.breakPenalty?.(end) || 0);
-  const transitionAfter = (node: SearchNode, start: number, end: number, width: number, fill: number, last: boolean): number => problem.transition
-    ? problem.transition(node.lines + 1, fill, node.fill, node.parent ? node.parent.fill : 0, last)
-    : scoreTransition([...linesOf(node), { tokens: contentTokens.slice(start, end), width, fill }], last);
+  const transitionAfter = (node: SearchNode, fill: number, last: boolean): number =>
+    transition(node.lines + 1, fill, node.fill, node.parent ? node.parent.fill : 0, last);
   const child = (node: SearchNode, end: number, width: number, fill: number, cost: number): SearchNode =>
     ({ tokenIndex: end, cost, lines: node.lines + 1, start: node.tokenIndex, width, fill, parent: node });
   const root = (): SearchNode => ({ tokenIndex: 0, cost: 0, lines: 0, start: 0, width: 0, fill: 0, parent: null });
@@ -1312,7 +1308,7 @@ export function searchParagraph(problem: ParagraphProblem, limits: { exactStates
         if (fill > (state.tokenIndex === 0 && last ? 1 : candidateBar)) continue;
         if (opts.maxLines && state.lines + 1 + minRemaining[end] > opts.maxLines) continue;
         stack.push(child(state, end, width, fill, state.cost + lineScore(state.tokenIndex, end)
-          + (last ? 0 : breakCost(end)) + transitionAfter(state, state.tokenIndex, end, width, fill, last)));
+          + (last ? 0 : breakCost(end)) + transitionAfter(state, fill, last)));
       }
     }
     if (!stack.length) return result('exact');
@@ -1352,7 +1348,7 @@ export function searchParagraph(problem: ParagraphProblem, limits: { exactStates
         if (opts.maxLines && state.lines + 1 + minRemaining[end] > opts.maxLines) continue;
 
         const linePenalty = lineScore(start, end) + (isLast ? 0 : breakCost(end));
-        const transitionPenalty = transitionAfter(state, start, end, width, fill, isLast);
+        const transitionPenalty = transitionAfter(state, fill, isLast);
 
         // Finished layouts must not compete with unfinished, cheaper prefixes.
         (isLast ? completes : newBeam).push(child(state, end, width, fill, state.cost + linePenalty + transitionPenalty));

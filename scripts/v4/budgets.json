@@ -3,14 +3,29 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 37735,
-      "TypesetText-only": 38027,
-      "TypesetRichText-only": 33393,
+      "mount-only": 39725,
+      "TypesetText-only": 40050,
+      "TypesetRichText-only": 35230,
       "smartQuotes-only": 11713,
-      "react.js+shared": 39899,
-      "go.js": 42682,
-      "typeset.global.js": 42493
-    }
+      "react.js+shared": 41935,
+      "go.js": 45055,
+      "typeset.global.js": 44853
+    },
+    "raised": [
+      {
+        "by": "4.3 composition fixes (P6, C3, C13, C14, C16)",
+        "reason": "Code the fixes need, measured per commit on typeset.global.js gzip: P6 memoized search +496 B, C3 justify guard and audit error +193 B, C14 keep matching +371 B, C13 abbreviation, unit, honorific, label and designator lists +886 B, C16 audit line review +492 B. smartQuotes-only is unchanged.",
+        "before": {
+          "mount-only": 37735,
+          "TypesetText-only": 38027,
+          "TypesetRichText-only": 33393,
+          "smartQuotes-only": 11713,
+          "react.js+shared": 39899,
+          "go.js": 42682,
+          "typeset.global.js": 42493
+        }
+      }
+    ]
   },
   "runtime": {
     "lane": "chromium@4x",
