@@ -28,14 +28,6 @@
       "modes": ["candidate", "prebuilt", "staged-release"],
       "awaiting": "C2",
       "reason": "The CLI returns auditJSON, which reports hidden-break and isolated-space errors on composed output until C2."
-    },
-    {
-      "script": "verify-iframe-mount",
-      "label": ": a font loaded inside the iframe is recomposed$",
-      "browser": "webkit",
-      "modes": ["candidate", "prebuilt", "staged-release"],
-      "awaiting": "C7",
-      "reason": "WebKit fires no loadingdone event for this face, and until C7 the controller listens for nothing else."
     }
   ]
 }

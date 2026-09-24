@@ -15,6 +15,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
+import { armFonts, subscribe } from './lifecycle';
 
 export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 'dangerouslySetInnerHTML'> {
   children: ReactNode;
@@ -131,6 +132,7 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   private observer?: MutationObserver;
   private resize?: ResizeObserver;
   private releaseCopy?: () => void;
+  private unsubscribe?: () => void;
   private frame = 0;
   private mounted = false;
 
@@ -143,7 +145,9 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.observer = new MutationObserver(this.schedule);
     this.resize = new ResizeObserver(this.schedule);
     this.bindHost();
-    el.ownerDocument.fonts.addEventListener('loadingdone', this.schedule);
+    // Fonts a stylesheet loads late, including in WebKit, which fires no
+    // loadingdone event for them.
+    this.unsubscribe = subscribe(el.ownerDocument, { fonts: this.schedule, metrics: this.metricsEnded, styles: this.stylesChanged });
     el.ownerDocument.defaultView?.addEventListener('resize', this.schedule);
     el.ownerDocument.fonts.ready.then(this.schedule);
     this.recompose();
@@ -203,7 +207,7 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.mounted = false;
     cancelAnimationFrame(this.frame);
     this.observer?.disconnect(); this.resize?.disconnect();
-    this.host.current?.ownerDocument.fonts.removeEventListener('loadingdone', this.schedule);
+    this.unsubscribe?.();
     this.host.current?.ownerDocument.defaultView?.removeEventListener('resize', this.schedule);
     this.releaseCopy?.();
   }
@@ -221,6 +225,14 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.resize?.observe(el);
     if (el.parentElement) this.resize?.observe(el.parentElement);
   };
+  private metricsEnded = (target: Element) => {
+    const el = this.host.current;
+    if (el && (target.contains(el) || el.contains(target))) this.schedule();
+  };
+  private stylesChanged = () => {
+    const el = this.host.current, plan = this.state.plan;
+    if (el && (!plan?.styleSignature || richFingerprint(el) !== plan.styleSignature)) this.schedule();
+  };
   private schedule = () => {
     if (!this.mounted || this.frame) return;
     this.frame = requestAnimationFrame(() => { this.frame = 0; this.recompose(); });
@@ -232,6 +244,7 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
     else this.observe();
+    armFonts(this.host.current.ownerDocument);
   };
   render(): ReactElement {
     const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;

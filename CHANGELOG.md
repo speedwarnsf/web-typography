@@ -20,6 +20,10 @@ Hashes for every published version live in
   `isolated-space`, a word space alone beside an inline-block engine marker,
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
+- A third new error, `stale-layout`: a composed block whose rendered line count
+  differs from its composed lines (breaks + 1), because a font, spacing or size
+  changed after it was composed. 4.2.0 left such blocks double-wrapped and
+  its audit passed them.
 
 ### Lifecycle
 
@@ -33,6 +37,14 @@ Hashes for every published version live in
   scroll-linked custom property on `<html>` now cause 0 compositions (4.2.0:
   92 to 174 over 40 paragraphs). Removing nodes walks the removed subtree
   instead of every claimed element.
+- Composed text follows text metrics, not only width: fonts that finish
+  loading (including CSS-requested fonts in WebKit, which fires no loading
+  events), the text-spacing overrides of WCAG 1.4.12, a browser font-size
+  setting, rules changed through the CSSOM, and transitions or animations of
+  font weight, size or spacing. A same-width height change makes the
+  controller verify rendered lines against the composition. One set of font,
+  stylesheet and transition listeners serves every controller and
+  `TypesetRichText` in a document.
 
 ### Rendering changes
 

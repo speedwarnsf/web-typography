@@ -15,6 +15,7 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
+import { armFonts, subscribe } from './lifecycle';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -532,6 +533,12 @@ export function auditReport(selector = defaults): AuditReport {
       for (const sibling of [marker.previousSibling, marker.nextSibling]) if (sibling?.nodeType === 3 && /^\s+$/.test((sibling as Text).data)) isolatedSpaces++;
     }
     if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
+    // A composition renders one line per generated line. A font, spacing or
+    // size change since then adds native wraps: alternating long and short lines.
+    if (outcome === 'composed:rich' || outcome === 'composed') {
+      const expected = outcome === 'composed' ? element.querySelectorAll(':scope > .ts-line').length : element.querySelectorAll('br[data-ts-break]').length + 1;
+      if (layout.lines.length !== expected) add('stale-layout', 'error', layout.lines.length + ' rendered lines where the composition has ' + expected + '; text metrics changed after it was composed');
+    }
     if (layout.lastSingleton) add('orphan', 'review', 'One word on the final line; may be unavoidable');
     if (layout.firstSingleton) add('first-singleton', 'review', 'One word on the first line; may be unavoidable');
     for (const [index, line] of layout.lines.slice(0, -1).entries()) {
@@ -720,14 +727,28 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     schedule();
   });
-  const observedWidths = new WeakMap<Element, number>();
+  // Content-box sizes as last seen by the ResizeObserver or left by our writes.
+  const sizes = new WeakMap<Element, { w: number; h: number }>();
+  const boxOf = (el: Element) => {
+    const cs = getComputedStyle(el), rect = el.getBoundingClientRect();
+    return { w: Math.max(0, rect.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0')),
+      h: Math.max(0, rect.height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0') - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0')) };
+  };
   const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
     for (const entry of entries) {
-      const previous = observedWidths.get(entry.target);
-      observedWidths.set(entry.target, entry.contentRect.width);
-      if (previous !== undefined && Math.abs(previous - entry.contentRect.width) <= .01) continue;
-      for (const el of watched.get(entry.target) || []) enqueue(el, KEY);
+      const { width, height } = entry.contentRect;
+      const previous = sizes.get(entry.target);
+      sizes.set(entry.target, { w: width, h: height });
+      if (!previous) continue;
+      if (Math.abs(previous.w - width) > .01) {
+        for (const el of watched.get(entry.target) || []) enqueue(el, KEY);
+      } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
+        // Same width, new height: a font, a text-spacing override, a browser
+        // font-size setting or text-only zoom can add native wraps to composed
+        // lines without any mutation. Verify the rendered lines.
+        enqueue(entry.target as HTMLElement, VERIFY);
+      }
     }
     if (pending.size) schedule();
   });
@@ -739,7 +760,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       let dependents = watched.get(target);
       if (!dependents) {
         dependents = new Set(); watched.set(target, dependents);
-        observedWidths.set(target, contentWidth(target)); resize?.observe(target);
+        sizes.set(target, boxOf(target)); resize?.observe(target);
       }
       dependents.add(el);
     }
@@ -776,6 +797,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     const result = typeset(el, options);
     if (result.changed) stats.compositions++;
     if (!owned.has(el)) { owned.add(el); watch(el); }
+    // Our own write may change the block's height; that is not a reason to verify.
+    else if (result.changed) { const box = boxOf(el); sizes.set(el, { w: sizes.get(el)?.w ?? box.w, h: box.h }); }
   };
   function flush(deadline?: IdleDeadline) {
     timer = undefined;
@@ -798,6 +821,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     stats.maxBatchMs = Math.max(stats.maxBatchMs, performance.now() - start);
     observe();
+    // A composition can start a font load (a face first used by this text).
+    armFonts(doc);
     if (pending.size) schedule();
     else resolveReady();
   }
@@ -819,6 +844,18 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of owned) enqueue(el, KEY | VERIFY);
     schedule();
   };
+  // Owned text a transition or animation ended on, inside or around.
+  const metricsChanged = (target: Element) => {
+    if (stopped) return;
+    for (const el of ownedWithin(target)) enqueue(el, VERIFY);
+    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, VERIFY);
+    schedule();
+  };
+  const stylesChanged = () => {
+    if (stopped) return;
+    for (const el of owned) enqueue(el, KEY);
+    schedule();
+  };
   doc.fonts.ready.then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
@@ -827,7 +864,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  doc.fonts.addEventListener('loadingdone', fontsChanged);
+  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged });
   view?.addEventListener('resize', resized);
   return {
     ready, refresh, stats,
@@ -836,7 +873,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (timer !== undefined) clearTimeout(timer);
       if (idle !== undefined) cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
-      doc.fonts.removeEventListener('loadingdone', fontsChanged);
+      unsubscribe();
       view?.removeEventListener('resize', resized);
       if (restoreContent) for (const el of owned) restore(el);
       owned.clear(); pending.clear(); nearby.clear();
