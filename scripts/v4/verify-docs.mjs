@@ -12,6 +12,10 @@
 // - readme: the package README introduces the product in order, covers every
 //   option, links only absolutely and to things that exist, and names the
 //   release it ships with; the root README's install block is generated.
+// - claims: no v3-era claim (audit() returns [], 1.6 ms per paragraph, 20 KB,
+//   English only, ...) in current docs, the site or SKILL.md's frontmatter;
+//   SUPPORT.md's known limitations and /faq cover the standard objections;
+//   the CHANGELOG has the published and the next version.
 // - community: contributor files and issue forms exist and ask for what a
 //   report needs (`--network` also reads GitHub's community profile).
 //
@@ -175,6 +179,46 @@ try {
   const brokenRoot = [];
   for (const link of rootLinks) if (!await exists(link) && !(await readdir(link).then(() => true, () => false))) brokenRoot.push(link);
   check('readme', 'root README relative links name files in the repository', brokenRoot.length === 0, brokenRoot);
+
+  // claims (D3): no stale v3 claim in current docs, known limitations and an
+  // FAQ, and a CHANGELOG entry for both the published and the next version.
+  check('claims', `CHANGELOG.md has "## ${pkg.version}" (the published version)`, new RegExp(`^## ${pkg.version.replace(/\./g, '\\.')}\\b`, 'm').test(changelog));
+  const next = changelog.split('\n## ').find(section => section.startsWith(target)) ?? '';
+  check('claims', `the ${target} CHANGELOG section has a "Rendering changes" subsection`, /### Rendering changes/.test(next));
+  const STALE = [
+    [/audit\(\) returns \[\]/, 'audit() returns []'], [/Zero means zero/, 'audit zero-violation claim'],
+    [/~?1\.[46] ?ms (?:median )?per paragraph|1\.[46] ?ms per paragraph/i, 'v3 per-paragraph timing'], [/\b20 ?KB\b/, 'v3 bundle size'], [/38(?:&nbsp;|\s)KB/, 'old homepage size'],
+    [/English (?:prose )?only/i, 'English-only claim'], [/cloned per\s+segment/, 'v3 link cloning'], [/npx typeset\.us audit/, 'old CLI name'], [/48[–-]80 retained/, 'v3 search size'],
+    [/React 19\.2\.3 is the local target|Locally targeted React: 19\.2\.3/, 'React 19.2.3-only claim'], [/abandons a word\.\s+The book version never does/, 'homepage orphan claim'], [/SceneF/, 'client name'],
+  ];
+  const CURRENT = ['packages/typeset-v4/README.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/for-agents.md', 'packages/typeset-v4/OUTCOMES.md', 'README.md', 'STABILITY.md', 'SECURITY.md', 'CONTRIBUTING.md', 'ROADMAP.md', 'docs/show-hn.md', 'docs/outcomes.md', 'docs/RELEASING.md', 'public/llms.txt'];
+  /** @type {Record<string, string>} */
+  const texts = {};
+  for (const file of CURRENT) texts[file] = await readFile(file, 'utf8');
+  texts['SKILL.md (frontmatter)'] = (await readFile('SKILL.md', 'utf8')).split('\n---\n')[0];
+  /** @param {string} dir */
+  const site = async dir => { for (const entry of await readdir(dir, { withFileTypes: true })) { const path = `${dir}/${entry.name}`; if (entry.isDirectory()) await site(path); else if (/\.tsx$/.test(entry.name)) texts[path] = await readFile(path, 'utf8'); } };
+  await site('src/app');
+  const stale = [];
+  for (const [file, text] of Object.entries(texts)) for (const [pattern, what] of STALE) {
+    // Claims can wrap across lines; check sentences of the joined text. A
+    // sentence that says the claim is historical (3.x, V3) may quote it.
+    const joined = text.replace(/\n\s*(?:>\s*)?/g, ' ').replace(/\s+/g, ' ');
+    const hits = joined.split(/(?<=[.!?])\s+/).filter(sentence => /** @type {RegExp} */ (pattern).test(sentence) && !/\b(?:3\.x|V3|v3)\b/.test(sentence));
+    if (hits.length) stale.push(`${file}: ${what}: ${hits[0].trim().slice(0, 120)}`);
+  }
+  check('claims', 'no stale v3-era claim in current docs, the site or the SKILL.md frontmatter', stale.length === 0, stale);
+  const historical = [];
+  for (const file of ['docs/for-agents-copy.md', 'docs/agents-canonical.md']) if (!/^> \*\*Historical\.\*\*/m.test((await readFile(file, 'utf8')).split('\n').slice(0, 8).join('\n'))) historical.push(file);
+  check('claims', 'v3-era agent docs are marked historical at the top', historical.length === 0, historical);
+  const support = texts['packages/typeset-v4/SUPPORT.md'];
+  const limitations = support.split('## Known limitations')[1] ?? '';
+  check('claims', 'SUPPORT.md lists known limitations: find-in-page, Text Fragments, innerText and selection, print, translation, CSP/Trusted Types, hyphenation, justification, RTL, browser floor', ['Find-in-page', 'Text Fragment', 'innerText', 'selection.toString', 'Print', 'translation', 'Trusted Types', 'hyphenation', 'justification', 'Right-to-left', 'Browser floor'].every(term => limitations.includes(term)));
+  const faq = await readFile('src/app/faq/page.tsx', 'utf8').catch(() => '');
+  check('claims', '/faq answers screen readers, layout shift, SEO, copying, print and translation, no-JS, when it runs, and text-wrap: pretty', ['screen readers', 'layout shift', 'SEO', 'copies text', 'Printing and translation', 'without JavaScript', 'defer it', 'text-wrap: pretty'].every(q => faq.includes(q)));
+  check('claims', 'the README has an FAQ section that links /faq', /## FAQ\n\nMore answers: https:\/\/typeset\.us\/faq/.test(readme));
+  const llmsVersions = [...texts['public/llms.txt'].matchAll(/typeset\.us@(\d+\.\d+\.\d+)|go@(\d+\.\d+\.\d+)\.js|releases\/(\d+\.\d+\.\d+)\/(?!README)/g)].map(m => m[1] || m[2] || m[3]).filter(v => v !== '3.5.1');
+  check('claims', `llms.txt names ${target} in its install lines and links`, llmsVersions.length > 0 && llmsVersions.every(v => v === target), [...new Set(llmsVersions)]);
 
   // community (D6): the files GitHub's community profile looks for, and issue
   // forms that ask for what a bad-break report needs.

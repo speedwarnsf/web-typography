@@ -124,10 +124,11 @@ export default function EssayPage() {
           width, if any of a dozen browser quirks would make the composed
           paragraph worse than the browser&rsquo;s own, the engine restores
           the original and records why. The result is a property no CSS
-          declaration can offer: <code>audit()</code> returns the measured
-          violations on the page — overflows, orphans, weak line-ends — as
-          data. Zero means zero. Your CI can assert it. Your AI agent can
-          verify it. You can paste any URL into{' '}
+          declaration can offer: <code>auditJSON()</code> reports what it
+          measured on the page — overflow, stale output, words hidden from a
+          screen reader, and what happened to every paragraph — as data. Your
+          CI can assert it passes. Your AI agent can verify it. You can paste
+          any URL into{' '}
           <Link href="/fix">the grader</Link> and watch it count.
         </p>
 

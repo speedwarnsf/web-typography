@@ -1,5 +1,10 @@
 # typeset.us — canonical instructions for coding agents
 
+> **Historical.** This page describes typeset.us 3.5.x and is kept for the
+> record. Its API, audit and performance statements are not the 4.x contract.
+> Current instructions: packages/typeset-v4/for-agents.md, served at
+> https://typeset.us/for-agents.md.
+
 typeset.us is a paragraph compositor for the browser. The browser's greedy
 line-breaker strands prepositions at line ends, orphans single words on last
 lines, and cuts staircases into the right edge. The browser types. It doesn't

@@ -42,7 +42,7 @@ let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 
-const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/fix', '/font-inspector', '/for-agents', '/install', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
+const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
 const KEY_ROUTES = ['/', '/audit', '/dna', '/proof', '/fix', '/essay', '/install'];
 const ATTACK = `<!doctype html><html><head>
 <base href="https://attacker.invalid/">

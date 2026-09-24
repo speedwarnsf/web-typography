@@ -28,7 +28,7 @@ This document records our attempt to bring that taste back, drawing on the mathe
 > failures in them — v3's merged words, the Pass 2 that was never wired —
 > are part of the record.
 
-**The thesis:** A well-set paragraph is not an accident. It is the product of measurable decisions — about where to break, how much to stretch, what to avoid — that have been understood for centuries. We can express those decisions as math, and the math can run on any text, any font, any column width, on any device, in milliseconds per paragraph (measured, not asserted: docs/BENCHMARKS.md — median 1.4 ms per paragraph in Chromium at desktop speed, 6.6 ms at a 4x-throttled mid-range-phone proxy).
+**The thesis:** A well-set paragraph is not an accident. It is the product of measurable decisions — about where to break, how much to stretch, what to avoid — that have been understood for centuries. We can express those decisions as math, and the math can run on any text, any font, any column width, on any device, in milliseconds per paragraph (measured, not asserted: docs/BENCHMARKS.md — a few milliseconds per paragraph in Chromium at desktop speed, about 25 ms at a 4x-throttled mid-range-phone proxy, for the 4.x engine; the 3.x engine's 1.4 ms and 6.6 ms do not describe 4.x).
 
 **The constraint:** No hyphens. "Fuck the hyphen — we have math." The web has `hyphens: auto` but it produces ugly, often wrong breaks. The great narrow-column publications (The New Yorker, Typographica, Octavo) relied on five tools: hyphenation, H&J parameters, paragraph-level optimization, hanging punctuation, and skilled editing. We're rebuilding four of the five without the one most publications leaned on.
 

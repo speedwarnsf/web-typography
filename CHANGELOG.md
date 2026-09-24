@@ -50,6 +50,19 @@ Hashes for every published version live in
   install lines are generated from the published version and sri.json at
   each cut (it had pinned 4.1.0).
 
+- SUPPORT.md describes 4.3.0 and lists known limitations: generated line
+  breaks and find-in-page, Text Fragments, `innerText` and selection; print;
+  machine translation; CSP and Trusted Types; no hyphenation, justification
+  or right-to-left text; the browser floor; framework-owned text. A new FAQ
+  (typeset.us/faq, and in the README) answers what screen readers hear,
+  layout shift, SEO, copying, printing and translation, readers without
+  JavaScript, cost, and when it runs.
+- Stale 3.x claims are gone from current docs and the site: "audit() returns
+  []", "zero means zero", 1.4 to 1.6 ms per paragraph, 20 KB, English only,
+  cloned links. The Show HN kit, the essay, SKILL.md's frontmatter, the agent
+  contract (for-agents.md) and llms.txt describe 4.3; the 3.5 agent pages are
+  marked historical. A client's name is gone from SUPPORT.md and the CHANGELOG.
+
 ### Installation and packaging
 
 - The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no
@@ -187,8 +200,15 @@ Hashes for every published version live in
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each change to default output in 4.3 fixes a verified defect and is listed
+here with the number of test paragraphs whose output changed (STABILITY.md).
+<!-- TODO(docs-sync): C2 (generated breaks no longer hidden from assistive
+technology; spacing markers inline), C3 (justified text declined as
+native:justify), C4 (live regions excluded), C9 (print and break display),
+C13 (abbreviations, honorifics, units and letter designators kept together)
+and C15 (smart-quote fixes and server-rendered quotes) each add an entry
+with its golden-diff count. Until they are integrated, the packaging and
+documentation changes above change no default output. -->
 
 ### Development
 

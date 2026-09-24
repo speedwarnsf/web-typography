@@ -1,7 +1,9 @@
-# Typeset 4.2.0 support contract
+# Typeset 4.3.0 support contract
 
-4.2.0 is released with owner approval within the range below. Local tests
+4.3.0 is released with owner approval within the range below. Local tests
 are not certification for every device, browser, font, or sentence.
+What each outcome means: OUTCOMES.md. What a version promises: STABILITY.md
+in the repository.
 
 - Horizontal LTR Latin prose/titles; declared English, French, German and
   Spanish. Untagged Latin uses neutral preferences.
@@ -104,7 +106,8 @@ lane, at 320, 375 and 768 px. The 4.2.0 build fails these checks: its hidden
 generated line breaks join the words on either side of each break, including
 inside link and heading names, and Chromium also drops some word spaces beside
 spacing markers. `auditJSON()` reports both conditions as `hidden-break` and
-`isolated-space` errors. Local coverage also includes keyboard navigation,
+`isolated-space` errors.
+<!-- TODO(docs-sync): after C2, state that 4.3.0 passes these checks in all three engines and what screen readers hear at a generated break. --> Local coverage also includes keyboard navigation,
 emulated touch/rotation, 200%/400% text sizing,
 delayed variable fonts, source updates and no-JavaScript rendering. The macOS
 clipboard suite uses headed Chromium/WebKit/Firefox, trusted copy/paste events
@@ -129,7 +132,39 @@ No install hooks, telemetry, page-content uploads or required runtime service.
 Mount's incremental discovery, initial visible-text priority and yielded batches
 reduce redundant work; real text, font and width changes still recompose.
 The 8ms batch target cannot preempt one paragraph or a browser layout.
-Large-document discovery/layout can still create long tasks. Static SceneF
-snapshot benchmarking is not live hydration, server, or physical-device proof.
+Large-document discovery/layout can still create long tasks. Benchmarks of a
+static snapshot of a client site are not live hydration, server, or
+physical-device proof.
 The audit CLI navigates only your explicit URL and reports locally; --apply
 changes only an isolated preview, never a deployed site.
+
+## Known limitations
+
+- **Generated line breaks are real `<br>` elements.** Find-in-page does not
+  match a phrase that spans one, a Text Fragment link (`#:~:text=`) to such
+  a phrase does not scroll, and `innerText` and `selection.toString()`
+  contain a newline at each. Copying through the browser's copy command is
+  cleaned (no extra newlines), and the source text in the DOM is unchanged.
+  A newline-free rendering is on the roadmap.
+- **Print.** <!-- TODO(docs-sync): C9 changes how composed text prints; describe the 4.3 behaviour. -->
+  Until then, printed pages can re-wrap composed lines at the paper width.
+- **Machine translation.** <!-- TODO(docs-sync): C10 steps aside on translated pages; describe it. -->
+  Browser translation of composed text can come out garbled, because
+  spacing and tracking wrappers split sentences into segments.
+- **Content Security Policy and Trusted Types.** The 4.x composition path
+  (`mount`, `typeset`, the loaders and the React adapters) assigns no HTML
+  strings, uses no `eval`, and injects no `<style>` elements, so it needs no
+  `unsafe-eval` and no Trusted Types policy. (The retained v3 helpers, such
+  as `renderFrozenLines`, are not part of that path.) <!-- TODO(docs-sync): C5 makes style restoration strict-CSP safe; state the exact policy that passes. -->
+- **No hyphenation, no justification.** Text with `hyphens: auto` or soft
+  hyphens keeps the browser's layout.
+  <!-- TODO(docs-sync): C3 declines justified text with native:justify; confirm. -->
+- **Right-to-left, vertical and non-Latin text** keeps the browser's layout.
+- **Browser floor.** Needs `Intl.Segmenter`, `ResizeObserver`,
+  `MutationObserver`, `document.fonts` and CSS `text-wrap`: Chrome and Edge
+  114, Safari 17.4 and Firefox 125, or later. Tested in Playwright's
+  Chromium, WebKit and Firefox; the versions are in each report.
+  <!-- TODO(docs-sync): K4 keeps older engines native without throwing; say so. -->
+- **Framework-owned text.** Do not point `mount()` or a loader at text that
+  Vue, Svelte, Lit, Solid or React update in place; use the React adapters or
+  leave it native. <!-- TODO(docs-sync): C6 makes mount() safe under framework text updates; relax this. -->

@@ -1,8 +1,12 @@
-# Typeset 4.2.0: agent integration contract
+# Typeset 4.3.0: agent integration contract
 
-Status: public release 4.2.0, following 4.1.0. Install typeset.us@4.2.0 with
-project-owner approval and retain the prior dependency/deployment for rollback.
-No telemetry, install hook, or automatic registration is included.
+Status: public release 4.3.0, following 4.2.0. Install the exact version,
+`npm i -E typeset.us@4.3.0`, or the pinned go@4.3.0.js with its integrity
+hash from https://typeset.us/sri.json, with project-owner approval, and
+retain the prior dependency/deployment for rollback. Never recommend the
+unpinned go.js for a production site. No telemetry, install hook, or
+automatic registration is included. What a version may change: STABILITY.md
+in the repository.
 
 ## Decide and scope
 
@@ -20,9 +24,17 @@ and pure 2D translation are measured in context. Inspect native reasons.
 For DOM text: import mount, restore and auditJSON from 'typeset.us'; mount
 a narrow prose/title selector; await controller.ready; disconnect on teardown.
 For React: import TypesetText or TypesetRichText from 'typeset.us/react'.
-Locally targeted React: 19.2.3. Never imperatively mount
+Supported React: 18.2 and later and every 19.x (peer ^18.2.0 || ^19.0.0);
+tested versions are in capabilities.json. Never imperatively mount
 a framework-owned subtree or overlap controllers. Custom stateful children
-remain native:react-component.
+remain native:react-component. Framework recipes (Next.js, Vite, Astro,
+SvelteKit, Vue): https://typeset.us/install/frameworks.
+
+Every element gets an outcome (result.outcome, data-ts-outcome). native:
+means the browser's layout was kept on purpose, with the reason; it is not
+an error. OUTCOMES.md in this package explains every code and what to do;
+the Outcome type and OUTCOMES const list them. Explain a declined paragraph
+from its outcome and result.constraint, not by guessing.
 
 4.2 coordinates same-target mounts within one engine instance: first claim
 wins, waiting controllers take over after release, and stats.overlappingTargets
@@ -91,7 +103,9 @@ Read measured constraint.kind before explaining why composition was declined.
 ## Packaged audit command
 
 Install the optional runner with npm install -D playwright, then
-npx playwright install chromium. Run typeset-audit --help, or:
+npx playwright install chromium (Playwright is not a peer of this package,
+so any version installs cleanly). The CLI needs Node 18.3 or later. Run
+typeset-audit --help, or:
 
     typeset-audit --url http://localhost:3000 --selector 'article p'
 
@@ -106,10 +120,12 @@ Read MIGRATION.md and SUPPORT.md inside this package. Keep the prior version pin
 the pilot passes. New globals use window.Typeset; go.js targets [data-typeset]
 explicitly. Restore or disconnect DOM ownership, unmount React, restore list
 styling, and revert the recorded dependency/deployment to roll back.
-The website go@4.2.0.js preserves the broad automatic prose/headings scope and
-craft defaults of the previous website loader. Override its selector with
+The website go@4.3.0.js, and the identical typeset.us/auto (dist/auto.js)
+in this package, keep the broad automatic prose/headings scope and craft
+defaults of the previous website loader. Override its selector with
 data-typeset-selector; exclude content with data-no-typeset. npm /go remains
-explicitly scoped to [data-typeset]. All old website pins remain immutable.
+explicitly scoped to [data-typeset]. Both log one console.info when nothing
+matches. All old website pins remain immutable.
 
 Outstanding external acceptance: physical iOS/Android; spoken VoiceOver/NVDA;
 non-macOS and native-application rich clipboard; representative-device performance.

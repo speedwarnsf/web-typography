@@ -221,6 +221,8 @@ lets go.
 
 ## FAQ
 
+More answers: https://typeset.us/faq
+
 **What do screen readers hear?** The same words as the source. See
 Accessibility above.
 <!-- TODO(docs-sync): true once C2 lands (4.2.0 joined words at generated breaks); confirm with verify-native-ax. -->

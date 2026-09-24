@@ -669,6 +669,7 @@ function DevelopersBand() {
         <a href={`/releases/${PINNED_VERSION}/README.md`}>Docs</a>
         <a href="/install/frameworks">Next, Vite, Astro, Svelte, Vue</a>
         <a href="/install">No-code platforms</a>
+        <a href="/faq">FAQ</a>
       </nav>
     </section>
   );
