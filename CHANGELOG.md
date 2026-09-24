@@ -20,6 +20,23 @@ Hashes for every published version live in
   `isolated-space`, a word space alone beside an inline-block engine marker,
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
+- `issue.target` now resolves: every selector started `html:nth-of-type(0)`
+  and matched nothing. Targets start from a unique id, from `body`, or are
+  `:root`.
+- Line-end reviews follow the compositor's own policy, which removes false
+  positives: a word before sentence punctuation ("…what it was for.") and a
+  letter designator ("type A") are valid line ends; an abbreviation is not a
+  sentence end, so "Dr. Jones" and "8 a.m. Monday" are not stranded openers;
+  untagged text gets no English word lists, as the compositor gives it none
+  (text composed through the legacy break path still does).
+- New review items: `bound-split` (a number and its unit, an honorific and a
+  name, a label and its number, or a word and its letter designator split
+  across lines), `split-ellipsis`, `line-initial-punctuation` (a line opening
+  with a dash or closing punctuation) and `regressed-vs-native` (a composed
+  element with more line-end reviews than its native layout had; 11 of 671
+  composed corpus cells at 4 widths in Chromium under 4.3). New error:
+  `alignment-lost` (see Rendering changes). Field shapes and `schemaVersion`
+  are unchanged.
 
 ### Rendering changes
 

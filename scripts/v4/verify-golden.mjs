@@ -107,7 +107,8 @@ function compose({ cells, build, baseline }) {
       breaks: after.lines.map(line => line.sourceStart), lines: after.lines.map(line => line.text), nativeText: native.lines.map(line => line.text),
       overflow: after.overflow, nativeOrphan: native.lastSingleton, orphan: after.lastSingleton, nativeLines: native.lines.length,
       textIntact: plain(el.textContent) === plain(new DOMParser().parseFromString('<body>' + cell.html, 'text/html').body.textContent),
-      review: { native: nativeReview, subject: review(el), baseline: {} } };
+      review: { native: nativeReview, subject: review(el), baseline: {} },
+      regressed: build === 'subject' && window.Typeset.audit('#golden-cell').some(issue => issue.type === 'regressed-vs-native') };
     api.restore(el);
     if (build === 'subject' && baseline?.[index]) {
       // 4.2.0's output, rendered as it was, judged by the same audit.
@@ -152,6 +153,19 @@ function changeReasons(cell) {
   return [...new Set(reasons)];
 }
 
+
+/**
+ * Changed cells allowed to end with more line-end problems than both native
+ * and 4.2.0, each with the reason. The check above fails on any other.
+ * @type {Record<string, string>}
+ */
+const tradeOffs = {
+  // The ranking may adopt a layout within its cost slack that ends on a weak
+  // word when the cheapest layout pays for a 97% line and a cliff (the
+  // tight-line trade, to be retuned in 4.4). Unbinding "10 g" at a line end
+  // made that layout eligible here.
+  'recipe@320/TypesetFixture': 'weak line end chosen over a 97% line (tight-line trade, 4.4)',
+};
 
 /** @param {{ name: string, engine: any, executablePath?: string }} config */
 async function runEngine({ name, engine, executablePath }) {
@@ -211,8 +225,33 @@ for (const { name, base, cand } of runs) {
     }
     const damaged = pairs.filter(({ c }) => !c.textIntact || /^threw/.test(c.outcome));
     check(name, `${variant}: source text intact`, !damaged.length, damaged.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
+    // The audit under test judges the native layout, 4.2.0's output and this
+    // build's output alike. A changed paragraph may trade one line-end
+    // problem for another, but never ends with more of them than both the
+    // browser and 4.2.0 had. (Declined justified text is native by design.)
+    if (variant === 'justified') continue;
+    const total = (/** @type {Record<string, number>} */ counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
+    const worse = differ.filter(({ c }) => total(c.review.subject) > Math.max(total(c.review.native), total(c.review.baseline)))
+      .filter(({ c }) => !Object.keys(tradeOffs).some(key => c.id.endsWith(' ' + key)));
+    check(name, `${variant}: no changed paragraph has more line-end problems than native and 4.2.0`, !worse.length,
+      worse.slice(0, 4).map(({ c }) => ({ id: c.id, review: c.review, lines: c.lines })));
+    const sums = { native: 0, baseline: 0, subject: 0 };
+    for (const { c } of pairs) for (const key of /** @type {const} */ (['native', 'baseline', 'subject'])) sums[key] += total(c.review[key]);
+    report.counts[`${name} ${variant}`].review = sums;
+    check(name, `${variant}: no more line-end problems than 4.2.0 in all`, sums.subject <= sums.baseline, sums);
+    // The audit's own regressed-vs-native item agrees with these counts.
+    const composed = pairs.filter(({ c }) => c.outcome.startsWith('composed'));
+    const inconsistent = composed.filter(({ c }) => c.regressed !== total(c.review.subject) > total(c.review.native));
+    check(name, `${variant}: audit reports regressed-vs-native exactly where composition added line-end problems`, !inconsistent.length && composed.length > 0,
+      { composed: composed.length, regressed: composed.filter(({ c }) => c.regressed).length, inconsistent: inconsistent.slice(0, 3).map(({ c }) => ({ id: c.id, review: c.review, regressed: c.regressed })) });
+  }
+  // A recorded trade-off that no longer occurs must be removed from the list.
+  for (const key of Object.keys(tradeOffs)) {
+    const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (c.markup !== base[i].markup || c.outcome !== base[i].outcome));
+    check(name, `recorded trade-off still occurs: ${key}`, occurs);
   }
 }
+
 // Engines keep agreeing wherever 4.2.0 made the same decision in each. Where
 // a rendering change applies, near-equal costs can settle differently in each
 // engine's text metrics, as they already do in some 4.2.0 cells: those cells

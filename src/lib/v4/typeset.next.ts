@@ -11,7 +11,7 @@ import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
 import { languageOf, languageWeakEnding } from './break-opportunities';
-import { strandedOpener } from './phrase-boundaries';
+import { boundPair, proseBoundary, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
@@ -68,6 +68,9 @@ interface State {
   optical?: RichOutput;
   spacing?: RichOutput;
   tracking?: RichOutput;
+  /** Composed with English lexical preferences (declared English, or the
+   * legacy break path, which applies them to untagged text). */
+  english: boolean;
 }
 const states = new WeakMap<HTMLElement, State>();
 // Controllers share composition state, so only one may write a given target.
@@ -364,6 +367,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
       signature: signature(element, options), result,
       rich, hadStyle, quotes, optical, spacing, tracking,
+      english: options.lineBreaks !== 'unicode' || languageOf(element.closest('[lang]')?.getAttribute('lang')) === 'en',
     });
     return result;
   };
@@ -477,6 +481,37 @@ export interface AuditReport {
   features: Record<'quotes' | 'hanging' | 'spacing' | 'tracking', Record<string, number>>;
   issues: AuditIssue[];
 }
+/**
+ * What a reader notices where lines end, judged by the policy the compositor
+ * applies to this text: English lexical preferences for declared English (or
+ * text the legacy path composed), the language profile for fr/de/es, and no
+ * word lists for untagged text, which the compositor treats neutrally.
+ */
+function lineReview(layout: LayoutMetrics, language: string, english: boolean): { type: string; detail: string }[] {
+  const review: { type: string; detail: string }[] = [];
+  const add = (type: string, detail: string) => review.push({ type, detail });
+  if (layout.lastSingleton) add('orphan', 'One word on the final line; may be unavoidable');
+  if (layout.firstSingleton) add('first-singleton', 'One word on the first line; may be unavoidable');
+  for (const [index, line] of layout.lines.slice(0, -1).entries()) {
+    const words = line.text.trim().split(/\s+/u);
+    const word = words.at(-1) || '', previous = words.at(-2), earlier = words.at(-3);
+    const first = layout.lines[index + 1].text.trim().split(/\s+/u)[0] || '';
+    const at = 'Line ' + (index + 1);
+    // A word before sentence punctuation ends its sentence ("through."), and
+    // a letter designator completes its phrase ("type A"); both may end a line.
+    const designated = previous !== undefined && boundPair(previous, word, earlier) === 'designator';
+    const weak = !proseBoundary(word) && !designated && (english ? isWeakEnding(word)
+      : language !== 'und' && language !== 'en' && language !== 'invalid' && languageWeakEnding(word, language));
+    if (weak) add('weak-line-end', at + ' ends on "' + word + '"');
+    if (english && strandedOpener(line.text)) add('stranded-opener', at + ' leaves a sentence or clause opener at its end');
+    const pair = english ? boundPair(word, first, previous) : null;
+    if (pair) add('bound-split', at + ' separates "' + word + '" from "' + first + '" (' + { unit: 'number and unit', honorific: 'honorific and name', label: 'label and number', designator: 'word and letter designator' }[pair] + ')');
+    if (/^\./u.test(first)) add('split-ellipsis', 'Line ' + (index + 2) + ' begins with the rest of a split ellipsis');
+    else if (/^[\u2013\u2014,;:!?)\]}\u201D\u2019\u00BB]/u.test(first)) add('line-initial-punctuation', 'Line ' + (index + 2) + ' begins with "' + first[0] + '"');
+  }
+  return review;
+}
+
 export function auditReport(selector = defaults): AuditReport {
   const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
@@ -519,18 +554,20 @@ export function auditReport(selector = defaults): AuditReport {
       for (const sibling of [marker.previousSibling, marker.nextSibling]) if (sibling?.nodeType === 3 && /^\s+$/.test((sibling as Text).data)) isolatedSpaces++;
     }
     if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
-    if (layout.lastSingleton) add('orphan', 'review', 'One word on the final line; may be unavoidable');
-    if (layout.firstSingleton) add('first-singleton', 'review', 'One word on the first line; may be unavoidable');
-    for (const [index, line] of layout.lines.slice(0, -1).entries()) {
-      const word = line.text.trim().split(/\s+/u).at(-1) || '';
-      const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
-      if (language === 'und' ? isWeakEnding(word) : language !== 'invalid' && languageWeakEnding(word, language)) add('weak-line-end', 'review', 'Line ' + (index + 1) + ' ends on "' + word + '"');
-      if (['en', 'und'].includes(language) && strandedOpener(line.text)) add('stranded-opener', 'review', 'Line ' + (index + 1) + ' leaves a sentence or clause opener at its end');
-    }
     const state = states.get(element);
-    if (state && state.output !== element.textContent) add('stale-output', 'error', 'Content changed since the last composition');
+    const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
+    const english = language === 'en' || (language === 'und' && !!state?.english);
+    const review = lineReview(layout, language, english);
+    for (const item of review) add(item.type, 'review', item.detail);
+    const current = !!state && state.output === element.textContent;
+    if (state && !current) add('stale-output', 'error', 'Content changed since the last composition');
+    // More line-end problems than the browser's own layout had.
+    if (current && outcome.startsWith('composed')) {
+      const native = lineReview(state.result.before, language, english).length;
+      if (review.length > native) add('regressed-vs-native', 'review', review.length + ' line review items after composition; the native layout had ' + native);
+    }
     if (outcome === 'native:no-candidate') {
-      const constraint = state?.output === element.textContent ? state.result.constraint : undefined;
+      const constraint = current ? state!.result.constraint : undefined;
       const detail = constraint?.kind === 'unbreakable-run'
         ? 'A run needs ' + constraint.requiredWidth.toFixed(3) + 'px in ' + constraint.availableWidth.toFixed(3) + 'px with the permitted breaks'
         : constraint?.kind === 'line-budget'
@@ -549,10 +586,15 @@ export function audit(selector?: string): AuditIssue[] { return auditReport(sele
  * an empty selector match is never reported as a successful audit. */
 export function auditJSON(selector = defaults) {
   const report = auditReport(selector);
+  // A selector document.querySelector resolves to the element: from a unique
+  // id, or else from body (or :root for the root element itself).
   const identify = (element: HTMLElement) => {
     const path: string[] = [];
+    const doc = element.ownerDocument;
     for (let el: HTMLElement | null = element; el; el = el.parentElement) {
-      if (el.id) { path.unshift('#' + CSS.escape(el.id)); break; }
+      if (el.id && doc.querySelectorAll('#' + CSS.escape(el.id)).length === 1) { path.unshift('#' + CSS.escape(el.id)); break; }
+      if (el === doc.documentElement) { path.unshift(':root'); break; }
+      if (el === doc.body) { path.unshift('body'); break; }
       path.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + (Array.from(el.parentElement?.children || []).filter(sibling => sibling.tagName === el!.tagName).indexOf(el) + 1) + ')');
     }
     return path.join(' > ');

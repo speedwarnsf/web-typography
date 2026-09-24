@@ -129,6 +129,8 @@ const LINKING_END_WORDS = new Set([
   "isn't","aren't","wasn't","weren't","hasn't","haven't","hadn't","mustn't",
 ]);
 export function isWeakEnding(word: string): boolean {
+  // "…what it was for." ends a sentence, which is a good place to end a line.
+  if (proseBoundary(word)) return false;
   const clean = word.replace(/[^A-Za-z0-9\u2019']+$/g, '').toLowerCase();
   return WEAK_END_WORDS.has(clean) || LINKING_END_WORDS.has(clean);
 }

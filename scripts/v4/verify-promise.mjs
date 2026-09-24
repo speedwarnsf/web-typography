@@ -7,7 +7,7 @@ import { releaseIdentity } from './release-evidence.mjs';
 import { reactUnderTest } from './candidate.mjs';
 
 const report={...await releaseIdentity(),checks:[],samples:[],errors:[],browsers:{}};
-const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize} from './src/lib/v4/typeset';export {isAbbreviation,proseBoundary,boundPair,keptPhrases,strandedOpener} from './src/lib/v4/phrase-boundaries';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
+const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize,isWeakEnding} from './src/lib/v4/typeset';export {isAbbreviation,proseBoundary,boundPair,keptPhrases,strandedOpener} from './src/lib/v4/phrase-boundaries';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
 const texts=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
 const specimenFont=(await readFile('lab/fraunces-latin-variable.woff2')).toString('base64');
 const react=await build({stdin:{contents:`
@@ -55,6 +55,7 @@ for(const config of browsers){
       check('stranded opener ignores an honorific',!internals.strandedOpener('Your first visit is with Dr. Jones'));
       check('stranded opener ignores a.m.',!internals.strandedOpener('arrive by 8 a.m. with'));
       check('stranded opener still found',internals.strandedOpener('the word was abandoned. Books'));
+      check('a sentence-final word is not a weak ending',!internals.isWeakEnding('through.')&&!internals.isWeakEnding('for?')&&internals.isWeakEnding('through')&&internals.isWeakEnding('the,'));
       const p=document.createElement('p');document.body.append(p);
       const ink=[];
       for(const font of ['Georgia','Arial','Times New Roman','Courier New'])for(const size of [16,32,48])for(const char of ['"','\u201c','\u2018','T','V','A','O','H']){

@@ -85,6 +85,17 @@ its handle on teardown. Do not style navigation or ordered lists.
 
 auditJSON schema 1 pass means:
 nonempty scope, no hard errors, no unprocessed targets. It does not mean aesthetic approval.
+Each issue.target is a selector document.querySelector resolves to the flagged
+element: a unique id, or a path from body. Errors: overflow, nested-output,
+alignment-lost, hidden-break, isolated-space, stale-output. Reviews: orphan,
+first-singleton, weak-line-end, stranded-opener, bound-split (number/unit,
+honorific/name, label/number, word/letter designator), split-ellipsis,
+line-initial-punctuation, regressed-vs-native (more line-end reviews than the
+native layout had), composition-constraint, unmeasurable, unprocessed. Line-end
+reviews follow the compositor's policy: English lists for declared English,
+the language profile for fr/de/es, none for untagged text; a word before
+sentence punctuation, an abbreviation and a letter designator are judged as
+the compositor judges them.
 Unavoidable geometry, unsupported content, and a solver search limit differ.
 Read measured constraint.kind before explaining why composition was declined.
 
