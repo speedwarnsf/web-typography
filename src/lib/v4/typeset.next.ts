@@ -15,7 +15,7 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, installLifecycleStyles, printing, rendered, subscribe } from './lifecycle';
+import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -78,6 +78,9 @@ interface State {
   tracking?: RichOutput;
 }
 const states = new WeakMap<HTMLElement, State>();
+// The last options.text written to an element: a translator's rewrite of that
+// text is not a new value to write back.
+const authorTexts = new WeakMap<HTMLElement, string>();
 // Controllers share composition state, so only one may write a given target.
 const mountOwners = new WeakMap<HTMLElement, symbol>();
 const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
@@ -196,6 +199,24 @@ export function restore(element: HTMLElement): void {
   element.removeAttribute('data-ts-stale');
 }
 
+/** Release to a translator. Engine markers are removed and wrappers unwrapped
+ * by moving their existing Text nodes; no Text node is split, merged, edited
+ * or removed, since the translator holds and fills them. Quote substitutions
+ * stay as they are for the same reason. */
+function yieldToTranslation(element: HTMLElement): void {
+  const state = states.get(element);
+  for (const marker of element.querySelectorAll('[data-ts-break]')) marker.remove();
+  for (const wrapper of element.querySelectorAll('[data-ts-track], .ts-line[data-ts-generated]')) wrapper.replaceWith(...wrapper.childNodes);
+  if (state) {
+    resetStyles(element, state);
+    if (element.style.getPropertyPriority('text-wrap-style') === 'important' && element.style.getPropertyValue('text-wrap-style') === 'auto') element.style.removeProperty('text-wrap-style');
+    if (!state.hadStyle && !element.style.length) element.removeAttribute('style');
+  }
+  states.delete(element);
+  for (const name of ['typesetDone', 'tsQuotes', 'tsHanging', 'tsSpacing', 'tsTracking']) delete element.dataset[name];
+  element.removeAttribute('data-ts-stale');
+}
+
 /** Exact DOM measurements inherit font features, axes, tracking and transforms. */
 function makeMeasurer(element: HTMLElement): { prepare: (texts: string[]) => void; measure: (text: string) => number; dispose: () => void } {
   const cs = getComputedStyle(element);
@@ -295,6 +316,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
+  if (translationActive(element.ownerDocument)) {
+    if (states.has(element) || element.querySelector('[data-ts-break], [data-ts-track]')) yieldToTranslation(element);
+    if (options.text !== undefined && authorTexts.get(element) !== options.text) { element.textContent = options.text; authorTexts.set(element, options.text); }
+    element.dataset.tsOutcome = 'native:translated';
+    return { outcome: 'native:translated', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
+  }
   const prior = states.get(element);
   // Hidden (display:none, a closed dialog, a skipped content-visibility
   // subtree): nothing can be measured, so keep the composition. When the
@@ -329,7 +356,10 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     prior.quotes?.restore();
     restoreSelection();
   }
-  if (options.text !== undefined && element.textContent !== options.text) element.textContent = options.text;
+  if (options.text !== undefined) {
+    if (element.textContent !== options.text) element.textContent = options.text;
+    authorTexts.set(element, options.text);
+  }
   const rawMarkup = element.innerHTML;
   const restoreQuoteSelection = selectionBookmark(element);
   const quotes = options.smartQuotes === 'en' ? applySmartQuotes(element) : undefined;
@@ -824,6 +854,10 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const record of records) {
       const target = isElement(record.target) ? record.target : record.target.parentElement;
       if (!target) continue;
+      if (record.type === 'attributes' && record.attributeName?.startsWith('_mst')) { markTranslated(doc); continue; }
+      if (record.type === 'childList' && !translationActive(doc) && [...record.addedNodes].some(node => node.nodeName === 'FONT')) {
+        for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) if (owned.has(el)) { markTranslated(doc); break; }
+      }
       if (record.type === 'attributes') {
         // Class and style changes restyle a subtree. Recheck what owned text
         // computes to instead of recomposing it: most changes (a menu class,
@@ -933,7 +967,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     parents.delete(el);
   };
   function observe() {
-    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode'] });
+    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', '_msttexthash', '_msthash'] });
     if (isElement(root)) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
       observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang'] });
     }
@@ -1032,6 +1066,17 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of owned) enqueue(el, KEY);
     schedule();
   };
+  // Translation started: step aside at once, before the translator fills the
+  // Text nodes it holds. Ended ("show original"): compose the current DOM.
+  const translationChanged = (active: boolean) => {
+    if (stopped) return;
+    if (active) {
+      observer.disconnect();
+      for (const el of owned) typeset(el, options);
+      observe();
+    } else for (const el of owned) enqueue(el, CONTENT);
+    schedule();
+  };
   // A content-visibility:auto section scrolled into range: its text can be measured now.
   const visibilityChanged = (target: Element) => {
     if (stopped) return;
@@ -1046,7 +1091,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized });
+  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized, translation: translationChanged });
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {

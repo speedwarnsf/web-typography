@@ -68,6 +68,16 @@ Hashes for every published version live in
   about 125 ms and 60 paragraphs in about 3 s (4.2.0: about 2 s and 13 s).
   After a resize, blocks on or within a viewport of the screen are
   recomposed; offscreen blocks wait until they come near.
+- Machine translation no longer garbles or loses text. When the page is
+  translated (the `translated-ltr`/`translated-rtl` class Google Translate and
+  Chrome set on `<html>`, a `<font>` wrapper inside composed text, or Edge's
+  `_msttexthash`), `mount()` and `typeset()` remove their markers and unwrap
+  their wrappers by moving the existing Text nodes, never splitting, merging,
+  editing or removing one, record `native:translated`, and compose nothing
+  until the translation ends; then the current DOM is composed again.
+  `TypesetRichText` freezes instead: it stops observing and replanning, but
+  the breaks React rendered stay. 4.2.0 merged and edited the Text nodes the
+  translator was filling, which lost sentences.
 
 ### Rendering changes
 

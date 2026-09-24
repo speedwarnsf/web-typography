@@ -91,6 +91,15 @@ as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. Hidden text (display:none, the hidden attribute, a closed dialog,
 content-visibility) keeps its composition and is not measured until shown.
 
+Machine translation: when a page is translated (Google Translate and Chrome set
+`translated-ltr`/`translated-rtl` on `<html>`; translators wrap text in `<font>`;
+Edge adds `_msttexthash`), `mount()` and `typeset()` step aside with outcome
+`native:translated`, moving but never splitting, merging or removing the Text
+nodes the translator fills, and compose the current DOM again when the
+translation ends. `TypesetRichText` only freezes: the breaks React rendered
+remain, so a translation of that text is read per line. `TypesetText` steps
+aside like `mount()`.
+
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are
