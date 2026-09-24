@@ -32,16 +32,18 @@ export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lin
   const [initialText] = useState(text);
   const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
   options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
+  // By value: an inline keep={[...]} is a new array on every parent render.
+  const keepKey = keep?.join('\u0000');
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const controller = mount(element, '[data-typeset-react]', options.current);
     return () => controller.disconnect();
-  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
+  }, [as, text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
   useLayoutEffect(() => {
     const element = ref.current;
     if (element) typeset(element, options.current);
     return () => { if (element) restore(element); };
-  }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
+  }, [as, text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
   return createElement(as, { ...attributes, ref, 'data-typeset-react': '' }, initialText);
 }

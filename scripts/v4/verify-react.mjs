@@ -1,0 +1,204 @@
+// @ts-check
+// The React adapters (TypesetText, TypesetRichText) as shipped in react.js,
+// on React 18.3.1 and 19.2.3 (development builds, so React's warnings
+// surface), in Chromium, WebKit and Firefox.
+//
+//   node scripts/v4/verify-react.mjs [--only chromium] [--major 19]
+//
+// Recomposition only on real changes (P4): parent re-renders with an inline
+// keep array and fresh JSX children, and a 60-frame ancestor transform,
+// write nothing inside the hosts; a real style change still recomposes;
+// 60 rapid updates in five React scheduling modes end exact. Lifecycle: no
+// observers or listeners survive unmounting or 30 fast mount cycles, and
+// StrictMode renders without warnings.
+import { build } from 'esbuild';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { parseArgs } from 'node:util';
+import { browsers } from './browsers.mjs';
+import { reactUnderTest } from './candidate.mjs';
+import { releaseIdentity } from './release-evidence.mjs';
+import { ensureReactEnv, reactMajor } from './react-env.mjs';
+
+const { values } = parseArgs({ options: { only: { type: 'string' }, major: { type: 'string' } } });
+const env = await ensureReactEnv();
+const majors = /** @type {('18' | '19')[]} */ (values.major ? [values.major] : ['18', '19']);
+/** @type {Record<string, string>} */
+const bundles = {};
+for (const major of majors) {
+  const result = await build({ entryPoints: ['tests/react/app.tsx'], bundle: true, write: false, format: 'iife', target: 'es2022', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"' }, plugins: [reactUnderTest(), reactMajor(major, env)], logLevel: 'error' });
+  bundles[major] = result.outputFiles[0].text;
+}
+const instrument = await readFile('tests/react/instrument.js', 'utf8');
+const html = '<!doctype html><html lang="en"><head><style>body{margin:16px;font:18px/1.45 Georgia,serif}.col{display:flex;flex-direction:column;align-items:flex-start}.blk{margin:0 0 10px}.big .blk{font-size:21px}</style></head><body><div id="root"></div><script src="/app.js"></script></body></html>';
+
+const report = { ...await releaseIdentity(), react: majors, browsers: /** @type {Record<string, string>} */ ({}), checks: /** @type {{ browser: string, label: string, pass: boolean, detail?: unknown }[]} */ ([]), errors: /** @type {{ browser: string, error: string }[]} */ ([]), timings: /** @type {Record<string, unknown>} */ ({}) };
+const selected = browsers.filter(b => !values.only || values.only.split(',').includes(b.name));
+
+for (const config of selected) {
+  const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
+  report.browsers[config.name] = browser.version();
+  try {
+    for (const major of majors) {
+      const prefix = `React ${major}: `;
+      /** @param {string} label @param {unknown} pass @param {unknown} [detail] */
+      const check = (label, pass, detail) => report.checks.push({ browser: config.name, label: prefix + label, pass: !!pass, ...(pass ? {} : { detail }) });
+      const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
+      page.setDefaultTimeout(20000);
+      page.on('pageerror', error => report.errors.push({ browser: config.name, error: prefix + error.message }));
+      await page.addInitScript(instrument);
+      await page.route('http://react.test/**', route => route.request().url().endsWith('/app.js')
+        ? route.fulfill({ contentType: 'text/javascript', body: bundles[major] })
+        : route.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
+      await page.goto('http://react.test/index.html');
+      await page.waitForFunction(() => /** @type {any} */ (window).booted);
+      check('fixture runs the expected React', await page.evaluate(() => /** @type {any} */ (window).T.version) === (major === '18' ? '18.3.1' : '19.2.3'));
+      // Observers and listeners the page holds before any adapter mounts (Playwright's, React's root).
+      const baseline = await page.evaluate(() => { const w = /** @type {any} */ (window); w.T.render('none'); return w.__snapshot(); });
+
+      for (const strict of [false, true]) {
+        const mode = strict ? ' (StrictMode)' : '';
+        // P4: re-renders that change nothing write nothing.
+        await page.evaluate(strict => /** @type {any} */ (window).T.render('blocks', { n: 6, kind: 'both', inlineKeep: true }, strict), strict);
+        await page.evaluate(() => /** @type {any} */ (window).__quiet(400));
+        const before = await page.evaluate(() => Array.from(document.querySelectorAll('.blk'), el => /** @type {HTMLElement} */ (el).dataset.tsOutcome));
+        check('blocks compose' + mode, before.filter(o => o === 'composed:rich').length >= 6, before);
+        const rerender = await page.evaluate(async () => {
+          const w = /** @type {any} */ (window);
+          const stop = w.__watch();
+          const started = performance.now();
+          for (let i = 0; i < 100; i++) w.api.flushSync(() => w.api.bump());
+          const ms = performance.now() - started;
+          await w.__quiet(400);
+          return { ms, writes: stop() };
+        });
+        report.timings[`${config.name} ${prefix}100 re-renders${mode}`] = Math.round(rerender.ms);
+        check('100 parent re-renders with an inline keep write nothing in TypesetText hosts' + mode, rerender.writes.text === 0, rerender);
+        check('100 parent re-renders with fresh JSX children write nothing in TypesetRichText hosts' + mode, rerender.writes.rich === 0, rerender);
+        const ancestor = await page.evaluate(async () => {
+          const w = /** @type {any} */ (window);
+          const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+          const stop = w.__watch();
+          for (let i = 0; i < 60; i++) { wrap.style.transform = `translateX(${i % 12}px)`; await new Promise(r => requestAnimationFrame(r)); }
+          wrap.style.transform = '';
+          for (let i = 0; i < 10; i++) { document.body.classList.toggle('unstyled-toggle'); await new Promise(r => requestAnimationFrame(r)); }
+          await w.__quiet(400);
+          return stop();
+        });
+        check('a 60-frame ancestor transform and no-op ancestor class toggles write nothing in TypesetText hosts' + mode, ancestor.text === 0, ancestor);
+        check('a 60-frame ancestor transform and no-op ancestor class toggles write nothing in TypesetRichText hosts' + mode, ancestor.rich === 0, ancestor);
+        const restyle = await page.evaluate(async () => {
+          const w = /** @type {any} */ (window);
+          const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+          const stop = w.__watch();
+          wrap.classList.add('big');
+          await w.__quiet(400);
+          const writes = stop();
+          const blocks = Array.from(document.querySelectorAll('.blk'), el => ({ outcome: /** @type {HTMLElement} */ (el).dataset.tsOutcome, overflow: el.scrollWidth > el.clientWidth + 1 }));
+          wrap.classList.remove('big');
+          await w.__quiet(400);
+          return { writes, blocks };
+        });
+        check('a real ancestor style change still recomposes every block' + mode, restyle.writes.hosts.length === 12 && restyle.blocks.every(b => !b.overflow && b.outcome), restyle);
+      }
+
+      // Continuous resize: never double-wrapped, and recomposed once the size holds.
+      await page.evaluate(() => /** @type {any} */ (window).T.render('blocks', { n: 4, kind: 'both', width: '100%' }));
+      await page.evaluate(() => { /** @type {HTMLElement} */ (document.getElementById('wrap')).style.width = '360px'; });
+      await page.evaluate(() => /** @type {any} */ (window).__quiet(400));
+      const drag = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+        // Line boxes from text only: markers and inline-block spacers report rects of their own.
+        const lines = (/** @type {HTMLElement} */ el) => {
+          /** @type {number[]} */ const bottoms = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), range = document.createRange();
+          for (let n; (n = /** @type {Text | null} */ (walker.nextNode()));) {
+            if (!n.data.trim()) continue;
+            range.selectNodeContents(n);
+            for (const r of range.getClientRects()) if (r.width > 1 && !bottoms.some(b => Math.abs(b - r.bottom) < 3)) bottoms.push(r.bottom);
+          }
+          return bottoms.length;
+        };
+        /** @type {Record<string, number>} */ const doubled = {};
+        const stop = w.__watch();
+        for (let i = 1; i <= 40; i++) {
+          wrap.style.width = (360 - i * 3) + 'px';
+          await new Promise(r => requestAnimationFrame(r));
+          for (const el of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.blk'))) {
+            const breaks = el.querySelectorAll('br[data-ts-break]').length;
+            if (breaks && lines(el) > breaks + 1) doubled[el.id] = (doubled[el.id] || 0) + 1;
+          }
+        }
+        await w.__quiet(500);
+        const writes = stop();
+        const final = Array.from(document.querySelectorAll('.blk'), el => ({ id: el.id, outcome: /** @type {HTMLElement} */ (el).dataset.tsOutcome, stale: el.hasAttribute('data-ts-stale'), overflow: el.scrollWidth > el.clientWidth + 1 }));
+        return { doubled, writes, final };
+      });
+      // Resize observations arrive after layout, so the first frame of a resize
+      // can still show the old breaks; every later frame must be clean.
+      const worst = (/** @type {string} */ kind) => Math.max(0, ...Object.entries(drag.doubled).filter(([id]) => id.startsWith(kind)).map(([, n]) => n));
+      check('continuous resize paints double-wrapped TypesetRichText lines in at most its first frame', worst('r') <= 1, drag);
+      check('continuous resize paints double-wrapped TypesetText lines in at most its first frame', worst('t') <= 1, drag);
+      check('after continuous resize every block is composed again at the final width', drag.final.every(b => b.outcome === 'composed:rich' && !b.stale && !b.overflow), drag.final);
+      report.timings[`${config.name} ${prefix}resize writes (text, rich)`] = [drag.writes.text, drag.writes.rich];
+
+      // Correctness under churn: every scheduling mode ends on the exact text.
+      const words = 'alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec romeo sierra tango uniform victor whiskey'.split(' ');
+      /** @type {[string, string, Record<string, unknown>][]} */
+      const modes = [['batched burst', 'burst', {}], ['one per frame', 'frame', {}], ['flushSync', 'flush', {}], ['startTransition', 'transition', {}], ['useDeferredValue', 'frame', { deferred: true }], ['inline keep, one per frame', 'frame', { inlineKeep: true }]];
+      for (const [name, driver, props] of modes) {
+        await page.evaluate(props => /** @type {any} */ (window).T.render('rapid', props), props);
+        await page.evaluate(() => /** @type {any} */ (window).__quiet(300));
+        const expected = await page.evaluate(async ({ words, driver }) => {
+          const w = /** @type {any} */ (window);
+          let last = '';
+          for (let i = 0; i < 60; i++) {
+            const text = last = words.slice(0, 8 + (i % 15)).join(' ') + ' ' + i;
+            if (driver === 'burst') w.api.setText(text);
+            else if (driver === 'flush') w.api.flushSync(() => w.api.setText(text));
+            else if (driver === 'transition') { w.api.startTransition(() => w.api.setText(text)); if (i % 7 === 0) await new Promise(r => setTimeout(r, 3)); }
+            else { w.api.setText(text); await new Promise(r => requestAnimationFrame(r)); }
+          }
+          return last;
+        }, { words, driver });
+        await page.evaluate(() => /** @type {any} */ (window).__quiet(400));
+        const state = await page.evaluate(() => ['rapid', 'rapidrich'].map(id => {
+          const el = /** @type {HTMLElement} */ (document.getElementById(id));
+          return { id, text: el.textContent, outcome: el.dataset.tsOutcome, done: el.dataset.typesetDone, overflow: el.scrollWidth > el.clientWidth + 1 };
+        }));
+        check(`60 updates (${name}) end on the exact text`, state.every(s => s.text === expected && s.done === '1' && s.outcome && !s.overflow), { expected, state });
+      }
+
+      // Lifecycle: nothing survives unmounting.
+      await page.evaluate(() => /** @type {any} */ (window).T.render('blocks', { n: 10, kind: 'both' }));
+      await page.evaluate(() => /** @type {any} */ (window).__quiet(300));
+      const leaks = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const mounted = w.__snapshot();
+        w.api.setShow(false);
+        await w.__frames(3);
+        const unmounted = w.__snapshot();
+        for (let i = 0; i < 30; i++) { w.api.flushSync(() => w.api.setShow(true)); w.api.flushSync(() => w.api.setShow(false)); }
+        await new Promise(r => setTimeout(r, 400));
+        return { mounted, unmounted, cycled: w.__snapshot() };
+      });
+      // The engine keeps one copy listener and one font-epoch listener per document, by design.
+      const perDocument = ['document:copy', 'fonts:loadingdone'];
+      const clean = (/** @type {any} */ s) => s.mo.active === baseline.mo.active && s.ro.active === baseline.ro.active && s.io.active === baseline.io.active
+        && Object.entries(s.listeners).every(([key, count]) => count <= (baseline.listeners[key] || 0) + (perDocument.includes(key) ? 1 : 0));
+      check('unmounting leaves no observers or listeners', clean(leaks.unmounted), { baseline, unmounted: leaks.unmounted });
+      check('30 fast mount/unmount cycles leave no observers or listeners', clean(leaks.cycled), leaks.cycled);
+      const warnings = await page.evaluate(() => /** @type {any} */ (window).__inst.warnings);
+      check('no React warnings or console errors', warnings.length === 0, warnings.slice(0, 5));
+      await page.close();
+    }
+  } catch (error) {
+    report.errors.push({ browser: config.name, error: String(/** @type {Error} */ (error).stack || error) });
+  } finally { await browser.close(); }
+}
+
+const summary = { checks: report.checks.length, failed: report.checks.filter(c => !c.pass).length, errors: report.errors.length };
+await mkdir('output', { recursive: true });
+await writeFile('output/react.json', JSON.stringify({ ...report, summary }, null, 2));
+console.log(JSON.stringify({ ...summary, timings: report.timings, failures: report.checks.filter(c => !c.pass).slice(0, 20).map(c => `${c.browser} ${c.label}`), errors: report.errors.slice(0, 5) }, null, 2));
+if (summary.failed || summary.errors) process.exitCode = 1;

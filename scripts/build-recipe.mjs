@@ -26,7 +26,7 @@ const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true 
  */
 export async function buildPackageDist({ root, distDir, plugins = [] }) {
   const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning') };
-  await build({ ...base, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react'], outdir: distDir, chunkNames: 'shared-[hash]' });
+  await build({ ...base, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react', 'react-dom'], outdir: distDir, chunkNames: 'shared-[hash]' });
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], format: 'iife', minify: true, outfile: `${distDir}/typeset.global.js` });
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.go.ts'], format: 'iife', minify: true, outfile: `${distDir}/go.js` });

@@ -21,6 +21,23 @@ Hashes for every published version live in
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
 
+### React adapters
+
+- `TypesetText` and `TypesetRichText` recompose only on real changes. An
+  inline `keep={[...]}` array, fresh JSX children, inline style objects and
+  callbacks are compared by value, so a parent re-render that changes nothing
+  writes nothing: 100 such re-renders of 6 + 6 blocks went from 119,736 DOM
+  node writes to 0. `TypesetRichText` checks a computed layout key (text,
+  widths, fonts, and the computed type of the host and its descendants)
+  before replanning, so ancestor transforms and no-op class toggles cost no
+  composition, and it carries an unchanged plan's spacing, tracking and
+  hanging forward after re-verifying them instead of rebuilding them through
+  four commits.
+- During continuous resizing `TypesetRichText` shows native wrapping wherever
+  its composed lines no longer fit (host attribute `data-ts-stale`), and
+  recomposes once the size has held for 100 ms instead of on every frame.
+- The React entry imports `flushSync` from `react-dom` (external, like `react`).
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff

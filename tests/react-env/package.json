@@ -1,0 +1,11 @@
+{
+  "name": "typeset-react-env-fixture",
+  "private": true,
+  "description": "Test-only dependencies for scripts/v4/verify-react*.mjs: React 18.3.1 (the repository itself uses React 19.2.3) and the DOM emulations used by Jest and Vitest. Installed into output/react-env by scripts/v4/react-env.mjs, never shipped.",
+  "dependencies": {
+    "happy-dom": "20.14.5",
+    "jsdom": "26.1.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
