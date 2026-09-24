@@ -1,6 +1,8 @@
 // @ts-check
 // Cut a release. This is the only script that writes packages/typeset-v4/dist,
-// public/releases/<v>/, public/go@<v>.js and the website aliases, and the only
+// public/releases/<v>/, the pins public/go@<v>.js, typeset@<v>.min.js and
+// typeset@<v>.esm.js, the aliases (go@<major>.js; go.js, typeset.min.js,
+// typeset.esm.js and typeset.css for 4.x only) and sri.json, and the only
 // place the package version changes. Development builds use
 // scripts/build-candidate.mjs, which writes nothing outside output/.
 //
@@ -21,7 +23,7 @@ import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor } from './build-recipe.mjs';
+import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor, sriIndex, pinnedGlobal, EVERGREEN_MAJOR } from './build-recipe.mjs';
 import { readLedger, describeRelease, describePins, readTarball, LEDGER } from './v4/ledger.mjs';
 
 const { values } = parseArgs({ options: {
@@ -84,7 +86,7 @@ try {
   // release line's recipe and so reproduces its published bytes.
   const recipe = recipeFor(version);
   report.recipe = recipe.line;
-  await buildPackageDist({ root: staging, distDir, recipe });
+  await buildPackageDist({ root: staging, distDir, version, recipe });
   await emitDeclarations({ root: staging, distDir, declarationDir: `${pkgDir}/declarations`, tsc: join(repo, 'node_modules/.bin/tsc') });
   await copyPackageFiles({ root: staging, packageDir: pkgDir });
   await writeManifest({ root: staging, distDir, version });
@@ -98,12 +100,12 @@ try {
   for (const file of recipe.archivedFiles) await copyFile(join(staging, pkgDir, file), join(archive, file));
   await copyFile(join(staging, 'pack', pack.filename), join(archive, pack.filename));
   if (values.summary) await writeFile(join(archive, 'index.html'), archivePage(version, values.summary, stable));
-  await buildSite({ root: staging, distDir, siteDir: 'site', version });
+  await buildSite({ root: staging, distDir, siteDir: 'site', version, recipe });
   const go = await readFile(join(staging, 'site/go.js'));
 
   // 4. Verify the staged release with the full suite before touching the tree.
   if (!dryRun || values.verify) {
-    const env = { ...process.env, TYPESET_RELEASE_STAGING: staging, TYPESET_DIST: join(staging, distDir), TYPESET_BUNDLE: join(staging, distDir, 'typeset.global.js'), TYPESET_ESM: join(staging, distDir, 'index.js'), TYPESET_REACT: join(staging, distDir, 'react.js'), TYPESET_GO: join(staging, distDir, 'go.js'), TYPESET_STYLES: join(staging, distDir, 'styles.css'), TYPESET_SITE_GO: join(staging, 'site/go.js') };
+    const env = { ...process.env, TYPESET_RELEASE_STAGING: staging, TYPESET_DIST: join(staging, distDir), TYPESET_BUNDLE: join(staging, distDir, 'typeset.global.js'), TYPESET_ESM: join(staging, distDir, 'index.js'), TYPESET_REACT: join(staging, distDir, 'react.js'), TYPESET_GO: join(staging, distDir, 'go.js'), TYPESET_AUTO: join(staging, distDir, 'auto.js'), TYPESET_STYLES: join(staging, distDir, 'styles.css'), TYPESET_SITE_GO: join(staging, 'site/go.js') };
     const run = spawnSync(process.execPath, ['scripts/v4/verify-release.mjs', '--prebuilt'], { cwd: repo, env, stdio: 'inherit' });
     report.preconditions['staged release passes test:v4'] = { pass: run.status === 0 };
     if (run.status !== 0 && !dryRun) throw new Error('release-cut: the staged release failed test:v4. Nothing was written.');
@@ -155,16 +157,23 @@ try {
     await move(join(staging, distDir), distDir);
     for (const file of ['package.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
     await place('src/lib/v4/typeset.next.ts', await readFile(join(staging, 'src/lib/v4/typeset.next.ts')));
-    for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await readFile(join(staging, 'site', file)));
+    const site = (/** @type {string} */ file) => readFile(join(staging, 'site', file));
+    const major = Number(version.split('.')[0]);
+    const isStable = !version.includes('-');
+    // Immutable versioned copies of the website bundles (listed in sri.json).
+    await place(`public/typeset@${version}.min.js`, pinnedGlobal(await site('typeset.min.js'), version), 'wx');
+    await place(`public/typeset@${version}.esm.js`, await site('typeset.esm.js'), 'wx');
+    // go@<major>.js follows its major line. The unversioned aliases follow
+    // EVERGREEN_MAJOR (4.x) only, so a 5.0 cut never restyles a go.js site.
+    if (isStable) await place(`public/go@${major}.js`, go);
+    if (isStable && major === EVERGREEN_MAJOR) {
+      for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await site(file));
+    }
     await place('public/for-agents.md', await readFile(join(staging, pkgDir, 'for-agents.md')));
     await place('public/capabilities.json', await readFile(join(staging, pkgDir, 'capabilities.json')));
-    /** @type {Record<string, string>} */
-    const files = {};
-    for (const file of (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).sort(byPinVersion)) files[file] = sri(await readFile(join(root, 'public', file)));
-    for (const file of ['typeset.min.js', 'typeset.esm.js']) files[file] = sri(await readFile(join(root, 'public', file)));
-    await place('public/sri.json', JSON.stringify({ version, files, snippet: `<script src="https://typeset.us/go@${version}.js" integrity="${sri(go)}" crossorigin="anonymous" defer></script>` }, null, 2) + '\n');
+    await place('public/sri.json', JSON.stringify(await sriIndex({ root, version, go }), null, 2) + '\n');
     const pins = (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).map(f => f.slice(3, -3)).filter(v => compareVersions(v, version) < 0).sort(compareVersions);
-    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length, npm: `typeset.us@${version}/dist/auto.js` }, aliases: { [`/go@${major}.js`]: `latest ${major}.x; no integrity hash`, '/go.js': `latest ${EVERGREEN_MAJOR}.x only; for trying Typeset out` }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
     // 6. Append the new release to the ledger. It records the tarball that
     //    must be published: npm publish public/releases/<v>/<tarball>.
     const nextLedger = await readLedger(root);
@@ -181,8 +190,6 @@ try {
   await rm(npmCache, { recursive: true, force: true });
 }
 
-/** @param {string} a @param {string} b */
-function byPinVersion(a, b) { return compareVersions(a.slice(3, -3), b.slice(3, -3)); }
 
 /**
  * The archive landing page, in the form 4.1.0 and 4.2.0 shipped.

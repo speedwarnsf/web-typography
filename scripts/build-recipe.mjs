@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { readdir, readFile, writeFile, copyFile, mkdir, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import { IMMUTABLE_SITE_FILE } from './v4/ledger.mjs';
 
 /** @param {Uint8Array} bytes */
 export const sri = bytes => 'sha384-' + createHash('sha384').update(bytes).digest('base64');
@@ -33,7 +34,9 @@ const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true 
  *      without sources make webpack's source-map-loader warn once per missing
  *      file.) typeset.global.js and go.js keep maps without embedded sources,
  *      for stack traces; third-party license comments are kept at the end of
- *      every bundle.
+ *      every bundle. dist/auto.js is the automatic website loader, the same
+ *      bytes as typeset.us/go@<v>.js, so npm, jsDelivr and typeset.us serve
+ *      one file with one SRI hash.
  * @typedef {{ line: string, moduleMaps: boolean, iifeSourcesContent: boolean, autoLoader: boolean, archivedFiles: string[] }} Recipe
  */
 /** @type {Record<string, Recipe>} */
@@ -43,7 +46,7 @@ export const RECIPES = {
     archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
   },
   '4.3': {
-    line: '4.3', moduleMaps: false, iifeSourcesContent: false, autoLoader: false,
+    line: '4.3', moduleMaps: false, iifeSourcesContent: false, autoLoader: true,
     archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
   },
 };
@@ -62,9 +65,9 @@ export function recipeFor(version) {
  * The npm package's dist/: ESM with a shared chunk, CJS, and the IIFEs.
  * `distDir` must sit three directories below `root` (packages/typeset-v4/dist
  * or output/candidate/dist) so source-map paths match the published maps.
- * @param {{ root: string, distDir: string, plugins?: import('esbuild').Plugin[], recipe?: Recipe }} options
+ * @param {{ root: string, distDir: string, version: string, plugins?: import('esbuild').Plugin[], recipe?: Recipe }} options
  */
-export async function buildPackageDist({ root, distDir, plugins = [], recipe = CURRENT_RECIPE }) {
+export async function buildPackageDist({ root, distDir, version, plugins = [], recipe = CURRENT_RECIPE }) {
   const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning'), ...(recipe.line === '4.2' ? {} : { legalComments: /** @type {const} */ ('eof') }) };
   const modules = { ...base, sourcemap: recipe.moduleMaps };
   const iife = { ...base, format: /** @type {const} */ ('iife'), minify: true, sourcesContent: recipe.iifeSourcesContent };
@@ -72,7 +75,18 @@ export async function buildPackageDist({ root, distDir, plugins = [], recipe = C
   await build({ ...modules, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
   await build({ ...iife, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], outfile: `${distDir}/typeset.global.js` });
   await build({ ...iife, entryPoints: ['src/lib/v4/typeset.go.ts'], outfile: `${distDir}/go.js` });
+  if (recipe.autoLoader) await build({ ...iife, ...autoLoader(version), outfile: `${distDir}/auto.js` });
   await copyFile(join(root, 'src/lib/v4/typeset-lists.css'), join(root, distDir, 'styles.css'));
+}
+
+/**
+ * The automatic website loader: every prose block, with English quotes and
+ * optical hanging. No source map, so the file is identical wherever it is
+ * served.
+ * @param {string} version
+ */
+function autoLoader(version) {
+  return { entryPoints: ['src/lib/v4/typeset.website-go.ts'], sourcemap: false, banner: { js: `/* typeset.us ${version}; automatic website loader. MIT. https://typeset.us */` } };
 }
 
 /**
@@ -109,13 +123,14 @@ export async function writeManifest({ root, distDir, version, extra = {} }) {
 /**
  * The website aliases: the automatic loader (go.js), typeset.min.js,
  * typeset.esm.js and typeset.css. `siteDir` is public/ at release time and
- * output/candidate/site for a candidate.
- * @param {{ root: string, distDir: string, siteDir: string, version: string, plugins?: import('esbuild').Plugin[] }} options
+ * output/candidate/site for a candidate. From 4.3 the loader is dist/auto.js.
+ * @param {{ root: string, distDir: string, siteDir: string, version: string, plugins?: import('esbuild').Plugin[], recipe?: Recipe }} options
  */
-export async function buildSite({ root, distDir, siteDir, version, plugins = [] }) {
+export async function buildSite({ root, distDir, siteDir, version, plugins = [], recipe = CURRENT_RECIPE }) {
   const base = { ...common, absWorkingDir: root, plugins, sourcemap: false, logLevel: /** @type {const} */ ('warning') };
   await mkdir(join(root, siteDir), { recursive: true });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.website-go.ts'], format: 'iife', minify: true, outfile: `${siteDir}/go.js`, banner: { js: `/* typeset.us ${version}; automatic website loader. MIT. https://typeset.us */` } });
+  if (recipe.autoLoader) await copyFile(join(root, distDir, 'auto.js'), join(root, siteDir, 'go.js'));
+  else await build({ ...base, entryPoints: ['src/lib/v4/typeset.website-go.ts'], format: 'iife', minify: true, outfile: `${siteDir}/go.js`, banner: { js: `/* typeset.us ${version}; automatic website loader. MIT. https://typeset.us */` } });
   await copyFile(join(root, distDir, 'typeset.global.js'), join(root, siteDir, 'typeset.min.js'));
   await copyFile(join(root, distDir, 'typeset.global.js.map'), join(root, siteDir, 'typeset.global.js.map'));
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'esm', minify: true, outfile: `${siteDir}/typeset.esm.js` });
@@ -147,4 +162,48 @@ export function compareVersions(a, b) {
   if (!x.pre) return 1;
   if (!y.pre) return -1;
   return x.pre < y.pre ? -1 : 1;
+}
+
+/**
+ * The major line the unversioned website aliases (go.js, typeset.min.js,
+ * typeset.esm.js, typeset.css) follow. A 5.0 cut writes go@5.js and its own
+ * pins but never moves these, so no site on go.js is restyled by a major.
+ */
+export const EVERGREEN_MAJOR = 4;
+
+/**
+ * public/sri.json: integrity hashes for immutable paths only
+ * (IMMUTABLE_SITE_FILE), loaders first, each in version order.
+ * @param {{ root: string, version: string, go: Uint8Array }} options
+ */
+export async function sriIndex({ root, version, go }) {
+  const names = (await readdir(join(root, 'public'))).filter(f => IMMUTABLE_SITE_FILE.test(f));
+  const key = (/** @type {string} */ name) => { const match = /^(go|typeset)@(\d+\.\d+\.\d+)\.(?:(min|esm)\.)?js$/.exec(name); return /** @type {RegExpExecArray} */ (match); };
+  names.sort((a, b) => {
+    const x = key(a), y = key(b);
+    if (x[1] !== y[1]) return x[1] === 'go' ? -1 : 1;
+    return compareVersions(x[2], y[2]) || String(x[3] ?? '').localeCompare(String(y[3] ?? ''));
+  });
+  /** @type {Record<string, string>} */
+  const files = {};
+  for (const name of names) files[name] = sri(await readFile(join(root, 'public', name)));
+  return {
+    version,
+    note: 'Integrity hashes for immutable files only. go.js, go@<major>.js, typeset.min.js and typeset.esm.js change with each release and have none; pin a versioned file instead.',
+    files,
+    snippet: `<script src="https://typeset.us/go@${version}.js" integrity="${sri(go)}" crossorigin="anonymous" defer></script>`,
+  };
+}
+
+/**
+ * The versioned website copy of typeset.global.js. Its source map comment
+ * points at the release archive, whose map never changes.
+ * @param {Uint8Array} bytes typeset.min.js as built
+ * @param {string} version
+ */
+export function pinnedGlobal(bytes, version) {
+  const text = Buffer.from(bytes).toString('utf8');
+  const comment = '//# sourceMappingURL=typeset.global.js.map';
+  if (!text.includes(comment)) return Buffer.from(bytes);
+  return Buffer.from(text.replace(comment, `//# sourceMappingURL=/releases/${version}/typeset.global.js.map`), 'utf8');
 }

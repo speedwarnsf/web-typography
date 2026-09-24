@@ -51,6 +51,16 @@ try {
   }
   check('relative links in packaged docs name files in the package', broken.length === 0, broken);
 
+  // K6: the automatic loader on npm, and CDN defaults that run in a browser.
+  check('exports ./auto -> dist/auto.js, packed', pkg.exports?.['./auto'] === './dist/auto.js' && files.has('dist/auto.js'), pkg.exports);
+  check('dist/auto.js is side-effectful (never tree-shaken away)', pkg.sideEffects?.includes('./dist/auto.js'), pkg.sideEffects);
+  check('bare jsDelivr and unpkg URLs serve the browser global, not CommonJS', pkg.jsdelivr === './dist/typeset.global.js' && pkg.unpkg === './dist/typeset.global.js' && files.has('dist/typeset.global.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  const siteGo = artifacts.siteGo;
+  if (files.has('dist/auto.js')) {
+    const [auto, site] = await Promise.all([readFile(`${staged.dir}/dist/auto.js`), readFile(siteGo)]);
+    check('dist/auto.js is the website loader byte for byte (one SRI for npm, jsDelivr and typeset.us)', auto.equals(site), { auto: auto.length, site: site.length, siteGo });
+  }
+
   // K7: a smaller tarball that carries its third-party notices.
   check('unpacked package is under 1.2 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1200000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);

@@ -9,4 +9,11 @@ window.Typeset = api;
 window.TypesetReady = new Promise<void>(resolve => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => resolve(), { once: true });
   else resolve();
-}).then(async () => { const controller = api.mount(document, selector, options); await controller.ready; return controller; });
+}).then(async () => {
+  const controller = api.mount(document, selector, options);
+  await controller.ready;
+  // This loader composes only explicit targets. Say so once when there are
+  // none, rather than silently doing nothing.
+  if (!document.querySelector(selector)) console.info('typeset.us go.js: no element matches ' + requested + ', so nothing was composed. Mark the text to set with data-typeset, pass data-typeset-selector on this script, or use typeset.us/auto (dist/auto.js) to set all prose. New matches are composed as they appear.');
+  return controller;
+});

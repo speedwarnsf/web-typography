@@ -11,6 +11,7 @@ export const artifacts = {
   esm: process.env.TYPESET_ESM || `${dist}/index.js`,
   react: process.env.TYPESET_REACT || `${dist}/react.js`,
   go: process.env.TYPESET_GO || `${dist}/go.js`,
+  auto: process.env.TYPESET_AUTO || `${dist}/auto.js`,
   styles: process.env.TYPESET_STYLES || `${dist}/styles.css`,
   siteGo: process.env.TYPESET_SITE_GO || 'public/go.js',
 };

@@ -47,8 +47,6 @@ export async function buildCandidate({ out = CANDIDATE, types = false, plugins =
   if (distDir.split('/').length !== 3) throw new Error(`The candidate dist must sit three directories deep, like packages/typeset-v4/dist (got ${distDir}).`);
   await rm(out, { recursive: true, force: true });
   await mkdir(distDir, { recursive: true });
-  await buildPackageDist({ root, distDir, plugins });
-  if (types) await emitDeclarations({ root, distDir, declarationDir: `${out}/declarations` });
   const commit = git(['rev-parse', 'HEAD']);
   const dirty = git(['status', '--porcelain', '--', 'src/lib/v4', 'src/vendor']) !== '';
   const identity = {
@@ -59,6 +57,8 @@ export async function buildCandidate({ out = CANDIDATE, types = false, plugins =
     sourceSHA256: await sourceDigest(root),
     ...(label ? { label } : {}),
   };
+  await buildPackageDist({ root, distDir, version: identity.version, plugins });
+  if (types) await emitDeclarations({ root, distDir, declarationDir: `${out}/declarations` });
   await writeManifest({ root, distDir, version: identity.version, extra: { candidate: true } });
   await buildSite({ root, distDir, siteDir, version: identity.version, plugins });
   await writeFile(`${out}/identity.json`, JSON.stringify(identity, null, 2) + '\n');
@@ -73,6 +73,7 @@ export async function buildCandidate({ out = CANDIDATE, types = false, plugins =
       TYPESET_ESM: abs(`${distDir}/index.js`),
       TYPESET_REACT: abs(`${distDir}/react.js`),
       TYPESET_GO: abs(`${distDir}/go.js`),
+      TYPESET_AUTO: abs(`${distDir}/auto.js`),
       TYPESET_STYLES: abs(`${distDir}/styles.css`),
       TYPESET_SITE_GO: abs(`${siteDir}/go.js`),
     },

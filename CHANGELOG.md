@@ -51,6 +51,26 @@ Hashes for every published version live in
   and `license` is `MIT AND Unicode-3.0`. The notices add about 150 bytes
   gzip to each bundle.
 
+### Loaders and CDN
+
+- The automatic website loader is on npm as `typeset.us/auto`
+  (`dist/auto.js`), byte for byte the same file as
+  `https://typeset.us/go@<version>.js`, so npm, jsDelivr and typeset.us serve
+  one file with one integrity hash. `typeset.us/go` still composes only
+  `[data-typeset]` targets. Each loader now logs one `console.info` when no
+  element matches, instead of silently doing nothing.
+- Bare `cdn.jsdelivr.net/npm/typeset.us` and `unpkg.com/typeset.us` URLs serve
+  `dist/typeset.global.js` (the `jsdelivr` and `unpkg` fields), not the
+  CommonJS build that browsers refuse to run.
+- From the 4.3.0 cut, typeset.us publishes versioned `typeset@<v>.min.js` and
+  `typeset@<v>.esm.js`, and `sri.json` lists only immutable paths. The
+  go@4.2.0.js entry is unchanged. `go@4.js` follows 4.x, and `go.js` and the
+  other unversioned aliases follow 4.x only: a 5.0 release will never move
+  them. Versioned files are cached for a year, aliases and indexes for five
+  minutes, all with `Access-Control-Allow-Origin: *`.
+  docs/ops/vercel-firewall.md has the firewall bypass that stops bot
+  challenges on these paths; it is applied in the Vercel project, not here.
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff
