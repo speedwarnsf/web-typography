@@ -15,8 +15,21 @@ are not certification for every device, browser, font, or sentence.
   text-wrap required. Node 22+ for CLI/tooling.
 - ESM/CommonJS core; ESM-only client React entry; optional browser global.
 
-Never imperatively mount framework-owned text. Stateful custom React children
-remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
+Prefer the React adapters for text React renders. From 4.3, mount() and the
+website loader also keep framework-updated text correct: when a framework
+writes to or removes a Text node the engine split (Svelte, Vue, Solid, Lit and
+React set .data or .nodeValue on the node they created), the stale fragments
+are removed before the next frame and the paragraph recomposes; disconnect()
+leaves exactly the framework's text. Author Text nodes that Solid or Lit find by
+position, and React's, stay in place (emptied, with their text wrapped next to
+them) instead of moving into tracking wrappers. `verify-framework-text.mjs`
+runs a hand-rolled renderer, React 19, Svelte 5, Vue 3.5, Solid 1.9 and Lit 3
+through twenty updates each in three engines. Limits: direct typeset() and
+restore() without a controller see edits only by value, so an emptied node set
+to '' again is not noticed; the legacy .ts-line renderer (lineBreaks: 'legacy'
+on plain text) copies text and never sees framework writes; Lit text in arrays
+or nested templates is moved into wrappers as in 4.2. Stateful custom React
+children remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
 hyphens and editable content remain native. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 

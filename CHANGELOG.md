@@ -65,6 +65,24 @@ line boxes, outcomes, feature statuses, copy text and markup).
   inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts and
   styles. The clone is now walked in step with its source and those nodes are
   dropped; if the two ever disagree, only plain text is written.
+- **Framework text updates never leave stale text (C6).** Composition splits
+  author Text nodes, and frameworks keep the node they created. When Svelte,
+  Vue, Solid, Lit or React (outside the adapters) set its `.data`, 4.2 replaced
+  only line 1 and left the old lines 2..n on screen, merged them back on
+  `restore()`, and `disconnect()` kept them. Solid and Lit updates were lost
+  outright once a marker or tracking wrapper took their node's position, and
+  React threw (removeChild) when it removed a Text node tracking had moved,
+  unmounting the app. Now the mount observer removes the stale fragments
+  within the mutation's microtask, before any frame, and recomposes; every
+  cleanup drops the fragments of a node that was written to or removed instead
+  of merging them; and Text nodes Solid or Lit address by position, and React's,
+  stay in place (left empty, their text wrapped beside them). Chromium drops a
+  whitespace-only Text node beside an empty one or a comment from its
+  accessibility tree, so the engine puts an empty `<wbr>` between such a space
+  and an emptied node, and never splits a comment-adjacent node down to its
+  opening space. No rendering change: 0 pixel, line box, outcome or feature
+  differences on the framework fixtures (48 paragraphs per engine) or in the
+  golden A/B against 4.2.0.
 
 ### Development
 

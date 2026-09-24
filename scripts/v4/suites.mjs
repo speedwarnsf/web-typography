@@ -14,6 +14,7 @@ export const SUITES = [
   { name: 'verify-break-semantics', report: 'output/break-semantics.json', note: 'generated breaks are word separators; markers paint nothing (C2)' },
   { name: 'verify-strict-csp', report: 'output/strict-csp.json', note: "style-src without 'unsafe-inline' and Trusted Types (C5)" },
   { name: 'verify-copy-privacy', report: 'output/copy-privacy.json', note: 'no hidden content on the clipboard (C11)' },
+  { name: 'verify-framework-text', report: 'output/framework-text.json', note: 'framework text updates never show stale text (C6)' },
   { name: 'verify-inline-code', report: 'output/inline-code-regression.json' },
   { name: 'verify-inline-nowrap', report: 'output/inline-nowrap-regression.json' },
   { name: 'verify-name-groups', report: 'output/name-groups-regression.json' },

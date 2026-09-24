@@ -372,11 +372,106 @@ export function breakReplacesSpace(source: string, offset: number): boolean {
   return offset > 0 && /\s/u.test(source[offset - 1]);
 }
 
-interface Split { head: Text; parts: Text[] }
-export interface RichOutput { cleanup: () => void; nodes: Node[] }
+/** Text nodes the engine created by splitting author text. Frameworks hold
+ * references only to their own nodes, never to these. */
+export const engineText = new WeakSet<Text>();
+
+/** Chromium leaves a whitespace-only Text node out of its accessibility tree
+ * when the node beside it, skipping comments and empty inline elements, is an
+ * empty Text node, which joins the words around it. The engine leaves author
+ * Text nodes empty in place (see renderRichText and renderTracking), so it
+ * puts an empty <wbr> between: a line-break opportunity where a space already
+ * is one, which Chromium does not skip. Returns the shields it inserted. */
+export function shieldWhitespace(element: HTMLElement): HTMLElement[] {
+  const shields: HTMLElement[] = [];
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const spaces: Text[] = [];
+  while (walker.nextNode()) if ((walker.currentNode as Text).length && !/\S/u.test((walker.currentNode as Text).data)) spaces.push(walker.currentNode as Text);
+  const emptyBeside = (node: Node, forward: boolean): boolean => {
+    let at = node;
+    for (let steps = 0; steps < 16; steps++) {
+      const sibling: Node | null = forward ? at.nextSibling : at.previousSibling;
+      if (!sibling) {
+        if (!at.parentNode || at.parentNode === element) return false;
+        at = at.parentNode; continue;
+      }
+      at = sibling;
+      // Chromium passes over comments and empty inline elements (our markers),
+      // not <br>, <wbr> or replaced elements.
+      if (sibling.nodeType === Node.COMMENT_NODE || (sibling instanceof HTMLElement && !sibling.firstChild && !['BR', 'WBR', 'IMG', 'INPUT'].includes(sibling.tagName)
+        && getComputedStyle(sibling).display === 'inline')) continue;
+      return sibling instanceof Text && !sibling.length;
+    }
+    return false;
+  };
+  for (const space of spaces) {
+    for (const forward of [false, true]) {
+      if (!emptyBeside(space, forward)) continue;
+      const shield = element.ownerDocument.createElement('wbr');
+      shield.setAttribute(BREAK_ATTRIBUTE, ''); shield.setAttribute('aria-hidden', 'true'); shield.dataset.tsShield = '';
+      if (forward) space.after(shield); else space.before(shield);
+      shields.push(shield);
+    }
+  }
+  return shields;
+}
+
+/** Whether a framework may find this author Text node by position rather
+ * than by reference: Solid writes parent.firstChild.data for a lone text
+ * child, and Lit writes the data of its part marker's next sibling (a
+ * `<!--?lit$...$-->` comment). Such a node must keep its place: nothing may go
+ * in front of it, and it may not move into a wrapper. Plain HTML text is
+ * often a first child too; for it the treatment is equivalent (an empty node
+ * in place, identical pixels). Other comments are not taken as part markers:
+ * Solid ends each dynamic text with one and reads the node's current text to
+ * skip unchanged writes, which an emptied node would defeat. */
+export function positional(node: Text): boolean {
+  const before = node.previousSibling;
+  return !before || (before.nodeType === Node.COMMENT_NODE && (before as Comment).data.startsWith('?lit$'));
+}
+
+/** React 17+ records its fiber on every Text node it renders, and removes or
+ * inserts relative to that node through the parent it knows, which throws if
+ * the node has moved into a wrapper. */
+export function reactOwned(node: Text): boolean {
+  return Object.keys(node).some(key => key.startsWith('__reactFiber$'));
+}
+
+/** Split Text nodes, head first, with every part's data as rendered. */
+export interface SplitRecord { head: Text; parts: Text[]; expected: string[] }
+
+/** Undo splits. A head still holding its rendered fragment gets its tails
+ * back. A head that was written to (a framework setting .data or .nodeValue)
+ * or removed now holds the author's whole value, or nothing: its tails are
+ * stale copies of the old text and are removed, never merged back. `written`
+ * names heads a mutation record showed were written, for writes that left
+ * the rendered value (an emptied author node set to '' again). */
+export function releaseSplits(element: HTMLElement, splits: Iterable<SplitRecord>, written?: ReadonlySet<Node>): void {
+  for (const { head, parts, expected } of splits) {
+    const edited = !element.contains(head) || head.data !== expected[0] || !!written?.has(head);
+    for (const tail of parts.slice(1)) {
+      // Tails already removed by someone else are never resurrected.
+      if (!element.contains(tail)) continue;
+      if (!edited) head.appendData(tail.data);
+      tail.remove();
+    }
+  }
+}
+
+export interface RichOutput {
+  /** Remove this output; `written` as in releaseSplits. */
+  cleanup: (written?: ReadonlySet<Node>) => void;
+  nodes: Node[];
+  /** Text nodes this output split, including author nodes; see releaseSplits. */
+  heads: ReadonlySet<Text>;
+}
 
 /** Insert breaks without moving or cloning author elements. Split Text nodes
- * are reversible; their original head object is retained for restoration. */
+ * are reversible; their original head object is retained for restoration.
+ * Nothing is inserted in front of a positional author Text node (see
+ * positional): a marker at its start goes after it, and the node is split
+ * there and left empty, or the framework's next write would land on the
+ * marker and be lost. */
 export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
   const restoreSelection = selectionBookmark(element);
   const hadStyle = element.hasAttribute('style');
@@ -388,13 +483,18 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   const runs = textRuns(element);
   const source = element.textContent || '';
   const markers: HTMLElement[] = [];
-  const splits = new Map<Text, Split>();
+  const splits = new Map<Text, SplitRecord>();
   const insertions = [...breaks.map(offset => ({ offset, px: 0, spacing: false })), ...hangs.map(hang => ({ ...hang, spacing: false })),
     ...spaces.map(space => ({ ...space, spacing: true }))].sort((a, b) => b.offset - a.offset || b.px - a.px);
   for (const { offset, px, spacing } of insertions) {
     const point = pointAt(runs, offset);
     if (!point) continue;
     const head = point.node as Text;
+    // Chromium drops a whitespace-only Text node next to a comment from its
+    // accessibility tree (frameworks mark their text with comments). A word
+    // space that opens such a node takes its spacing marker in front of it,
+    // not behind it, so the node is never split down to the space alone.
+    if (spacing && point.offset && head.previousSibling?.nodeType === Node.COMMENT_NODE && !/\S/u.test(head.data.slice(0, point.offset))) point.offset = 0;
     const marker = element.ownerDocument.createElement(px ? 'span' : 'br');
     marker.setAttribute(BREAK_ATTRIBUTE, '');
     // The space before a generated break collapses at the line end, so the
@@ -408,21 +508,28 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       marker.dataset.tsHang = String(offset);
       Object.assign(marker.style, opticalMarkerStyle(px));
     } else marker.style.setProperty('display', 'inline', 'important');
-    if (point.offset === 0) head.before(marker);
+    if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
     else {
       const tail = head.splitText(point.offset);
-      const split = splits.get(head) || { head, parts: [head] };
+      engineText.add(tail);
+      const split = splits.get(head) || { head, parts: [head], expected: [] };
       split.parts.splice(1, 0, tail);
       splits.set(head, split);
       tail.before(marker);
     }
     markers.push(marker);
   }
+  for (const split of splits.values()) split.expected = split.parts.map(part => part.data);
+  if (splits.size) markers.push(...shieldWhitespace(element));
   restoreSelection();
   const releaseCopy = preserveRichCopy(element);
+  let released = false;
   return {
     nodes: [element, ...element.querySelectorAll('*'), ...textRuns(element).map(r => r.node)],
-    cleanup() {
+    heads: new Set(splits.keys()),
+    cleanup(written) {
+      if (released) return;
+      released = true;
       const restoreSelection = selectionBookmark(element);
       markers.forEach(marker => marker.remove());
       if (spaces.length) element.querySelectorAll('[data-ts-break][data-ts-space]').forEach(marker => marker.remove());
@@ -431,15 +538,9 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       // Only clean copied markers when this renderer owns line breaks. A
       // separate optical pass must not remove the underlying composition.
       if (breaks.length) element.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
-      for (const { head, parts } of splits.values()) {
-        // Only merge adjacent fragments we own. External replacements are
-        // never resurrected and unrelated author Text nodes are never normalized.
-        if (!element.contains(head)) continue;
-        for (const part of parts.slice(1)) {
-          if (head.nextSibling !== part || part.parentNode !== head.parentNode) break;
-          head.appendData(part.data); part.remove();
-        }
-      }
+      // Only fragments we own are merged or removed; unrelated author Text
+      // nodes are never normalized.
+      releaseSplits(element, splits.values(), written);
       // Restore through the CSSOM only (strict CSP); see restoreInlineStyle.
       if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
         && element.style.getPropertyPriority('text-wrap-style') === 'important') {

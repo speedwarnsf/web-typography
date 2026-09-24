@@ -63,7 +63,8 @@ try {
       check('mixed selection preserves authored line breaks', copied.mixed.endsWith('An authored line.\nAnother authored line.') && copied.mixedHTML.includes('<br>'));
       check('copy respects native input and site handlers', copied.inputUntouched && copied.siteHandler === 'Site-owned copy');
       await page.evaluate(() => {
-        const nodes = []; const walker = document.createTreeWalker(document.querySelector('#first'), NodeFilter.SHOW_TEXT); while(walker.nextNode()) nodes.push(walker.currentNode);
+        // Composition may leave an author Text node empty in place; select within text.
+        const nodes = []; const walker = document.createTreeWalker(document.querySelector('#first'), NodeFilter.SHOW_TEXT); while(walker.nextNode()) if (walker.currentNode.length > 3) nodes.push(walker.currentNode);
         getSelection().setBaseAndExtent(nodes.at(-1), nodes.at(-1).length - 3, nodes[0], 3); window.selected = getSelection().getRangeAt(0).toString();
       });
       for (const width of [320, 568, 280, 768, 390]) {

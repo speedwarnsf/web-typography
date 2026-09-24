@@ -3,13 +3,13 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 37735,
-      "TypesetText-only": 38027,
-      "TypesetRichText-only": 33393,
-      "smartQuotes-only": 11713,
-      "react.js+shared": 39899,
-      "go.js": 42682,
-      "typeset.global.js": 42493
+      "mount-only": 39168,
+      "TypesetText-only": 39454,
+      "TypesetRichText-only": 34043,
+      "smartQuotes-only": 11712,
+      "react.js+shared": 41384,
+      "go.js": 44022,
+      "typeset.global.js": 43825
     }
   },
   "runtime": {

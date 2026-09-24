@@ -1,6 +1,6 @@
 import type { LayoutMetrics } from './layout-metrics';
-import { preserveRichCopy, selectionBookmark } from './rich-text';
-import type { RichOutput } from './rich-text';
+import { engineText, positional, preserveRichCopy, reactOwned, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
+import type { RichOutput, SplitRecord } from './rich-text';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
 export const MAX_TRACKING_EM = .01;
@@ -47,7 +47,10 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
       const count = [...segmenter.segment(source.slice(start, end))].filter(part => !/^\s+$/u.test(part.segment)).length;
       const previous = pieces.at(-1);
       let adjacent: ChildNode | null = previous?.last.nextSibling || null;
-      while (adjacent instanceof HTMLElement && adjacent.hasAttribute('data-ts-space')) adjacent = adjacent.nextSibling;
+      // Space markers, accessibility shields and empty author Text nodes left
+      // by earlier passes do not separate a run.
+      while ((adjacent instanceof HTMLElement && (adjacent.hasAttribute('data-ts-space') || adjacent.hasAttribute('data-ts-shield')))
+        || (adjacent instanceof Text && !adjacent.length)) adjacent = adjacent.nextSibling;
       if (previous && adjacent === text.node && previous.end === start) {
         previous.end = end; previous.count += count; previous.last = text.node;
       } else pieces.push({ start, end, line, px: 0, fontSize, letterSpacing, wordSpacing, last: text.node, count });
@@ -68,13 +71,23 @@ export function trackingStyle(run: TrackingRun): Record<string, string> {
     wordSpacing: run.wordSpacing - run.px + 'px' };
 }
 
-/** Wrap contiguous text/engine-space runs only, never author elements. */
+/** Wrap contiguous text runs and space markers, never author elements.
+ * An author Text node that a framework finds by position (Solid, Lit; see
+ * positional) or removes through its parent (React) stays where it is: its
+ * text is split off into an engine node that moves, the empty author node
+ * stays in place, and the run's wrappers are split around it (see
+ * shieldWhitespace for the accessibility side). Other author Text nodes move
+ * into the wrapper as in 4.2: frameworks that hold them write to them in
+ * place, and some (Solid) skip a write when the node's text already equals
+ * the new value, which an emptied node would always do for ''. */
 export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput {
   const restoreSelection = selectionBookmark(element), texts = textRuns(element);
-  const splits = new Map<Text, Text[]>();
+  const splits = new Map<Text, SplitRecord>();
   const split = (head: Text, at: number) => {
-    const tail = head.splitText(at), parts = splits.get(head) || [head];
-    parts.splice(1, 0, tail); splits.set(head, parts); return tail;
+    const tail = head.splitText(at);
+    engineText.add(tail);
+    const record = splits.get(head) || { head, parts: [head], expected: [] };
+    record.parts.splice(1, 0, tail); splits.set(head, record); return tail;
   };
   for (const run of [...plan.runs].reverse()) {
     const a = texts.find(text => text.start <= run.start && text.end > run.start);
@@ -84,34 +97,50 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
     if (end < b.node.length) split(b.node, end);
     const first = run.start > a.start ? split(a.node, run.start - a.start) : a.node;
     const last = a.node === b.node ? first : b.node;
-    const wrapper = element.ownerDocument.createElement('span');
-    wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
-    Object.assign(wrapper.style, trackingStyle(run));
-    first.before(wrapper);
-    for (let node: ChildNode | null = first; node;) {
-      const next: ChildNode | null = node.nextSibling;
+    const nodes: ChildNode[] = [];
+    for (let node: ChildNode | null = first; node; node = node.nextSibling) { nodes.push(node); if (node === last) break; }
+    let wrapper: HTMLElement | null = null;
+    for (const node of nodes) {
+      if (node instanceof Text && !engineText.has(node) && (!node.length || positional(node) || reactOwned(node))) {
+        // An author node that must keep its place: leave it, empty, and wrap its text.
+        if (!node.length) { wrapper = null; continue; }
+        const piece = split(node, 0);
+        if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
+        wrapper.append(piece);
+        continue;
+      }
+      if (!wrapper || wrapper.nextSibling !== node) { wrapper = trackingWrapper(element, run); node.before(wrapper); }
       wrapper.append(node);
-      if (node === last) break;
-      node = next;
     }
   }
+  for (const record of splits.values()) record.expected = record.parts.map(part => part.data);
+  const shields = splits.size ? shieldWhitespace(element) : [];
   restoreSelection();
   const releaseCopy = preserveRichCopy(element);
-  return { nodes: [element], cleanup() {
+  let released = false;
+  return { nodes: [element], heads: new Set(splits.keys()), cleanup(written) {
+    if (released) return;
+    released = true;
     const restoreSelection = selectionBookmark(element);
+    shields.forEach(shield => shield.remove());
     // Also unwrap engine spans copied by a framework replacement, retaining edits.
     element.querySelectorAll('[' + TRACK_ATTRIBUTE + ']').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
-    for (const [head, parts] of splits) if (element.contains(head)) for (const part of parts.slice(1)) {
-      if (head.nextSibling !== part) break;
-      head.appendData(part.data); part.remove();
-    }
+    releaseSplits(element, splits.values(), written);
     releaseCopy(); restoreSelection();
   } };
 }
 
+function trackingWrapper(element: HTMLElement, run: TrackingRun): HTMLElement {
+  const wrapper = element.ownerDocument.createElement('span');
+  wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
+  Object.assign(wrapper.style, trackingStyle(run));
+  return wrapper;
+}
+
 export function trackingVerified(element: HTMLElement, plan: TrackingPlan, after: LayoutMetrics): boolean {
   const wrappers = Array.from(element.querySelectorAll<HTMLElement>('[' + TRACK_ATTRIBUTE + ']'));
-  if (wrappers.length !== plan.runs.length || after.lines.length !== plan.before.lines.length
+  // A run is wrapped in one span, or in several split around author Text nodes.
+  if (new Set(wrappers.map(wrapper => wrapper.getAttribute(TRACK_ATTRIBUTE))).size !== plan.runs.length || after.lines.length !== plan.before.lines.length
     || Math.abs(after.width - plan.before.width) > .5 || after.overflow > Math.max(.5, plan.before.overflow)) return false;
   if (wrappers.some(wrapper => {
     const run = plan.runs.find(run => run.start === Number(wrapper.getAttribute(TRACK_ATTRIBUTE)));
