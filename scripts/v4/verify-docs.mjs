@@ -17,7 +17,9 @@
 //   SUPPORT.md's known limitations and /faq cover the standard objections;
 //   the CHANGELOG has the published and the next version.
 // - community: contributor files and issue forms exist and ask for what a
-//   report needs (`--network` also reads GitHub's community profile).
+//   report needs (`--community` also reads GitHub's community profile).
+//
+// `--network` also fetches every external README link.
 //
 // Later sections are added by the other docs items. TODO(docs-sync) anchors
 // are counted and listed; release-cut refuses to cut while any remain.
@@ -233,7 +235,7 @@ try {
   check('community', 'CONTRIBUTING.md covers setup, build:dist, test:v4 with --only, and attaching auditJSON', /npm ci/.test(contributing) && /build:dist/.test(contributing) && /--only/.test(contributing) && /auditJSON/.test(contributing));
   const coc = await readFile('CODE_OF_CONDUCT.md', 'utf8').catch(() => '');
   check('community', 'CODE_OF_CONDUCT.md adopts the Contributor Covenant and names a contact', /Contributor Covenant/.test(coc) && /@typeset\.us/.test(coc));
-  if (process.argv.includes('--network')) {
+  if (process.argv.includes('--community')) {
     // After these files reach the default branch: GitHub's own score.
     let health = null;
     try { health = Number(execFileSync('gh', ['api', 'repos/speedwarnsf/web-typography/community/profile', '--jq', '.health_percentage'], { encoding: 'utf8', timeout: 30000 }).trim()); } catch {}

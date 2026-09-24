@@ -58,7 +58,8 @@ gh repo edit "$REPO" --enable-discussions \
 
 Then check the community profile:
 `gh api repos/$REPO/community/profile --jq .health_percentage` (target 85 or
-more; `node scripts/v4/verify-docs.mjs` checks the files locally).
+more), or `node scripts/v4/verify-docs.mjs --community`, which checks the
+files locally and reads the same score.
 
 ## npm
 

@@ -38,6 +38,12 @@ jobs:
       - name: Every suite against the committed release artifacts
         run: npm run test:release
 
+      - name: README links resolve, and the React/Playwright install matrix
+        run: |
+          node scripts/v4/verify-docs.mjs --network
+          npm run build:candidate
+          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-react-matrix.mjs
+
       - name: Engine accessibility trees, including Gecko through Marionette
         env:
           TYPESET_AX_FIREFOX: '1'
