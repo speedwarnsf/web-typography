@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import ThreeWay from './ThreeWay';
 import './essay.css';
+import { PINNED_SNIPPET } from '@/lib/install-snippet';
 
 export const metadata: Metadata = {
   title: 'The Browser Types. It Doesn’t Read.',
@@ -169,7 +170,7 @@ export default function EssayPage() {
         </p>
 
         <div className="es-snippet" data-no-typeset>
-          <code>{'<script src="https://typeset.us/go.js" defer></script>'}</code>
+          <code>{PINNED_SNIPPET}</code>
         </div>
 
         <p className="es-close">

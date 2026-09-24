@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import typeset, { measureLayout, restore } from '@/lib/typeset-site';
 import { withDemoMeasurement } from '@/lib/typeset-demo';
 import { strandedOpener } from '@/lib/v4/phrase-boundaries';
+import { PINNED_SNIPPET } from '@/lib/install-snippet';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -52,7 +53,8 @@ const CRAFT = [
   },
 ];
 
-const INSTALL_LINE = '<script src="https://typeset.us/go.js" defer></script>';
+// The pinned loader with its integrity hash, from public/sri.json.
+const INSTALL_LINE = PINNED_SNIPPET;
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 

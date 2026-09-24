@@ -85,6 +85,22 @@ Hashes for every published version live in
   docs/ops/vercel-firewall.md has the firewall bypass that stops bot
   challenges on these paths; it is applied in the Vercel project, not here.
 
+### Stability
+
+- STABILITY.md states what a version number promises: API names,
+  `auditJSON` `schemaVersion` 1, outcome codes, CLI exit codes and published
+  bytes do not break in 4.x, and a minor release changes default rendering
+  only to fix a verified defect, listed under "Rendering changes" with its
+  golden-diff count. Install with `npm i -E`, or pin `go@<version>.js` with
+  its integrity hash. `go.js` and `go@4.js` follow 4.x and will never move to
+  5.0.
+- Every install line on typeset.us is generated at build time from
+  `public/sri.json`: the pinned loader with its integrity hash and
+  `crossorigin`, on the homepage, /install and each platform guide, /utility,
+  /essay, the pairing-card and reading-lab templates and the grader. The
+  evergreen `go.js` appears only with that label. Docs written before a cut
+  carry a placeholder hash that `release-cut` fills.
+
 ### Release trust
 
 - Releases are published by `.github/workflows/release.yml` from a `v*` tag,

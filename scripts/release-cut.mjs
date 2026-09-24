@@ -35,6 +35,8 @@ const dryRun = values['dry-run'];
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) throw new Error('Pass --version x.y.z.');
 if (!dryRun && !values.summary) throw new Error('Pass --summary with one sentence for public/releases/' + version + '/index.html.');
 const repo = process.cwd();
+/** The integrity placeholder in pre-release docs; see verify-docs.mjs. */
+const SRI_PLACEHOLDER = 'sha384-FILLED-BY-RELEASE-CUT';
 const root = resolve(values.root ?? repo);
 const exists = (/** @type {string} */ path) => stat(path).then(() => true, () => false);
 const report = { version, dryRun, root, recipe: /** @type {string | null} */ (null), preconditions: /** @type {Record<string, unknown>} */ ({}), tarball: /** @type {Record<string, unknown>} */ ({}), reproduces: /** @type {Record<string, unknown> | null} */ (null), wrote: /** @type {string[]} */ ([]) };
@@ -106,6 +108,14 @@ try {
   const recipe = recipeFor(version);
   report.recipe = recipe.line;
   await buildPackageDist({ root: staging, distDir, version, recipe });
+  // Docs written before the cut show the pinned loader with a placeholder
+  // hash; the loader now exists, so its integrity is known (the site's
+  // go@<v>.js is dist/auto.js from the 4.3 recipe on).
+  const loaderSRI = recipe.autoLoader ? sri(await readFile(join(staging, distDir, 'auto.js'))) : null;
+  if (loaderSRI) {
+    const readmePath = join(staging, pkgDir, 'README.md');
+    await writeFile(readmePath, (await readFile(readmePath, 'utf8')).replaceAll(SRI_PLACEHOLDER, loaderSRI));
+  }
   await emitDeclarations({ root: staging, distDir, declarationDir: `${pkgDir}/declarations`, tsc: join(repo, 'node_modules/.bin/tsc') });
   await copyPackageFiles({ root: staging, packageDir: pkgDir, recipe });
   await writeManifest({ root: staging, distDir, version });
@@ -174,7 +184,7 @@ try {
     await place(`public/go@${version}.js`, go, 'wx');
     await rename(join(root, distDir), join(staging, 'previous-dist'));
     await move(join(staging, distDir), distDir);
-    for (const file of ['package.json', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md', 'SECURITY.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
+    for (const file of ['package.json', 'capabilities.json', 'README.md', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md', 'SECURITY.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
     await place('src/lib/v4/typeset.next.ts', await readFile(join(staging, 'src/lib/v4/typeset.next.ts')));
     const site = (/** @type {string} */ file) => readFile(join(staging, 'site', file));
     const major = Number(version.split('.')[0]);
@@ -187,6 +197,10 @@ try {
     if (isStable) await place(`public/go@${major}.js`, go);
     if (isStable && major === EVERGREEN_MAJOR) {
       for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await site(file));
+    }
+    for (const doc of ['README.md', 'STABILITY.md']) {
+      const text = await readFile(join(root, doc), 'utf8').catch(() => null);
+      if (text && loaderSRI && text.includes(SRI_PLACEHOLDER)) await place(doc, text.replaceAll(SRI_PLACEHOLDER, loaderSRI));
     }
     await place('public/for-agents.md', await readFile(join(staging, pkgDir, 'for-agents.md')));
     await place('public/capabilities.json', await readFile(join(staging, pkgDir, 'capabilities.json')));

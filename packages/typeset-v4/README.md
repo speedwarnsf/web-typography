@@ -102,7 +102,7 @@ both finishing passes. Set data-typeset-tracking="false" to disable only trackin
 The existing website drop-in remains automatic:
 
 ```html
-<script src="https://typeset.us/go@4.2.0.js" defer></script>
+<script src="https://typeset.us/go@4.2.0.js" integrity="sha384-KpyXtkC1KXixYXRIvrZCP7VPGJ2BcKJ07LeCuQpFXQms/QwY033ti1+QWU/XFD/a" crossorigin="anonymous" defer></script>
 ```
 
 It targets paragraphs, headings, captions, list items and other prose blocks,

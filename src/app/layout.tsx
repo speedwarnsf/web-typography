@@ -39,6 +39,7 @@ import PrevNextStrip from "@/components/PrevNextStrip";
 import GlyphField from "@/components/chrome/GlyphField";
 import ScrollHairline from "@/components/chrome/ScrollHairline";
 import BloomMenu from "@/components/chrome/BloomMenu";
+import { PINNED_VERSION } from "@/lib/install-snippet";
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans", display: "swap" });
@@ -110,7 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PrevNextStrip />
           <SectionFooter />
           <footer className="px-6 py-6 text-center text-xs text-neutral-500" data-no-typeset>
-            <a href="/releases/4.2.0/">Typeset 4.2.0</a>
+            <a href={`/releases/${PINNED_VERSION}/`}>Typeset {PINNED_VERSION}</a>
             {' / '}<a href="/releases/3.5.1/">V3 archive</a>
           </footer>
           <BackToTop />

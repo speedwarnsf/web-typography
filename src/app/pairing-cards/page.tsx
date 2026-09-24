@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import CodeBlock from "@/components/CodeBlock";
 import { typesetText, typeset } from "@/lib/typeset-site";
+import { PINNED_SNIPPET } from "@/lib/install-snippet";
 
 const POPULAR_FONTS = [
   "Playfair Display", "Inter", "Lora", "Source Sans 3", "Space Grotesk",
@@ -396,7 +397,7 @@ h1, h2, h3 {
   <h1>${headingText}</h1>
   <p>${rawText}</p>
   <!-- Typeset — automatic typographic refinement. https://typeset.us -->
-  <script src="https://typeset.us/go.js" defer></script>
+  ${PINNED_SNIPPET}
 </body>
 </html>`;
 
@@ -406,8 +407,9 @@ h1, h2, h3 {
   // the generated distributable, which is always the same code as the site.
   const typesetJS = `<!-- Typeset — the engine that set this card's preview.
      Full pipeline: beam-search composition, hanging punctuation,
-     Tschichold spacing, self-healing lines. One line, no build step: -->
-<script src="https://typeset.us/go.js" defer></script>
+     Tschichold spacing, self-healing lines. One line, no build step,
+     pinned with its integrity hash: -->
+${PINNED_SNIPPET}
 
 <!-- Library version (window.Typeset) and docs: https://typeset.us/utility -->`;
 

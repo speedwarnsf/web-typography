@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { INSTALL_ORDER, PLATFORMS, SNIPPET } from '@/lib/platforms';
+import { EVERGREEN_NOTE, EVERGREEN_SNIPPET, NPM_INSTALL, PINNED_VERSION } from '@/lib/install-snippet';
 import '../install/install.css';
 
 export const metadata: Metadata = {
@@ -25,11 +26,17 @@ export default function InstallIndex() {
         <code>{SNIPPET}</code>
       </div>
       <p className="in-fine">
-        Prefer a pinned build with an integrity hash? Take the exact tag from{' '}
-        <a href="/sri.json">sri.json</a>. Not sure it worked? Paste your URL
-        into <Link href="/fix">the grader</Link> after — it reads your page,
-        confirms the script is installed, and re-sets your opening paragraph
-        both ways.
+        This is typeset {PINNED_VERSION}, pinned: the file never changes, and
+        the integrity hash makes the browser refuse it if it ever did. Every
+        pinned version and its hash are in <a href="/sri.json">sri.json</a>.
+        Not sure it worked? Paste your URL into <Link href="/fix">the grader</Link>{' '}
+        after — it reads your page, confirms the script is installed, and
+        re-sets your opening paragraph both ways.
+      </p>
+      <p className="in-fine">
+        Just trying it out? <code data-no-typeset>{EVERGREEN_SNIPPET}</code>{' '}
+        also works. {EVERGREEN_NOTE} Building with npm?{' '}
+        <code data-no-typeset>{NPM_INSTALL}</code>.
       </p>
 
       <div className="in-grid">

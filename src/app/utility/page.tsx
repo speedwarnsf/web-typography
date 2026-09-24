@@ -1,4 +1,5 @@
 import CodeBlock from "@/components/CodeBlock";
+import { EVERGREEN_NOTE, EVERGREEN_SNIPPET, LIBRARY_PINNED, LIBRARY_SNIPPET, PINNED_SNIPPET, PINNED_VERSION } from "@/lib/install-snippet";
 import { readFileSync } from "fs";
 import path from "path";
 import EssayModal from "./EssayModal";
@@ -51,9 +52,12 @@ export default function UtilityPage() {
             <code className="text-neutral-300">data-no-typeset</code>.
           </p>
           <CodeBlock
-            code={`<script src="https://typeset.us/go.js" defer></script>`}
-            title="go.js — anywhere HTML runs"
+            code={PINNED_SNIPPET}
+            title={`go@${PINNED_VERSION}.js — anywhere HTML runs, pinned`}
           />
+          <p className="text-sm text-neutral-500 mt-4 max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
+            Trying it out? <code className="text-neutral-300">{EVERGREEN_SNIPPET}</code> also works. {EVERGREEN_NOTE}
+          </p>
         </section>
 
         <section className="mb-16">
@@ -65,7 +69,7 @@ export default function UtilityPage() {
             global, for when you want to decide what gets composed and when.
           </p>
           <CodeBlock
-            code={`<script src="https://typeset.us/typeset.min.js"></script>
+            code={`${LIBRARY_SNIPPET}
 <script>
   const controller = Typeset.mount(document, '.headline, article p, article li', {
     smartQuotes: 'en', opticalHanging: true
@@ -73,7 +77,7 @@ export default function UtilityPage() {
   controller.ready.then(() => console.log(Typeset.auditJSON('article p')));
   // On teardown: controller.disconnect();
 </script>`}
-            title="typeset.min.js — window.Typeset"
+            title={LIBRARY_PINNED ? `typeset@${PINNED_VERSION}.min.js — window.Typeset` : "typeset.min.js — window.Typeset, auto-updating within 4.x"}
           />
         </section>
 
@@ -84,8 +88,8 @@ export default function UtilityPage() {
           <p className="text-base text-neutral-400 mb-6 leading-relaxed max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
             TypeScript, dependency-free at runtime. This is the V4 engine entry;
             its supporting modules and React adapter ship in the npm package.
-            <a href="/releases/4.2.0/README.md"> Installation</a>,{" "}
-            <a href="/releases/4.2.0/MIGRATION.md">migration</a>, and{" "}
+            <a href={`/releases/${PINNED_VERSION}/README.md`}> Installation</a>,{" "}
+            <a href={`/releases/${PINNED_VERSION}/MIGRATION.md`}>migration</a>, and{" "}
             <a href="/releases/3.5.1/README.md">V3 archive</a>.
           </p>
           <CodeBlock code={typesetFullCode} title="typeset.ts" />

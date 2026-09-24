@@ -170,6 +170,25 @@ try {
       check('security', 'npm audit reports no high or critical vulnerability', counts && counts.high === 0 && counts.critical === 0, counts);
     }
   }
+  if (sections.has('content')) {
+    // D4: every install line the site renders is the pinned loader with the
+    // integrity hash from public/sri.json; the evergreen go.js appears only
+    // with its label.
+    const sri = JSON.parse(await readFile('public/sri.json', 'utf8'));
+    const decode = (/** @type {string} */ html) => html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+    const installIndex = await (await fetch(base + '/install')).text();
+    const platforms = [...new Set([...installIndex.matchAll(/href="(\/install\/[a-z-]+)"/g)].map(m => m[1]))];
+    for (const route of ['/', '/install', ...platforms, '/utility', '/essay', '/fix']) {
+      const response = await fetch(base + route);
+      const html = decode(await response.text());
+      const snippets = [...html.matchAll(/<script src="https:\/\/typeset\.us\/(go(?:@[\d.]+)?\.js|typeset(?:@[\d.]+\.min)?\.min\.js|typeset@[\d.]+\.min\.js)"([^>]*)>/g)];
+      const bad = snippets.filter(([, file, attributes]) => {
+        if (/@/.test(file)) return /integrity="([^"]+)"/.exec(attributes)?.[1] !== sri.files[file] || !/crossorigin="anonymous"/.test(attributes);
+        return !/never move to 5\.0/.test(html);
+      }).map(m => m[0]);
+      check('content', `${route}: install lines are pinned with sri.json's integrity (go.js only with its label)`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+    }
+  }
 } catch (error) {
   errors.push(String(/** @type {Error} */ (error).stack || error));
 } finally {

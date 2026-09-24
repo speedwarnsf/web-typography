@@ -5,6 +5,10 @@
 //   src/lib/v4/outcomes.ts and nothing there is unused; OUTCOMES.md and
 //   docs/outcomes.md are regenerated; `Outcome` supports an exhaustive
 //   switch; every option has a documented default.
+// - stability: STABILITY.md states the promise; site pages take install
+//   lines from public/sri.json; pinned snippets in the docs carry
+//   crossorigin and the right integrity (before the cut, the placeholder
+//   release-cut fills).
 //
 // Later sections are added by the other docs items. TODO(docs-sync) anchors
 // are counted and listed; release-cut refuses to cut while any remain.
@@ -84,6 +88,43 @@ try {
   const undocumented = [...options.matchAll(/(\/\*\*[\s\S]*?\*\/\s*)?\n\s*(\w+)\?:/g)].filter(([, doc, name]) => name !== 'text' && !/Default/.test(doc ?? '')).map(m => m[2]);
   check('outcomes', 'every Options field states its default in JSDoc', options && undocumented.length === 0, undocumented);
   check('outcomes', 'the lineBreaks JSDoc names unicode as the default', /Default `'unicode'`/.test(options));
+  // stability (D4): a written promise, and pinned-first install lines.
+  const changelog = await readFile('CHANGELOG.md', 'utf8');
+  const target = /^## (\d+\.\d+\.\d+(?:-[\w.]+)?)\b/m.exec(changelog)?.[1] ?? '';
+  const released = pkg.version === target;
+  const sri = JSON.parse(await readFile('public/sri.json', 'utf8'));
+  const stability = await readFile('STABILITY.md', 'utf8').catch(() => '');
+  for (const [label, pattern] of /** @type {[string, RegExp][]} */ ([
+    ['API names', /API names/], ['auditJSON schemaVersion', /schemaVersion/], ['outcome codes', /Outcome codes/], ['default rendering only for verified defects', /only to fix a\s+verified defect/],
+    ['a "Rendering changes" list with golden-diff counts', /"Rendering changes"[\s\S]*number of test\s+paragraphs/], ['exact installs (npm i -E)', /npm i -E typeset\.us@/], ['go.js never moves to 5.0', /never move to 5\.0/], ['release cadence', /two to four weeks/],
+  ])) check('stability', `STABILITY.md covers ${label}`, pattern.test(stability));
+  check('stability', `the CHANGELOG's first version (${target}) is the package version or the next release`, !!target && (released || /^## \d+\.\d+\.\d+ - Unreleased$/m.test(changelog.split('\n').find(line => line.startsWith(`## ${target}`)) ?? '')), { target, package: pkg.version });
+  /** @type {string[]} */
+  const hardcoded = [];
+  const ALLOWED = new Set(['src/lib/install-snippet.ts', 'src/app/fix/page.tsx', 'src/lib/go-entry.ts', 'src/lib/typeset.standalone.ts']);
+  /** @param {string} dir */
+  const walk = async dir => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) { if (!['v4', 'vendor'].includes(entry.name)) await walk(path); continue; }
+      if (!/\.(tsx?|mjs)$/.test(entry.name) || ALLOWED.has(path)) continue;
+      const text = await readFile(path, 'utf8');
+      if (/<script src="https:\/\/typeset\.us\/(?:go|typeset)[^"]*"/.test(text)) hardcoded.push(path);
+    }
+  };
+  await walk('src');
+  check('stability', 'site pages take install lines from src/lib/install-snippet.ts (public/sri.json), not hard-coded URLs', hardcoded.length === 0, hardcoded);
+  const docs = { 'packages/typeset-v4/README.md': await readFile('packages/typeset-v4/README.md', 'utf8'), 'STABILITY.md': stability, 'README.md': await readFile('README.md', 'utf8') };
+  for (const [file, text] of Object.entries(docs)) {
+    const snippets = [...text.matchAll(/<script src="https:\/\/(?:typeset\.us\/go@|cdn\.jsdelivr\.net\/npm\/typeset\.us@)([\d.]+(?:-[\w.]+)?)(?:\.js|\/dist\/auto\.js)"([^>]*)>/g)];
+    const wrong = snippets.filter(([, version, attributes]) => {
+      if (!/crossorigin="anonymous"/.test(attributes)) return true;
+      const integrity = /integrity="([^"]+)"/.exec(attributes)?.[1];
+      if (version !== target) return integrity !== sri.files[`go@${version}.js`];
+      return released ? integrity !== sri.files[`go@${version}.js`] : integrity !== 'sha384-FILLED-BY-RELEASE-CUT';
+    }).map(m => m[0]);
+    check('stability', `${file}: every pinned loader snippet has crossorigin and the right integrity (${released ? 'from sri.json' : 'the release-cut placeholder for ' + target})`, wrong.length === 0, wrong);
+  }
 } catch (error) {
   errors.push(String(/** @type {Error} */ (error).stack || error));
 }
