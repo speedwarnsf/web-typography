@@ -277,8 +277,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       // An external edit inside a generated line is new author text, never
       // permission to resurrect our cached source.
       for (const node of prior.outputNodes) {
-        if (node instanceof HTMLElement && node.parentNode === element && node.hasAttribute('data-ts-generated')) {
-          node.replaceWith(...node.childNodes);
+        if (node.nodeType === 1 && node.parentNode === element && (node as Element).hasAttribute('data-ts-generated')) {
+          (node as Element).replaceWith(...node.childNodes);
         }
       }
     }
@@ -456,6 +456,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   return finish('composed');
 }
 
+const isElement = (node: unknown): node is HTMLElement => (node as Node | null)?.nodeType === 1;
+
 export function typesetAll(selector = defaults, options: Options = {}): Result[] {
   return Array.from(document.querySelectorAll<HTMLElement>(selector), el => typeset(el, options));
 }
@@ -560,6 +562,10 @@ export interface Controller {
 
 /** One lifecycle owner per mount. Observers are disconnected during our writes. */
 export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
+  // Realm-safe: a parent page may mount into a same-origin iframe, whose
+  // nodes fail instanceof checks against this window's constructors.
+  const doc = (root as Node).nodeType === 9 ? root as Document : (root as Node).ownerDocument!;
+  const view = doc.defaultView;
   const identity = Symbol('typeset-mount');
   const claimed = new Set<HTMLElement>();
   const blocked = new Map<HTMLElement, () => void>();
@@ -611,9 +617,9 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const wake of waiters || []) wake();
   };
   const select = (within: ParentNode = root) => {
-    const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
+    const scope = isElement(root) && (within as Node).contains(root as Node) ? root : within;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
-    if (scope instanceof HTMLElement && scope.matches(selector)) elements.unshift(scope);
+    if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
     return elements.filter(el => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line'));
   };
   const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
@@ -640,7 +646,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   };
   const observer = new MutationObserver(records => {
     for (const record of records) {
-      const target = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
+      const target = isElement(record.target) ? record.target : record.target.parentElement;
       for (let el = target; el && (el === root || root.contains(el)); el = el.parentElement) {
         if (owned.has(el)) pending.add(el);
       }
@@ -651,9 +657,9 @@ export function mount(root: ParentNode = document, selector = defaults, options:
         if (target.closest(excluded)) for (const el of owned) if (target.contains(el)) pending.add(el);
       }
       if (record.type === 'childList') {
-        for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
+        for (const node of record.addedNodes) if (isElement(node)) discover(node);
         if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
-        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) {
+        for (const node of record.removedNodes) if (isElement(node) && !root.contains(node)) {
           for (const el of claimed) if (node.contains(el) && !root.contains(el)) {
             owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
           }
@@ -699,7 +705,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   };
   function observe() {
     observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode'] });
-    if (root instanceof HTMLElement) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
+    if (isElement(root)) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
       observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang'] });
     }
   }
@@ -746,7 +752,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     refresh();
   };
-  document.fonts.ready.then(() => {
+  doc.fonts.ready.then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
     discover();
@@ -754,8 +760,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  document.fonts.addEventListener('loadingdone', fontsChanged);
-  window.addEventListener('resize', resized);
+  doc.fonts.addEventListener('loadingdone', fontsChanged);
+  view?.addEventListener('resize', resized);
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
@@ -763,8 +769,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (timer !== undefined) clearTimeout(timer);
       if (idle !== undefined) window.cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
-      document.fonts.removeEventListener('loadingdone', fontsChanged);
-      window.removeEventListener('resize', resized);
+      doc.fonts.removeEventListener('loadingdone', fontsChanged);
+      view?.removeEventListener('resize', resized);
       if (restoreContent) for (const el of owned) restore(el);
       owned.clear(); pending.clear(); nearby.clear();
       watched.clear(); parents.clear();
