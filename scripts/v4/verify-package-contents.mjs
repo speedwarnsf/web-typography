@@ -32,6 +32,25 @@ try {
   const plainTypes = await readFile(`${staged.dir}/dist/typeset-react.d.ts`, 'utf8');
   check('React adapters declare ReactElement, not inferred @types/react internals', /TypesetText\(props: TypesetTextProps\): ReactElement/.test(reactTypes) && /TypesetRichText\(props: TypesetRichTextProps\): ReactElement/.test(reactTypes) && /\): ReactElement;/.test(plainTypes) && !/DetailedReactHTMLElement|ChangeEventHandler|SubmitEventHandler/.test(plainTypes + reactTypes), plainTypes.match(/export declare function TypesetText[^;]*;/)?.[0]);
 
+  // K8: people can find the package on npm and follow its links.
+  const KEYWORDS = ['typography', 'line-breaking', 'line-break', 'text-wrap', 'text-wrap-pretty', 'orphans', 'widows', 'rag', 'knuth-plass', 'hanging-punctuation', 'smart-quotes', 'react', 'paragraph'];
+  check('keywords cover the terms people search for', KEYWORDS.every(k => pkg.keywords?.includes(k)), { missing: KEYWORDS.filter(k => !pkg.keywords?.includes(k)) });
+  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.', pkg.description);
+  check('repository.directory points npm and GitHub at packages/typeset-v4', pkg.repository?.directory === 'packages/typeset-v4' && /github\.com\/speedwarnsf\/web-typography/.test(pkg.repository?.url), pkg.repository);
+  check('bugs.url is the issue tracker', pkg.bugs?.url === 'https://github.com/speedwarnsf/web-typography/issues', pkg.bugs);
+  check('no engines field that would make Yarn refuse a browser library', !pkg.engines, pkg.engines);
+  /** @type {string[]} */
+  const broken = [];
+  for (const doc of [...files.keys()].filter(path => path.endsWith('.md'))) {
+    const text = await readFile(`${staged.dir}/${doc}`, 'utf8');
+    for (const [, target] of text.matchAll(/\]\(([^)\s]+)\)/g)) {
+      if (/^(https?:|mailto:|#)/.test(target)) continue;
+      const path = target.split('#')[0];
+      if (!files.has(path)) broken.push(`${doc} -> ${target}`);
+    }
+  }
+  check('relative links in packaged docs name files in the package', broken.length === 0, broken);
+
   check('packed file list includes the CLI, docs and dist', ['bin/audit.mjs', 'README.md', 'SUPPORT.md', 'MIGRATION.md', 'for-agents.md', 'capabilities.json', 'dist/manifest.json', 'dist/styles.css'].every(path => files.has(path)), [...files.keys()]);
   check('nothing from the repository leaks into the package', [...files.keys()].every(path => !/^(?:output|src|node_modules|\.env|scripts)/.test(path)), [...files.keys()]);
   const report = { version: staged.version, dist: artifacts.dist, tarball: packed.filename, entryCount: packed.entryCount, unpackedSize: packed.unpackedSize, size: packed.size, files: Object.fromEntries(files), checks, errors };

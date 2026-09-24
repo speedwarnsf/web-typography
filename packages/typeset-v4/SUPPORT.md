@@ -16,7 +16,11 @@ are not certification for every device, browser, font, or sentence.
 - Chromium, WebKit and Firefox through Playwright. Reports record versions;
   no untested historical minimum is inferred.
 - Intl.Segmenter, ResizeObserver, MutationObserver, document.fonts and CSS
-  text-wrap required. Node 22+ for CLI/tooling.
+  text-wrap required. The library has no Node requirement and the package
+  declares no `engines` field, so no package manager refuses it. The
+  `typeset-audit` CLI needs Node 18.3 or later (its help and argument
+  parsing run on 18.3.0 and 18.20.8; full audits are tested on Node 22 and
+  24) plus Playwright, which has its own Node floor.
 - ESM/CommonJS core; ESM-only client React entry; optional browser global.
 
 Never imperatively mount framework-owned text. Stateful custom React children

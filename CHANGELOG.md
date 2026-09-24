@@ -35,6 +35,12 @@ Hashes for every published version live in
   and 19.0 with `skipLibCheck: false`. Tested by
   `scripts/v4/verify-react-matrix.mjs` over React 18.2.0, 18.3.1, 19.0.8,
   19.1.9, 19.2.8 and 19.3.0 in Chromium, WebKit and Firefox.
+- npm metadata: a plain description, keywords (typography, line-breaking,
+  text-wrap, orphans, widows, knuth-plass, hanging-punctuation, react and
+  others), `repository.directory` so README links resolve on npmjs.com, and
+  `bugs.url`. The `engines` field (`node >=22`) is removed: it made Yarn 1
+  refuse installs of a browser library on older Node. The `typeset-audit`
+  CLI needs Node 18.3 or later.
 
 ### Rendering changes
 
