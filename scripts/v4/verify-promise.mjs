@@ -7,7 +7,7 @@ import { releaseIdentity } from './release-evidence.mjs';
 import { reactUnderTest } from './candidate.mjs';
 
 const report={...await releaseIdentity(),checks:[],samples:[],errors:[],browsers:{}};
-const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize} from './src/lib/v4/typeset';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
+const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize} from './src/lib/v4/typeset';export {isAbbreviation,proseBoundary,boundPair,keptPhrases,strandedOpener} from './src/lib/v4/phrase-boundaries';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
 const texts=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
 const specimenFont=(await readFile('lab/fraunces-latin-variable.woff2')).toString('base64');
 const react=await build({stdin:{contents:`
@@ -35,6 +35,26 @@ for(const config of browsers){
     const result=await page.evaluate(texts=>{
       const api=window.Typeset,internals=window.Internals,checks=[],samples=[];
       const check=(label,pass,detail)=>checks.push({label,pass:!!pass,detail});
+      // Abbreviations, sentence ends, bound pairs and keep matching (C13, C14, C16).
+      for(const [text,expected] of [['Dr.',true],['Mrs.',true],['(Fig.',true],['fig.',true],['p.',true],['pp.',true],['a.m.',true],['p.m.',true],['e.g.',true],['i.e.',true],['etc.',true],['vs.',true],['Inc.',true],['No.',true],['U.S.',true],['U.K.',true],['J.',true],
+        ['no.',false],['I.',false],['A.',false],['through.',false],['Ohio.',false],['Ph.D.',false],['Dr',false],['Dr.,',false]])check('isAbbreviation '+text,internals.isAbbreviation(text)===expected);
+      for(const [text,expected] of [['through.',true],['done!',true],['why?',true],['note:',true],['end.\u201d',true],['end.)',true],['so did I.',true],
+        ['Dr.',false],['a.m.',false],['U.S.',false],['word',false],['word,',false]])check('proseBoundary '+text,internals.proseBoundary(text)===expected);
+      for(const [previous,next,before,expected] of [['1,200','m',undefined,'unit'],['8','a.m.',undefined,'unit'],['500','mg,',undefined,'unit'],['38','\u00b0C',undefined,'unit'],['$2.5','million',undefined,'unit'],
+        ['Dr.','Jones',undefined,'honorific'],['Ms.','Lindqvist',undefined,'honorific'],['Fig.','3',undefined,'label'],['p.','17,',undefined,'label'],['type','2',undefined,'label'],['Table','3',undefined,'label'],
+        ['hepatitis','C,',undefined,'designator'],['vitamin','D',undefined,'designator'],['Plan','B',undefined,'designator'],['type','A',undefined,'designator'],['War','I','World','designator'],
+        ['When','I','fine.',null],['When','I',undefined,null],['and','I','then',null],['such','A','as',null],['20','years',undefined,null],['2','in',undefined,null],['St.','Louis',undefined,null],['U.S.','sample',undefined,null],['with','Dr.',undefined,null]])
+        check('boundPair '+previous+' / '+next,internals.boundPair(previous,next,before)===expected,internals.boundPair(previous,next,before));
+      const kept=(units,keep)=>JSON.stringify(internals.keptPhrases(units,keep));
+      check('keep matches across a dash unit',kept(['the','price','tag\u2014','it\u2019s'],['price tag'])==='[{"start":1,"end":3}]');
+      check('keep ignores case and spacing',kept(['a','stop','signal,','not'],['  STOP   signal '])==='[{"start":1,"end":3}]');
+      check('keep joins hyphen units',kept(['long-','term','care'],['long-term care'])==='[{"start":0,"end":3}]');
+      check('keep treats NBSP as a space',kept(['price','tag'],['price\u00a0tag'])==='[{"start":0,"end":2}]');
+      check('keep ignores punctuation around the phrase',kept(['your','wellness','data.'],['(wellness data),'])==='[{"start":1,"end":3}]');
+      check('keep skips absent and single-unit phrases',kept(['price','tag'],['zzzq qqqz','price'])==='[]');
+      check('stranded opener ignores an honorific',!internals.strandedOpener('Your first visit is with Dr. Jones'));
+      check('stranded opener ignores a.m.',!internals.strandedOpener('arrive by 8 a.m. with'));
+      check('stranded opener still found',internals.strandedOpener('the word was abandoned. Books'));
       const p=document.createElement('p');document.body.append(p);
       const ink=[];
       for(const font of ['Georgia','Arial','Times New Roman','Courier New'])for(const size of [16,32,48])for(const char of ['"','\u201c','\u2018','T','V','A','O','H']){

@@ -13,11 +13,68 @@ let sentenceSegmenter: Intl.Segmenter | undefined;
 /** English sentence boundaries. Created on first use and shared. */
 export const sentences = (): Intl.Segmenter => sentenceSegmenter ??= new Intl.Segmenter('en', { granularity: 'sentence' });
 
-/** A colon can introduce a thought without introducing a new sentence. */
-export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text);
-
+// ─── Abbreviations and bound pairs (English) ───
+//
+// A period after an abbreviation does not end a sentence, and some pairs read
+// as one unit: a number and its unit ("1,200 m"), an honorific and a name
+// ("Dr. Jones"), a label and its number ("Fig. 3", "type 2"), and a word and
+// its letter designator ("hepatitis C", "World War I"). The compositor charges
+// for splitting them and audit() reports the splits; both use these lists.
+// Chicago (7.62, 10.4) and the SI brochure (5.4.3) keep these units together.
+const abbreviations = new Set(['Mr', 'Mrs', 'Ms', 'Mx', 'Dr', 'Prof', 'Rev', 'St', 'Mt', 'Jr', 'Sr', 'vs', 'etc', 'e.g', 'i.e', 'E.g', 'I.e',
+  'a.m', 'p.m', 'p', 'pp', 'Fig', 'fig', 'No', 'Vol', 'Ch', 'Inc', 'Ltd', 'Co']);
+// "St." and "Mt." also abbreviate Street and Mount after a name, so they bind
+// only to the closed toponym list in typeset.ts.
+const honorifics = new Set(['Mr', 'Mrs', 'Ms', 'Mx', 'Dr', 'Prof', 'Rev']);
+const abbreviatedLabels = new Set(['Fig', 'fig', 'p', 'pp', 'No', 'Vol', 'Ch']);
+const labelWords = new Set(['table', 'figure', 'chapter', 'section', 'page', 'part', 'step', 'room', 'level', 'grade', 'stage', 'phase',
+  'type', 'class', 'category', 'tier', 'zone', 'appendix', 'exhibit', 'schedule', 'version']);
+// Words that take a capital-letter designator ("type A"). Other capitals are
+// designators after any word; "A" is also the article, so it needs a head.
+const designatorHeads = new Set(['type', 'grade', 'class', 'size', 'plan', 'part', 'vitamin', 'hepatitis', 'blood', 'group', 'section',
+  'model', 'exhibit', 'appendix', 'schedule', 'title', 'category', 'level', 'phase', 'stage', 'tier', 'zone', 'option', 'list', 'team']);
+const units = new Set(['%', '‰', '°', '°C', '°F', 'K', 'm', 'km', 'cm', 'mm', 'µm', 'μm', 'nm', 'g', 'kg', 'mg', 'µg', 'μg', 'mcg', 'ng', 'l', 'L', 'ml', 'mL',
+  'dl', 'dL', 's', 'ms', 'min', 'h', 'hr', 'hrs', 'Hz', 'kHz', 'MHz', 'GHz', 'W', 'kW', 'MW', 'kWh', 'V', 'mA', 'J', 'kJ', 'cal', 'kcal',
+  'Pa', 'kPa', 'mmHg', 'dB', 'lb', 'lbs', 'oz', 'ft', 'yd', 'mi', 'mph', 'km/h', 'kph', 'gal', 'IU', 'mol', 'mmol', 'bpm', 'KB', 'MB', 'GB',
+  'TB', 'px', 'pt', 'a.m', 'p.m', 'am', 'pm', 'AM', 'PM', 'A.M', 'P.M', 'million', 'billion', 'trillion', 'percent']);
 const leading = (text: string) => text.replace(/^[("'\u201C\u2018[{]+/u, '');
-const trailing = (text: string) => text.replace(/[.,;:!?"'\u201D\u2019)\]}]+$/u, '');
+const outer = (text: string) => leading(text).replace(/["'\u201D\u2019)\]}]+$/u, '');
+const trailing = (text: string) => text.replace(/[.,;:!?"'\u201D\u2019)\]}\u2013\u2014]+$/u, '');
+
+/** "Dr.", "Fig.", "a.m.", "U.S." and initials such as "J." end no sentence.
+ * Capital "I." and "A." are left as sentence ends ("so did I."). */
+export function isAbbreviation(text: string): boolean {
+  const core = outer(text);
+  if (!core.endsWith('.')) return false;
+  const stem = core.slice(0, -1);
+  return abbreviations.has(stem) || /^(?:\p{Lu}\.){2,}$/u.test(core) || (/^\p{Lu}$/u.test(stem) && stem !== 'I' && stem !== 'A');
+}
+
+/** A colon can introduce a thought without introducing a new sentence.
+ * The period of an abbreviation ends no sentence. */
+export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text) && !isAbbreviation(text);
+
+export type BoundPair = 'unit' | 'honorific' | 'label' | 'designator';
+/**
+ * The kind of unit `next` forms with `previous`, if a line break between them
+ * would split it. `before` is the word ahead of `previous`, if any: a capital
+ * "I" is a designator ("World War I") only after a capitalized word that is
+ * not itself opening a sentence ("When I" is a pronoun).
+ */
+export function boundPair(previous: string, next: string, before?: string): BoundPair | null {
+  const tail = trailing(next);
+  if (/^[$€£¥]?\d[\d,.]*(?:[–-]\d[\d,.]*)?$/u.test(previous) && units.has(tail)) return 'unit';
+  const head = outer(previous);
+  if (head.endsWith('.') && honorifics.has(head.slice(0, -1)) && /^["'\u201C\u2018(]*\p{Lu}/u.test(next)) return 'honorific';
+  if (((head.endsWith('.') && abbreviatedLabels.has(head.slice(0, -1))) || labelWords.has(head.toLowerCase()))
+    && /^(?:\d[\p{L}\d.,–-]*|[IVX]{2,})$/u.test(tail)) return 'label';
+  if (/^\p{L}+$/u.test(previous) && /^\p{Lu}$/u.test(tail)) {
+    if (tail === 'A') return designatorHeads.has(previous.toLowerCase()) ? 'designator' : null;
+    if (tail === 'I') return /^\p{Lu}/u.test(previous) && before !== undefined && !proseBoundary(before) ? 'designator' : null;
+    return 'designator';
+  }
+  return null;
+}
 
 /**
  * Where author `keep` phrases occur in a run of break units: [start, end)

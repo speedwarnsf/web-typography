@@ -41,6 +41,24 @@ changes is byte-identical to 4.2.0 in Chromium, WebKit and Firefox.
   engine (42 corpus paragraphs), 0 of the rest. `audit()` reports a new error,
   `alignment-lost`, for a composed element whose alignment later changes to
   one the breaks cannot keep.
+- **Abbreviations, units, honorifics, labels and letter designators stay
+  with their words** (English). Every word ending in a period counted as a
+  sentence end, so the compositor paid to break after "Dr.", "Fig.", "a.m."
+  and "U.S.", and the single-letter penalty pushed units and designators to
+  the next line ("1,200 / m", "hepatitis / C", "World War / I"). Now an
+  abbreviation (Mr, Mrs, Ms, Dr, Prof, St, Mt, Jr, Sr, vs, etc, e.g, i.e,
+  a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted initialisms and
+  single initials) ends no sentence; splitting a number from its unit, an
+  honorific from a name, a label from its number or a word from its letter
+  designator costs what a weak line end costs; and only the article and the
+  pronoun "I" pay the single-letter penalty. Golden diff: 0 of the 2,724
+  corpus cells in each engine (the corpus has none of these constructions),
+  and 43 (Chromium, Firefox) or 44 (WebKit) of 160 cells of the new
+  adversarial set (`tests/v4-corpus-adversarial.json`), 41 of 160 through
+  the legacy renderer. On that set, pairs split at line ends fall from 46
+  (WebKit 44) under 4.2.0 to 12 (WebKit 11), against 26 in the browser's
+  own layout; weak line ends stay at 46 (WebKit 46 to 48); lines added
+  over native fall from 5 to 2. No orphan, overflow or source change.
 
 ### Fixes
 

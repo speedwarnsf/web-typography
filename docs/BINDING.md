@@ -128,10 +128,35 @@ therefore never shorten a line. **That was false** — 2400 is three times that
 rung. The claim is recorded here because a false justification beside a number
 is worse than no justification.
 
-### `numberUnit`
+### `numberUnit` (3.x) and `pair` (4.3)
 
-Measured, found to have no supporting evidence in any corpus, **not shipped**.
-There is no disabled code path for it either.
+In 3.x a `numberUnit` weight was measured, found to have no supporting
+evidence in the derivation corpus (which contains no numbers with units) and
+**not shipped**.
+
+4.3 ships `pair`, which covers a number and its unit ("1,200 m", "8 a.m."),
+an honorific and a name ("Dr. Jones"), a label and its number ("Fig. 3",
+"type 2") and a word and its letter designator ("hepatitis C", "World War
+I"), using the lists in `src/lib/v4/phrase-boundaries.ts` that `audit()` also
+uses. The evidence is `tests/v4-corpus-adversarial.json`: health and
+public-information copy built around these constructions, which the 4.2.0
+compositor split more often than the browser did (46 splits against 26 over
+20 paragraphs x 4 widths x 2 fonts). `pair` is a multiple of the measure
+profile's weak-end penalty, swept with `verify-golden.mjs --bind` in three
+engines:
+
+| pair | pairs split (Chromium) | weak line ends (Chromium) |
+| --- | --- | --- |
+| 0.75 | 14 | 46 |
+| **1** | **12** | **46** |
+| 1.25 | 9 | 49 |
+| 1.5 | 8 | 52 |
+| 2 | 6 | 53 |
+
+4.2.0 left 46 weak line ends on the same cells. 1 is the largest weight that
+adds none, the same rule that chose the toponym weight. Like the toponym
+weight it is a cost, never a weld: a pair still splits where every
+alternative is as bad. It changes no cell of the 85-paragraph corpus.
 
 ---
 

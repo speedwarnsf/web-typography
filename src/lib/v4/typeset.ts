@@ -1,6 +1,6 @@
 'use client';
 
-import { keptPhrases, proseBoundary } from './phrase-boundaries';
+import { boundPair, keptPhrases, proseBoundary } from './phrase-boundaries';
 
 /**
  * typeset.ts — Typographic refinement utility
@@ -204,10 +204,12 @@ function bindOpenerOf(part: string): string | undefined {
  * taste; `__TYPESET_BIND__` lets the derivation harness sweep them without a
  * rebuild.
  *
- * There is deliberately no numberUnit weight. It was measured, found to have
- * no supporting evidence in any corpus, and therefore not shipped.
+ * The 3.x numberUnit weight was measured against the 85-paragraph corpus,
+ * which has no numbers with units, and was not shipped. 4.3's pair weight
+ * (numbers and units, honorifics, labels, letter designators) is derived on
+ * tests/v4-corpus-adversarial.json instead; see docs/BINDING.md.
  */
-interface BindWeights { toponym: number }
+interface BindWeights { toponym: number; pair: number }
 // Re-derived 2026-07-24 against the fixed predicate and closed list, over 85
 // real paragraphs x 7 measures (24-78ch), in Chromium and WebKit — which
 // agreed on every cell. 1600 sits inside a plateau, [800, 2000], where the
@@ -223,7 +225,15 @@ interface BindWeights { toponym: number }
 // Do not read precision into this number. The metric cannot separate any
 // value inside the plateau, so 1600 is a conservative point in a flat region,
 // not an optimum. See docs/BINDING.md for the full method and its limits.
-const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+//
+// pair (a number and its unit, an honorific and a name, a label and its
+// number, a word and its letter designator; see phrase-boundaries.ts) is a
+// multiple of the measure profile's weak-end penalty. Swept 2026-09-24 over
+// the adversarial set (20 paragraphs x 4 widths x 2 fonts, 3 engines):
+// 0.75 / 1 / 1.25 / 1.5 / 2 left 14 / 12 / 9 / 8 / 6 pairs split (native
+// 26, 4.2.0 46) and 46 / 46 / 49 / 52 / 53 weak line ends (4.2.0 46) in
+// Chromium. 1 is the largest weight that adds no weak line end.
+const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600, pair: 1 };
 /** A kept phrase that fits the measure is split only when nothing else can
  * satisfy the paragraph's hard constraints. */
 const KEEP_UNSPLIT = 1e6;
@@ -864,7 +874,8 @@ export function createParagraphProblem(
   const lastLexicalAt = new Int32Array(count);
   const lastBoundaryAt = new Int32Array(count);
   const linkingEnd: boolean[] = [];
-  const singleLetter: boolean[] = [];
+  const weakLetter: boolean[] = [];
+  const designator: boolean[] = [];
   const boundary: boolean[] = [];
   const openerLength: number[] = [];
   for (let i = 0; i < count; i++) {
@@ -873,10 +884,26 @@ export function createParagraphProblem(
     lexicalPrefix[i + 1] = lexicalPrefix[i] + (lexical ? t.text.split(/\s+/u).filter(Boolean).length : 0);
     lastLexicalAt[i] = lexical ? i : i ? lastLexicalAt[i - 1] : -1;
     linkingEnd[i] = LINKING_END_WORDS.has(t.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, ""));
-    singleLetter[i] = /^[A-Za-z]$/.test(t.text);
     boundary[i] = proseBoundary(t.text);
     lastBoundaryAt[i] = boundary[i] ? i : i ? lastBoundaryAt[i - 1] : -1;
     openerLength[i] = t.text.replace(/[^A-Za-z0-9]/g, "").length;
+  }
+  // Pairs that read as one unit (phrase-boundaries.ts): a number and its unit,
+  // an honorific and a name, a label and its number, a word and its letter
+  // designator. Splitting one costs what a weak line end costs, so it happens
+  // only where every alternative is as bad; it remains a cost, never a weld.
+  // A letter designator may end a line ("…hepatitis C"), so of the single
+  // letters only the article ("a", "A") and the pronoun "I" pay the letter
+  // penalty, and "A" and "I" only when they are not designators ("type A",
+  // "World War I").
+  const english = opts.englishLexical !== false;
+  const pairCost = english ? new Float64Array(count + 1) : null;
+  const pairWeight = profile.weakEndPenalty * bindWeights().pair;
+  for (let i = 0; i < count; i++) {
+    const kind = english && i > 0 ? boundPair(contentTokens[i - 1].text, contentTokens[i].text, i > 1 ? contentTokens[i - 2].text : undefined) : null;
+    if (kind && pairCost) pairCost[i] = pairWeight;
+    designator[i] = kind === 'designator';
+    weakLetter[i] = contentTokens[i].text === 'a' || ((contentTokens[i].text === 'A' || contentTokens[i].text === 'I') && !designator[i]);
   }
   // Author keep phrases (the public keep option), matched over these tokens.
   const keepCost = opts.keep?.length ? new Float64Array(count + 1) : null;
@@ -1055,8 +1082,8 @@ export function createParagraphProblem(
       penalty += 1e9;
     }
 
-    // Weak lexical word at line end: penalty, not hard fail
-    if (!isLast && lastLexical?.weakEnd) {
+    // Weak lexical word at line end: penalty, not hard fail. "type A" may end a line.
+    if (!isLast && lastLexical?.weakEnd && !designator[lastLexicalIndex]) {
       penalty += profile.weakEndPenalty;
     }
 
@@ -1065,8 +1092,8 @@ export function createParagraphProblem(
       penalty += profile.linkingEndPenalty;
     }
 
-    // Extra penalty for single-letter lexical endings like "a" / "I"
-    if (opts.englishLexical !== false && !isLast && lastLexical && singleLetter[lastLexicalIndex]) {
+    // Extra penalty for the single-letter words "a", "A" and "I" at a line end
+    if (opts.englishLexical !== false && !isLast && lastLexical && weakLetter[lastLexicalIndex]) {
       penalty += profile.weakEndPenalty * 1.5;
     }
 
@@ -1080,6 +1107,7 @@ export function createParagraphProblem(
     if (opts.englishLexical !== false && !isLast) {
       penalty += bindPenaltyAt(breakEnd);
     }
+    if (!isLast && pairCost) penalty += pairCost[breakEnd];
     if (!isLast && keepCost) penalty += keepCost[breakEnd];
 
     // Sentence-start dangling — BOTH modes. Penalize a non-last line that
