@@ -453,6 +453,58 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   };
 }
 
+const unrendered = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+/** Whether the browser's own copy leaves this element and its subtree out. */
+function hiddenFromCopy(element: Element): boolean {
+  if (unrendered.has(element.tagName) || (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'hidden')) return true;
+  // display:none, and content-visibility:hidden descendants. Selected
+  // content-visibility:auto content is rendered, so it is kept. A
+  // display:contents element has no box of its own; its children decide.
+  const rendered = typeof element.checkVisibility === 'function' ? element.checkVisibility() : element.getClientRects().length > 0;
+  return !rendered && getComputedStyle(element).display !== 'contents';
+}
+
+/** range.cloneContents() without what native copy leaves out: unrendered
+ * elements, hidden inputs, script, style, template and noscript, and
+ * visibility:hidden text. Source and clone are walked in step (both in
+ * document order over the nodes the range touches); if they ever disagree,
+ * null, so the caller never ships a clone it could not check. */
+function visibleContents(range: Range): DocumentFragment | null {
+  const fragment = range.cloneContents();
+  const root = range.commonAncestorContainer;
+  const visibility = new Map<Element, boolean>();
+  const visibleText = (text: Node) => {
+    const parent = text.parentElement;
+    if (!parent) return true;
+    // Text directly inside a content-visibility:hidden element is skipped too;
+    // checkVisibility() covers only that element's descendant elements.
+    if (!visibility.has(parent)) { const cs = getComputedStyle(parent); visibility.set(parent, cs.visibility === 'visible' && cs.getPropertyValue('content-visibility') !== 'hidden'); }
+    return visibility.get(parent)!;
+  };
+  if (!(root instanceof Element || root instanceof Document || root instanceof DocumentFragment)) {
+    if (!visibleText(root)) fragment.replaceChildren();
+    return fragment;
+  }
+  const doc = range.startContainer.ownerDocument!;
+  const sources: Node[] = [];
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ALL,
+    { acceptNode: node => range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+  while (walker.nextNode()) sources.push(walker.currentNode);
+  const clones: Node[] = [];
+  const cloneWalker = doc.createTreeWalker(fragment, NodeFilter.SHOW_ALL);
+  while (cloneWalker.nextNode()) clones.push(cloneWalker.currentNode);
+  if (sources.length !== clones.length) return null;
+  for (let i = 0; i < sources.length; i++) {
+    const source = sources[i], clone = clones[i];
+    if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
+    const hidden = source instanceof Element ? hiddenFromCopy(source) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
+    if (!hidden) continue;
+    (clone as ChildNode).remove();
+    while (i + 1 < sources.length && source.contains(sources[i + 1])) i++;
+  }
+  return fragment;
+}
+
 const copyRoots = new WeakMap<Document, WeakMap<HTMLElement, number>>();
 /** Source copying is independent of visual line breaks. Respect site handlers. */
 export function preserveRichCopy(element: HTMLElement): () => void {
@@ -479,8 +531,9 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return Array.from(parent?.querySelectorAll<HTMLElement>('*') || []).some(el => registered.has(el) && range.intersectsNode(el));
       });
       if (!affected) return;
-      const html = ranges.map(range => {
-        const fragment = range.cloneContents();
+      const fragments = ranges.map(visibleContents);
+      const sourceText = fragments[0]?.textContent ?? null;
+      const html = fragments.some(fragment => !fragment) ? '' : (fragments as DocumentFragment[]).map(fragment => {
         fragment.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
         fragment.querySelectorAll('[data-ts-track]').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
         for (const el of fragment.querySelectorAll('*')) {
@@ -494,7 +547,8 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return container.innerHTML;
       }).join('');
       let text: string;
-      if (ranges.length === 1 && containingRoot(ranges[0])) text = ranges[0].toString();
+      // Inside one composed root: the source characters, whatever the lines.
+      if (ranges.length === 1 && containingRoot(ranges[0]) && sourceText !== null) text = sourceText;
       else {
         // Let the browser serialize real paragraphs, lists and authored breaks.
         // Hide only generated markers for this synchronous read; source nodes,
@@ -506,7 +560,8 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         finally { restore.forEach(undo => undo()); }
       }
       event.clipboardData.setData('text/plain', text);
-      event.clipboardData.setData('text/html', html);
+      // Without a checked clone, plain text only: formatting is lost, nothing hidden leaks.
+      if (html) event.clipboardData.setData('text/html', html);
       event.preventDefault();
     });
   }

@@ -58,6 +58,13 @@ line boxes, outcomes, feature statuses, copy text and markup).
   declined as `native:rich-whitespace` under that policy. Published bundles no
   longer read the bind-weight research global `__TYPESET_BIND__`; the research
   harness builds its own loader.
+- **Hidden content stays off the clipboard (C11).** A copy that touches a
+  composed paragraph is serialized by the engine; 4.2 built its HTML from
+  `range.cloneContents()`, which keeps what native copy leaves out, so a
+  select-all or a cross-paragraph copy pasted `display:none` notes, hidden
+  inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts and
+  styles. The clone is now walked in step with its source and those nodes are
+  dropped; if the two ever disagree, only plain text is written.
 
 ### Development
 
