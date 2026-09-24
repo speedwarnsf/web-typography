@@ -7,13 +7,17 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { releaseIdentity } from './release-evidence.mjs';
+import { stagePackage } from './stage-package.mjs';
+import { artifacts } from './candidate.mjs';
 const run = (command, args, cwd, capture = false) => new Promise((accept, reject) => {
   const child = spawn(command, args, { cwd, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', npm_config_cache: resolve('output/npm-cache') }, stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit' });
   let stdout = ''; child.stdout?.on('data', chunk => { stdout += chunk; });
   child.on('error', reject); child.on('exit', code => code === 0 ? accept(stdout) : reject(new Error(command + ' exited ' + code)));
 });
-await mkdir('output/packages', { recursive: true });
-const packed = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--offline', '--pack-destination', resolve('output/packages'), '--json'], resolve('packages/typeset-v4'), true))[0];
+// The package the next release would publish: packages/typeset-v4 with the
+// dist under test (the candidate by default), staged as release-cut does.
+const staged = await stagePackage({ out: 'output/packages/stage' });
+const packed = /** @type {NonNullable<typeof staged.packed>} */ (staged.packed);
 const paths = new Set(packed.files.map(file => file.path));
 for (const file of ['bin/audit.mjs', 'README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'dist/styles.css', 'dist/manifest.json']) assert.ok(paths.has(file), 'missing package file ' + file);
 assert.ok([...paths].every(path => !/^(?:output|src|node_modules|\.env)/.test(path)));
@@ -25,9 +29,9 @@ const verificationToken = randomUUID();
 await mkdir(join(consumer, 'public'), { recursive: true });
 await writeFile(join(consumer, 'public/typeset-artifact.json'), JSON.stringify({ ...identity, verificationToken }));
 await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'typeset-packed-consumer', private: true, type: 'module', scripts: { dev: 'next dev', build: 'next build --webpack', start: 'next start' } }));
-await run('npm', ['install', '--offline', '--ignore-scripts', '--no-fund', '--no-audit', resolve('output/packages', packed.filename)], consumer);
+await run('npm', ['install', '--offline', '--ignore-scripts', '--no-fund', '--no-audit', /** @type {string} */ (staged.tarball)], consumer);
 await run('node', ['smoke.mjs'], consumer);
-assert.equal(await readFile(join(consumer, 'node_modules/typeset.us/dist/manifest.json'), 'utf8'), await readFile('packages/typeset-v4/dist/manifest.json', 'utf8'), 'installed artifacts differ from current release');
+assert.equal(await readFile(join(consumer, 'node_modules/typeset.us/dist/manifest.json'), 'utf8'), await readFile(join(staged.dir, 'dist/manifest.json'), 'utf8'), 'installed artifacts differ from the staged package');
 const cliHelp = await run('node', ['node_modules/typeset.us/bin/audit.mjs', '--help'], consumer, true);
 assert.ok(cliHelp.includes('Read-only by default'));
 const installed = JSON.parse(await readFile(join(consumer, 'package-lock.json'), 'utf8'));
@@ -36,7 +40,7 @@ await run('npm', ['install', '--ignore-scripts', '--no-fund', '--no-audit', '--s
 await run('node', ['node_modules/typescript/bin/tsc', '--noEmit', '--strict', '--target', 'es2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--jsx', 'react-jsx', '--lib', 'es2022,dom,dom.iterable', 'core.mts', 'core.cts', 'react.tsx'], consumer);
 await run('node', ['node_modules/typescript/bin/tsc', '--noEmit', '--strict', '--target', 'es2022', '--module', 'esnext', '--moduleResolution', 'node', '--jsx', 'react-jsx', '--lib', 'es2022,dom,dom.iterable', 'react.tsx'], consumer);
 await run('node', ['node_modules/next/dist/bin/next', 'build', '--webpack'], consumer);
-const global = await readFile('packages/typeset-v4/dist/typeset.global.js');
-const report = { ...identity, verificationToken, packed, consumer, freshDependencyInstall: true, next: '16.1.6', react: '19.2.3', node: process.version, globalBytes: { raw: global.length, gzip: gzipSync(global).length, brotli: brotliCompressSync(global).length }, passed: ['packed core install without optional peers', 'ESM/CJS/global initialization', 'CLI help without Playwright', 'strict ESM/CJS/React consumer types', 'legacy moduleResolution React types', 'Next production build'] };
+const global = await readFile(join(staged.dir, 'dist/typeset.global.js'));
+const report = { ...identity, verificationToken, dist: artifacts.dist, packed, consumer, freshDependencyInstall: true, next: '16.1.6', react: '19.2.3', node: process.version, globalBytes: { raw: global.length, gzip: gzipSync(global).length, brotli: brotliCompressSync(global).length }, passed: ['packed core install without optional peers', 'ESM/CJS/global initialization', 'CLI help without Playwright', 'strict ESM/CJS/React consumer types', 'legacy moduleResolution React types', 'Next production build'] };
 await writeFile('output/package-verification.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ consumer, passed: report.passed, globalBytes: report.globalBytes }, null, 2));

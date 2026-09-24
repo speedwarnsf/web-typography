@@ -21,5 +21,6 @@ export const SUITES = [
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
   { name: 'verify-cli', report: 'output/cli-verification.json' },
+  { name: 'verify-package-contents', report: 'output/package-contents.json', note: 'the package the next release would publish' },
   { name: 'verify-budgets', report: 'output/budget-verification.json', note: 'gzip size budgets (runtime budgets: --runtime, nightly)' },
 ];

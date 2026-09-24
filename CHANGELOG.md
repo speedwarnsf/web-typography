@@ -21,6 +21,21 @@ Hashes for every published version live in
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
 
+### Installation and packaging
+
+- The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no
+  longer a peer. `npm install typeset.us` no longer fails with ERESOLVE beside
+  React 18, React 19.0/19.1 or an older pinned Playwright, and no longer
+  upgrades `react` alone in apps locked to React 19.0 or 19.1 (which left
+  `react-dom` behind and threw "Incompatible React versions"). The
+  `typeset-audit` CLI still imports Playwright on demand and says how to
+  install it. `TypesetText` uses a layout effect only in the browser, so React
+  18 server rendering no longer warns. Both adapters declare `ReactElement`
+  return types, so the published `.d.ts` compiles against @types/react 18.3
+  and 19.0 with `skipLibCheck: false`. Tested by
+  `scripts/v4/verify-react-matrix.mjs` over React 18.2.0, 18.3.1, 19.0.8,
+  19.1.9, 19.2.8 and 19.3.0 in Chromium, WebKit and Firefox.
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff

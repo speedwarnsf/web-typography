@@ -1,7 +1,7 @@
 'use client';
 
-import { createElement, useLayoutEffect, useRef, useState } from 'react';
-import type { HTMLAttributes } from 'react';
+import { createElement, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { HTMLAttributes, ReactElement } from 'react';
 import { mount, restore, typeset } from './typeset.next';
 import type { Mode, Options } from './typeset.next';
 export { TypesetRichText } from './typeset-rich-react';
@@ -22,23 +22,27 @@ export interface TypesetTextProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   contour?: Options['contour'];
 }
 
+// Layout effects do nothing during server rendering, and React 18 warns when
+// one is scheduled there. On the server the effect never runs either way.
+const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
+
 /**
  * React owns the semantic host and its attributes; this adapter owns only
  * its text subtree. The stable initial child also supplies readable SSR.
  * Inline interactive children belong outside this plain-text adapter.
  */
-export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, ...attributes }: TypesetTextProps) {
+export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, ...attributes }: TypesetTextProps): ReactElement {
   const ref = useRef<HTMLElement>(null);
   const [initialText] = useState(text);
   const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
   options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const controller = mount(element, '[data-typeset-react]', options.current);
     return () => controller.disconnect();
   }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     const element = ref.current;
     if (element) typeset(element, options.current);
     return () => { if (element) restore(element); };

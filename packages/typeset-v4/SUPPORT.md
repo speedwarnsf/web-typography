@@ -7,8 +7,12 @@ are not certification for every device, browser, font, or sentence.
   Spanish. Untagged Latin uses neutral preferences.
 - Ordinary inline links, bold, italics and supported semantic spans. Author
   elements are not cloned/reparented by the imperative rich renderer.
-- React 19.2.3 is the local target. React 18 is not declared supported. Next
-  acceptance requires a real packed consumer build with the version recorded.
+- React 18.2 and later, and every React 19 minor (peer `^18.2.0 || ^19.0.0`).
+  `scripts/v4/verify-react-matrix.mjs` installs the packed package beside
+  18.2.0, 18.3.1, 19.0.8, 19.1.9, 19.2.8 and 19.3.0, then server-renders,
+  hydrates and composes both adapters in Chromium, WebKit and Firefox, and
+  type-checks against @types/react 18.3, 19.0 and latest. Next acceptance
+  requires a real packed consumer build with the version recorded.
 - Chromium, WebKit and Firefox through Playwright. Reports record versions;
   no untested historical minimum is inferred.
 - Intl.Segmenter, ResizeObserver, MutationObserver, document.fonts and CSS

@@ -57,7 +57,15 @@ jobs:
         run: npm run build
 
       - name: Fresh packed npm consumer and TypeScript contracts
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+          TYPESET_CANDIDATE: ${{ github.workspace }}/output/candidate
         run: node scripts/v4/verify-package.mjs
+
+      - name: React 18.2 to latest, Playwright and @types/react installs beside the packed package
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-react-matrix.mjs
 
       - name: Packed React consumer in three browsers
         run: node scripts/v4/verify-consumer-browser.mjs

@@ -24,7 +24,7 @@
   "sideEffects": ["./dist/styles.css", "./dist/typeset.global.js", "./dist/go.js"],
   "engines": { "node": ">=22" },
   "publishConfig": { "tag": "latest", "access": "public" },
-  "peerDependencies": { "react": "^19.2.3", "playwright": "^1.58.2" },
-  "peerDependenciesMeta": { "react": { "optional": true }, "playwright": { "optional": true } },
+  "peerDependencies": { "react": "^18.2.0 || ^19.0.0" },
+  "peerDependenciesMeta": { "react": { "optional": true } },
   "license": "MIT"
 }
