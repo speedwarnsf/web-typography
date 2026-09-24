@@ -3,7 +3,7 @@
 import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from 'react';
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
 import { BREAK_ATTRIBUTE, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
-import { measureLayout } from './layout-metrics';
+import { contentWidth, measureLayout } from './layout-metrics';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
 import { smartQuotes } from './smart-quotes';
@@ -15,7 +15,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
-import { armFonts, rendered, subscribe } from './lifecycle';
+import { armFonts, installLifecycleStyles, printing, rendered, subscribe } from './lifecycle';
 
 export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 'dangerouslySetInnerHTML'> {
   children: ReactNode;
@@ -100,7 +100,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       for (const stop of stops) {
         const local = stop - start;
         append(text.slice(cursor, local), start + cursor);
-        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true }), stop, true);
+        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true, style: breakStyle }), stop, true);
         if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
         if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
         cursor = local;
@@ -113,6 +113,9 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
   });
   return visit(children);
 }
+
+// The same switch as the DOM renderer's break: print and stale mode set it to none.
+const breakStyle = { display: 'var(--ts-break-display, inline)' };
 
 function supportedTree(children: ReactNode): boolean {
   let supported = true;
@@ -134,6 +137,9 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   private releaseCopy?: () => void;
   private unsubscribe?: () => void;
   private frame = 0;
+  private staleFrame = 0;
+  private settle?: ReturnType<typeof setTimeout>;
+  private widths = new WeakMap<Element, number>();
   private mounted = false;
 
   static getDerivedStateFromProps(props: TypesetRichTextProps, state: State): Partial<State> | null {
@@ -143,12 +149,12 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.mounted = true;
     const el = this.host.current!;
     this.observer = new MutationObserver(this.schedule);
-    this.resize = new ResizeObserver(this.schedule);
+    this.resize = new ResizeObserver(this.resized);
+    installLifecycleStyles(el.ownerDocument);
     this.bindHost();
     // Fonts a stylesheet loads late, including in WebKit, which fires no
     // loadingdone event for them.
-    this.unsubscribe = subscribe(el.ownerDocument, { fonts: this.schedule, metrics: this.metricsEnded, styles: this.stylesChanged });
-    el.ownerDocument.defaultView?.addEventListener('resize', this.schedule);
+    this.unsubscribe = subscribe(el.ownerDocument, { fonts: this.schedule, metrics: this.metricsEnded, styles: this.stylesChanged, resize: this.schedule });
     el.ownerDocument.fonts.ready.then(this.schedule);
     this.recompose();
   }
@@ -158,6 +164,8 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   }
   componentDidUpdate(previous: TypesetRichTextProps, _state: State, restoreSelection: (() => void) | null): void {
     restoreSelection?.();
+    // A new plan renders for the current width: show it.
+    if (this.settle === undefined) this.host.current?.removeAttribute('data-ts-stale');
     if (previous.as !== this.props.as) this.bindHost();
     if (previous !== this.props) this.recompose();
     else {
@@ -205,10 +213,10 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   }
   componentWillUnmount(): void {
     this.mounted = false;
-    cancelAnimationFrame(this.frame);
+    cancelAnimationFrame(this.frame); cancelAnimationFrame(this.staleFrame);
+    if (this.settle !== undefined) clearTimeout(this.settle);
     this.observer?.disconnect(); this.resize?.disconnect();
     this.unsubscribe?.();
-    this.host.current?.ownerDocument.defaultView?.removeEventListener('resize', this.schedule);
     this.releaseCopy?.();
   }
   private observe = () => {
@@ -233,6 +241,27 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     const el = this.host.current, plan = this.state.plan;
     if (el && (!plan?.styleSignature || richFingerprint(el) !== plan.styleSignature)) this.schedule();
   };
+  /** Width changes (a sidebar drag, a rotation) replan once the size has held
+   * for 100 ms, not every frame. Meanwhile, if the host is narrower than its
+   * widest composed line, it shows native wrapping ([data-ts-stale]); that is
+   * written in the next animation frame, since a ResizeObserver callback must
+   * not change sizes. Other size changes (fonts, reveals) replan next frame. */
+  private resized = (entries: ResizeObserverEntry[]) => {
+    let width = false;
+    for (const entry of entries) {
+      const previous = this.widths.get(entry.target), next = entry.contentRect.width;
+      this.widths.set(entry.target, next);
+      if (previous && next && Math.abs(previous - next) > .01) width = true;
+    }
+    if (!width || !this.state.plan?.breaks.length) { this.schedule(); return; }
+    if (this.settle !== undefined) clearTimeout(this.settle);
+    this.settle = setTimeout(() => { this.settle = undefined; this.recompose(); }, 100);
+    if (!this.staleFrame) this.staleFrame = requestAnimationFrame(() => {
+      this.staleFrame = 0;
+      const el = this.host.current, plan = this.state.plan;
+      if (el && plan?.widths.length && contentWidth(el) < Math.max(...plan.widths) - .5) el.setAttribute('data-ts-stale', '');
+    });
+  };
   private schedule = () => {
     if (!this.mounted || this.frame) return;
     this.frame = requestAnimationFrame(() => { this.frame = 0; this.recompose(); });
@@ -241,12 +270,12 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     if (!this.mounted || !this.host.current) return;
     // Hidden: keep the current plan. Shown again at the same width, the text
     // paints composed instead of native first and re-broken a frame later.
-    if (this.state.plan && !rendered(this.host.current)) return;
+    if (this.state.plan && (!rendered(this.host.current) || printing(this.host.current.ownerDocument))) return;
     this.observer?.disconnect();
     const plan: RenderPlan = planRichText(this.host.current, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
-    else this.observe();
+    else { this.host.current.removeAttribute('data-ts-stale'); this.observe(); }
     armFonts(this.host.current.ownerDocument);
   };
   render(): ReactElement {

@@ -15,7 +15,7 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, rendered, subscribe } from './lifecycle';
+import { armFonts, installLifecycleStyles, printing, rendered, subscribe } from './lifecycle';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -66,6 +66,9 @@ interface State {
   layout: string;
   /** optionsKey() of the options it was composed with. */
   options: string;
+  /** Right edge of the widest composed line from the content box's left edge;
+   * 0 when nothing is composed. Narrower than this, the forced breaks wrap twice. */
+  widest: number;
   result: Result;
   rich?: RichOutput;
   hadStyle: boolean;
@@ -190,6 +193,7 @@ export function restore(element: HTMLElement): void {
   delete element.dataset.tsHanging;
   delete element.dataset.tsSpacing;
   delete element.dataset.tsTracking;
+  element.removeAttribute('data-ts-stale');
 }
 
 /** Exact DOM measurements inherit font features, axes, tracking and transforms. */
@@ -298,7 +302,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const visible = rendered(element);
   if (prior && !visible && prior.options === optionsKey(options) && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
   const sig = signature(element, options);
-  if (prior?.signature === sig && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
+  if (prior?.signature === sig && ownsOutput(element, prior)) {
+    // Back at the geometry it was composed for (a resize that returned).
+    element.removeAttribute('data-ts-stale');
+    return { ...prior.result, changed: false, durationMs: performance.now() - started };
+  }
+  element.removeAttribute('data-ts-stale');
   if (prior) {
     const restoreSelection = selectionBookmark(element);
     const unchanged = ownsOutput(element, prior);
@@ -379,19 +388,27 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
         }
       }
     }
+    const after = visible ? measureLayout(element) : emptyMetrics();
+    let widest = 0;
+    if (outcome.startsWith('composed') && after.lines.length) {
+      const style = getComputedStyle(element), box = element.getBoundingClientRect();
+      const left = box.left + parseFloat(style.borderLeftWidth || '0') + parseFloat(style.paddingLeft || '0');
+      widest = Math.max(...after.lines.map(line => line.right - left));
+      installLifecycleStyles(element.ownerDocument);
+    }
     element.dataset.tsOutcome = outcome;
     element.dataset.typesetDone = '1';
     element.dataset.tsQuotes = features.quotes;
     element.dataset.tsHanging = features.hanging;
     element.dataset.tsSpacing = features.spacing;
     element.dataset.tsTracking = features.tracking;
-    const result: Result = { outcome, mode, before, after: visible ? measureLayout(element) : emptyMetrics(), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
+    const result: Result = { outcome, mode, before, after, changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
     const layout = layoutKey(element);
     states.set(element, {
       nodes, outputNodes: Array.from(element.childNodes), source, output: element.textContent || '', markup: element.innerHTML, styles,
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
       // Never cache a decision made without measurement: the next call decides again.
-      signature: outcome === 'unmeasurable' ? '' : signature(element, options, layout), layout, options: optionsKey(options), result,
+      signature: outcome === 'unmeasurable' ? '' : signature(element, options, layout), layout, options: optionsKey(options), widest, result,
       rich, hadStyle, quotes, optical, spacing, tracking,
     });
     return result;
@@ -543,7 +560,7 @@ export function auditReport(selector = defaults): AuditReport {
     if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
     // A composition renders one line per generated line. A font, spacing or
     // size change since then adds native wraps: alternating long and short lines.
-    if (outcome === 'composed:rich' || outcome === 'composed') {
+    if ((outcome === 'composed:rich' || outcome === 'composed') && !element.hasAttribute('data-ts-stale')) {
       const expected = outcome === 'composed' ? element.querySelectorAll(':scope > .ts-line').length : element.querySelectorAll('br[data-ts-break]').length + 1;
       if (layout.lines.length !== expected) add('stale-layout', 'error', layout.lines.length + ' rendered lines where the composition has ' + expected + '; text metrics changed after it was composed');
     }
@@ -607,6 +624,7 @@ export interface Controller {
 // KEY rechecks the computed layout key and composes only if it changed;
 // VERIFY also checks that the rendered lines still match the composition.
 const CONTENT = 1, KEY = 2, VERIFY = 4;
+const RESIZE_SETTLE_MS = 100;
 
 /** One lifecycle owner per mount. Observers are disconnected during our writes. */
 export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
@@ -622,6 +640,12 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   const nearby = new Set<HTMLElement>();
   // Owned blocks last seen without boxes. Their compositions are kept.
   const hidden = new Set<HTMLElement>();
+  // Owned blocks whose width is changing. They are recomposed once, after the
+  // size has held for RESIZE_SETTLE_MS; meanwhile any that would wrap twice
+  // show their native wrapping ([data-ts-stale]).
+  const resizing = new Set<HTMLElement>();
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  let guardFrame = 0;
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -713,6 +737,51 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of elements) { pending.delete(el); process(el, KEY); }
     observe();
   };
+  /** Before a frame's layout only (a mutation callback, the window's resize
+   * event, an animation frame): blocks now narrower than their widest composed
+   * line would paint alternating long and short lines, so they show native
+   * wrapping until they are recomposed. All reads come before any write. */
+  const guard = (elements: Iterable<HTMLElement>) => {
+    if (printing(doc)) return;
+    const stale: HTMLElement[] = [];
+    for (const el of elements) {
+      const widest = states.get(el)?.widest;
+      if (!widest || el.hasAttribute('data-ts-stale')) continue;
+      const width = boxOf(el).w;
+      if (width > 0 && width < widest - .5) stale.push(el);
+    }
+    for (const el of stale) el.setAttribute('data-ts-stale', '');
+  };
+  const settle = () => {
+    settleTimer = undefined;
+    if (stopped) return;
+    for (const el of resizing) if (owned.has(el)) enqueue(el, KEY);
+    resizing.clear();
+    schedule();
+  };
+  /** A block's width is changing: recompose once it settles, not every frame. */
+  const resizeStarted = (el: HTMLElement) => {
+    resizing.add(el);
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+    settleTimer = setTimeout(settle, RESIZE_SETTLE_MS);
+    // Widths the observers cannot see change ahead of layout (a stylesheet
+    // rule, a sibling outside the root): check them before each frame.
+    if (!guardFrame && view) guardFrame = view.requestAnimationFrame(function frame() {
+      guardFrame = 0;
+      if (stopped || !resizing.size) return;
+      guard(resizing);
+      guardFrame = view.requestAnimationFrame(frame);
+    });
+  };
+  /** Owned blocks whose content width differs from the last one observed. */
+  const widthChanged = (elements: Iterable<HTMLElement>) => {
+    const changed: HTMLElement[] = [];
+    for (const el of elements) {
+      const last = sizes.get(el), width = boxOf(el).w;
+      if (last && width && Math.abs(last.w - width) > .01) changed.push(el);
+    }
+    return changed;
+  };
   const schedule = () => {
     if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
     if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(flush, { timeout: 200 });
@@ -727,11 +796,15 @@ export function mount(root: ParentNode = document, selector = defaults, options:
         // computes to instead of recomposing it: most changes (a menu class,
         // a transform, a scroll-linked variable) leave every line unchanged.
         const affected = ownedWithin(target);
-        for (const el of affected) enqueue(el, KEY);
+        // A width this change sets (a sidebar drag, a container animation):
+        // guard the frame about to paint, and recompose once it settles.
+        const resized = fontsReady && affected.length ? widthChanged(affected) : [];
+        if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
+        for (const el of affected) if (!resizing.has(el)) enqueue(el, KEY);
         // A tab, dialog or card this change just showed: text that could not be
         // composed while hidden, or was hidden at another width, composes
         // before the reveal paints. A retained composition needs nothing.
-        if (fontsReady && hidden.size) {
+        if (fontsReady && hidden.size && !printing(doc)) {
           const shown = affected.filter(el => hidden.has(el) && rendered(el) && onScreen(el));
           if (shown.length) composeNow(shown);
         }
@@ -782,7 +855,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
         for (const el of watched.get(entry.target) || []) {
           // Revealed: a retained composition is already painting; verify it.
           if (!previous.w || hidden.has(el)) { hidden.delete(el); enqueue(el, VERIFY); }
-          else enqueue(el, KEY);
+          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
         // Same width, new height: a font, a text-spacing override, a browser
@@ -832,6 +905,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!(job & CONTENT) && state && owned.has(el) && !rendered(el)) { hidden.add(el); return; }
     hidden.delete(el);
     if (!(job & CONTENT) && state?.signature && owned.has(el) && layoutKey(el) === state.layout) {
+      // Back at the width it was composed for: show the composition again.
+      if (el.hasAttribute('data-ts-stale')) { el.removeAttribute('data-ts-stale'); job |= VERIFY; }
       // Nothing that decides layout changed. The rendered lines are the safety
       // net for anything the key cannot see.
       if (!(job & VERIFY) || layoutIntact(el)) return;
@@ -847,7 +922,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   function flush(deadline?: IdleDeadline) {
     timer = undefined;
     idle = undefined;
-    if (stopped) return;
+    // Print shows native wrapping; the work waits until printing ends.
+    if (stopped || printing(doc)) return;
     observer.disconnect();
     const start = performance.now();
     stats.passes++;
@@ -859,6 +935,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       const job = pending.get(el);
       if (job === undefined) continue;
       pending.delete(el);
+      // Superseded: a width still changing is recomposed once it settles.
+      if (resizing.has(el) && !(job & CONTENT)) continue;
       nearby.delete(el); viewport?.unobserve(el);
       process(el, job);
       if (performance.now() - start >= 8 || (deadline && deadline.timeRemaining() <= 1)) break;
@@ -876,10 +954,18 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of owned) enqueue(el, KEY | VERIFY);
     schedule();
   };
-  // A viewport resize can change vw/vh-based sizes without resizing a box.
-  // Owned text gets a key recheck, which composes nothing unless it changed.
+  // The window's resize event runs before the frame's layout: guard what is
+  // on screen, and let the settle recompose what changed width. A viewport
+  // resize can also change vw/vh sizes without resizing a box; those blocks
+  // get a key recheck, which composes nothing unless it changed.
   const resized = () => {
-    for (const el of owned) enqueue(el, KEY);
+    if (stopped || !fontsReady) return;
+    const visible: HTMLElement[] = [];
+    for (const el of owned) if (states.get(el)?.widest && onScreen(el)) visible.push(el);
+    const changed = widthChanged(visible);
+    guard(changed);
+    for (const el of changed) resizeStarted(el);
+    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY);
     schedule();
   };
   const fontsChanged = () => {
@@ -914,8 +1000,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged });
-  view?.addEventListener('resize', resized);
+  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized });
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
@@ -924,9 +1009,10 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (idle !== undefined) cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
       unsubscribe();
-      view?.removeEventListener('resize', resized);
+      if (settleTimer !== undefined) clearTimeout(settleTimer);
+      if (guardFrame) view?.cancelAnimationFrame(guardFrame);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear(); nearby.clear(); hidden.clear();
+      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear();
       watched.clear(); parents.clear();
       for (const el of blocked.keys()) stopWaiting(el);
       for (const el of claimed) release(el);

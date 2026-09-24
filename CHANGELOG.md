@@ -53,11 +53,29 @@ Hashes for every published version live in
   change reveals at a new width is composed before that frame paints. Text
   in a skipped `content-visibility:auto` section composes when it comes into
   range; WebKit had cached a failed measurement there.
+- No double-wrapped frames during resizes or in print. A block whose width
+  changes is recomposed once the size has held for 100 ms, not every frame;
+  meanwhile, if it is narrower than its widest composed line, it shows native
+  wrapping (`data-ts-stale`). The switch is written before the frame's layout
+  (in the mutation callback for a script-driven width, in the window's resize
+  event, or in the next animation frame for changes no observer sees). Print
+  shows native wrapping and pauses composition. `--ts-break-display` and
+  `data-ts-stale` are supported hooks; see SUPPORT.md.
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each default-output change in 4.3 is listed here with its golden-diff count:
+the V4 corpus (85 paragraphs, every fourth with a link and emphasis) composed
+at 320, 440 and 600 px by 4.2.0 and by 4.3 in Chromium, WebKit and Firefox.
+
+- Generated `<br>` elements are written `display: var(--ts-break-display,
+  inline) !important` instead of `display: inline !important`, and the
+  `TypesetRichText` break carries `display: var(--ts-break-display, inline)`.
+  On screen nothing moves: 251, 249 and 251 of 255 blocks change markup in
+  Chromium, WebKit and Firefox, 0 differ once the break style is normalized,
+  and 0 change outcome or rendered lines. In print, breaks are now `none` and
+  text wraps natively at the paper's width, where 4.2.0 printed the screen
+  breaks and alternated long and short lines.
 
 ### Development
 

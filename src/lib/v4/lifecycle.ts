@@ -4,6 +4,8 @@
 export interface LifecycleClient {
   /** A font face finished loading, or the font set settled. */
   fonts?(): void;
+  /** The window resized, or printing ended. Runs before the frame's layout. */
+  resize?(): void;
   /** A transition or animation of text metrics ended on `target`. */
   metrics?(target: Element): void;
   /** A stylesheet was added, removed, edited or switched. */
@@ -18,6 +20,12 @@ const metric = /^(?:font|letter-spacing|word-spacing|line-height|text-transform|
 
 function notify(hub: Hub, call: (client: LifecycleClient) => void): void {
   for (const client of [...hub.clients]) call(client);
+}
+
+/** Printing (or print emulation) lays text out at the paper's width, where
+ * print CSS shows native wrapping; composing for it is wasted work. */
+export function printing(doc: Document): boolean {
+  return !!doc.defaultView?.matchMedia?.('print').matches;
 }
 
 /** Whether an element's text is laid out now: it has boxes and is not in a
@@ -46,7 +54,9 @@ export function armFonts(doc: Document): void {
 }
 
 function start(doc: Document): Hub {
+  const view = doc.defaultView;
   const hub: Hub = { clients: new Set(), faces: new WeakSet(), ready: false, stop: () => {} };
+  const resize = () => notify(hub, client => client.resize?.());
   const fonts = () => { notify(hub, client => client.fonts?.()); armFonts(doc); };
   const loading = () => armFonts(doc);
   const ended = (event: Event) => {
@@ -67,7 +77,13 @@ function start(doc: Document): Hub {
   doc.addEventListener('transitionend', ended, true);
   doc.addEventListener('animationend', ended, true);
   doc.addEventListener('contentvisibilityautostatechange', visibility, true);
+  view?.addEventListener('resize', resize);
+  const print = view?.matchMedia?.('print');
+  const printed = () => { if (!print?.matches) resize(); };
+  print?.addEventListener?.('change', printed);
   hub.stop = () => {
+    view?.removeEventListener('resize', resize);
+    print?.removeEventListener?.('change', printed);
     observer.disconnect();
     doc.fonts.removeEventListener('loadingdone', fonts);
     doc.fonts.removeEventListener('loading', loading);
@@ -88,4 +104,33 @@ export function subscribe(doc: Document, client: LifecycleClient): () => void {
     current.clients.delete(client);
     if (!current.clients.size && hubs.get(doc) === current) { current.stop(); hubs.delete(doc); }
   };
+}
+
+/** Hooks for authors and for the engine's own transient states:
+ * --ts-break-display drives every generated break, [data-ts-stale] shows a
+ * block's native wrapping while its composition waits to be redone, and print
+ * wraps natively at the paper's width. dist/styles.css ships the same rules
+ * for engines without constructable stylesheets. */
+export const LIFECYCLE_CSS = '[data-ts-stale]{--ts-break-display:none}'
+  + '[data-ts-stale] :is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}'
+  + '[data-ts-stale] [data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}'
+  + '[data-ts-stale]>.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}'
+  + '@media print{:root{--ts-break-display:none}'
+  + ':is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}'
+  + '[data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}'
+  + '.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}}';
+
+const styled = new WeakSet<Document>();
+/** One constructable stylesheet per document: no <style> element, so a strict
+ * style-src policy is not involved. Skipped where unsupported. */
+export function installLifecycleStyles(doc: Document): void {
+  if (styled.has(doc)) return;
+  styled.add(doc);
+  try {
+    const Sheet = (doc.defaultView as (Window & typeof globalThis) | null)?.CSSStyleSheet;
+    if (!Sheet || !('adoptedStyleSheets' in doc)) return;
+    const sheet = new Sheet();
+    sheet.replaceSync(LIFECYCLE_CSS);
+    doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+  } catch { /* dist/styles.css carries the same rules. */ }
 }

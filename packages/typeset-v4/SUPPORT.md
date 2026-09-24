@@ -80,6 +80,17 @@ native overflow is never extra room for a newly composed line. The 0.5px
 layout rounding allowance remains; fallback is reported instead of presenting
 unprocessed native text as successful composition.
 
+Generated line breaks are displayed through the custom property
+`--ts-break-display` (default `inline`). In print it is `none`, so printed text
+wraps natively at the paper's width; set `--ts-break-display: inline` on a
+composed element in print CSS to keep its composition. While a block's width is
+changing and it is narrower than its widest composed line, the engine marks it
+`data-ts-stale` and shows native wrapping until the size has held for 100 ms
+and it is recomposed. Both hooks are supported; the engine installs their rules
+as a constructable stylesheet, and `dist/styles.css` carries them for engines
+without one. Hidden text (display:none, the hidden attribute, a closed dialog,
+content-visibility) keeps its composition and is not measured until shown.
+
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are
