@@ -21,6 +21,19 @@ Hashes for every published version live in
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
 
+### Lifecycle
+
+- `mount()` works when a parent page mounts into a same-origin iframe
+  document: inserted paragraphs, text edits, resizes and fonts inside the
+  iframe are picked up (nodes from another realm failed `instanceof` checks).
+- Ancestor class and style changes no longer recompose owned text. The
+  controller rechecks a layout key built from computed values (fonts, metrics,
+  width, effective scale and zoom) and composes only when it changed: 60
+  frames of an ancestor transform animation, a body class with no styles or a
+  scroll-linked custom property on `<html>` now cause 0 compositions (4.2.0:
+  92 to 174 over 40 paragraphs). Removing nodes walks the removed subtree
+  instead of every claimed element.
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff

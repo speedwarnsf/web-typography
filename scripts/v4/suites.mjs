@@ -18,6 +18,7 @@ export const SUITES = [
   { name: 'verify-controller', report: 'output/controller-regression.json' },
   { name: 'verify-mount-ownership', report: 'output/mount-ownership-regression.json' },
   { name: 'verify-iframe-mount', report: 'output/iframe-mount.json', note: 'mount() into a same-origin iframe (C12)' },
+  { name: 'verify-recompose-storms', report: 'output/recompose-storms.json', note: 'ancestor mutations recheck a layout key, not recompose (P3)' },
   { name: 'verify-tracking-clipping', report: 'output/tracking-clipping.json' },
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
