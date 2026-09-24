@@ -9,7 +9,9 @@ const nameHeads = new Set(['street', 'avenue', 'boulevard', 'road', 'lane', 'dri
 const capitalized = (text: string) => /^[('"\u2018\u201c]*\p{Lu}[\p{L}'\u2019-]*[.,;:!?!)"'\u201d\u2019]*$/u.test(text);
 const word = (text: string) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, '');
 const ends = (text: string) => /[.,;:!?)]["'”’]*$/u.test(text);
-const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+let sentenceSegmenter: Intl.Segmenter | undefined;
+/** English sentence boundaries. Created on first use and shared. */
+export const sentences = (): Intl.Segmenter => sentenceSegmenter ??= new Intl.Segmenter('en', { granularity: 'sentence' });
 
 /** A colon can introduce a thought without introducing a new sentence. */
 export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text);
@@ -23,7 +25,7 @@ export function strandedOpener(line: string): boolean {
 export function retainSentenceLayout(source: string, before: LayoutMetrics, chosenEnds: readonly number[]): boolean {
   if (before.overflow > .5 || before.lines.length < 2 || before.lines.some(l => l.words < 2)
     || before.lines.some((l, i) => l.width / before.width < (i === before.lines.length - 1 ? .35 : .65))) return false;
-  const boundaries = Array.from(sentences.segment(source), s => s.index + s.segment.trimEnd().length);
+  const boundaries = Array.from(sentences().segment(source), s => s.index + s.segment.trimEnd().length);
   if (boundaries.length < 2) return false;
   const lineEnds = new Set(before.lines.map(l => l.sourceEnd));
   return boundaries.every(end => lineEnds.has(end)) && boundaries.some(end => !chosenEnds.includes(end));

@@ -298,6 +298,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const before = measureLayout(element);
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
+  // The composition's style fingerprint as the last verification confirmed
+  // it, so a finish pass reads it again only after a rollback.
+  let fingerprinted: string | undefined;
+  // Natural word spaces measured for the contour serve the spacing finish.
+  // Only within this call: a later call may see different fonts.
+  const spaceWidths = new Map<string, number>();
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
     let optical: RichOutput | undefined;
     let spacing: RichOutput | undefined;
@@ -307,9 +313,9 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       spacing: options.spacing === false ? 'off' : mode !== 'body' ? 'native:spacing-mode' : 'native:spacing-uncomposed',
       tracking: options.tracking === false || options.spacing === false ? 'off' : mode !== 'body' ? 'native:tracking-mode' : 'native:tracking-uncomposed' };
     if (options.spacing !== false && mode === 'body' && outcome === 'composed:rich') {
-      const plan = planSpacingFinish(element, measureLayout(element));
+      const plan = planSpacingFinish(element, measureLayout(element), spaceWidths);
       targets = finishTargets(plan.before.lines.map(line => line.width), plan.before.width);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
         spacing = renderRichText(element, [], [], plan.adjustments);
@@ -317,12 +323,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
           spacing.cleanup(); spacing = undefined; features.spacing = 'native:spacing-verification';
         }
       }
+      fingerprinted = spacing || !plan.adjustments.length ? fingerprint : undefined;
     } else if (options.spacing !== false && mode === 'body' && outcome === 'composed') {
       features.spacing = Array.from(element.querySelectorAll<HTMLElement>('.ts-line')).some(line => parseFloat(line.style.wordSpacing)) ? 'applied' : 'unchanged';
     }
     if (targets && options.tracking !== false && ['applied', 'unchanged'].includes(features.spacing)) {
       const plan = planTrackingFinish(element, measureLayout(element), targets);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       features.tracking = plan.outcome;
       if (plan.runs.length) {
         tracking = renderTracking(element, plan);
@@ -330,10 +337,11 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
           tracking.cleanup(); tracking = undefined; features.tracking = 'native:tracking-verification';
         }
       }
+      fingerprinted = tracking || !plan.runs.length ? fingerprint : undefined;
     }
     if (options.opticalHanging && (outcome === 'composed:rich' || outcome === 'native:fits')) {
       const layout = measureLayout(element);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       const plan = planOpticalHanging(element, layout);
       features.hanging = plan.outcome;
       if (plan.hangs.length) {
@@ -379,7 +387,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (cs.overflow !== 'visible' && cs.textOverflow === 'ellipsis') return finish('native:clamped');
   if (cs.display === 'inline') return finish('native:inline');
   if (options.lineBreaks === 'unicode' || options.opticalHanging || options.smartQuotes || element.children.length || nodes.some(node => node.nodeType !== Node.TEXT_NODE)) {
-    const plan = planRichText(element, { ...options, mode }, before);
+    const plan = planRichText(element, { ...options, mode }, before, spaceWidths);
     search = plan.search;
     if (plan.outcome !== 'composed:rich') return finish(plan.outcome, plan.constraint);
     rich = renderRichText(element, plan.breaks);
@@ -389,6 +397,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       rich.cleanup(); rich = undefined;
       return finish('native:verification');
     }
+    fingerprinted = plan.styleSignature;
     return finish('composed:rich');
   }
   if (before.lines.length === 1 && before.overflow <= 0.5) return finish('native:fits');

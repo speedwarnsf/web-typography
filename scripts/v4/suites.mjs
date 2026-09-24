@@ -9,6 +9,7 @@ export const SUITES = [
   { name: 'verify-release-craft', report: 'output/release-craft.json' },
   { name: 'verify-spacing', report: 'output/spacing.json' },
   { name: 'verify-promise', report: 'output/promise.json' },
+  { name: 'verify-golden', report: 'output/golden.json', note: 'composition byte-identical to 4.2.0 outside the recorded rendering changes' },
   { name: 'verify-acceptance', report: 'output/acceptance.json' },
   { name: 'verify-native-ax', report: 'output/native-ax.json', note: 'engine accessibility trees match the source (C1)' },
   { name: 'verify-inline-code', report: 'output/inline-code-regression.json' },

@@ -21,6 +21,11 @@ export interface LayoutMetrics {
   rag: number;
 }
 
+// Segmenters hold no state between calls; one serves every measurement, and
+// it is created on first use rather than at import.
+let graphemeSegmenter: Intl.Segmenter | undefined;
+const graphemes = () => graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 export function contentWidth(element: HTMLElement): number {
   const cs = getComputedStyle(element);
   const rect = element.getBoundingClientRect();
@@ -60,7 +65,6 @@ export function measureLayout(element: HTMLElement): LayoutMetrics {
         overflow: Math.max(0, rect.right - right, left - rect.left), firstSingleton: false, lastSingleton: false, rag: 0 };
     }
   }
-  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   let node: Node | null;
   while ((node = walker.nextNode())) {
     const nodeOffset = sourceOffset;
@@ -75,7 +79,7 @@ export function measureLayout(element: HTMLElement): LayoutMetrics {
       if (rects.length > 1) {
         // A browser may split a hyphenated word. Attribute each grapheme to
         // its actual line instead of counting the entire word on both lines.
-        for (const part of segmenter.segment(match[0])) {
+        for (const part of graphemes().segment(match[0])) {
           range.setStart(node, match.index! + part.index);
           range.setEnd(node, match.index! + part.index + part.segment.length);
           // WebKit includes a zero-width caret on the previous line at a

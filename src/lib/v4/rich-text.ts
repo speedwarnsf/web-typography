@@ -120,7 +120,7 @@ function unsupported(element: HTMLElement): string | null {
 }
 
 /** Read the real styled DOM. No clone can reproduce contextual selectors reliably. */
-export function planRichText(element: HTMLElement, options: Options = {}, nativeLayout?: RichPlan['before']): RichPlan {
+export function planRichText(element: HTMLElement, options: Options = {}, nativeLayout?: RichPlan['before'], spaceWidths?: Map<string, number>): RichPlan {
   const source = element.textContent || '';
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));
@@ -254,7 +254,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
     const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
     const contourWidths = !title && options.contour === 'finished' && ['left', 'start'].includes(getComputedStyle(element).textAlign)
-      ? finishedContour(element, words, before.width) : undefined;
+      ? finishedContour(element, words, before.width, spaceWidths) : undefined;
     const onSearch = (evidence: ParagraphSearchEvidence) => { search.push(evidence); };
     let lines = title
       ? composeTitle(tokens, before.width, () => 0, { ...options, maxLines, measureRange, breakPenalty,

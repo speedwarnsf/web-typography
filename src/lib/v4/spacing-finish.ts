@@ -37,7 +37,7 @@ export function naturalSpace(element: HTMLElement, style: CSSStyleDeclaration, t
 
 /** Finish existing lines only. The V3 neighbor/median policy is unchanged;
  * each rich-text space gets a bound measured in its own styled context. */
-export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics): SpacingPlan {
+export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, measuredSpaces = new Map<string, number>()): SpacingPlan {
   const result = (outcome: string, adjustments: SpaceAdjustment[] = []): SpacingPlan => ({ outcome, adjustments, before: layout });
   const cs = getComputedStyle(element);
   if (!['left', 'start'].includes(cs.textAlign) || cs.direction !== 'ltr' || cs.writingMode !== 'horizontal-tb') return result('native:spacing-layout');
@@ -52,7 +52,6 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics): 
   }
   const point = (at: number, end = false) => runs.find(run => end ? run.start < at && run.end >= at : run.start <= at && run.end > at);
   const range = element.ownerDocument.createRange();
-  const measuredSpaces = new Map<string, number>();
   const measured: { offset: number; naturalPx: number; available: number }[][] = [];
   for (const line of layout.lines.slice(0, -1)) {
     const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));

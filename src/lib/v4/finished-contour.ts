@@ -3,7 +3,7 @@ import { naturalSpace } from './spacing-finish';
 import { finishSpaceDeltas } from './space-policy';
 
 /** Measure once per paragraph, then rank all candidates without DOM writes. */
-export function finishedContour(element: HTMLElement, words: readonly { index: number; text: string }[], measure: number): (lines: ParagraphLine[]) => number[] {
+export function finishedContour(element: HTMLElement, words: readonly { index: number; text: string }[], measure: number, cache = new Map<string, number>()): (lines: ParagraphLine[]) => number[] {
   const source = element.textContent || '';
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const runs: { start: number; end: number; node: Text }[] = [];
@@ -12,7 +12,6 @@ export function finishedContour(element: HTMLElement, words: readonly { index: n
     const text = node as Text;
     runs.push({ start: offset, end: offset + text.length, node: text }); offset += text.length;
   }
-  const cache = new Map<string, number>();
   const spaces = Array.from(source.matchAll(/[\t\n\r \u00a0\u202f]+/gu), match => {
     const run = runs.find(run => run.start <= match.index! && run.end > match.index!);
     const parent = run?.node.parentElement;
