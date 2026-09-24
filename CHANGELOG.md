@@ -23,8 +23,24 @@ Hashes for every published version live in
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each default-output change in 4.3 is a defect fix, listed with its golden-diff
+count: cells of `scripts/v4/verify-golden.mjs` (85 corpus paragraphs at 240,
+320, 400 and 560 px in Georgia and the bundled Fraunces, per engine) whose
+outcome, finish features or markup differ from 4.2.0. Every cell outside these
+changes is byte-identical to 4.2.0 in Chromium, WebKit and Firefox.
+
+- **Justified text is left as the author set it** (`native:justify`). A
+  generated break ends its line, so every composed line took the last-line
+  alignment: `text-align: justify` became ragged right, and a `text-align-last`
+  that differs from `text-align` applied to every line, while `audit()` still
+  passed. Multi-line paragraphs whose computed `text-align` is `justify` or
+  `justify-all`, or whose `text-align-last` differs from `text-align`, are now
+  declined under every entry point (`typeset()`, `mount()`, `go.js`,
+  `TypesetText`, `TypesetRichText` and the legacy renderer). A single line
+  still reports `native:fits`. Golden diff: 336 of 336 justified cells per
+  engine (42 corpus paragraphs), 0 of the rest. `audit()` reports a new error,
+  `alignment-lost`, for a composed element whose alignment later changes to
+  one the breaks cannot keep.
 
 ### Development
 

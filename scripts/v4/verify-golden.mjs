@@ -50,7 +50,7 @@ function linked(text) {
   html[8] = '<em>' + html[8] + '</em>';
   return html.filter(Boolean).join(' ');
 }
-/** @typedef {{ id: string, variant: string, tag: string, html: string, width: number, font: string, options: Record<string, unknown> }} Cell */
+/** @typedef {{ id: string, variant: string, tag: string, html: string, width: number, font: string, options: Record<string, unknown>, style?: string }} Cell */
 /** @type {Cell[]} */
 const cells = [];
 for (const [index, text] of texts.entries()) for (const width of widths) for (const font of fonts) {
@@ -59,6 +59,7 @@ for (const [index, text] of texts.entries()) for (const width of widths) for (co
   cells.push({ id: 'rich ' + at, variant: 'rich', tag: 'p', html: linked(text), width, font, options: {} });
   cells.push({ id: 'legacy ' + at, variant: 'legacy', tag: 'p', html: escape(text), width, font, options: { lineBreaks: 'legacy', contour: 'natural' } });
   if (index % 2 === 0) cells.push({ id: 'finishes ' + at, variant: 'finishes', tag: 'p', html: escape(text), width, font, options: { smartQuotes: 'en', opticalHanging: true } });
+  if (index % 2 === 1) cells.push({ id: 'justified ' + at, variant: 'justified', tag: 'p', html: escape(text), width, font, options: {}, style: 'text-align:justify' });
   if (width <= 320) {
     const title = text.split(' ').slice(0, 9).join(' ');
     cells.push({ id: 'title ' + at, variant: 'title', tag: 'h2', html: escape(title), width: width - 60, font, options: {} });
@@ -73,7 +74,7 @@ function compose({ cells, build }) {
   const out = [];
   for (const cell of cells) {
     const el = document.createElement(cell.tag);
-    el.style.cssText = `font:18px/1.5 ${cell.font === 'Georgia' ? 'Georgia, serif' : cell.font};width:${cell.width}px;margin:0;text-wrap:wrap`;
+    el.style.cssText = `font:18px/1.5 ${cell.font === 'Georgia' ? 'Georgia, serif' : cell.font};width:${cell.width}px;margin:0;text-wrap:wrap;${cell.style || ''}`;
     el.innerHTML = cell.html;
     document.body.append(el);
     const native = api.measureLayout(el);
@@ -90,14 +91,16 @@ function compose({ cells, build }) {
 }
 
 /**
- * Constructions a 4.3 rendering change is about. A cell whose text has none
- * of them must be byte-identical to 4.2.0. Returns the reasons that apply.
- * @param {string} html
+ * The 4.3 rendering changes that apply to a cell. A cell none of them applies
+ * to must be byte-identical to 4.2.0.
+ * @param {Cell} cell
  * @returns {string[]}
  */
-function changeReasons(html) {
-  void html;
-  return [];
+function changeReasons(cell) {
+  const reasons = [];
+  // C3: justified text is declined instead of composed ragged.
+  if (/text-align:\s*justify/.test(cell.style || '')) reasons.push('justify');
+  return reasons;
 }
 
 /** @param {{ name: string, engine: any, executablePath?: string }} config */
@@ -141,15 +144,19 @@ for (const { name, base, cand } of runs) {
   for (const variant of variants) {
     const pairs = cand.map((c, i) => ({ c, b: base[i], cell: /** @type {Cell} */ (byId.get(c.id)) })).filter(p => p.cell.variant === variant);
     const differ = pairs.filter(({ c, b }) => c.outcome !== b.outcome || c.markup !== b.markup || JSON.stringify(c.features) !== JSON.stringify(b.features));
-    const unexplained = differ.filter(({ cell }) => !changeReasons(cell.html).length);
+    const unexplained = differ.filter(({ cell }) => !changeReasons(cell).length);
     report.counts[`${name} ${variant}`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length };
-    for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: changeReasons(cell.html), baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
+    for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: changeReasons(cell), baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
     check(name, `${variant}: identical to 4.2.0 unless a rendering change applies`, unexplained.length === 0,
       unexplained.length ? unexplained.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: [b.outcome, ...b.lines], subject: [c.outcome, ...c.lines] })) : { cells: pairs.length, changed: differ.length });
     const overflow = pairs.filter(({ c }) => c.overflow > .5);
     check(name, `${variant}: no overflow`, !overflow.length, overflow.slice(0, 4).map(({ c }) => ({ id: c.id, overflow: c.overflow })));
     const orphans = pairs.filter(({ c, cell }) => cell.tag === 'p' && c.orphan && !c.nativeOrphan);
     check(name, `${variant}: no new orphan`, !orphans.length, orphans.slice(0, 4).map(({ c }) => ({ id: c.id, lines: c.lines })));
+    if (variant === 'justified') {
+      const composed = pairs.filter(({ c }) => !/^native:(justify|fits)$/.test(c.outcome) || /data-ts-(break|track)/.test(c.markup));
+      check(name, 'justified: declined and untouched', !composed.length, composed.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
+    }
     const damaged = pairs.filter(({ c }) => !c.textIntact || /^threw/.test(c.outcome));
     check(name, `${variant}: source text intact`, !damaged.length, damaged.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
   }

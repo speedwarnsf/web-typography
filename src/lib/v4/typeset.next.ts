@@ -3,7 +3,7 @@ import type { FrozenLine } from './typeset';
 import { composeTitle } from './title-layout';
 import { contentWidth, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
-import { planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified } from './rich-text';
+import { planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
 import { applySmartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
@@ -116,7 +116,7 @@ function signature(el: HTMLElement, options: Options): string {
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
     cs.fontSizeAdjust, cs.fontSynthesis, cs.textRendering, cs.letterSpacing, cs.wordSpacing,
-    cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.direction,
+    cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.textAlignLast, cs.direction,
     cs.writingMode, cs.display, cs.textWrap, cs.hyphens, cs.wordBreak, cs.lineBreak, cs.overflowWrap, cs.getPropertyValue('-webkit-line-clamp'),
     el.closest('[lang]')?.getAttribute('lang'), el.dataset.typesetMode,
     options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour,
@@ -401,6 +401,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     return finish('composed:rich');
   }
   if (before.lines.length === 1 && before.overflow <= 0.5) return finish('native:fits');
+  if (breaksChangeAlignment(cs)) return finish('native:justify');
   if (mode === 'ui') return finish('native:ui');
   if (source.length > 12000 || source.trim().split(/\s+/u).length > 500) return finish('native:budget');
   const measure = makeMeasurer(element);
@@ -491,6 +492,13 @@ export function auditReport(selector = defaults): AuditReport {
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
     if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
+    // Composed while left-aligned, then justified: every generated break now
+    // ends a line that takes the last-line alignment.
+    const style = getComputedStyle(element);
+    if (outcome.startsWith('composed') && breaksChangeAlignment(style)) {
+      add('alignment-lost', 'error', 'text-align: ' + style.textAlign + (style.textAlignLast && style.textAlignLast !== 'auto' ? ', text-align-last: ' + style.textAlignLast : '')
+        + ' cannot apply to composed lines, which each end in a generated break');
+    }
     // A generated break at a space stands in for that space, which collapses at
     // the line end. Hidden from assistive technology, it leaves nothing between
     // the two words. (A break after a hyphen or dash separates no words.)

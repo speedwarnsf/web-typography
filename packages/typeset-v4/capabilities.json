@@ -16,7 +16,7 @@
   "react": { "testedVersion": "19.2.3", "entry": "typeset.us/react", "customComponentChildren": "native:react-component" },
   "node": ">=22",
   "browserRequirements": ["Intl.Segmenter", "ResizeObserver", "MutationObserver", "FontFaceSet", "CSS text-wrap"],
-  "unsupported": ["automatic hyphenation", "soft hyphens", "mixed languages in one block", "RTL and vertical text", "editable text", "inline widgets", "unsupported inline box decoration", "scale, rotation, perspective and nonzero Z transforms"],
+  "unsupported": ["automatic hyphenation", "soft hyphens", "mixed languages in one block", "RTL and vertical text", "justified text, and a text-align-last that differs from text-align (native:justify)", "editable text", "inline widgets", "unsupported inline box decoration", "scale, rotation, perspective and nonzero Z transforms"],
   "inlineCode": { "supported": "normal whitespace, overflow-wrap:break-word and nonnegative sliced padding/borders/margins measured in context", "tracking": false },
   "quotes": { "mode": "explicit English", "lengthPreserving": true, "dashesAndEllipses": "not changed", "richReactRequires": "lang=en on the adapter" },
   "opticalHanging": { "mode": "explicit", "scope": "full measured leading punctuation and raster-measured optical capitals on composed lines or fitting single lines", "capitalMaxEm": 0.08, "clipping": "full glyph must fit available clip/padding/scrollport; partial line coverage reported", "unsupported": ["centered or justified text", "insufficient clip room", "unknown clip paths/masks", "scale/rotation/perspective transforms", "author text indentation", "custom font-feature/variation settings unsupported by canvas, including onum"] },

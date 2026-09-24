@@ -20,6 +20,12 @@ remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
 hyphens and editable content remain native. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 
+Justified text remains native and reports `native:justify`: a generated break
+ends its line, so each composed line would take the last-line alignment. This
+covers a computed `text-align` of `justify` or `justify-all`, and any
+`text-align-last` that differs from `text-align`. Composition does not justify
+text; it composes left, centred and right-aligned text.
+
 4.2 supports ordinary nonwrapping inline phrases in otherwise wrapping rich
 text. Internal no-break boundaries survive styled descendants and composition;
 an overlong protected phrase is reported as an unbreakable-run constraint.

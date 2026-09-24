@@ -100,6 +100,20 @@ function override(element: HTMLElement, properties: Record<string, string>): () 
   };
 }
 
+/**
+ * A generated break ends its line, so every composed line takes the
+ * paragraph's last-line alignment. That undoes text-align: justify, and
+ * imposes any text-align-last that differs from text-align on every line.
+ * Callers have already declined anything but left-to-right text.
+ */
+export function breaksChangeAlignment(style: CSSStyleDeclaration): boolean {
+  const side = (value: string) => value === 'start' ? 'left' : value === 'end' ? 'right' : value;
+  const align = side(style.textAlign);
+  if (align === 'justify' || align === 'justify-all') return true;
+  const last = style.textAlignLast || 'auto';
+  return last !== 'auto' && side(last) !== align;
+}
+
 function unsupported(element: HTMLElement): string | null {
   for (const el of [element, ...element.querySelectorAll<HTMLElement>('*')]) {
     if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
@@ -151,6 +165,8 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     if (reason) return result(reason);
     if (!before.width || !before.lines.length) return result('unmeasurable');
     if (before.lines.length === 1 && before.overflow <= .5) return result('native:fits');
+    // A single line is its own last line, so only longer text is declined.
+    if (breaksChangeAlignment(getComputedStyle(element))) return result('native:justify');
     if (options.mode === 'ui') return result('native:ui');
     const runs = textRuns(element);
     const words = analysis?.units || Array.from(source.matchAll(wordPattern)).flatMap(word => {
