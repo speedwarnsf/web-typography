@@ -6,7 +6,7 @@ import { measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import type { Options } from './typeset.next';
 import { analyzeBreaks, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
-import { englishPhraseGroups, phraseBreakCosts, retainSentenceLayout, strandedOpener } from './phrase-boundaries';
+import { englishPhraseGroups, keptPhrases, phraseBreakCosts, retainSentenceLayout, strandedOpener } from './phrase-boundaries';
 import { retainParagraphRhythm } from './paragraph-rhythm';
 import { opticalMarkerStyle } from './optical-hanging';
 import type { OpticalHang } from './optical-hanging';
@@ -266,7 +266,14 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const clamp = parseInt(getComputedStyle(element).getPropertyValue('-webkit-line-clamp'), 10);
     const openerRepair = options.density !== 'compact' && (!analysis || analysis.language === 'en')
       && before.lines.slice(0, -1).some(line => strandedOpener(line.text));
-    const allowance = !title && (before.lastSingleton || options.density === 'editorial' || openerRepair) ? 1 : 0;
+    // A phrase the author asked to keep that the browser splits can earn the
+    // same extra line as a stranded opener.
+    const keepSplit = keptPhrases(words.map(word => word.text), options.keep).some(({ start, end }) => {
+      const from = words[start].index, to = words[end - 1].index + words[end - 1].text.length;
+      return before.lines.slice(0, -1).some(line => line.sourceEnd > from && line.sourceEnd < to);
+    });
+    const allowance = !title && (before.lastSingleton || options.density === 'editorial' || openerRepair
+      || (keepSplit && options.density !== 'compact')) ? 1 : 0;
     const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
     const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
     const contourWidths = !title && options.contour === 'finished' && ['left', 'start'].includes(getComputedStyle(element).textAlign)
@@ -277,7 +284,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
         ...(analysis && analysis.language !== 'en' && { weakEnding: (word: string) => languageWeakEnding(word, analysis.language) }) })
       : composeParagraph(tokens, before.width, before.width / (fontSize * .5), {
         maxLines, candidateBar: 1, measureRange, breakPenalty, englishLexical: !analysis || analysis.language === 'en', contourWidths, onSearch,
-        allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
+        allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width), keep: options.keep,
       });
     if (analysis?.language === 'en' && lines) {
       const texts = words.map(word => word.text);
@@ -294,7 +301,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
           ? composeTitle(tokens, before.width, () => 0, { ...options, maxLines, measureRange, breakPenalty: phrasedPenalty })
           : composeParagraph(tokens, before.width, before.width / (fontSize * .5), {
             maxLines, candidateBar: 1, measureRange, breakPenalty: phrasedPenalty, englishLexical: true, contourWidths, onSearch,
-            allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
+            allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width), keep: options.keep,
           });
         const wordCounts = (composition: NonNullable<typeof lines>) => {
           let end = 0;
@@ -328,9 +335,10 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
         end += line.tokens.length;
         return words[end - 1].index + words[end - 1].text.length;
       });
-      if (!title && options.density !== 'editorial' && !options.keep?.length && before.lines.length <= maxLines
+      // The native layout may be kept unless it splits a phrase the author asked to keep.
+      if (!title && options.density !== 'editorial' && !keepSplit && before.lines.length <= maxLines
         && retainSentenceLayout(source, before, chosenEnds)) return result('native:sentence-aligned');
-      if (!title && options.density !== 'editorial' && !options.keep?.length && before.lines.length <= maxLines
+      if (!title && options.density !== 'editorial' && !keepSplit && before.lines.length <= maxLines
         && retainParagraphRhythm(source, before, lines.map(line => line.width))) return result('native:paragraph-rhythm');
     }
     if (!lines) {

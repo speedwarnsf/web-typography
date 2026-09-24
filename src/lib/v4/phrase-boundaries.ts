@@ -15,6 +15,35 @@ export const sentences = (): Intl.Segmenter => sentenceSegmenter ??= new Intl.Se
 
 /** A colon can introduce a thought without introducing a new sentence. */
 export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text);
+
+const leading = (text: string) => text.replace(/^[("'\u201C\u2018[{]+/u, '');
+const trailing = (text: string) => text.replace(/[.,;:!?"'\u201D\u2019)\]}]+$/u, '');
+
+/**
+ * Where author `keep` phrases occur in a run of break units: [start, end)
+ * unit ranges spanning at least one break. Matching ignores case, treats
+ * NBSP and runs of spaces as one space, ignores punctuation around the
+ * phrase, and joins a unit that ends in a hyphen or dash to the next.
+ */
+export function keptPhrases(texts: readonly string[], keep: readonly string[] | undefined): { start: number; end: number }[] {
+  const normalize = (text: string) => text.toLowerCase().replace(/[\s\u00A0\u202F]+/gu, ' ').trim();
+  const phrases = [...new Set((keep || []).map(phrase => trailing(leading(normalize(phrase))))
+    .filter(phrase => phrase.includes(' ') || /[-\u2010\u2013\u2014/]./u.test(phrase)))];
+  const found: { start: number; end: number }[] = [];
+  if (!phrases.length) return found;
+  const longest = Math.max(...phrases.map(phrase => phrase.length));
+  for (let start = 0; start < texts.length; start++) {
+    let joined = '';
+    for (let end = start + 1; end <= texts.length; end++) {
+      const unit = normalize(texts[end - 1]);
+      joined += (end === start + 1 || /[-\u2010\u2013\u2014/]$/u.test(joined) ? '' : ' ') + unit;
+      const bare = trailing(leading(joined));
+      if (bare.length > longest) break;
+      if (end - start > 1 && phrases.includes(bare)) found.push({ start, end });
+    }
+  }
+  return found;
+}
 export function strandedOpener(line: string): boolean {
   const words = line.trim().split(/\s+/u);
   return words.length > 1 && proseBoundary(words.at(-2)!)

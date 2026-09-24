@@ -1,6 +1,6 @@
 'use client';
 
-import { proseBoundary } from './phrase-boundaries';
+import { keptPhrases, proseBoundary } from './phrase-boundaries';
 
 /**
  * typeset.ts — Typographic refinement utility
@@ -224,6 +224,9 @@ interface BindWeights { toponym: number }
 // value inside the plateau, so 1600 is a conservative point in a flat region,
 // not an optimum. See docs/BINDING.md for the full method and its limits.
 const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+/** A kept phrase that fits the measure is split only when nothing else can
+ * satisfy the paragraph's hard constraints. */
+const KEEP_UNSPLIT = 1e6;
 function bindWeights(): BindWeights {
   const o = (globalThis as { __TYPESET_BIND__?: Partial<BindWeights> }).__TYPESET_BIND__;
   return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
@@ -746,6 +749,9 @@ export interface ParagraphOptions {
   breakPenalty?: (end: number) => number;
   contourWidths?: (lines: ParagraphLine[]) => number[];
   onSearch?: (evidence: ParagraphSearchEvidence) => void;
+  /** Author phrases to keep on one line: never split where the phrase fits
+   * the measure, and split as little as possible where it cannot. */
+  keep?: readonly string[];
 }
 export interface ParagraphLine { tokens: Token[]; width: number; fill: number }
 export interface ParagraphState { tokenIndex: number; lines: ParagraphLine[]; cost: number }
@@ -871,6 +877,14 @@ export function createParagraphProblem(
     boundary[i] = proseBoundary(t.text);
     lastBoundaryAt[i] = boundary[i] ? i : i ? lastBoundaryAt[i - 1] : -1;
     openerLength[i] = t.text.replace(/[^A-Za-z0-9]/g, "").length;
+  }
+  // Author keep phrases (the public keep option), matched over these tokens.
+  const keepCost = opts.keep?.length ? new Float64Array(count + 1) : null;
+  if (keepCost) {
+    for (const { start, end } of keptPhrases(contentTokens.map(t => t.text), opts.keep)) {
+      const cost = widthBetween(start, end) <= measurePx ? KEEP_UNSPLIT : profile.weakEndPenalty;
+      for (let at = start + 1; at < end; at++) keepCost[at] = Math.max(keepCost[at], cost);
+    }
   }
 
   // Protected compound boundary check
@@ -1066,6 +1080,7 @@ export function createParagraphProblem(
     if (opts.englishLexical !== false && !isLast) {
       penalty += bindPenaltyAt(breakEnd);
     }
+    if (!isLast && keepCost) penalty += keepCost[breakEnd];
 
     // Sentence-start dangling — BOTH modes. Penalize a non-last line that
     // crosses a sentence boundary and ends on the first word(s) of the next

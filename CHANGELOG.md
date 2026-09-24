@@ -42,6 +42,18 @@ changes is byte-identical to 4.2.0 in Chromium, WebKit and Firefox.
   `alignment-lost`, for a composed element whose alignment later changes to
   one the breaks cannot keep.
 
+### Fixes
+
+- `keep` works in body text. It was typed and exposed on both React adapters,
+  but body composition never received it; it only switched off native
+  retention. A kept phrase that fits the measure is now never split, a phrase
+  the browser splits can earn one extra line (not with `density: 'compact'`),
+  and a phrase longer than the measure is split as few times as possible.
+  Matching ignores case, NBSP and punctuation around the phrase, in titles
+  too, where a fitting phrase is held within the minimum line count. Native
+  retention is kept unless the native layout splits a kept phrase. Output with
+  `keep` omitted is unchanged (golden diff 0).
+
 ### Development
 
 - `npm run build:dist` (also `build:candidate`) builds the engine into

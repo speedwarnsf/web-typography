@@ -424,7 +424,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const maxLines = options.maxLines || before.lines.length + (before.lastSingleton || options.density === 'editorial' ? 1 : 0);
       const tail = parts.slice(-2).join(' ');
       const unavoidableOrphan = before.lastSingleton && measure.measure(tail) > before.width;
-      const composed = composeParagraph(tokens, before.width, ch, { maxLines, candidateBar: 1, allowOrphan: unavoidableOrphan });
+      const composed = composeParagraph(tokens, before.width, ch, { maxLines, candidateBar: 1, allowOrphan: unavoidableOrphan, keep: options.keep });
       const spaceEm = measure.measure(' ') / fontSize;
       lines = composed && (options.spacing === false ? composed : shapeExactLines(composed, ch, before.width, false, spaceEm, fontSize));
       if (lines && !finalValidate(lines, ch, false, spaceEm, unavoidableOrphan)) lines = null;

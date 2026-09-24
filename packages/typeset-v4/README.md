@@ -28,6 +28,14 @@ console.log(report);      // inspect reviews and native outcomes, not just pass
 Default composition uses Unicode opportunities and declared HTML lang. Body
 composition can use one extra line to repair a stranded sentence/clause opener;
 explicit compact density and maxLines constraints remain respected.
+
+`keep: ['price tag', 'stop signal']` holds each phrase on one line. Matching
+ignores case, NBSP and punctuation around the phrase. In body text a kept
+phrase that fits the measure is never split; one the browser splits can earn
+the same extra line as a stranded opener (not with `density: 'compact'`). A
+phrase too long for one line is split as few times as possible. Titles keep
+phrases within their minimum line count. TypesetText and TypesetRichText take
+`keep` as a prop.
 Quotes/hanging are off by default. Content excluded with data-no-typeset
 stays native. Scope to prose/titles, not UI or framework-owned content. mount
 waits for fonts, observes updates/resizes and restores on disconnect. For one
