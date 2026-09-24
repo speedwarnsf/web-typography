@@ -967,9 +967,9 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     parents.delete(el);
   };
   function observe() {
-    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', '_msttexthash', '_msthash'] });
+    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', '_msttexthash', '_msthash'] });
     if (isElement(root)) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang'] });
+      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open'] });
     }
   }
   /** One job. Rechecks are a computed-style read; only a changed key, changed

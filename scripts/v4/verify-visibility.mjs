@@ -31,6 +31,7 @@ body{margin:0;font:17px/1.45 Georgia,serif}section,dialog{width:340px;padding:8p
 <div id="tabs" data-tab="a"><section id="tab-a">${container('tab', 3)}</section><section id="tab-b"><p>Other tab.</p></section></div>
 <div id="stack"><section class="card" id="s-stack">${container('stack', 4)}</section></div>
 <section id="s-cvhidden">${container('cvhidden', 5)}</section>
+<section id="s-late"><p class="m">${escape(text(1))}</p></section><dialog id="d-late" style="top:400px"><p class="m">${escape(text(2))}</p></dialog>
 <div class="spacer"></div>
 <section id="cv"><p class="m" id="cv-p">${escape(text(6))}</p></section>
 <script src="/react.js"></script></body></html>`;
@@ -76,6 +77,7 @@ for (const { name, engine, executablePath } of browsers) {
       w.loopErrors = [];
       window.addEventListener('error', event => { if (/ResizeObserver/.test(String(event.message))) w.loopErrors.push(event.message); });
       /** @type {HTMLDialogElement} */ (document.getElementById('s-dialog')).showModal();
+      /** @type {HTMLDialogElement} */ (document.getElementById('d-late')).show();
       await document.fonts.ready;
       w.renderReact();
       w.controller = w.Typeset.mount(document, 'p.m');
@@ -130,10 +132,31 @@ for (const { name, engine, executablePath } of browsers) {
       const first = await new Promise(resolve => requestAnimationFrame(() => resolve(w.snapshot(section))));
       await new Promise(r => setTimeout(r, 600));
       const settled = w.snapshot(section);
-      return { first: first.map((/** @type {any} */ b) => b.kind + ':' + b.outcome), settled: settled.map((/** @type {any} */ b) => ({ kind: b.kind, outcome: b.outcome, intact: b.lines.length === b.breaks + 1 })) };
+      return { first: first.map((/** @type {any} */ b) => b.kind + ':' + b.outcome + (b.lines.length === b.breaks + 1 ? '' : ':double-wrapped')), settled: settled.map((/** @type {any} */ b) => ({ kind: b.kind, outcome: b.outcome, intact: b.lines.length === b.breaks + 1 })) };
     });
     check('shown at a new width, every block recomposes for it', resized.settled.every((/** @type {any} */ b) => b.outcome === 'composed:rich' && b.intact), resized);
     check('the mount() block is composed for the new width in the first frame', resized.first[0] === 'mount:composed:rich', resized.first);
+    // The same through the hidden attribute and a dialog's open attribute.
+    for (const [label, hide, reveal, id] of [
+      ['the hidden attribute', 'window.__section.hidden = true', 'window.__section.hidden = false', 's-late'],
+      ['a reopened dialog', 'window.__section.close()', 'window.__section.show()', 'd-late'],
+    ]) {
+      const result = await page.evaluate(async ({ hide, reveal, id }) => {
+        const w = /** @type {any} */ (window);
+        const section = w.__section = /** @type {any} */ (document.getElementById(id));
+        (0, eval)(hide);
+        await new Promise(r => setTimeout(r, 200));
+        section.style.width = '290px';
+        // Let the width change be seen on its own: only the attribute reveals.
+        await new Promise(r => setTimeout(r, 100));
+        const pending = new Promise(resolve => requestAnimationFrame(() => resolve(w.snapshot(section))));
+        (0, eval)(reveal);
+        const first = await pending;
+        await new Promise(r => setTimeout(r, 400));
+        return (/** @type {any[]} */ (first)).filter(b => b.kind === 'mount').map(b => ({ outcome: b.outcome, intact: b.lines.length === b.breaks + 1 }));
+      }, { hide, reveal, id });
+      check(`${label} at a new width: the mount() block is composed for it in the first frame`, result.length === 1 && result[0].outcome === 'composed:rich' && result[0].intact, result);
+    }
     // content-visibility:auto, far below the fold, then scrolled into view.
     const cv = await page.evaluate(async () => {
       const w = /** @type {any} */ (window);
