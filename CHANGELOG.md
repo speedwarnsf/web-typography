@@ -45,6 +45,14 @@ Hashes for every published version live in
   controller verify rendered lines against the composition. One set of font,
   stylesheet and transition listeners serves every controller and
   `TypesetRichText` in a document.
+- Hidden text keeps its composition. A tab, dialog, accordion or stack card
+  hidden with `display:none`, the `hidden` attribute or `content-visibility`
+  and shown again at the same width paints its composed lines in the first
+  frame, instead of native lines re-broken a moment later (field report b),
+  with `mount()`, `TypesetText` and `TypesetRichText`. Text an attribute
+  change reveals at a new width is composed before that frame paints. Text
+  in a skipped `content-visibility:auto` section composes when it comes into
+  range; WebKit had cached a failed measurement there.
 
 ### Rendering changes
 

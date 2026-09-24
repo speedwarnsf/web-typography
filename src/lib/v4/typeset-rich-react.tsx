@@ -15,7 +15,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
-import { armFonts, subscribe } from './lifecycle';
+import { armFonts, rendered, subscribe } from './lifecycle';
 
 export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 'dangerouslySetInnerHTML'> {
   children: ReactNode;
@@ -239,6 +239,9 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   };
   private recompose = () => {
     if (!this.mounted || !this.host.current) return;
+    // Hidden: keep the current plan. Shown again at the same width, the text
+    // paints composed instead of native first and re-broken a frame later.
+    if (this.state.plan && !rendered(this.host.current)) return;
     this.observer?.disconnect();
     const plan: RenderPlan = planRichText(this.host.current, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }

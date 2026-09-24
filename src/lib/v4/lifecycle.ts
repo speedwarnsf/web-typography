@@ -8,6 +8,8 @@ export interface LifecycleClient {
   metrics?(target: Element): void;
   /** A stylesheet was added, removed, edited or switched. */
   styles?(): void;
+  /** A content-visibility:auto subtree under `target` stopped being skipped. */
+  visibility?(target: Element): void;
 }
 
 interface Hub { clients: Set<LifecycleClient>; faces: WeakSet<FontFace>; ready: boolean; stop: () => void }
@@ -16,6 +18,14 @@ const metric = /^(?:font|letter-spacing|word-spacing|line-height|text-transform|
 
 function notify(hub: Hub, call: (client: LifecycleClient) => void): void {
   for (const client of [...hub.clients]) call(client);
+}
+
+/** Whether an element's text is laid out now: it has boxes and is not in a
+ * skipped content-visibility subtree. Measuring anything else is guesswork. */
+export function rendered(element: Element): boolean {
+  if (!element.getClientRects().length) return getComputedStyle(element).display === 'contents';
+  const check = (element as Element & { checkVisibility?: (options: object) => boolean }).checkVisibility;
+  return typeof check !== 'function' || check.call(element, { contentVisibilityAuto: true });
 }
 
 /** Re-arm font notifications. WebKit fires no loading events for fonts a
@@ -44,6 +54,10 @@ function start(doc: Document): Hub {
     if (target?.nodeType !== 1) return;
     if (event.type === 'animationend' || metric.test((event as TransitionEvent).propertyName || '')) notify(hub, client => client.metrics?.(target));
   };
+  const visibility = (event: Event) => {
+    const target = event.target as Element | null;
+    if (target?.nodeType === 1 && !(event as Event & { skipped?: boolean }).skipped) notify(hub, client => client.visibility?.(target));
+  };
   // Stylesheets arrive and switch without touching composed text: a late
   // @font-face, a text-spacing bookmarklet, a theme <link media>.
   const observer = new MutationObserver(() => { notify(hub, client => client.styles?.()); armFonts(doc); });
@@ -52,12 +66,14 @@ function start(doc: Document): Hub {
   doc.fonts.addEventListener('loading', loading);
   doc.addEventListener('transitionend', ended, true);
   doc.addEventListener('animationend', ended, true);
+  doc.addEventListener('contentvisibilityautostatechange', visibility, true);
   hub.stop = () => {
     observer.disconnect();
     doc.fonts.removeEventListener('loadingdone', fonts);
     doc.fonts.removeEventListener('loading', loading);
     doc.removeEventListener('transitionend', ended, true);
     doc.removeEventListener('animationend', ended, true);
+    doc.removeEventListener('contentvisibilityautostatechange', visibility, true);
   };
   return hub;
 }

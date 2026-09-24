@@ -15,7 +15,7 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, subscribe } from './lifecycle';
+import { armFonts, rendered, subscribe } from './lifecycle';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -64,6 +64,8 @@ interface State {
   signature: string;
   /** layoutKey() of the composed element, for cheap rechecks. */
   layout: string;
+  /** optionsKey() of the options it was composed with. */
+  options: string;
   result: Result;
   rich?: RichOutput;
   hadStyle: boolean;
@@ -290,6 +292,11 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
   const prior = states.get(element);
+  // Hidden (display:none, a closed dialog, a skipped content-visibility
+  // subtree): nothing can be measured, so keep the composition. When the
+  // block is shown at the same width it paints composed, with no re-break.
+  const visible = rendered(element);
+  if (prior && !visible && prior.options === optionsKey(options) && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
   const sig = signature(element, options);
   if (prior?.signature === sig && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
   if (prior) {
@@ -323,7 +330,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const nodes = Array.from(element.childNodes);
   const hadStyle = element.hasAttribute('style');
   const styles = { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize };
-  const before = measureLayout(element);
+  const before = visible ? measureLayout(element) : emptyMetrics();
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
@@ -378,12 +385,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     element.dataset.tsHanging = features.hanging;
     element.dataset.tsSpacing = features.spacing;
     element.dataset.tsTracking = features.tracking;
-    const result: Result = { outcome, mode, before, after: measureLayout(element), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
+    const result: Result = { outcome, mode, before, after: visible ? measureLayout(element) : emptyMetrics(), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
     const layout = layoutKey(element);
     states.set(element, {
       nodes, outputNodes: Array.from(element.childNodes), source, output: element.textContent || '', markup: element.innerHTML, styles,
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
-      signature: signature(element, options, layout), layout, result,
+      // Never cache a decision made without measurement: the next call decides again.
+      signature: outcome === 'unmeasurable' ? '' : signature(element, options, layout), layout, options: optionsKey(options), result,
       rich, hadStyle, quotes, optical, spacing, tracking,
     });
     return result;
@@ -392,7 +400,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const cs = getComputedStyle(element);
   const lang = element.closest('[lang]')?.getAttribute('lang');
   if (options.lineBreaks !== 'unicode' && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return finish('native:language');
-  if (!before.width || !before.lines.length) return finish('unmeasurable');
+  if (!visible || !before.width || !before.lines.length) return finish('unmeasurable');
   if (cs.writingMode !== 'horizontal-tb' || cs.direction !== 'ltr') return finish('native:direction');
   for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
@@ -612,6 +620,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   const owned = new Set<HTMLElement>();
   const pending = new Map<HTMLElement, number>();
   const nearby = new Set<HTMLElement>();
+  // Owned blocks last seen without boxes. Their compositions are kept.
+  const hidden = new Set<HTMLElement>();
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -689,7 +699,19 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     return found;
   };
   const drop = (el: HTMLElement) => {
-    owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
+    owned.delete(el); pending.delete(el); nearby.delete(el); hidden.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
+  };
+  const onScreen = (el: HTMLElement) => {
+    const box = el.getBoundingClientRect();
+    return box.bottom > 0 && box.top < (view?.innerHeight ?? 0) && box.right > 0 && box.left < (view?.innerWidth ?? 0);
+  };
+  /** Compose now, before this frame paints: for text an attribute change just
+   * revealed. Called from the MutationObserver callback, never from a
+   * ResizeObserver callback, where a size change would report a loop error. */
+  const composeNow = (elements: HTMLElement[]) => {
+    observer.disconnect();
+    for (const el of elements) { pending.delete(el); process(el, KEY); }
+    observe();
   };
   const schedule = () => {
     if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
@@ -704,7 +726,15 @@ export function mount(root: ParentNode = document, selector = defaults, options:
         // Class and style changes restyle a subtree. Recheck what owned text
         // computes to instead of recomposing it: most changes (a menu class,
         // a transform, a scroll-linked variable) leave every line unchanged.
-        for (const el of ownedWithin(target)) enqueue(el, KEY);
+        const affected = ownedWithin(target);
+        for (const el of affected) enqueue(el, KEY);
+        // A tab, dialog or card this change just showed: text that could not be
+        // composed while hidden, or was hidden at another width, composes
+        // before the reveal paints. A retained composition needs nothing.
+        if (fontsReady && hidden.size) {
+          const shown = affected.filter(el => hidden.has(el) && rendered(el) && onScreen(el));
+          if (shown.length) composeNow(shown);
+        }
         // An attribute on an author element inside owned text is new markup.
         for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
         discover(target);
@@ -736,13 +766,24 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   };
   const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
+    // Reads only. A write here that changed any observed size would make every
+    // engine report "ResizeObserver loop completed with undelivered notifications".
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
       const previous = sizes.get(entry.target);
       sizes.set(entry.target, { w: width, h: height });
       if (!previous) continue;
+      if (!width) {
+        // Hidden. Keep the composition: shown again at this width, it paints composed.
+        if (owned.has(entry.target as HTMLElement)) hidden.add(entry.target as HTMLElement);
+        continue;
+      }
       if (Math.abs(previous.w - width) > .01) {
-        for (const el of watched.get(entry.target) || []) enqueue(el, KEY);
+        for (const el of watched.get(entry.target) || []) {
+          // Revealed: a retained composition is already painting; verify it.
+          if (!previous.w || hidden.has(el)) { hidden.delete(el); enqueue(el, VERIFY); }
+          else enqueue(el, KEY);
+        }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
         // Same width, new height: a font, a text-spacing override, a browser
         // font-size setting or text-only zoom can add native wraps to composed
@@ -788,6 +829,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!eligible(el)) { restore(el); drop(el); return; }
     if (owned.has(el) && parents.get(el) !== el.parentElement) { unwatch(el); watch(el); }
     const state = states.get(el);
+    if (!(job & CONTENT) && state && owned.has(el) && !rendered(el)) { hidden.add(el); return; }
+    hidden.delete(el);
     if (!(job & CONTENT) && state?.signature && owned.has(el) && layoutKey(el) === state.layout) {
       // Nothing that decides layout changed. The rendered lines are the safety
       // net for anything the key cannot see.
@@ -796,6 +839,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     const result = typeset(el, options);
     if (result.changed) stats.compositions++;
+    if (result.outcome === 'unmeasurable') hidden.add(el);
     if (!owned.has(el)) { owned.add(el); watch(el); }
     // Our own write may change the block's height; that is not a reason to verify.
     else if (result.changed) { const box = boxOf(el); sizes.set(el, { w: sizes.get(el)?.w ?? box.w, h: box.h }); }
@@ -856,6 +900,12 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     for (const el of owned) enqueue(el, KEY);
     schedule();
   };
+  // A content-visibility:auto section scrolled into range: its text can be measured now.
+  const visibilityChanged = (target: Element) => {
+    if (stopped) return;
+    for (const el of ownedWithin(target)) enqueue(el, KEY);
+    schedule();
+  };
   doc.fonts.ready.then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
@@ -864,7 +914,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged });
+  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged });
   view?.addEventListener('resize', resized);
   return {
     ready, refresh, stats,
@@ -876,7 +926,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       unsubscribe();
       view?.removeEventListener('resize', resized);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear(); nearby.clear();
+      owned.clear(); pending.clear(); nearby.clear(); hidden.clear();
       watched.clear(); parents.clear();
       for (const el of blocked.keys()) stopWaiting(el);
       for (const el of claimed) release(el);
