@@ -19,17 +19,59 @@ export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true };
 
 /**
- * The npm package's dist/: ESM with a shared chunk, CJS, and the two IIFEs.
+ * How a release line is built. A release is cut with the recipe for its
+ * version, so a dry run at an older tag (release-cut --root) still
+ * reproduces that tag's published bytes; candidates always use the current
+ * recipe.
+ *
+ * 4.2: unminified ESM and CJS, minified browser IIFEs, and every file has a
+ *      source map that embeds all engine sources (73% of the 2.57 MB
+ *      unpacked package).
+ * 4.3: ESM and CJS stay unminified, readable and mapless: consumers' bundlers
+ *      minify them, and stack traces already name real functions. (Minified
+ *      modules would need maps; maps that embed sources are 1.3 MB, and maps
+ *      without sources make webpack's source-map-loader warn once per missing
+ *      file.) typeset.global.js and go.js keep maps without embedded sources,
+ *      for stack traces; third-party license comments are kept at the end of
+ *      every bundle.
+ * @typedef {{ line: string, moduleMaps: boolean, iifeSourcesContent: boolean, autoLoader: boolean, archivedFiles: string[] }} Recipe
+ */
+/** @type {Record<string, Recipe>} */
+export const RECIPES = {
+  '4.2': {
+    line: '4.2', moduleMaps: true, iifeSourcesContent: true, autoLoader: false,
+    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
+  },
+  '4.3': {
+    line: '4.3', moduleMaps: false, iifeSourcesContent: false, autoLoader: false,
+    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
+  },
+};
+export const CURRENT_RECIPE = RECIPES['4.3'];
+
+/**
+ * The recipe a version was (or will be) cut with.
+ * @param {string} version
+ */
+export function recipeFor(version) {
+  const [major, minor] = version.split('-')[0].split('.').map(Number);
+  return major === 4 && minor <= 2 ? RECIPES['4.2'] : CURRENT_RECIPE;
+}
+
+/**
+ * The npm package's dist/: ESM with a shared chunk, CJS, and the IIFEs.
  * `distDir` must sit three directories below `root` (packages/typeset-v4/dist
  * or output/candidate/dist) so source-map paths match the published maps.
- * @param {{ root: string, distDir: string, plugins?: import('esbuild').Plugin[] }} options
+ * @param {{ root: string, distDir: string, plugins?: import('esbuild').Plugin[], recipe?: Recipe }} options
  */
-export async function buildPackageDist({ root, distDir, plugins = [] }) {
-  const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning') };
-  await build({ ...base, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react'], outdir: distDir, chunkNames: 'shared-[hash]' });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], format: 'iife', minify: true, outfile: `${distDir}/typeset.global.js` });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.go.ts'], format: 'iife', minify: true, outfile: `${distDir}/go.js` });
+export async function buildPackageDist({ root, distDir, plugins = [], recipe = CURRENT_RECIPE }) {
+  const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning'), ...(recipe.line === '4.2' ? {} : { legalComments: /** @type {const} */ ('eof') }) };
+  const modules = { ...base, sourcemap: recipe.moduleMaps };
+  const iife = { ...base, format: /** @type {const} */ ('iife'), minify: true, sourcesContent: recipe.iifeSourcesContent };
+  await build({ ...modules, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react'], outdir: distDir, chunkNames: 'shared-[hash]' });
+  await build({ ...modules, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
+  await build({ ...iife, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], outfile: `${distDir}/typeset.global.js` });
+  await build({ ...iife, entryPoints: ['src/lib/v4/typeset.go.ts'], outfile: `${distDir}/go.js` });
   await copyFile(join(root, 'src/lib/v4/typeset-lists.css'), join(root, distDir, 'styles.css'));
 }
 
@@ -80,8 +122,8 @@ export async function buildSite({ root, distDir, siteDir, version, plugins = [] 
   await copyFile(join(root, distDir, 'styles.css'), join(root, siteDir, 'typeset.css'));
 }
 
-/** Files copied from the package directory into public/releases/<v>/ beside dist/. */
-export const ARCHIVED_PACKAGE_FILES = ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'];
+/** Files copied from the package directory into public/releases/<v>/ beside dist/ (the current recipe's list). */
+export const ARCHIVED_PACKAGE_FILES = CURRENT_RECIPE.archivedFiles;
 
 /**
  * Generated package files that are copies of repository sources.

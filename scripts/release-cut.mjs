@@ -21,7 +21,7 @@ import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, ARCHIVED_PACKAGE_FILES } from './build-recipe.mjs';
+import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor } from './build-recipe.mjs';
 import { readLedger, describeRelease, describePins, readTarball, LEDGER } from './v4/ledger.mjs';
 
 const { values } = parseArgs({ options: {
@@ -35,7 +35,7 @@ if (!dryRun && !values.summary) throw new Error('Pass --summary with one sentenc
 const repo = process.cwd();
 const root = resolve(values.root ?? repo);
 const exists = (/** @type {string} */ path) => stat(path).then(() => true, () => false);
-const report = { version, dryRun, root, preconditions: /** @type {Record<string, unknown>} */ ({}), tarball: /** @type {Record<string, unknown>} */ ({}), reproduces: /** @type {Record<string, unknown> | null} */ (null), wrote: /** @type {string[]} */ ([]) };
+const report = { version, dryRun, root, recipe: /** @type {string | null} */ (null), preconditions: /** @type {Record<string, unknown>} */ ({}), tarball: /** @type {Record<string, unknown>} */ ({}), reproduces: /** @type {Record<string, unknown> | null} */ (null), wrote: /** @type {string[]} */ ([]) };
 /** @param {string} name @param {boolean} pass @param {unknown} [detail] */
 function precondition(name, pass, detail) {
   report.preconditions[name] = { pass, ...(detail === undefined ? {} : { detail }) };
@@ -80,7 +80,11 @@ try {
   await writeFile(enginePath, engineText.replace(/export const VERSION = '[^']+';/, `export const VERSION = '${version}';`));
 
   // 3. Build, pack and assemble the archive inside staging.
-  await buildPackageDist({ root: staging, distDir });
+  // The recipe this version is cut with: a dry run at an older tag uses that
+  // release line's recipe and so reproduces its published bytes.
+  const recipe = recipeFor(version);
+  report.recipe = recipe.line;
+  await buildPackageDist({ root: staging, distDir, recipe });
   await emitDeclarations({ root: staging, distDir, declarationDir: `${pkgDir}/declarations`, tsc: join(repo, 'node_modules/.bin/tsc') });
   await copyPackageFiles({ root: staging, packageDir: pkgDir });
   await writeManifest({ root: staging, distDir, version });
@@ -91,7 +95,7 @@ try {
   const archive = join(staging, 'archive', version);
   await mkdir(archive, { recursive: true });
   for (const file of await readdir(join(staging, distDir))) await copyFile(join(staging, distDir, file), join(archive, file));
-  for (const file of ARCHIVED_PACKAGE_FILES) await copyFile(join(staging, pkgDir, file), join(archive, file));
+  for (const file of recipe.archivedFiles) await copyFile(join(staging, pkgDir, file), join(archive, file));
   await copyFile(join(staging, 'pack', pack.filename), join(archive, pack.filename));
   if (values.summary) await writeFile(join(archive, 'index.html'), archivePage(version, values.summary, stable));
   await buildSite({ root: staging, distDir, siteDir: 'site', version });

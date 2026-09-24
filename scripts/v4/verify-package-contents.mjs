@@ -51,6 +51,31 @@ try {
   }
   check('relative links in packaged docs name files in the package', broken.length === 0, broken);
 
+  // K7: a smaller tarball that carries its third-party notices.
+  check('unpacked package is under 1.2 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1200000, packed.unpackedSize);
+  check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
+  check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
+  const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];
+  const bundles = [...files.keys()].filter(path => /^dist\/(go|auto|typeset\.global|index)\.c?js$|^dist\/shared-[A-Z0-9]+\.js$/.test(path));
+  for (const bundle of bundles.filter(path => path !== 'dist/index.js')) {
+    const text = await readFile(`${staged.dir}/${bundle}`, 'utf8');
+    const missing = NOTICES.filter(notice => !text.includes(notice));
+    check(`${bundle} keeps all four third-party license notices`, missing.length === 0 && /\/\*! @license/.test(text), { missing });
+  }
+  check('dist has the browser bundles whose notices were checked', ['dist/go.js', 'dist/typeset.global.js', 'dist/index.cjs'].every(path => bundles.includes(path)) && bundles.some(path => path.startsWith('dist/shared-')), bundles);
+  const maps = [...files.keys()].filter(path => path.endsWith('.map'));
+  /** @type {Record<string, unknown>} */
+  const mapFacts = {};
+  for (const map of maps) {
+    const parsed = JSON.parse(await readFile(`${staged.dir}/${map}`, 'utf8'));
+    mapFacts[map] = { sourcesContent: Array.isArray(parsed.sourcesContent) && parsed.sourcesContent.some(Boolean) };
+  }
+  check('only typeset.global.js and go.js ship source maps, without embedded sources', maps.every(map => ['dist/typeset.global.js.map', 'dist/go.js.map'].includes(map)) && Object.values(mapFacts).every(fact => !(/** @type {{ sourcesContent: boolean }} */ (fact).sourcesContent)), mapFacts);
+  const vendor = JSON.parse(await readFile('vendor/unicode/manifest.json', 'utf8'));
+  const { createHash } = await import('node:crypto');
+  const vendored = createHash('sha256').update(await readFile('src/vendor/unicode-linebreak.js')).digest('hex');
+  check('vendor manifest records the vendored line-break bundle with its license header', vendor.hashes['src/vendor/unicode-linebreak.js'] === vendored, { recorded: vendor.hashes['src/vendor/unicode-linebreak.js'], actual: vendored });
+
   check('packed file list includes the CLI, docs and dist', ['bin/audit.mjs', 'README.md', 'SUPPORT.md', 'MIGRATION.md', 'for-agents.md', 'capabilities.json', 'dist/manifest.json', 'dist/styles.css'].every(path => files.has(path)), [...files.keys()]);
   check('nothing from the repository leaks into the package', [...files.keys()].every(path => !/^(?:output|src|node_modules|\.env|scripts)/.test(path)), [...files.keys()]);
   const report = { version: staged.version, dist: artifacts.dist, tarball: packed.filename, entryCount: packed.entryCount, unpackedSize: packed.unpackedSize, size: packed.size, files: Object.fromEntries(files), checks, errors };

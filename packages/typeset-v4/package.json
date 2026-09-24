@@ -27,5 +27,5 @@
   "publishConfig": { "tag": "latest", "access": "public" },
   "peerDependencies": { "react": "^18.2.0 || ^19.0.0" },
   "peerDependenciesMeta": { "react": { "optional": true } },
-  "license": "MIT"
+  "license": "MIT AND Unicode-3.0"
 }

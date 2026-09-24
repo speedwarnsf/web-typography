@@ -41,6 +41,15 @@ Hashes for every published version live in
   `bugs.url`. The `engines` field (`node >=22`) is removed: it made Yarn 1
   refuse installs of a browser library on older Node. The `typeset-audit`
   CLI needs Node 18.3 or later.
+- The unpacked package is about 0.97 MB, down from 2.57 MB, 73% of which was
+  source maps embedding every engine source. The ESM and CommonJS builds stay
+  readable and unminified and ship without maps (your bundler minifies them;
+  stack traces name real functions). `typeset.global.js` and `go.js` keep
+  maps without embedded sources. Each bundle now ends with the license
+  notices of the code it embeds (@cto.af/linebreak, unicode-trie-runtime,
+  fflate and the Unicode line-break data), which minification had stripped,
+  and `license` is `MIT AND Unicode-3.0`. The notices add about 150 bytes
+  gzip to each bundle.
 
 ### Rendering changes
 
