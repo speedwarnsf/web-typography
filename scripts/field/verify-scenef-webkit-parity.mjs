@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 const config = browsers.find(b => b.name === 'webkit');
 const browser = await config.engine.launch({ executablePath: config.executablePath });
 const report = { samples: [], checks: [] };

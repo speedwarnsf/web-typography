@@ -1,3 +1,4 @@
+// @ts-check
 import { readFile } from 'node:fs/promises';
 
 export const fixtureFont = await readFile('lab/fraunces-latin-variable.woff2');

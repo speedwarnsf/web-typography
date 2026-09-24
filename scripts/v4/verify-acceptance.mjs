@@ -1,3 +1,4 @@
+// @ts-check
 import { mkdir, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 import { releaseIdentity } from './release-evidence.mjs';

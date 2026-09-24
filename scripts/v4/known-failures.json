@@ -1,0 +1,4 @@
+{
+  "note": "Checks expected to fail until the named 4.3 plan item lands. verify-release.mjs reports such a suite as XFAIL, and as XPASS (a failure) once every listed check passes, so each entry is removed by the change that fixes it. label is a regular expression over check labels; browser and modes (candidate, release, staged-release, prebuilt) narrow an entry.",
+  "entries": []
+}

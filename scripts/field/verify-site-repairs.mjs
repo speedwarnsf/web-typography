@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 const base = process.env.SITE_URL || 'http://127.0.0.1:4211';
 const report = { checks: [], errors: [] };

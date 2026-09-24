@@ -11,7 +11,9 @@
     "release:cut": "node scripts/release-cut.mjs",
     "verify:ledger": "node scripts/v4/verify-ledger.mjs",
     "test:v4": "node scripts/v4/verify-release.mjs",
+    "test:release": "node scripts/v4/verify-release.mjs --release",
     "test": "node scripts/v4/verify-release.mjs",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "bench": "node scripts/bench.mjs"
   },
   "dependencies": {

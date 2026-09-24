@@ -31,7 +31,9 @@ jobs:
           node scripts/v4/verify-ledger-guards.mjs
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: |
+          npx tsc --noEmit
+          npx tsc -p tsconfig.scripts.json
 
       - name: Candidate build from the engine sources
         run: npm run build:candidate
@@ -48,7 +50,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit firefox
 
-      - name: Craft, spacing, tracking, clipping, lifecycle and accessibility invariants
+      - name: Every suite against the candidate built from src (craft, spacing, tracking, clipping, lifecycle, accessibility, loaders, CLI)
         run: npm run test:v4
 
       - name: Production website build

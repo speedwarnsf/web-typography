@@ -1,3 +1,4 @@
+// @ts-check
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 

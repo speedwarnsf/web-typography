@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 const base = process.env.SITE_URL || 'http://127.0.0.1:4210';
 const { version } = JSON.parse(await readFile('public/release.json', 'utf8'));

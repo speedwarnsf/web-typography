@@ -1,16 +1,25 @@
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+// @ts-check
+import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
+import { artifacts, expectedVersion } from './candidate.mjs';
 
-const { version } = JSON.parse(await readFile('packages/typeset-v4/package.json', 'utf8'));
-let checks = 0;
+const version = await expectedVersion();
+/** @type {{ browser: string, label: string, pass: boolean, detail?: unknown }[]} */
+const checks = [];
+/** @type {{ browser: string, error: string }[]} */
+const errors = [];
+const loaders = [['package go.js', artifacts.go], ['website go.js', artifacts.siteGo]];
 for (const config of browsers) {
   const browser = await config.engine.launch({ executablePath: config.executablePath });
   try {
-    for (const file of ['packages/typeset-v4/dist/go.js', 'public/go.js']) {
+    for (const [loader, file] of loaders) {
       const content = await readFile(file, 'utf8');
       for (const option of ['default', 'tracking', 'spacing']) {
         const page = await browser.newPage();
+        page.setDefaultTimeout(20000);
+        const label = `${loader} ${option}`;
+        /** @param {string} what @param {unknown} pass @param {unknown} [detail] */
+        const check = (what, pass, detail) => checks.push({ browser: config.name, label: `${label}: ${what}`, pass: !!pass, ...(pass ? {} : { detail }) });
         try {
           await page.setContent('<html lang="en"><style>p{width:320px;font:20px/1.5 Georgia}</style><p data-typeset>Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.</p><p data-no-typeset>Excluded text stays untouched.</p></html>');
           const before = await page.locator('[data-typeset]').textContent();
@@ -20,32 +29,29 @@ for (const config of browsers) {
             if (option === 'spacing') script.dataset.typesetSpacing = 'false';
             script.textContent = content; document.head.append(script);
           }, { content, option });
-          await page.evaluate(() => window.TypesetReady);
-          const result = await page.evaluate(() => ({
-            version: Typeset.VERSION,
-            text: document.querySelector('[data-typeset]').textContent,
-            outcome: document.querySelector('[data-typeset]').dataset.tsOutcome,
-            tracking: document.querySelector('[data-typeset]').dataset.tsTracking,
-            spacing: document.querySelector('[data-typeset]').dataset.tsSpacing,
-            excluded: document.querySelector('[data-no-typeset]').dataset.tsOutcome,
-          }));
-          const label = config.name + ':' + file + ':' + option;
-          assert.equal(result.version, version, label);
-          assert.equal(result.text, before, label);
-          assert.equal(result.outcome, 'composed:rich', label);
-          assert.equal(result.excluded, undefined, label);
-          if (option === 'default') assert.equal(result.tracking, 'applied', label);
-          else assert.equal(result.tracking, 'off', label);
-          if (option === 'spacing') assert.equal(result.spacing, 'off', label);
-          else assert.notEqual(result.spacing, 'off', label);
-          checks += 6;
-          await page.evaluate(() => window.TypesetReady.then(controller => controller.disconnect()));
-          assert.equal(await page.locator('[data-typeset]').textContent(), before, label);
-          assert.equal(await page.locator('[data-ts-track], [data-ts-space], [data-ts-break]').count(), 0, label);
-          checks += 2;
+          await page.evaluate(() => /** @type {any} */ (window).TypesetReady);
+          const result = await page.evaluate(() => {
+            const p = /** @type {HTMLElement} */ (document.querySelector('[data-typeset]'));
+            const excluded = /** @type {HTMLElement} */ (document.querySelector('[data-no-typeset]'));
+            return { version: /** @type {any} */ (window).Typeset.VERSION, text: p.textContent, outcome: p.dataset.tsOutcome, tracking: p.dataset.tsTracking, spacing: p.dataset.tsSpacing, excluded: excluded.dataset.tsOutcome };
+          });
+          check('reports VERSION ' + version, result.version === version, result.version);
+          check('text unchanged', result.text === before, result.text);
+          check('composes rich', result.outcome === 'composed:rich', result.outcome);
+          check('data-no-typeset untouched', result.excluded === undefined, result.excluded);
+          check('tracking ' + (option === 'default' ? 'applied' : 'off'), option === 'default' ? result.tracking === 'applied' : result.tracking === 'off', result.tracking);
+          check('spacing ' + (option === 'spacing' ? 'off' : 'on'), option === 'spacing' ? result.spacing === 'off' : result.spacing !== 'off', result.spacing);
+          await page.evaluate(() => /** @type {any} */ (window).TypesetReady.then((/** @type {any} */ controller) => controller.disconnect()));
+          check('disconnect restores text', await page.locator('[data-typeset]').textContent() === before);
+          check('disconnect removes markers', await page.locator('[data-ts-track], [data-ts-space], [data-ts-break]').count() === 0);
+        } catch (error) {
+          errors.push({ browser: config.name, error: label + ': ' + String(/** @type {Error} */ (error).stack || error) });
         } finally { await page.close(); }
       }
     }
   } finally { await browser.close(); }
 }
-console.log(JSON.stringify({ version, loaderChecks: checks, failed: 0 }));
+const failures = checks.filter(c => !c.pass);
+await writeFile('output/loaders.json', JSON.stringify({ version, loaders: Object.fromEntries(loaders), checks, errors }, null, 2));
+console.log(JSON.stringify({ version, loaderChecks: checks.length, failures, errors }, null, 2));
+if (failures.length || errors.length) process.exitCode = 1;

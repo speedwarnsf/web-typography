@@ -1,3 +1,4 @@
+// @ts-check
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';

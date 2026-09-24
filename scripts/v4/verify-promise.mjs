@@ -1,8 +1,10 @@
+// @ts-check
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 import { releaseIdentity } from './release-evidence.mjs';
+import { reactUnderTest } from './candidate.mjs';
 
 const report={...await releaseIdentity(),checks:[],samples:[],errors:[],browsers:{}};
 const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize} from './src/lib/v4/typeset';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
@@ -14,7 +16,7 @@ function Fixture(){const[bad,setBad]=useState(false),[count,setCount]=useState(0
 <button onClick={()=>setBad(!bad)}>Toggle interference</button><button onClick={()=>setCount(count+1)}>Update source</button>
 <TypesetRichText id="fit" className={bad?'bad':''} opticalHanging lang="en">"A short quotation."</TypesetRichText>
 <TypesetRichText id="linked" className={bad?'bad':''} opticalHanging lang="en">"Read <strong>the curator's notes</strong> at <a href="#notes" onClick={event=>event.preventDefault()}>the neighborhood gallery</a>," she said. There is always <em>another detail</em> to discover. {count>0?'A new exhibition opens tomorrow.':''}</TypesetRichText>
-</>};createRoot(document.getElementById('root')!).render(<React.StrictMode><Fixture/></React.StrictMode>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,format:'iife',target:'es2022'});
+</>};createRoot(document.getElementById('root')!).render(<React.StrictMode><Fixture/></React.StrictMode>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,format:'iife',target:'es2022',plugins:[reactUnderTest()]});
 await mkdir('output/playwright',{recursive:true});
 for(const config of browsers){
   const browser=await config.engine.launch({executablePath:config.executablePath});

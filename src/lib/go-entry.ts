@@ -11,7 +11,8 @@
  *      table cells, definition lists)
  *
  * go.js is GENERATED from the same engine that runs typeset.us
- * (src/lib/typeset.ts) via `npm run build:dist` — never edit it by hand.
+ * (src/lib/typeset.ts); this is the v3 entry, whose build script is preserved
+ * at tag archive/typeset-3.5.1 — never edit a generated go.js by hand.
  * v3 replaces the hand-written v2 script, which had only the pre-render
  * binding pass; this build carries the full pipeline: beam-search
  * composition with contour re-ranking, Tschichold spacing, hanging

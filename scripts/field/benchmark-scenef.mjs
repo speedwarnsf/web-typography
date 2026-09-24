@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 // A script-free public /week snapshot isolates composition from React, server,
 // and network costs. Both versions get the same text targets and real CSS.

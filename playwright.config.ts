@@ -6,18 +6,23 @@ import { defineConfig, devices } from '@playwright/test';
  * layers) was Safari-only and invisible in Chromium. A suite that runs in
  * one engine proves nothing about the other.
  */
+// The static server's port comes from the environment so parallel runs do
+// not collide, and a server left over from another run is never reused.
+const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: `http://localhost:${port}`,
   },
   webServer: {
     command: 'node scripts/static-server.mjs',
-    url: 'http://localhost:4173/go-test.html',
-    reuseExistingServer: !process.env.CI,
+    env: { PORT: String(port) },
+    url: `http://localhost:${port}/go-test.html`,
+    reuseExistingServer: false,
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

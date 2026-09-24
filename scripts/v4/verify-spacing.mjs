@@ -1,15 +1,17 @@
+// @ts-check
 import { browsers } from './browsers.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { releaseIdentity } from './release-evidence.mjs';
 import { build } from 'esbuild';
 import { fixtureFont } from './font-fixture.mjs';
+import { reactUnderTest } from './candidate.mjs';
 
 const proof='Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 const paragraphs=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
 const report={...await releaseIdentity(),checks:[],cases:[],errors:[],browsers:{}};
 await mkdir('output/playwright',{recursive:true});
 const fixtureHTML=await readFile('lab/spacing-react.html','utf8');
-const fixtureBundle=await build({entryPoints:['lab/spacing-react.tsx'],bundle:true,format:'esm',target:'es2022',write:false});
+const fixtureBundle=await build({entryPoints:['lab/spacing-react.tsx'],bundle:true,format:'esm',target:'es2022',write:false,plugins:[reactUnderTest()]});
 for(const {name,engine,executablePath} of browsers){
   const browser=await engine.launch({executablePath});report.browsers[name]=browser.version();
   try{

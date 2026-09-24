@@ -1,6 +1,6 @@
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 // Isolated browser experiment only. Never changes SceneF files or its deployment.
 const bundle = (await build({ entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], bundle: true,

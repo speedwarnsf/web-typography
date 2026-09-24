@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 // An opt-in integration check, not a fixed corpus: SceneF's listings change daily.
 const base = process.env.SCENEF_URL || 'http://127.0.0.1:4213';

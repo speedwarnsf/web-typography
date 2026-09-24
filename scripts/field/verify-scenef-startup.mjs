@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { browsers } from './browsers.mjs';
+import { browsers } from '../v4/browsers.mjs';
 
 const base = process.env.SCENEF_URL || 'http://127.0.0.1:4213';
 const { engine, executablePath } = browsers[0];

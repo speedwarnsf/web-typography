@@ -53,7 +53,8 @@ Read [migration](packages/typeset-v4/MIGRATION.md) and
 npm run dev         # site at localhost:3000
 npm run build:dist  # candidate build from src into output/candidate/; never writes packages/ or public/
 npm run release:cut -- --version x.y.z --summary "…"  # the only step that writes a release (try --dry-run)
-npm test            # current release: craft, spacing, tracking, clipping, lifecycle and accessibility
+npm test            # test:v4: builds the candidate from src, then runs every suite against it (--only, --list)
+npm run test:release  # the same suites against the committed packages/typeset-v4/dist
 npm run bench       # historical V3 benchmark; not a V4 performance claim
 ```
 

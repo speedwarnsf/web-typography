@@ -1,3 +1,4 @@
+// @ts-check
 import { chromium, webkit, firefox } from 'playwright';
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';

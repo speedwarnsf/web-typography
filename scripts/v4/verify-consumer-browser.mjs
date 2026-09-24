@@ -1,3 +1,4 @@
+// @ts-check
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -5,8 +6,8 @@ import { browsers } from './browsers.mjs';
 const installed = JSON.parse(await readFile('output/package-verification.json', 'utf8'));
 if (!installed.verificationToken) throw new Error('Rebuild the packed consumer to obtain its verification token.');
 const reserve = createServer();
-await new Promise(resolve => reserve.listen(0, '127.0.0.1', resolve));
-const available = reserve.address().port;
+await new Promise(resolve => reserve.listen(0, '127.0.0.1', () => resolve(undefined)));
+const available = /** @type {import('node:net').AddressInfo} */ (reserve.address()).port;
 await new Promise(resolve => reserve.close(resolve));
 const port = process.env.CONSUMER_PORT || String(available);
 const base = 'http://127.0.0.1:' + port;

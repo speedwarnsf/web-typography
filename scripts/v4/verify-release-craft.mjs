@@ -1,10 +1,13 @@
+// @ts-check
 import { browsers } from './browsers.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import { smartQuotes } from '../../packages/typeset-v4/dist/index.js';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 import { releaseIdentity } from './release-evidence.mjs';
 import { installFixtureFont } from './font-fixture.mjs';
 
+const { smartQuotes } = await import(pathToFileURL(resolve(process.env.TYPESET_ESM || 'packages/typeset-v4/dist/index.js')).href);
 assert.equal(smartQuotes('"Read Jane\'s notes," she said.'), '\u201cRead Jane\u2019s notes,\u201d she said.');
 assert.equal(smartQuotes('A 6\' 2" frame, a 12" print, and the \'90s.'), 'A 6\' 2" frame, a 12" print, and the \u201990s.');
 assert.equal(smartQuotes('"Read \'the notes\'," she said.'), '\u201cRead \u2018the notes\u2019,\u201d she said.');
@@ -20,7 +23,7 @@ for (const { name, engine, executablePath } of browsers) {
     page.on('pageerror', error => report.errors.push({ browser: name, error: error.message }));
     await page.setContent('<!doctype html><html lang="en"><head><style>body{margin:32px;font:20px/1.4 Georgia;color:#171717;background:white}p{width:240px;margin:0 0 24px;text-wrap:wrap}a{color:#176650}</style></head><body></body></html>');
     await page.addScriptTag({ path: process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js' });
-    await page.addStyleTag({ path: 'packages/typeset-v4/dist/styles.css' });
+    await page.addStyleTag({ path: process.env.TYPESET_STYLES || 'packages/typeset-v4/dist/styles.css' });
     await installFixtureFont(page);
     const checks = await page.evaluate(async () => {
       const api = window.Typeset, checks = [];

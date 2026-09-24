@@ -1,7 +1,9 @@
+// @ts-check
 import { build } from 'esbuild';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
-const bundle = (await build({ entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], bundle: true, format: 'iife', target: 'es2022', write: false })).outputFiles[0].text;
+const bundle = process.env.TYPESET_BUNDLE ? await readFile(process.env.TYPESET_BUNDLE, 'utf8')
+  : (await build({ entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], bundle: true, format: 'iife', target: 'es2022', write: false })).outputFiles[0].text;
 const report = { checks: [], errors: [] };
 for (const { name, engine, executablePath } of browsers) {
   const browser = await engine.launch({ executablePath });
