@@ -1,0 +1,157 @@
+{
+  "note": "Budgets checked by scripts/v4/verify-budgets.mjs. Sizes are gzip bytes and fail on more than size.tolerance growth. Runtime budgets are medians of repeated runs in Chromium at 4x CPU: observers and listeners created may not grow at all, observe() calls may not exceed budget x callTolerance, DOM mutation records budget x writeTolerance, and times max(budget x timeTolerance, budget + timeFloorMs); times are enforced only on the calibration platform. Budgets start at the values measured when they were introduced (4.2.0's engine) and are lowered as the 4.3 performance work lands; raise one only with a recorded reason.",
+  "size": {
+    "tolerance": 0.02,
+    "gzip": {
+      "mount-only": 37735,
+      "TypesetText-only": 38027,
+      "TypesetRichText-only": 33393,
+      "smartQuotes-only": 11713,
+      "react.js+shared": 39899,
+      "go.js": 42682,
+      "typeset.global.js": 42493
+    }
+  },
+  "runtime": {
+    "lane": "chromium@4x",
+    "timeTolerance": 1.5,
+    "timeFloorMs": 30,
+    "callTolerance": 1.1,
+    "writeTolerance": 1.05,
+    "scenarios": {
+      "mount-200": {
+        "visibleMs": 213,
+        "readyMs": 7817,
+        "tbtMs": 1041,
+        "longestTaskMs": 124,
+        "mutationObservers": 1,
+        "mutationObserve": 195,
+        "resizeObservers": 1,
+        "resizeObserve": 201,
+        "intersectionObservers": 1,
+        "intersectionObserve": 200,
+        "windowListeners": 1,
+        "documentListeners": 1,
+        "fontListeners": 2,
+        "nodeWrites": 53621
+      },
+      "mount-1000": {
+        "visibleMs": 258,
+        "tbtMs": 8152,
+        "longestTaskMs": 168,
+        "mutationObservers": 1,
+        "mutationObserve": 996,
+        "resizeObservers": 1,
+        "resizeObserve": 1001,
+        "intersectionObservers": 1,
+        "intersectionObserve": 1000,
+        "windowListeners": 1,
+        "documentListeners": 1,
+        "fontListeners": 2,
+        "nodeWrites": 268476
+      },
+      "react-plain-38": {
+        "commitMs": 4,
+        "tbtMs": 0,
+        "mutationObservers": 0,
+        "mutationObserve": 0,
+        "resizeObservers": 0,
+        "resizeObserve": 0,
+        "intersectionObservers": 0,
+        "intersectionObserve": 0,
+        "windowListeners": 0,
+        "documentListeners": 0,
+        "fontListeners": 0,
+        "nodeWrites": 1
+      },
+      "react-typeset-38": {
+        "commitMs": 161,
+        "tbtMs": 136,
+        "longestTaskMs": 186,
+        "mutationObservers": 38,
+        "mutationObserve": 1596,
+        "resizeObservers": 38,
+        "resizeObserve": 76,
+        "intersectionObservers": 38,
+        "intersectionObserve": 38,
+        "windowListeners": 38,
+        "documentListeners": 1,
+        "fontListeners": 39,
+        "nodeWrites": 1210
+      },
+      "react-rich-38": {
+        "commitMs": 78,
+        "tbtMs": 271,
+        "longestTaskMs": 151,
+        "mutationObservers": 38,
+        "mutationObserve": 2394,
+        "resizeObservers": 38,
+        "resizeObserve": 76,
+        "intersectionObservers": 0,
+        "intersectionObserve": 0,
+        "windowListeners": 38,
+        "documentListeners": 1,
+        "fontListeners": 38,
+        "nodeWrites": 3893
+      },
+      "storm": {
+        "elapsedMs": 1357,
+        "tbtMs": 10,
+        "longestTaskMs": 56,
+        "passes": 41,
+        "mutationObservers": 0,
+        "mutationObserve": 41,
+        "resizeObservers": 0,
+        "resizeObserve": 0,
+        "intersectionObservers": 0,
+        "intersectionObserve": 207,
+        "windowListeners": 0,
+        "documentListeners": 0,
+        "fontListeners": 0,
+        "nodeWrites": 2708
+      },
+      "hidden": {
+        "visibleMs": 241,
+        "tbtMs": 1045,
+        "longestTaskMs": 122,
+        "mutationObservers": 0,
+        "mutationObserve": 193,
+        "resizeObservers": 0,
+        "resizeObserve": 0,
+        "intersectionObservers": 0,
+        "intersectionObserve": 200,
+        "windowListeners": 0,
+        "documentListeners": 1,
+        "fontListeners": 0,
+        "nodeWrites": 53622
+      },
+      "late-font": {
+        "settledMs": 12565,
+        "tbtMs": 1809,
+        "longestTaskMs": 148,
+        "mutationObservers": 0,
+        "mutationObserve": 196,
+        "resizeObservers": 0,
+        "resizeObserve": 0,
+        "intersectionObservers": 0,
+        "intersectionObserve": 200,
+        "windowListeners": 0,
+        "documentListeners": 0,
+        "fontListeners": 0,
+        "nodeWrites": 97885
+      }
+    }
+  },
+  "calibrated": {
+    "size": {
+      "date": "2026-09-24",
+      "dist": "output/candidate/dist"
+    },
+    "runtime": {
+      "date": "2026-09-24",
+      "dist": "output/candidate/dist",
+      "repeat": 3,
+      "platform": "darwin-arm64"
+    }
+  }
+}

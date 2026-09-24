@@ -112,8 +112,8 @@ export default function EssayPage() {
           line may not end on a word that belongs to the next one. A
           paragraph may not abandon its last word. The right edge should move
           the way a book&rsquo;s does: gently, without cliffs. Within those
-          rules it chooses among thousands of candidate compositions, at
-          about a millisecond and a half per paragraph.
+          rules it chooses among thousands of candidate compositions in a
+          few milliseconds per paragraph.
         </p>
 
         <p>

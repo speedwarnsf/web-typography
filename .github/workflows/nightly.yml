@@ -1,0 +1,56 @@
+name: Nightly
+
+# Slower and platform-sensitive checks that do not gate every pull request:
+# the committed release artifacts, Gecko's accessibility tree through
+# Marionette, runtime budgets, and the ledger's registry cross-check.
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Published artifacts match the npm registry
+        run: node scripts/v4/verify-ledger.mjs --network
+
+      - name: Every suite against the committed release artifacts
+        run: npm run test:release
+
+      - name: Engine accessibility trees, including Gecko through Marionette
+        env:
+          TYPESET_AX_FIREFOX: '1'
+        run: node scripts/v4/verify-release.mjs --only native-ax --timeout 600
+
+      - name: Runtime budgets (Chromium, 4x CPU; times enforced only on the calibration platform)
+        run: |
+          npm run build:candidate
+          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-budgets.mjs --runtime --repeat 3
+
+      - name: Full benchmark
+        if: always()
+        run: TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/bench-v4.mjs --out output/bench-v4.json
+
+      - name: Retain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typeset-nightly
+          path: output/*.json
+          retention-days: 30

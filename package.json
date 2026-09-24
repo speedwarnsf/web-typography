@@ -14,7 +14,8 @@
     "test:release": "node scripts/v4/verify-release.mjs --release",
     "test": "node scripts/v4/verify-release.mjs",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
-    "bench": "node scripts/bench.mjs"
+    "bench": "node scripts/v4/bench-v4.mjs",
+    "budgets": "node scripts/v4/verify-budgets.mjs"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.0",

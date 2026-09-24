@@ -35,8 +35,13 @@ count.
 - `public/releases/published.json` records every published artifact by hash;
   `verify:ledger` and CI fail if any changes.
 - `npm test` builds the candidate and runs every suite against it, including
-  the CLI and engine accessibility trees (`verify-native-ax.mjs`).
-  `npm run test:release` runs them against the committed dist.
+  the CLI, engine accessibility trees (`verify-native-ax.mjs`) and gzip size
+  budgets. `npm run test:release` runs them against the committed dist.
+- `npm run bench` is the V4 benchmark (`scripts/v4/bench-v4.mjs`): mount(),
+  typesetAll(), React screens, ancestor class storms, hidden-to-shown and late
+  fonts at 1x and 4x CPU, with long tasks, observers, listeners, DOM writes
+  and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
+  Runtime budgets run nightly and at release cut.
 
 ## 4.1.0 - 2026-09-17
 

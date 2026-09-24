@@ -103,6 +103,9 @@ try {
     const run = spawnSync(process.execPath, ['scripts/v4/verify-release.mjs', '--prebuilt'], { cwd: repo, env, stdio: 'inherit' });
     report.preconditions['staged release passes test:v4'] = { pass: run.status === 0 };
     if (run.status !== 0 && !dryRun) throw new Error('release-cut: the staged release failed test:v4. Nothing was written.');
+    const budgets = spawnSync(process.execPath, ['scripts/v4/verify-budgets.mjs', '--runtime'], { cwd: repo, env, stdio: 'inherit' });
+    report.preconditions['staged release meets runtime budgets'] = { pass: budgets.status === 0 };
+    if (budgets.status !== 0 && !dryRun) throw new Error('release-cut: the staged release exceeded its runtime budgets. Nothing was written.');
   }
 
   // A dry run for a recorded version proves the recipe reproduces it.

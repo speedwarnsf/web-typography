@@ -55,7 +55,7 @@ npm run build:dist  # candidate build from src into output/candidate/; never wri
 npm run release:cut -- --version x.y.z --summary "…"  # the only step that writes a release (try --dry-run)
 npm test            # test:v4: builds the candidate from src, then runs every suite against it (--only, --list)
 npm run test:release  # the same suites against the committed packages/typeset-v4/dist
-npm run bench       # historical V3 benchmark; not a V4 performance claim
+npm run bench       # V4 benchmark: mount, typesetAll, React, storms, fonts, sizes (docs/BENCHMARKS.md)
 ```
 
 MIT © Dustin York — [typeset.us/support](https://typeset.us/support)
