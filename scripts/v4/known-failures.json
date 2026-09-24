@@ -57,6 +57,15 @@
       ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, whose go.js stays silent when no element matches (K6)."
+    },
+    {
+      "script": "verify-package-contents",
+      "label": "^(React adapters declare ReactElement|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.2 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release packs the committed 4.2.0 dist beside the 4.3 package.json: it has inferred React types, no dist/auto.js, maps with embedded sources and no license comments (K3, K6, K7)."
     }
   ]
 }
