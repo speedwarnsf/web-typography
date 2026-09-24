@@ -28,10 +28,10 @@ export default function UtilityPage() {
         
         <div className="text-lg text-neutral-400 mb-12 space-y-6 leading-relaxed" style={{ fontFamily: "var(--font-source-sans)" }}>
           <p>
-            The web wasn't built for typographers. By default, browsers allow lonely orphans on the last line of a paragraph, string together clunky rags, leave punctuation awkwardly stranded, and render lists with unrefined spacing.
+            The web wasn't built for typographers. Browsers fill each line until the words run out: short words like &ldquo;a&rdquo; and &ldquo;the&rdquo; get stranded at line ends, thoughts snap mid-phrase, and without <code>text-wrap: pretty</code> (Firefox has none) a single word can be left alone on the last line.
           </p>
           <p>
-            <strong>typeset.ts</strong> is a universal typographic enhancement script that fixes all of this dynamically. You drop it into your project, feed it an HTML element, and it applies professional typesetting rules—binding orphans, balancing rags, injecting exact typographic measurements, and bringing structural elegance to your web typography without requiring manual CSS overrides.
+            <strong>Typeset</strong> chooses where the lines of a paragraph, heading or list item break, keeps links and styling exactly as authored, and checks every result after it renders. It sets horizontal, left-to-right Latin-script text in English, French, German and Spanish; anything it cannot improve safely keeps the browser&rsquo;s own layout, and says why. It does not hyphenate or justify.
           </p>
           <div className="relative z-50 isolate mt-4">
             <EssayModal />

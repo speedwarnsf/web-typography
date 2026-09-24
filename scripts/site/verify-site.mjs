@@ -10,7 +10,11 @@
 //   site; /api/fetch-url refuses loopback, metadata and private addresses and
 //   rate-limits; go@4.2.0.js still loads cross-origin with its SRI hash.
 //   --audit also requires `npm audit` to report no high or critical issue.
-// content: checks added by the docs items (install snippets, homepage copy).
+// content (D4, D5): install lines pinned with sri.json's hash; titles,
+//   descriptions and og:images; the homepage names its baseline per engine
+//   and claims a one-word last line only where the engine produces one;
+//   developer links and framework recipes. --network also resolves the
+//   GitHub and npm links.
 //
 // Writes output/site-verification.json. Needs .next from `npm run build`.
 import { spawn, spawnSync } from 'node:child_process';
@@ -19,7 +23,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { browsers } from '../v4/browsers.mjs';
 
-const { values } = parseArgs({ options: { only: { type: 'string' }, audit: { type: 'boolean', default: false }, port: { type: 'string' } } });
+const { values } = parseArgs({ options: { only: { type: 'string' }, audit: { type: 'boolean', default: false }, network: { type: 'boolean', default: false }, port: { type: 'string' } } });
 const sections = new Set((values.only ?? 'security,content').split(','));
 /** @type {{ section: string, label: string, pass: boolean, browser?: string, detail?: unknown }[]} */
 const checks = [];
@@ -175,7 +179,8 @@ try {
     // integrity hash from public/sri.json; the evergreen go.js appears only
     // with its label.
     const sri = JSON.parse(await readFile('public/sri.json', 'utf8'));
-    const decode = (/** @type {string} */ html) => html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+    // React separates adjacent text with <!-- --> in server HTML.
+    const decode = (/** @type {string} */ html) => html.replace(/<!-- -->/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
     const installIndex = await (await fetch(base + '/install')).text();
     const platforms = [...new Set([...installIndex.matchAll(/href="(\/install\/[a-z-]+)"/g)].map(m => m[1]))];
     for (const route of ['/', '/install', ...platforms, '/utility', '/essay', '/fix']) {
@@ -187,6 +192,64 @@ try {
         return !/never move to 5\.0/.test(html);
       }).map(m => m[0]);
       check('content', `${route}: install lines are pinned with sri.json's integrity (go.js only with its label)`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+    }
+
+    // D5: titles, descriptions and unfurl images.
+    for (const route of ['/', '/support', '/library', '/install/frameworks']) {
+      const html = decode(await (await fetch(base + route)).text());
+      const meta = (/** @type {string} */ key) => new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
+      const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
+      const image = meta('og:image');
+      let imageOK = false;
+      if (image) { const r = await fetch(image.replace(/^https?:\/\/[^/]+/, base)); imageOK = r.status === 200 && /image\/png/.test(r.headers.get('content-type') ?? ''); }
+      check('content', `${route}: own title, description and an og:image that renders`, !!title && !!meta('description') && !!meta('og:title') && imageOK, { title, description: meta('description'), image, imageOK });
+    }
+    check('content', '/ and /support have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/support')).text()).includes('<title>Support Typeset'));
+
+    // D5: the homepage names its baseline by engine and claims only what that
+    // engine does; the developer band links to GitHub, npm and the docs.
+    const developer = decode(await (await fetch(base + '/')).text());
+    for (const [label, href] of [['GitHub', 'https://github.com/speedwarnsf/web-typography'], ['npm', 'https://www.npmjs.com/package/typeset.us'], ['framework recipes', '/install/frameworks']]) {
+      check('content', `homepage links to ${label}`, developer.includes(`href="${href}"`));
+    }
+    check('content', 'homepage states a measured loader size, not "38 KB", and no "--" dash', !/38(&nbsp;|\s)KB/.test(developer) && !developer.includes('doing -- visible') && /\d+\.\d(&nbsp;|\s)KB gzipped/.test(developer));
+    const frameworks = await (await fetch(base + '/install/frameworks')).text();
+    check('content', '/install/frameworks has Next.js, Vite, Astro, SvelteKit and Vue recipes', ['Next.js (App Router)', 'Vite + React', 'Astro', 'SvelteKit', 'Vue and Nuxt'].every(t => frameworks.includes(t)));
+    for (const config of browsers) {
+      const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
+      try {
+        const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+        await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
+        const page = await context.newPage();
+        page.setDefaultTimeout(20000);
+        await page.goto(base + '/', { waitUntil: 'load' });
+        await page.locator('#v2-squeeze-input').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1200);
+        const pretty = await page.evaluate(() => /pretty/.test(getComputedStyle(/** @type {HTMLElement} */ (document.querySelector('.v2-panel'))).getPropertyValue('text-wrap-style') || getComputedStyle(/** @type {HTMLElement} */ (document.querySelector('.v2-panel'))).getPropertyValue('text-wrap')));
+        const baseline = await page.locator('#v2-baseline').textContent();
+        const note = await page.locator('#v2-squeeze-note').textContent();
+        let orphanWidths = 0, hangingBrowser = 0, hangingTypeset = 0;
+        for (let width = 250; width <= 345; width += 5) {
+          await page.locator('#v2-squeeze-input').fill(String(width));
+          await page.waitForTimeout(150);
+          const row = await page.evaluate(() => [...document.querySelectorAll('.v2-stat-row')].map(r => [...r.querySelectorAll('.v2-stat-vals em')].map(e => e.textContent)));
+          hangingBrowser += Number(row[0]?.[0] ?? 0); hangingTypeset += Number(row[0]?.[1] ?? 0);
+          if (row[1]?.[0] === 'yes') orphanWidths++;
+        }
+        const claimsOrphan = /alone on the last line/.test(note ?? '');
+        check('content', 'homepage names the baseline by what this engine does', pretty ? /with CSS text-wrap: pretty/.test(baseline ?? '') : /has no text-wrap: pretty/.test(baseline ?? ''), { pretty, baseline }, config.name);
+        check('content', 'homepage claims a one-word last line only in an engine that produced one', claimsOrphan ? orphanWidths > 0 : true, { claimsOrphan, orphanWidths, note }, config.name);
+        check('content', 'homepage lead claim holds: the browser leaves more short words hanging than Typeset', hangingBrowser > hangingTypeset, { hangingBrowser, hangingTypeset, widths: 20 }, config.name);
+        await context.close();
+      } finally { await browser.close(); }
+    }
+    if (values.network) {
+      // npmjs.com answers scripts with 403, so the npm link is checked through
+      // the registry, which serves the same package.
+      for (const [label, url] of [['GitHub link', 'https://github.com/speedwarnsf/web-typography'], ['npm link (registry)', 'https://registry.npmjs.org/typeset.us']]) {
+        const r = await fetch(url, { method: 'GET', redirect: 'follow' }).catch(() => null);
+        check('content', `${label} resolves: ${url}`, r?.status === 200, r?.status);
+      }
     }
   }
 } catch (error) {

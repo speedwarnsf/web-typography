@@ -6,6 +6,7 @@
  * every snippet moves to the new version together.
  */
 import sri from '../../public/sri.json';
+import release from '../../public/release.json';
 
 const files = sri.files as Record<string, string>;
 
@@ -28,6 +29,9 @@ export const LIBRARY_SNIPPET: string = files[`typeset@${sri.version}.min.js`]
   ? `<script src="https://typeset.us/typeset@${sri.version}.min.js" integrity="${files[`typeset@${sri.version}.min.js`]}" crossorigin="anonymous"></script>`
   : '<script src="https://typeset.us/typeset.min.js"></script>';
 export const LIBRARY_PINNED = !!files[`typeset@${sri.version}.min.js`];
+
+/** The pinned loader's gzip size in KB, as release-cut measured it. */
+export const LOADER_GZIP_KB: string = (release.loader.gzipBytes / 1000).toFixed(1);
 
 /** The evergreen loader. Always shown with EVERGREEN_NOTE. */
 export const EVERGREEN_SNIPPET = '<script src="https://typeset.us/go.js" defer></script>';

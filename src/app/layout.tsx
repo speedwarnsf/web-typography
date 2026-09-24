@@ -72,9 +72,9 @@ const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: 
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://typeset.us'),
-  title: "Typeset — A New Era in Web Typography",
+  title: "Typeset: better line breaks for web text",
   description:
-    "The web finally knows how to break lines. Watch the proof, live: beam-search composition, hanging punctuation, and Tschichold spacing — set by its own engine, in your browser.",
+    "No stranded short words or one-word last lines. Grammar-aware line breaks that keep links and styling intact, checked after rendering in Chrome, Safari and Firefox.",
 };
 
 export const viewport = {

@@ -85,6 +85,23 @@ Hashes for every published version live in
   docs/ops/vercel-firewall.md has the firewall bypass that stops bot
   challenges on these paths; it is applied in the Vercel project, not here.
 
+### Website copy (typeset.us)
+
+- The homepage names its baseline by engine ("Your browser, with CSS
+  text-wrap: pretty" in Chrome and Safari; "Firefox has no text-wrap:
+  pretty"), leads with the short words the browser leaves at line ends, and
+  claims a one-word last line only in an engine that produces one. It had
+  said "your browser abandons a word" in every engine, although Chrome and
+  Safari never did at any of the 96 widths.
+- A "For developers" band: the pinned script tag, npm and React, a "Do I
+  need it?" table against CSS `text-wrap`, the measured gzip size from
+  release.json (it said 38 KB; 4.2.0's loader is 42.4 KB), and links to
+  GitHub, npm, the docs and new framework recipes at /install/frameworks
+  (Next.js, Vite, Astro, SvelteKit, Vue). /utility describes the supported
+  scope instead of "universal ... fixes all of this".
+- /, /support and /library have their own titles, descriptions and unfurl
+  images.
+
 ### Contributing
 
 - CONTRIBUTING.md (setup, building the candidate, running and narrowing the

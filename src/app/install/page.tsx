@@ -36,7 +36,8 @@ export default function InstallIndex() {
       <p className="in-fine">
         Just trying it out? <code data-no-typeset>{EVERGREEN_SNIPPET}</code>{' '}
         also works. {EVERGREEN_NOTE} Building with npm?{' '}
-        <code data-no-typeset>{NPM_INSTALL}</code>.
+        <code data-no-typeset>{NPM_INSTALL}</code>, then see the{' '}
+        <Link href="/install/frameworks">framework recipes</Link>.
       </p>
 
       <div className="in-grid">
