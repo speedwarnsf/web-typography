@@ -345,6 +345,11 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   } finally { restoreMarkers.reverse().forEach(restore => restore()); }
 }
 
+/** Whether a generated break at `offset` stands in for a collapsed space. */
+export function breakReplacesSpace(source: string, offset: number): boolean {
+  return offset > 0 && /\s/u.test(source[offset - 1]);
+}
+
 interface Split { head: Text; parts: Text[] }
 export interface RichOutput { cleanup: () => void; nodes: Node[] }
 
@@ -360,6 +365,7 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   if (breaks.length) element.style.setProperty('text-wrap-style', 'auto', 'important');
   const renderedStyle = element.getAttribute('style');
   const runs = textRuns(element);
+  const source = element.textContent || '';
   const markers: HTMLElement[] = [];
   const splits = new Map<Text, Split>();
   const insertions = [...breaks.map(offset => ({ offset, px: 0, spacing: false })), ...hangs.map(hang => ({ ...hang, spacing: false })),
@@ -370,7 +376,10 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     const head = point.node as Text;
     const marker = element.ownerDocument.createElement(px ? 'span' : 'br');
     marker.setAttribute(BREAK_ATTRIBUTE, '');
-    marker.setAttribute('aria-hidden', 'true');
+    // The space before a generated break collapses at the line end, so the
+    // break is the only word separator left for assistive technology. A
+    // break after a hyphen or dash separates no words and stays hidden.
+    if (px || !breakReplacesSpace(source, offset)) marker.setAttribute('aria-hidden', 'true');
     if (spacing) {
       marker.dataset.tsSpace = String(offset);
       Object.assign(marker.style, spacingMarkerStyle(px));

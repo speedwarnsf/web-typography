@@ -23,8 +23,29 @@ Hashes for every published version live in
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each default-output change in 4.3 is listed here with its golden-diff count:
+the published 4.2.0 build against the candidate over the same blocks in
+Chromium, WebKit and Firefox (element screenshots at DPR 2, `measureLayout`
+line boxes, outcomes, feature statuses, copy text and markup).
+
+- **Generated line breaks are word separators again (accessibility, C2).** A
+  generated `<br>` that stands in for a collapsed space is no longer
+  `aria-hidden`, so engine accessibility trees stop joining the words on either
+  side of it ("galleryguide"), including inside link and heading names. A break
+  after a hyphen or dash stays hidden, so "public-health" is still one word.
+  Spacing and hanging markers are `display: inline` instead of `inline-block`,
+  which stops Chromium dropping the word space beside them. The same applies
+  to `TypesetRichText`. Assistive technology now meets a line boundary at each
+  generated break, and WebKit accessible names contain a newline there.
+  Golden diff over 316 blocks (309 composed) in each engine: markup changed in
+  311 blocks (310 in WebKit), only in those two attributes; 1,087 of 1,103
+  generated breaks are now exposed and 16 hyphen breaks stay hidden; 0
+  screenshots, 0 line boxes, 0 outcomes, 0 feature statuses and 0 copied texts
+  changed.
+- The legacy `renderFrozenLines()` export no longer sets the non-ARIA
+  `role="text"`, which emptied a composed heading's accessible name in WebKit,
+  and clears the element with `replaceChildren()` instead of `innerHTML`, so it
+  runs under Trusted Types.
 
 ### Development
 

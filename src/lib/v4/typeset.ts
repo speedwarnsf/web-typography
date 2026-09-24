@@ -1497,17 +1497,13 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[], runs?: InlineRun
   const fontSizePx = parseFloat(cs.fontSize) || 16;
   const measurer = makeMeasurer(p);
   safeWrite(() => {
-    p.innerHTML = "";
+    // Not innerHTML: a Trusted Types policy of 'none' rejects every HTML sink.
+    p.replaceChildren();
     p.dataset.typesetDone = "1";
-    // Plain paragraphs read as one text run. Rich-composed paragraphs carry
-    // cloned <a>/<em>/<code> inside their lines — role="text" would flatten
-    // them in WebKit/VoiceOver and take the links out of the accessibility
-    // tree, so those keep their native semantics. A plain-composed element
-    // can turn rich later (content mutated in place, then recomposed): shed
-    // OUR stale role then — only the exact value this engine sets, so an
-    // author-assigned role is never touched.
-    if (!runs) p.setAttribute("role", "text");
-    else if (p.getAttribute("role") === "text") p.removeAttribute("role");
+    // No role="text": it is not an ARIA role. WebKit honoured it by flattening
+    // the element, which emptied a composed heading's accessible name.
+    // Block-level lines already give every engine a word boundary between
+    // lines, in names and in reading order, so no line break is emitted.
 
 
     lines.forEach((line, i) => {

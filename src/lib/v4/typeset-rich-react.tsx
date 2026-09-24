@@ -2,7 +2,7 @@
 
 import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from 'react';
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
-import { BREAK_ATTRIBUTE, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
+import { BREAK_ATTRIBUTE, breakReplacesSpace, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
 import { measureLayout } from './layout-metrics';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
@@ -72,7 +72,8 @@ function trackingForTree(plan: TrackingPlan, children: ReactNode): TrackingPlan 
 
 function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean): ReactNode {
   let offset = 0;
-  const educated = educate ? smartQuotes(quoteSource(children)) : null;
+  const source = quoteSource(children);
+  const educated = educate ? smartQuotes(source) : null;
   const optical = new Map(hangs.map(hang => [hang.offset, hang.px]));
   const spacing = new Map(spaces.map(space => [space.offset, space.px]));
   const visit = (nodes: ReactNode): ReactNode => Children.map(nodes, child => {
@@ -99,7 +100,8 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       for (const stop of stops) {
         const local = stop - start;
         append(text.slice(cursor, local), start + cursor);
-        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true }), stop, true);
+        // Exposed where it stands in for the collapsed space; see renderRichText.
+        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true }), stop, true);
         if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
         if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
         cursor = local;

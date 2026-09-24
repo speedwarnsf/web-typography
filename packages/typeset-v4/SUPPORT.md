@@ -96,7 +96,10 @@ lane, at 320, 375 and 768 px. The 4.2.0 build fails these checks: its hidden
 generated line breaks join the words on either side of each break, including
 inside link and heading names, and Chromium also drops some word spaces beside
 spacing markers. `auditJSON()` reports both conditions as `hidden-break` and
-`isolated-space` errors. Local coverage also includes keyboard navigation,
+`isolated-space` errors. From 4.3, a generated break that stands in for a space
+is exposed, so assistive technology meets a line boundary there (WebKit names
+contain a newline), a break after a hyphen stays hidden, and spacing and
+hanging markers are empty, hidden and `display: inline`. Local coverage also includes keyboard navigation,
 emulated touch/rotation, 200%/400% text sizing,
 delayed variable fonts, source updates and no-JavaScript rendering. The macOS
 clipboard suite uses headed Chromium/WebKit/Firefox, trusted copy/paste events

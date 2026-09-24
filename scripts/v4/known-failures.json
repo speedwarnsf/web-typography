@@ -4,30 +4,9 @@
     {
       "script": "verify-native-ax",
       "label": "^candidate: .* (composed block words|link names|heading names) equal source$",
-      "modes": ["candidate", "prebuilt", "staged-release"],
-      "awaiting": "C2",
-      "reason": "The engine hides its generated <br> from assistive technology and renders spacing markers inline-block, so engine accessibility trees join the words around each generated break and beside some markers. C2 unhides the break and makes the markers display:inline."
-    },
-    {
-      "script": "verify-native-ax",
-      "label": "^candidate: .* (composed block words|link names|heading names) equal source$",
       "modes": ["release"],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed packages/typeset-v4/dist, which is the published 4.2.0 build with the joined-word defect until 4.3.0 is cut."
-    },
-    {
-      "script": "verify-release-craft",
-      "label": "^JSON audit passes the composed release sample$",
-      "modes": ["candidate", "prebuilt", "staged-release"],
-      "awaiting": "C2",
-      "reason": "auditJSON reports hidden-break and isolated-space errors on the engine's own composed output until C2 changes that output."
-    },
-    {
-      "script": "verify-cli",
-      "label": ": audit passes$",
-      "modes": ["candidate", "prebuilt", "staged-release"],
-      "awaiting": "C2",
-      "reason": "The CLI returns auditJSON, which reports hidden-break and isolated-space errors on composed output until C2."
     }
   ]
 }
