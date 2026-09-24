@@ -139,7 +139,10 @@ There is no disabled code path for it either.
 
 The harness is committed as `bind-harness.mjs`; the derivation corpus is
 `corpus.json`. Weights are injected at runtime via `__TYPESET_BIND__`, so a
-sweep needs no rebuild:
+sweep needs no rebuild per weight. Since 4.3 the published bundles compile
+that hook out (a page global must not change composition), so the harness
+serves a research build of the website loader from `src/` with the hook
+defined:
 
 ```js
 import { measure } from './bind-harness.mjs';

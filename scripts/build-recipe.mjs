@@ -16,7 +16,9 @@ export const sri = bytes => 'sha384-' + createHash('sha384').update(bytes).diges
 /** @param {Uint8Array} bytes */
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
-const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true };
+// The bind-weight research hook (typeset.ts bindWeights) is compiled out of
+// every artifact. A source that does not mention the name builds unchanged.
+const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true, define: { __TYPESET_BIND_OVERRIDE__: 'undefined' } };
 
 /**
  * The npm package's dist/: ESM with a shared chunk, CJS, and the two IIFEs.

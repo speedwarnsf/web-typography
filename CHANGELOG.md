@@ -47,6 +47,18 @@ line boxes, outcomes, feature statuses, copy text and markup).
   and clears the element with `replaceChildren()` instead of `innerHTML`, so it
   runs under Trusted Types.
 
+### Fixed
+
+- **Strict Content Security Policy and Trusted Types (C5).** Measurement and
+  line-wrap styles are restored property by property through the CSSOM, never
+  by writing the style attribute. Under `style-src` without `'unsafe-inline'`,
+  4.2 left `white-space: nowrap` on paragraphs and links in Chromium and WebKit,
+  erased the author's CSSOM styles in Firefox (a 300px width became the
+  container width), and logged a CSP error on every pass. `TypesetRichText`
+  declined as `native:rich-whitespace` under that policy. Published bundles no
+  longer read the bind-weight research global `__TYPESET_BIND__`; the research
+  harness builds its own loader.
+
 ### Development
 
 - `npm run build:dist` (also `build:candidate`) builds the engine into

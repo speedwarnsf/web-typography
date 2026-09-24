@@ -80,6 +80,17 @@ native overflow is never extra room for a newly composed line. The 0.5px
 layout rounding allowance remains; fallback is reported instead of presenting
 unprocessed native text as successful composition.
 
+Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
+for styles and no 'unsafe-eval'. It writes and restores styles through the
+CSSOM only, never the style attribute, injects no <style> element and uses no
+HTML sink, so it also runs under require-trusted-types-for 'script' with
+trusted-types 'none'. Allow the origin that serves the script. 4.2 restored
+its measurement styles through the style attribute, which such a policy
+refuses: paragraphs kept white-space:nowrap in Chromium and WebKit, and
+Firefox erased author CSSOM styles. `scripts/v4/verify-strict-csp.mjs` runs
+typeset, recomposition, restore, copy, go.js and both React adapters under
+that policy in three engines.
+
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are

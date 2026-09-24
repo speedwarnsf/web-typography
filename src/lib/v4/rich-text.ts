@@ -86,18 +86,40 @@ export function selectionBookmark(element: HTMLElement): () => void {
   };
 }
 
-/** Temporarily modify only named properties and restore their priorities exactly. */
+/** Snapshot every inline longhand with its priority. */
+function inlineStyle(element: HTMLElement): Map<string, [string, string]> {
+  const style = element.style, saved = new Map<string, [string, string]>();
+  for (let i = 0; i < style.length; i++) saved.set(style[i], [style.getPropertyValue(style[i]), style.getPropertyPriority(style[i])]);
+  return saved;
+}
+
+/** Put an inline snapshot back through the CSSOM only. Writing the style
+ * attribute is inline-style injection: a style-src policy without
+ * 'unsafe-inline' blocks it, which left nowrap behind in Chromium and WebKit
+ * and erased author CSSOM styles in Firefox. Removing the attribute is allowed. */
+function restoreInlineStyle(element: HTMLElement, saved: Map<string, [string, string]>, hadAttribute: boolean): void {
+  const style = element.style;
+  for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.has(name)) style.removeProperty(name);
+  for (const [name, [value, priority]] of saved) {
+    if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
+  }
+  if (!hadAttribute && !style.length) removeStyleAttribute(element);
+}
+
+/** Resolve the live Attr first: Chromium serializes CSSOM changes into the
+ * attribute lazily, and removeAttribute('style') before that is a no-op that
+ * leaves style="" behind. */
+function removeStyleAttribute(element: HTMLElement): void {
+  const attribute = element.getAttributeNode('style');
+  if (attribute) element.removeAttributeNode(attribute);
+}
+
+/** Temporarily modify only named properties, then restore every longhand
+ * they touched (shorthands such as white-space and text-wrap) exactly. */
 function override(element: HTMLElement, properties: Record<string, string>): () => void {
-  const saved = element.getAttribute('style');
+  const hadAttribute = element.hasAttribute('style'), saved = inlineStyle(element);
   for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, 'important');
-  return () => {
-    // Resolve the live Attr first so lazy CSSOM serialization is synchronized.
-    if (saved === null) {
-      const attribute = element.getAttributeNode('style');
-      if (attribute) element.removeAttributeNode(attribute);
-    }
-    else element.setAttribute('style', saved);
-  };
+  return () => restoreInlineStyle(element, saved, hadAttribute);
 }
 
 function unsupported(element: HTMLElement): string | null {
@@ -357,13 +379,12 @@ export interface RichOutput { cleanup: () => void; nodes: Node[] }
  * are reversible; their original head object is retained for restoration. */
 export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
   const restoreSelection = selectionBookmark(element);
-  const originalStyle = element.getAttribute('style');
+  const hadStyle = element.hasAttribute('style');
   const wrapStyle = element.style.getPropertyValue('text-wrap-style');
   const wrapPriority = element.style.getPropertyPriority('text-wrap-style');
   // Browser pretty/balance must not re-break an already composed source span.
   // Keep ordinary wrapping as the overflow safety net, and own only this property.
   if (breaks.length) element.style.setProperty('text-wrap-style', 'auto', 'important');
-  const renderedStyle = element.getAttribute('style');
   const runs = textRuns(element);
   const source = element.textContent || '';
   const markers: HTMLElement[] = [];
@@ -419,13 +440,12 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
           head.appendData(part.data); part.remove();
         }
       }
+      // Restore through the CSSOM only (strict CSP); see restoreInlineStyle.
       if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
         && element.style.getPropertyPriority('text-wrap-style') === 'important') {
-        if (element.getAttribute('style') === renderedStyle) {
-          if (originalStyle === null) element.removeAttribute('style');
-          else element.setAttribute('style', originalStyle);
-        } else if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
+        if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
         else element.style.removeProperty('text-wrap-style');
+        if (!hadStyle && !element.style.length) removeStyleAttribute(element);
       }
       releaseCopy();
       restoreSelection();

@@ -5,8 +5,11 @@
 //   import { measure } from './bind-harness.mjs';
 //   const r = await measure({ paragraphs, phrases, measures, weight, engine, font, port });
 //
-// Weight is injected at runtime via __TYPESET_BIND__ — NO rebuild needed, so
-// many tests can run against one build. Never edit src/ to change a weight.
+// Weight is injected at runtime via __TYPESET_BIND__ — NO rebuild per weight,
+// so many tests run against one build. Release artifacts compile that hook
+// out, so the harness serves a research build of the website loader from src/
+// (built once per process, with the hook defined). Never edit src/ to change a
+// weight.
 
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -20,6 +23,14 @@ import { chromium, webkit, firefox } from '@playwright/test';
 // under "My Projects" would 404 every asset) and breaks on Windows drives.
 const PUBLIC = fileURLToPath(new URL('./public', import.meta.url));
 const ENGINES = { chromium, webkit, firefox };
+let researchLoader;
+/** The website loader from src/, with the bind-weight hook compiled in. */
+async function researchGo() {
+  const { build } = await import('esbuild');
+  researchLoader ??= build({ entryPoints: [fileURLToPath(new URL('./src/lib/v4/typeset.website-go.ts', import.meta.url))], bundle: true, format: 'iife', target: 'es2022', minify: true, write: false,
+    define: { __TYPESET_BIND_OVERRIDE__: 'globalThis.__TYPESET_BIND__' }, logLevel: 'silent' }).then(result => result.outputFiles[0].text);
+  return researchLoader;
+}
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 export function buildFixture({ paragraphs, measures, font = "'Source Serif 4', serif", fontLink, phrases = [] }) {
@@ -39,9 +50,11 @@ export async function measure({
   weight = 0, numberUnit = 0, engine = 'chromium', font, fontLink, port = 4500, viewport = 1400,
 }) {
   const html = buildFixture({ paragraphs, measures, font, fontLink, phrases });
+  const go = await researchGo();
   const server = createServer((req, res) => {
     const url = req.url.split('?')[0];
     if (url === '/_fixture.html') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(html); }
+    if (url === '/go.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(go); }
     try {
       const p = join(PUBLIC, url);
       const b = readFileSync(p);

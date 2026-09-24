@@ -201,8 +201,10 @@ function bindOpenerOf(part: string): string | undefined {
 
 /**
  * Bind weights. Derived by measurement (see docs/BINDING.md), not chosen by
- * taste; `__TYPESET_BIND__` lets the derivation harness sweep them without a
- * rebuild.
+ * taste. A research build lets the derivation harness sweep them through
+ * `globalThis.__TYPESET_BIND__`: it defines `__TYPESET_BIND_OVERRIDE__` as that
+ * expression. Release builds define it as `undefined`, so no published bundle
+ * reads a page global that could change composition.
  *
  * There is deliberately no numberUnit weight. It was measured, found to have
  * no supporting evidence in any corpus, and therefore not shipped.
@@ -224,8 +226,9 @@ interface BindWeights { toponym: number }
 // value inside the plateau, so 1600 is a conservative point in a flat region,
 // not an optimum. See docs/BINDING.md for the full method and its limits.
 const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+declare const __TYPESET_BIND_OVERRIDE__: Partial<BindWeights> | undefined;
 function bindWeights(): BindWeights {
-  const o = (globalThis as { __TYPESET_BIND__?: Partial<BindWeights> }).__TYPESET_BIND__;
+  const o = typeof __TYPESET_BIND_OVERRIDE__ === 'undefined' ? undefined : __TYPESET_BIND_OVERRIDE__;
   return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
 }
 
