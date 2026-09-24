@@ -10,6 +10,34 @@ Hashes for every published version live in
 
 ---
 
+## Unreleased (4.3.0)
+
+### Audit
+
+- `auditJSON()` and `audit()` report two new errors, with `schemaVersion` still 1:
+  `hidden-break`, a generated line break hidden from assistive technology
+  where it replaces a space (the words on either side are read as one), and
+  `isolated-space`, a word space alone beside an inline-block engine marker,
+  which Chromium drops from its accessibility tree. 4.2.0's composed output
+  has both, so audits of composed pages that passed under 4.2.0 can now fail.
+
+### Rendering changes
+
+None yet. Each default-output change in 4.3 is listed here with its golden-diff
+count.
+
+### Development
+
+- `npm run build:dist` (also `build:candidate`) builds the engine into
+  `output/candidate/` only. Releases are cut by `npm run release:cut`, the
+  only step that writes `packages/typeset-v4/dist`, `public/releases/<v>/`,
+  `public/go@<v>.js` or a version number.
+- `public/releases/published.json` records every published artifact by hash;
+  `verify:ledger` and CI fail if any changes.
+- `npm test` builds the candidate and runs every suite against it, including
+  the CLI and engine accessibility trees (`verify-native-ax.mjs`).
+  `npm run test:release` runs them against the committed dist.
+
 ## 4.1.0 - 2026-09-17
 
 The next public release after 4.0.0. Private 4.0.1-dev labels are not public pins.

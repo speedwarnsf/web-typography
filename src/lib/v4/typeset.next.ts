@@ -482,6 +482,26 @@ export function auditReport(selector = defaults): AuditReport {
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
     if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
+    // A generated break at a space stands in for that space, which collapses at
+    // the line end. Hidden from assistive technology, it leaves nothing between
+    // the two words. (A break after a hyphen or dash separates no words.)
+    let hiddenBreaks = 0;
+    for (const br of element.querySelectorAll('br[data-ts-break][aria-hidden="true" i]')) {
+      const range = element.ownerDocument.createRange();
+      range.setStart(element, 0); range.setEndBefore(br);
+      const before = range.toString();
+      range.setStartAfter(br); range.setEnd(element, element.childNodes.length);
+      if (/\s$/u.test(before) || /^\s/u.test(range.toString())) hiddenBreaks++;
+    }
+    if (hiddenBreaks) add('hidden-break', 'error', hiddenBreaks + ' generated line break' + (hiddenBreaks === 1 ? ' is' : 's are') + ' hidden from assistive technology where ' + (hiddenBreaks === 1 ? 'it replaces' : 'they replace') + ' a space; the words on either side are read as one');
+    // A space alone in its Text node beside an atomic-inline marker is dropped
+    // from Chromium's accessibility tree, joining the words around it.
+    let isolatedSpaces = 0;
+    for (const marker of element.querySelectorAll<HTMLElement>('[data-ts-break]:not(br)')) {
+      if (['inline', 'none', 'contents'].includes(getComputedStyle(marker).display)) continue;
+      for (const sibling of [marker.previousSibling, marker.nextSibling]) if (sibling?.nodeType === 3 && /^\s+$/.test((sibling as Text).data)) isolatedSpaces++;
+    }
+    if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
     if (layout.lastSingleton) add('orphan', 'review', 'One word on the final line; may be unavoidable');
     if (layout.firstSingleton) add('first-singleton', 'review', 'One word on the first line; may be unavoidable');
     for (const [index, line] of layout.lines.slice(0, -1).entries()) {

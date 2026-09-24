@@ -5,7 +5,7 @@ import { releaseIdentity } from './release-evidence.mjs';
 import { acceptanceFixture } from './acceptance-fixture.mjs';
 
 const fixture = await acceptanceFixture();
-const report = { ...await releaseIdentity(), generated: new Date().toISOString(), scope: 'Desktop browser automation with mobile viewport/touch emulation. Accessibility-tree and keyboard checks, not VoiceOver/NVDA or physical-device certification.', browsers: {}, checks: [], errors: [] };
+const report = { ...await releaseIdentity(), generated: new Date().toISOString(), scope: 'Desktop browser automation with mobile viewport/touch emulation. DOM-derived accessibility snapshots (Playwright ariaSnapshot) and keyboard checks; the engines\' own accessibility trees are checked by verify-native-ax.mjs. Not VoiceOver/NVDA or physical-device certification.', browsers: {}, checks: [], errors: [] };
 await mkdir('output/playwright', { recursive: true });
 try {
   for (const config of browsers) {
@@ -35,7 +35,9 @@ try {
       await page.locator('#first a').focus();
       await page.evaluate(() => compose());
       check('composition does real work', await page.locator('#passages [data-ts-break]').count() > 0);
-      check('accessible prose and links unchanged by rendering', ax === await page.locator('#passages').ariaSnapshot(), { before: ax, after: await page.locator('#passages').ariaSnapshot() });
+      // Secondary: ariaSnapshot is computed from the DOM with whitespace normalised,
+      // so it cannot see words the engine's accessibility tree joins. verify-native-ax.mjs reads the real trees.
+      check('DOM-derived ariaSnapshot of prose and links unchanged by rendering (secondary to verify-native-ax)', ax === await page.locator('#passages').ariaSnapshot(), { before: ax, after: await page.locator('#passages').ariaSnapshot() });
       check('focused author link survives initial composition', await page.evaluate(() => document.activeElement === link && document.querySelector('#first a') === link));
       await page.keyboard.press('Enter');
       check('keyboard activation occurs exactly once', await page.evaluate(() => activations === 1));

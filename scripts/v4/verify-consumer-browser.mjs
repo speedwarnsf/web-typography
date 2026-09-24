@@ -48,7 +48,7 @@ try {
       await page.waitForTimeout(150);
       check('keyboard activation is singular and retains focus', (await page.locator('#activations').textContent()) === '1 link activations' && await page.evaluate(() => document.activeElement === window.originalLink));
       const accessible = await page.locator('#react-specimen').ariaSnapshot();
-      check('one complete accessible link name', await page.locator('#react-specimen').getByRole('link', { name: 'the neighborhood gallery', exact: true }).count() === 1, accessible);
+      check('one complete link name in the DOM-derived role query (engine trees: verify-native-ax)', await page.locator('#react-specimen').getByRole('link', { name: 'the neighborhood gallery', exact: true }).count() === 1, accessible);
       check('declarative bullet styling retains list semantics', await page.locator('#declarative-list').getAttribute('class') === 'ts-styled' && (await page.locator('#declarative-list').ariaSnapshot()).includes('listitem'));
       const copy = await page.evaluate(() => {
         const el = document.querySelector('#react-specimen'); const range = document.createRange(); range.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(range);

@@ -68,9 +68,19 @@ try {
     let output = null;
     try { output = JSON.parse(expected === 2 ? result.stderr : result.stdout); } catch {}
     const errorIssues = output?.reports?.flatMap((/** @type {{ width: number, issues: { severity: string, type: string, detail: string }[] }} */ r) => r.issues.filter(i => i.severity === 'error').map(i => `${r.width}px ${i.type}: ${i.detail}`)) ?? [];
-    const pass = result.code === expected && output?.pass === (expected === 0)
-      && (label !== 'preview composes explicit scope' || output?.reports?.[0]?.features?.quotes?.applied === 1);
-    checks.push({ label, pass, exitCode: result.code, ...(pass ? {} : { detail: { expectedExit: expected, pass: output?.pass, errorIssues: errorIssues.slice(0, 6), stderr: result.stderr.slice(0, 300) } }) });
+    const detail = { exitCode: result.code, expectedExit: expected, pass: output?.pass, errorIssues: errorIssues.slice(0, 6), stderr: result.stderr.slice(0, 300) };
+    if (expected === 0) {
+      // What the CLI did, and separately whether the page it inspected passes.
+      const reports = output?.reports ?? [];
+      const composed = reports.length === 2 && reports.every((/** @type {{ outcomes: Record<string, number> }} */ r) => Object.keys(r.outcomes).some(o => o.startsWith('composed')));
+      const did = composed && (output?.errors ?? []).length === 0 && (label !== 'preview composes explicit scope' || reports[0]?.features?.quotes?.applied === 1);
+      checks.push({ label, pass: did, exitCode: result.code, ...(did ? {} : { detail }) });
+      const passes = result.code === 0 && output?.pass === true;
+      checks.push({ label: label + ': audit passes', pass: passes, exitCode: result.code, ...(passes ? {} : { detail }) });
+    } else {
+      const pass = result.code === expected && output?.pass === false;
+      checks.push({ label, pass, exitCode: result.code, ...(pass ? {} : { detail }) });
+    }
   }
 } catch (error) {
   errors.push({ error: String(/** @type {Error} */ (error).stack || error) });

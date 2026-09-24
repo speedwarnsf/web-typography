@@ -84,7 +84,9 @@ for (const { name, engine, executablePath } of browsers) {
       section.remove();
       const sample = make('"The room rewards a second look," says <a href="#artist">the artist</a>. "There is always another detail to discover."'); sample.id = 'release-sample';
       api.typeset(sample, options);
-      check('JSON audit reports feature outcomes separately', api.auditJSON('#release-sample').features.quotes.applied === 1 && api.auditJSON('#release-sample').pass);
+      const sampleAudit = api.auditJSON('#release-sample');
+      check('JSON audit reports feature outcomes separately', sampleAudit.features.quotes.applied === 1, sampleAudit.features);
+      check('JSON audit passes the composed release sample', sampleAudit.pass, sampleAudit.issues.filter(issue => issue.severity === 'error'));
       return checks;
     });
     report.checks.push(...checks.map(check => ({ browser: name, ...check })));

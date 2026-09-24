@@ -85,8 +85,19 @@ non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are
 not substitutes. No universal flawless-results or speed claim is made.
 
-Additional local coverage includes accessibility-tree comparisons with native
-text, keyboard navigation, emulated touch/rotation, 200%/400% text sizing,
+Additional local coverage includes accessibility checks at two depths. A
+DOM-derived snapshot (Playwright ariaSnapshot) compares composed and native
+text; it normalises whitespace, so it cannot see words an engine's own
+accessibility tree joins. `scripts/v4/verify-native-ax.mjs` reads the engines'
+trees: Chromium's full tree through CDP (every composed block's words, and every
+link and heading name), WebKit's accessible names for links and headings
+through its inspector protocol, and Gecko's tree through Marionette in a nightly
+lane, at 320, 375 and 768 px. The 4.2.0 build fails these checks: its hidden
+generated line breaks join the words on either side of each break, including
+inside link and heading names, and Chromium also drops some word spaces beside
+spacing markers. `auditJSON()` reports both conditions as `hidden-break` and
+`isolated-space` errors. Local coverage also includes keyboard navigation,
+emulated touch/rotation, 200%/400% text sizing,
 delayed variable fonts, source updates and no-JavaScript rendering. The macOS
 clipboard suite uses headed Chromium/WebKit/Firefox, trusted copy/paste events
 and the native NSPasteboard, including cross-paragraph and partial selections.
