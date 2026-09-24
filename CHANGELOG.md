@@ -35,6 +35,21 @@ Hashes for every published version live in
   `lineBreaks` comment said the default was the legacy path; the package
   default is `'unicode'`.
 
+### Documentation
+
+- The npm README is an introduction, not release notes: what Typeset does,
+  a 375 px before/after image against `text-wrap: pretty`, a "Do I need it?"
+  table (CSS `balance` and `pretty` first; Typeset for grammar-aware breaks,
+  Firefox parity, preserved markup and checkable results; not for justified
+  text), three pinned install paths, every option with its default, the
+  common outcomes, what it costs, what it won't do, browser requirements,
+  accessibility, baseline CSS for before the script runs, an FAQ, the
+  stability promise and a glossary. Every link is absolute, so it works on
+  npmjs.com. "New in" notes live here in the CHANGELOG.
+- The repository README states the positioning against `text-wrap`, and its
+  install lines are generated from the published version and sri.json at
+  each cut (it had pinned 4.1.0).
+
 ### Installation and packaging
 
 - The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no

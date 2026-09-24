@@ -47,7 +47,7 @@ export const RECIPES = {
   },
   '4.3': {
     line: '4.3', moduleMaps: false, iifeSourcesContent: false, autoLoader: true,
-    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'SECURITY.md', 'OUTCOMES.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
+    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'SECURITY.md', 'OUTCOMES.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'before-after.png'],
   },
 };
 export const CURRENT_RECIPE = RECIPES['4.3'];

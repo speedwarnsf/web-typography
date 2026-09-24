@@ -9,6 +9,9 @@
 //   lines from public/sri.json; pinned snippets in the docs carry
 //   crossorigin and the right integrity (before the cut, the placeholder
 //   release-cut fills).
+// - readme: the package README introduces the product in order, covers every
+//   option, links only absolutely and to things that exist, and names the
+//   release it ships with; the root README's install block is generated.
 // - community: contributor files and issue forms exist and ask for what a
 //   report needs (`--network` also reads GitHub's community profile).
 //
@@ -127,9 +130,54 @@ try {
     }).map(m => m[0]);
     check('stability', `${file}: every pinned loader snippet has crossorigin and the right integrity (${released ? 'from sri.json' : 'the release-cut placeholder for ' + target})`, wrong.length === 0, wrong);
   }
+  const exists = async (/** @type {string} */ path) => readFile(path).then(() => true, () => false);
+  // readme (D1): an introduction with every option, absolute links that
+  // resolve, and version strings for the release it ships with.
+  const readme = docs['packages/typeset-v4/README.md'];
+  const headings = [...readme.matchAll(/^## (.+)$/gm)].map(m => m[1]);
+  const ORDER = ['Do I need it?', 'Install', 'Options', 'What happened to my paragraph?', 'Checking it in CI', 'What it costs', "What it won't do", 'Browsers', 'Accessibility', 'Recommended CSS', 'FAQ', 'Stability', 'Glossary'];
+  check('readme', 'package README sections: value, image, do I need it, install, options, outcomes, costs, limits, browsers, accessibility, baseline CSS, FAQ, stability, glossary', JSON.stringify(headings.filter(h => ORDER.includes(h))) === JSON.stringify(ORDER) && /^# typeset\.us\n\nBetter line breaks/.test(readme) && /!\[[^\]]+\]\(https:\/\/typeset\.us\/releases\/[^)]+\/before-after\.png\)/.test(readme), headings);
+  const optionTable = readme.split('## Options')[1]?.split('## ')[0] ?? '';
+  const optionKeys = [...options.matchAll(/\n\s*(\w+)\?:/g)].map(m => m[1]);
+  const missingOptions = optionKeys.filter(key => !optionTable.includes(`| \`${key}\` |`));
+  check('readme', `every option (${optionKeys.length}) has a row in the README options table`, optionKeys.length > 0 && missingOptions.length === 0, missingOptions);
+  const outcomeCount = /All (\d+) outcomes/.exec(readme)?.[1];
+  check('readme', 'the README states the number of outcomes in OUTCOMES', Number(outcomeCount) === OUTCOMES.length, { readme: outcomeCount, OUTCOMES: OUTCOMES.length });
+  const links = [...readme.matchAll(/\]\(([^)\s]+)\)/g)].map(m => m[1]);
+  const relative = links.filter(link => !/^(https?:|#)/.test(link));
+  check('readme', 'package README links are absolute (npm renders them outside the repository)', relative.length === 0, relative);
+  const versions = [...readme.matchAll(/(?:typeset\.us@|go@|typeset\.us\/releases\/)(\d+\.\d+\.\d+(?:-[\w.]+)?)/g)].map(m => m[1]);
+  check('readme', `install lines and release links in the package README name ${target}`, versions.length > 0 && versions.every(v => v === target), [...new Set(versions)]);
+  const urls = [...new Set([...readme.matchAll(/https?:\/\/[^\s)<>"'`]+/g)].map(m => m[0].replace(/[.,;:]+$/, '')))];
+  const archived = new Set([...(await import('../build-recipe.mjs')).CURRENT_RECIPE.archivedFiles, 'manifest.json', 'index.js', 'typeset.global.js', 'go.js', 'auto.js', `typeset.us-${target}.tgz`]);
+  /** @type {string[]} */
+  const unresolved = [];
+  for (const url of urls) {
+    let m;
+    if ((m = /^https:\/\/typeset\.us\/releases\/([^/]+)\/(.+)$/.exec(url))) { if (m[1] === target ? !archived.has(m[2]) || (!['manifest.json', 'index.js', 'typeset.global.js', 'go.js', 'auto.js', `typeset.us-${target}.tgz`].includes(m[2]) && !await exists(`packages/typeset-v4/${m[2]}`)) : !await exists(`public/releases/${m[1]}/${m[2]}`)) unresolved.push(url); }
+    else if ((m = /^https:\/\/typeset\.us(\/[^?#]*)?$/.exec(url))) { const route = (m[1] ?? '/').replace(/\/$/, ''); if (route && !await exists(`src/app${route}/page.tsx`) && !await exists(`src/app${route}/route.ts`) && !await exists(`public${route}`) && !/^\/go@\d/.test(route)) unresolved.push(url); }
+    else if ((m = /^https:\/\/github\.com\/speedwarnsf\/web-typography\/blob\/master\/(.+)$/.exec(url))) { if (!await exists(m[1])) unresolved.push(url); }
+    else if ((m = /^https:\/\/cdn\.jsdelivr\.net\/npm\/typeset\.us@([^/]+)\/(.+)$/.exec(url))) { if (m[1] !== target || !pkg.files.includes(m[2].split('/')[0])) unresolved.push(url); }
+  }
+  check('readme', 'links to typeset.us, the release archive, the repository and jsDelivr resolve to real files and routes', unresolved.length === 0, unresolved);
+  if (process.argv.includes('--network')) {
+    const external = urls.filter(url => !url.includes(`/releases/${target}/`) && !url.includes(`typeset.us@${target}`) && !url.startsWith('https://typeset.us/go@'));
+    /** @type {string[]} */
+    const failed = [];
+    for (const url of external) { const r = await fetch(url, { redirect: 'follow' }).catch(() => null); if (!r || r.status !== 200) failed.push(`${url} ${r?.status}`); }
+    check('readme', 'external README links return 200 (unreleased-version links excepted)', failed.length === 0, failed);
+  }
+  check('readme', 'the before/after image exists and the release archive carries it', await exists('packages/typeset-v4/before-after.png') && archived.has('before-after.png') && !pkg.files.includes('before-after.png'));
+  const { rootInstallBlock, currentInstallBlock } = await import('./docs-blocks.mjs');
+  const rootReadme = docs['README.md'];
+  check('readme', `the root README install block names the published ${pkg.version} and its sri.json hash`, sri.version === pkg.version && currentInstallBlock(rootReadme) === rootInstallBlock(pkg.version, sri.files[`go@${pkg.version}.js`]), currentInstallBlock(rootReadme));
+  const rootLinks = [...rootReadme.matchAll(/\]\(([^)\s#]+)\)/g)].map(m => m[1]).filter(link => !/^https?:/.test(link));
+  const brokenRoot = [];
+  for (const link of rootLinks) if (!await exists(link) && !(await readdir(link).then(() => true, () => false))) brokenRoot.push(link);
+  check('readme', 'root README relative links name files in the repository', brokenRoot.length === 0, brokenRoot);
+
   // community (D6): the files GitHub's community profile looks for, and issue
   // forms that ask for what a bad-break report needs.
-  const exists = async (/** @type {string} */ path) => readFile(path).then(() => true, () => false);
   const community = ['README.md', 'LICENSE', 'CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'SECURITY.md', '.github/pull_request_template.md', '.github/ISSUE_TEMPLATE/bad-break.yml', '.github/ISSUE_TEMPLATE/integration-question.yml', 'ROADMAP.md'];
   const absent = [];
   for (const file of community) if (!await exists(file)) absent.push(file);

@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor, sriIndex, pinnedGlobal, EVERGREEN_MAJOR } from './build-recipe.mjs';
 import { readLedger, describeRelease, describePins, readTarball, LEDGER } from './v4/ledger.mjs';
+import { rootInstallBlock, replaceInstallBlock, currentInstallBlock } from './v4/docs-blocks.mjs';
 
 const { values } = parseArgs({ options: {
   version: { type: 'string' }, 'dry-run': { type: 'boolean', default: false }, root: { type: 'string' },
@@ -198,10 +199,11 @@ try {
     if (isStable && major === EVERGREEN_MAJOR) {
       for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await site(file));
     }
-    for (const doc of ['README.md', 'STABILITY.md']) {
-      const text = await readFile(join(root, doc), 'utf8').catch(() => null);
-      if (text && loaderSRI && text.includes(SRI_PLACEHOLDER)) await place(doc, text.replaceAll(SRI_PLACEHOLDER, loaderSRI));
-    }
+    const stability = await readFile(join(root, 'STABILITY.md'), 'utf8').catch(() => null);
+    if (stability && loaderSRI && stability.includes(SRI_PLACEHOLDER)) await place('STABILITY.md', stability.replaceAll(SRI_PLACEHOLDER, loaderSRI));
+    // The root README's install lines name the release just cut.
+    const rootReadme = await readFile(join(root, 'README.md'), 'utf8').catch(() => null);
+    if (rootReadme && currentInstallBlock(rootReadme)) await place('README.md', replaceInstallBlock(rootReadme, rootInstallBlock(version, sri(go))));
     await place('public/for-agents.md', await readFile(join(staging, pkgDir, 'for-agents.md')));
     await place('public/capabilities.json', await readFile(join(staging, pkgDir, 'capabilities.json')));
     // Known vulnerabilities in published files, which stay online unchanged.
