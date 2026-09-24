@@ -58,6 +58,12 @@ const npmCache = await mkdtemp(join(tmpdir(), 'typeset-release-npm-'));
   const published = view.status === 0 && view.stdout.trim() !== '';
   precondition(`typeset.us@${version} unused on npm`, notFound && !published, notFound ? undefined : (published ? 'already published' : (view.stderr || 'npm registry unreachable').split('\n')[0]));
 }
+{
+  // Release notes come from CHANGELOG.md, so a release needs a dated section.
+  const changelog = await readFile(join(root, 'CHANGELOG.md'), 'utf8').catch(() => '');
+  const heading = changelog.split('\n').find(line => line.startsWith(`## ${version} `) || line === `## ${version}`);
+  precondition(`CHANGELOG.md has a dated "## ${version}" section`, !!heading && /^## \S+ - \d{4}-\d{2}-\d{2}$/.test(heading), heading ?? null);
+}
 if (!dryRun) {
   const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();
   precondition('clean working tree', dirty === '', dirty.split('\n').slice(0, 10));
@@ -68,7 +74,7 @@ await mkdir(join(repo, 'output'), { recursive: true });
 const staging = await mkdtemp(join(repo, 'output', `release-cut-${version}-`));
 const pkgDir = 'packages/typeset-v4', distDir = `${pkgDir}/dist`;
 try {
-  for (const path of ['src/lib/v4', 'src/vendor', 'vendor/unicode', 'LICENSE']) await cp(join(root, path), join(staging, path), { recursive: true });
+  for (const path of ['src/lib/v4', 'src/vendor', 'vendor/unicode', 'LICENSE', 'SECURITY.md']) if (await exists(join(root, path))) await cp(join(root, path), join(staging, path), { recursive: true });
   await cp(join(root, pkgDir), join(staging, pkgDir), { recursive: true, filter: source => !/\/(dist|declarations|node_modules)(\/|$)/.test(source.slice(join(root, pkgDir).length)) });
   await symlink(join(repo, 'node_modules'), join(staging, 'node_modules'), 'dir');
   const pkgPath = join(staging, pkgDir, 'package.json');
@@ -76,6 +82,12 @@ try {
   const bumpedPkg = pkgText.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
   if (JSON.parse(bumpedPkg).version !== version) throw new Error('Could not set the package version.');
   await writeFile(pkgPath, bumpedPkg);
+  // capabilities.json is the machine contract; it names the version it describes.
+  const capsPath = join(staging, pkgDir, 'capabilities.json');
+  const capsText = await readFile(capsPath, 'utf8');
+  const bumpedCaps = capsText.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
+  if (JSON.parse(bumpedCaps).version !== version) throw new Error('Could not set the capabilities.json version.');
+  await writeFile(capsPath, bumpedCaps);
   const enginePath = join(staging, 'src/lib/v4/typeset.next.ts');
   const engineText = await readFile(enginePath, 'utf8');
   if ((engineText.match(/export const VERSION = '[^']+';/g) ?? []).length !== 1) throw new Error('Expected one VERSION constant in typeset.next.ts.');
@@ -88,7 +100,7 @@ try {
   report.recipe = recipe.line;
   await buildPackageDist({ root: staging, distDir, version, recipe });
   await emitDeclarations({ root: staging, distDir, declarationDir: `${pkgDir}/declarations`, tsc: join(repo, 'node_modules/.bin/tsc') });
-  await copyPackageFiles({ root: staging, packageDir: pkgDir });
+  await copyPackageFiles({ root: staging, packageDir: pkgDir, recipe });
   await writeManifest({ root: staging, distDir, version });
   await mkdir(join(staging, 'pack'));
   const [pack] = JSON.parse(execFileSync('npm', ['pack', '--json', '--cache', npmCache, '--pack-destination', join(staging, 'pack')], { cwd: join(staging, pkgDir), encoding: 'utf8' }));
@@ -155,7 +167,7 @@ try {
     await place(`public/go@${version}.js`, go, 'wx');
     await rename(join(root, distDir), join(staging, 'previous-dist'));
     await move(join(staging, distDir), distDir);
-    for (const file of ['package.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
+    for (const file of ['package.json', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md', 'SECURITY.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
     await place('src/lib/v4/typeset.next.ts', await readFile(join(staging, 'src/lib/v4/typeset.next.ts')));
     const site = (/** @type {string} */ file) => readFile(join(staging, 'site', file));
     const major = Number(version.split('.')[0]);
@@ -171,9 +183,11 @@ try {
     }
     await place('public/for-agents.md', await readFile(join(staging, pkgDir, 'for-agents.md')));
     await place('public/capabilities.json', await readFile(join(staging, pkgDir, 'capabilities.json')));
-    await place('public/sri.json', JSON.stringify(await sriIndex({ root, version, go }), null, 2) + '\n');
+    // Known vulnerabilities in published files, which stay online unchanged.
+    const { advisories } = JSON.parse(await readFile(join(root, 'docs/security/advisories.json'), 'utf8'));
+    await place('public/sri.json', JSON.stringify(await sriIndex({ root, version, go, advisories }), null, 2) + '\n');
     const pins = (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).map(f => f.slice(3, -3)).filter(v => compareVersions(v, version) < 0).sort(compareVersions);
-    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length, npm: `typeset.us@${version}/dist/auto.js` }, aliases: { [`/go@${major}.js`]: `latest ${major}.x; no integrity hash`, '/go.js': `latest ${EVERGREEN_MAJOR}.x only; for trying Typeset out` }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length, npm: `typeset.us@${version}/dist/auto.js` }, aliases: { [`/go@${major}.js`]: `latest ${major}.x; no integrity hash`, '/go.js': `latest ${EVERGREEN_MAJOR}.x only; for trying Typeset out` }, advisories, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
     // 6. Append the new release to the ledger. It records the tarball that
     //    must be published: npm publish public/releases/<v>/<tarball>.
     const nextLedger = await readLedger(root);

@@ -58,6 +58,12 @@ https://typeset.us/releases/4.0.0/.
 
 ## Historical v3 to v4 migration
 
+Security: typeset.us 3.0.0 to 3.4.0 and the go@3.3.2.js and go@3.4.0.js pins
+have a DOM XSS when a page calls `Typeset.auto()` on `[data-typeset-heading]`
+text an attacker can influence. Those files stay online unchanged, like every
+published file, and are deprecated on npm. If you are still on one of them,
+move to 4.3, or at least to 3.4.1. Details: SECURITY.md.
+
 4.0.0 follows public 3.5.1. Keep your v3 lockfile, deployed assets and integration
 until your own acceptance passes. Old pins remain available and unchanged.
 Do not run two Typeset versions on the same content.

@@ -47,7 +47,7 @@ export const RECIPES = {
   },
   '4.3': {
     line: '4.3', moduleMaps: false, iifeSourcesContent: false, autoLoader: true,
-    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
+    archivedFiles: ['README.md', 'MIGRATION.md', 'SUPPORT.md', 'SECURITY.md', 'for-agents.md', 'capabilities.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt'],
   },
 };
 export const CURRENT_RECIPE = RECIPES['4.3'];
@@ -141,11 +141,13 @@ export async function buildSite({ root, distDir, siteDir, version, plugins = [],
 export const ARCHIVED_PACKAGE_FILES = CURRENT_RECIPE.archivedFiles;
 
 /**
- * Generated package files that are copies of repository sources.
- * @param {{ root: string, packageDir: string }} options
+ * Generated package files that are copies of repository sources. From 4.3 the
+ * package also carries the repository's SECURITY.md.
+ * @param {{ root: string, packageDir: string, recipe?: Recipe }} options
  */
-export async function copyPackageFiles({ root, packageDir }) {
+export async function copyPackageFiles({ root, packageDir, recipe = CURRENT_RECIPE }) {
   await copyFile(join(root, 'LICENSE'), join(root, packageDir, 'LICENSE'));
+  if (recipe.line !== '4.2') await copyFile(join(root, 'SECURITY.md'), join(root, packageDir, 'SECURITY.md'));
   for (const file of ['THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt']) await copyFile(join(root, 'vendor/unicode', file), join(root, packageDir, file));
   await copyFile(join(root, packageDir, 'for-agents.md'), join(root, packageDir, 'AGENTS.md'));
 }
@@ -174,9 +176,9 @@ export const EVERGREEN_MAJOR = 4;
 /**
  * public/sri.json: integrity hashes for immutable paths only
  * (IMMUTABLE_SITE_FILE), loaders first, each in version order.
- * @param {{ root: string, version: string, go: Uint8Array }} options
+ * @param {{ root: string, version: string, go: Uint8Array, advisories?: unknown[] }} options
  */
-export async function sriIndex({ root, version, go }) {
+export async function sriIndex({ root, version, go, advisories }) {
   const names = (await readdir(join(root, 'public'))).filter(f => IMMUTABLE_SITE_FILE.test(f));
   const key = (/** @type {string} */ name) => { const match = /^(go|typeset)@(\d+\.\d+\.\d+)\.(?:(min|esm)\.)?js$/.exec(name); return /** @type {RegExpExecArray} */ (match); };
   names.sort((a, b) => {
@@ -192,6 +194,7 @@ export async function sriIndex({ root, version, go }) {
     note: 'Integrity hashes for immutable files only. go.js, go@<major>.js, typeset.min.js and typeset.esm.js change with each release and have none; pin a versioned file instead.',
     files,
     snippet: `<script src="https://typeset.us/go@${version}.js" integrity="${sri(go)}" crossorigin="anonymous" defer></script>`,
+    ...(advisories ? { advisories } : {}),
   };
 }
 

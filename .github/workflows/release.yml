@@ -1,0 +1,161 @@
+name: Release
+
+# Publishes a version that release-cut.mjs has already cut and committed.
+# Push the tag v<version> on the cut commit; this workflow then
+#   1. requires the CI workflow to have passed on that exact commit,
+#   2. checks that the tagged sources rebuild the ledger-recorded tarball
+#      byte for byte (release-check.mjs) and runs every suite against the
+#      committed dist (test:release),
+#   3. after approval in the npm environment, publishes exactly
+#      public/releases/<version>/typeset.us-<version>.tgz with npm trusted
+#      publishing (OIDC) and provenance, confirms the registry has the ledger's
+#      bytes and an attestation, and creates the GitHub Release with the notes
+#      from CHANGELOG.md and the evidence attached.
+# workflow_dispatch rehearses steps 1 and 2 on any tag, ending with
+# `npm publish --dry-run` (for a version npm already has, the expected
+# refusal counts as success); it never publishes or creates a release.
+#
+# One-time setup on npmjs.com: typeset.us > Settings > Trusted publishing >
+# GitHub Actions, repository speedwarnsf/web-typography, workflow release.yml,
+# environment npm. See docs/RELEASING.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to rehearse, for example v4.2.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Version from the tag
+        id: version
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "Tag $TAG is not v<version>"; exit 1 ;; esac
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          case "$VERSION" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+
+      - name: CI passed on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="$(git rev-parse "$TAG^{commit}")"
+          PASSED="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&status=success" --jq '.total_count')"
+          if [ "$PASSED" -lt 1 ]; then echo "CI has not passed on $SHA; push the commit, wait for CI, then tag."; exit 1; fi
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: The tag rebuilds the ledger-recorded release byte for byte
+        run: node scripts/v4/release-check.mjs --version "${{ steps.version.outputs.version }}" --ref "$TAG"
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Every suite against the committed release artifacts
+        run: npm run test:release
+
+      - name: npm accepts the tarball (dry run)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.prerelease == 'true' && 'next' || 'latest' }}
+        run: |
+          if npm publish "public/releases/$VERSION/typeset.us-$VERSION.tgz" --dry-run --access public --tag "$DIST_TAG" 2> output/npm-dry-run.log; then exit 0; fi
+          cat output/npm-dry-run.log
+          # A rehearsal on an already published tag ends here, as it should.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && grep -q "cannot publish over the previously published versions" output/npm-dry-run.log; then exit 0; fi
+          exit 1
+
+      - name: Keep the evidence with the release
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-evidence
+          path: |
+            output/*.json
+            output/release-notes.md
+          retention-days: 90
+
+  publish:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: npm with trusted publishing
+        run: npm install -g npm@11.6.0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-evidence
+          path: output
+
+      - name: Publish exactly the ledger-recorded tarball
+        run: |
+          DIST_TAG=latest
+          if [ "${{ needs.verify.outputs.prerelease }}" = "true" ]; then DIST_TAG=next; fi
+          npm publish "public/releases/$VERSION/typeset.us-$VERSION.tgz" --provenance --access public --tag "$DIST_TAG"
+
+      - name: The registry serves the ledger's bytes, with an attestation
+        run: |
+          node scripts/v4/verify-ledger.mjs --network
+          npm view "typeset.us@$VERSION" dist.attestations --json | tee output/npm-attestations.json
+          test -s output/npm-attestations.json
+
+      - name: GitHub Release with notes and evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/v4/release-notes.mjs --version "$VERSION" --provenance --out output/release-notes.md
+          FLAGS=""
+          if [ "${{ needs.verify.outputs.prerelease }}" = "true" ]; then FLAGS="--prerelease"; fi
+          gh release create "$TAG" --verify-tag --title "typeset.us $VERSION" --notes-file output/release-notes.md $FLAGS \
+            output/*.json "public/releases/$VERSION/typeset.us-$VERSION.tgz"

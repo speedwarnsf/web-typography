@@ -10,7 +10,7 @@ Hashes for every published version live in
 
 ---
 
-## Unreleased (4.3.0)
+## 4.3.0 - Unreleased
 
 ### Audit
 
@@ -71,6 +71,27 @@ Hashes for every published version live in
   docs/ops/vercel-firewall.md has the firewall bypass that stops bot
   challenges on these paths; it is applied in the Vercel project, not here.
 
+### Release trust
+
+- Releases are published by `.github/workflows/release.yml` from a `v*` tag,
+  only after CI passed on that commit, `scripts/v4/release-check.mjs` rebuilt
+  the ledger-recorded tarball from the tag byte for byte, and every suite
+  passed against the committed dist. It publishes exactly
+  `public/releases/<v>/typeset.us-<v>.tgz` with npm trusted publishing and
+  provenance, checks the registry's integrity and attestation, and creates a
+  GitHub Release from the CHANGELOG section with the evidence attached, so
+  evidence no longer expires with CI artifacts. docs/RELEASING.md describes
+  the whole flow.
+- CI and nightly run with `contents: read` only, every action is pinned to a
+  commit SHA, and Dependabot watches npm and GitHub Actions.
+- SECURITY.md (also in the package): supported versions, private reporting,
+  response targets. The DOM XSS in the 3.x `Typeset.auto()` heading branch,
+  fixed silently in 3.4.1, now has an advisory draft, a deprecation command
+  for 3.0.0 to 3.4.0 and an `advisories` list that each cut copies into
+  release.json and sri.json. The vulnerable files stay online unchanged.
+- The CHANGELOG has a 4.2.0 entry. docs/OWNER-ACTIONS.md lists the GitHub,
+  npm and Vercel settings only the owner can apply.
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff
@@ -93,6 +114,34 @@ count.
   and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
   Runtime budgets run nightly and at release cut.
 
+## 4.2.0 - 2026-09-17
+
+The next public release after 4.1.0. No public API was renamed and no
+required peer was added. (This entry was written after the release, from its
+acceptance record, docs/RELEASE-4.2.0.md.)
+
+- Two mounts from one engine copy no longer fight over the same element. The
+  first mount owns it; a waiting mount takes over only when the first releases
+  it. `controller.stats.overlappingTargets` counts the overlaps, and should be
+  0 in a correct integration.
+- Inline `white-space: nowrap` phrases keep their no-break boundary inside an
+  otherwise wrapping linked or styled paragraph, instead of sending the whole
+  paragraph back to native layout.
+- Declared-English text prefers breaks outside capitalized name and
+  designator pairs such as "Oak Street" or "Marquee Cinemas" when they fit.
+  It is a bounded preference, not a parser, and never widens a line past its
+  box.
+- Title mode may end on a substantial final location word when that avoids
+  splitting a recognized name.
+- While a rich paragraph is composed, Typeset sets `text-wrap-style: auto`
+  on it, so the browser's own `pretty` or `balance` cannot rewrap the chosen
+  breaks. Teardown restores the author's wrapping and keeps unrelated style
+  changes made in the meantime.
+
+Rendering: paragraphs with inline nowrap phrases, name pairs or overlapping
+mounts can break differently from 4.1.0. Pins, archives and 4.1.0 remain
+unchanged: https://typeset.us/releases/4.1.0/.
+
 ## 4.1.0 - 2026-09-17
 
 The next public release after 4.0.0. Private 4.0.1-dev labels are not public pins.
@@ -111,7 +160,7 @@ The next public release after 4.0.0. Private 4.0.1-dev labels are not public pin
   replacement; tracking, clipping, inline-code and controller regression suites.
 
 Existing 4.0.0 and v3 pins/archives remain unchanged. Read the migration and
-support contracts before upgrading. No SceneF integration changes are included.
+support contracts before upgrading. No changes specific to any client site are included.
 The scheduler reduces redundant work, not all layout cost; external device,
 spoken screen-reader and representative-device acceptance limits remain.
 
