@@ -190,7 +190,12 @@ const reactText = await reactFixture();
  * @param {Promise<T>} promise @param {number} ms @param {string} what
  * @returns {Promise<T>}
  */
-const within = (promise, ms, what) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${what} exceeded ${ms / 1000} s`)), ms))]);
+const within = (promise, ms, what) => {
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
+  // Cleared on settle: a pending timer would hold the process open for the full limit after the last scenario.
+  return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms / 1000} s`)), ms); })]).finally(() => clearTimeout(timer));
+};
 
 /** @param {import('playwright').Browser} browser @param {string} engineName @param {number} rate @param {string} html */
 async function openPage(browser, engineName, rate, html) {
