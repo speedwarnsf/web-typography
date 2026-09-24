@@ -92,6 +92,27 @@ Hashes for every published version live in
 - The CHANGELOG has a 4.2.0 entry. docs/OWNER-ACTIONS.md lists the GitHub,
   npm and Vercel settings only the owner can apply.
 
+### Website (typeset.us, not the package)
+
+- `/api/fetch-url` no longer reaches private networks: it resolves the host
+  and connects only to a checked address, refuses loopback, private,
+  link-local (including 169.254.169.254), CGNAT, multicast and reserved
+  addresses and their IPv6 forms, follows at most five redirects and checks
+  each, allows ports 80, 443, 8080 and 8443 only, streams the body with a
+  500 KB cap after decompression, and rate-limits each client to 12 requests
+  a minute.
+- `/audit` and `/dna` render fetched or pasted HTML inert: scripts, frames,
+  plugins, `<base>`, refresh `<meta>`, event handlers and `javascript:` URLs
+  are removed; `/audit` renders the sample in a shadow root so its styles
+  cannot restyle the site, and `/dna` uses an iframe sandboxed without
+  scripts. `/dna` no longer fails on pages with inline SVG.
+- Every page has a nonce-based Content Security Policy (`script-src` with a
+  per-request nonce and `strict-dynamic`, `object-src 'none'`,
+  `base-uri 'self'`, `frame-ancestors 'self'`), plus `nosniff`,
+  `X-Frame-Options: SAMEORIGIN` and a referrer policy. Pages are rendered
+  per request so each gets a fresh nonce. Next.js is 16.3.6; `npm audit`
+  reports no vulnerabilities.
+
 ### Rendering changes
 
 None yet. Each default-output change in 4.3 is listed here with its golden-diff

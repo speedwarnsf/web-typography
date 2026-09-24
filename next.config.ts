@@ -12,6 +12,14 @@ const REVALIDATED = [
   { key: 'Cache-Control', value: 'public, max-age=300, must-revalidate' },
 ];
 
+// Every response: no MIME sniffing, no framing by other sites, and no full
+// URLs in Referer. Pages also get a nonce-based CSP from src/proxy.ts.
+const SECURITY = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+];
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   async rewrites() {
@@ -21,6 +29,7 @@ const nextConfig: NextConfig = {
   // Later entries override earlier ones for the same header.
   async headers() {
     return [
+      { source: '/:path*', headers: SECURITY },
       { source: '/go@:version(\\d+\\.\\d+\\.\\d+).js', headers: IMMUTABLE },
       { source: '/typeset@:version(\\d+\\.\\d+\\.\\d+).:kind(min|esm).js', headers: IMMUTABLE },
       { source: '/releases/:path*', headers: IMMUTABLE },

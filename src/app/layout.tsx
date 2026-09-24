@@ -82,6 +82,10 @@ export const viewport = {
   maximumScale: 1,
 };
 
+// Every page is rendered per request so it carries that request's CSP nonce
+// (src/proxy.ts).
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const fontVars = [
     playfair, sourceSans, jetbrains, inter, lora, spaceGrotesk, crimsonPro,

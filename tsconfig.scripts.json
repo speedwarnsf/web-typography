@@ -21,6 +21,7 @@
   "include": [
     "scripts/*.mjs",
     "scripts/v4/*.mjs",
+    "scripts/site/*.mjs",
     "scripts/v4/page-globals.d.ts"
   ]
 }

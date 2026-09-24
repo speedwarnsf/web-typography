@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { inertHTML } from '@/lib/inert-html'
 
 const SAMPLE_HTML = `
 <!DOCTYPE html>
@@ -118,9 +119,13 @@ export default function DNAPage() {
     iframe.style.left = '-9999px'
     iframe.style.width = '1200px'
     iframe.style.height = '800px'
+    // Untrusted HTML: sandboxed without allow-scripts, so nothing in it can
+    // run even if the sanitizer missed something; allow-same-origin keeps its
+    // computed styles readable from here.
+    iframe.setAttribute('sandbox', 'allow-same-origin')
     document.body.appendChild(iframe)
 
-    iframe.srcdoc = html
+    iframe.srcdoc = inertHTML(html)
 
     iframe.onload = () => {
       try {
@@ -142,7 +147,9 @@ export default function DNAPage() {
         allElements.forEach((el) => {
           const computed = iframe.contentWindow!.getComputedStyle(el)
           const tagName = el.tagName.toLowerCase()
-          const className = el.className ? `.${el.className.split(' ')[0]}` : ''
+          // getAttribute, not className: an SVG element's className is not a string.
+          const firstClass = (el.getAttribute('class') || '').trim().split(/\s+/)[0]
+          const className = firstClass ? `.${firstClass}` : ''
           const identifier = className || tagName
 
           // Font families
