@@ -7,6 +7,48 @@
       "modes": ["release"],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed packages/typeset-v4/dist, which is the published 4.2.0 build with the joined-word defect until 4.3.0 is cut."
+    },
+    {
+      "script": "verify-break-semantics",
+      "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, which hides generated breaks, uses inline-block markers and sets role=text in renderFrozenLines (C2)."
+    },
+    {
+      "script": "verify-strict-csp",
+      "label": "^(strict CSP|without the policy): ",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, which restores styles through the style attribute (C5)."
+    },
+    {
+      "script": "verify-copy-privacy",
+      "label": ": nothing hidden reaches the clipboard that native copy leaves out$",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11)."
+    },
+    {
+      "script": "verify-framework-text",
+      "label": " under (mount\\(\\)|the website loader): |^typeset\\(\\) and restore\\(\\) without a controller",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist and website loader, which leave stale framework text and crash React (C6)."
+    },
+    {
+      "script": "verify-live-regions",
+      "label": ": ",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, which composes live regions (C4)."
+    },
+    {
+      "script": "verify-smart-quotes",
+      "label": "^education: |^server HTML: TypesetText with (smartQuotes and no lang|lang=\"en\") has curled quotes$|: TypesetRichText without lang warns once$",
+      "modes": ["release"],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, with the quote misfires and client-only TypesetText education (C15)."
     }
   ]
 }

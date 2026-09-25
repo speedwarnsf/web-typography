@@ -203,7 +203,8 @@ await Promise.all(browsers.map(async config => {
           check('typeset() and restore() without a controller never merge stale fragments', result.outcome === 'composed:rich' && result.recomposed === 'composed:rich' && result.recomposedText === true && result.restored === true, result);
         }
       } catch (error) {
-        errors.push({ browser: config.name, error: `${where}: ${String(/** @type {Error} */ (error).stack || error).split('\n').slice(0, 3).join(' ')}` });
+        // A page that could not finish (4.2's React unmounted itself) is a failed check, not a harness error.
+        check(`${where}: completes the update sequence`, false, String(/** @type {Error} */ (error).stack || error).split('\n').slice(0, 3).join(' '));
       } finally { await context.close(); }
     }
   } finally { await browser.close(); }
