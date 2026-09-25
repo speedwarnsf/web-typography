@@ -26,6 +26,8 @@ try {
   // K3: installs must not fail or upgrade React or Playwright underneath an app.
   check('react peer covers React 18.2+ and every React 19 minor', pkg.peerDependencies?.react === '^18.2.0 || ^19.0.0', pkg.peerDependencies);
   check('react peer is optional', pkg.peerDependenciesMeta?.react?.optional === true, pkg.peerDependenciesMeta);
+  // typeset.us/react imports flushSync from react-dom (kept external).
+  check('react-dom peer matches react and is optional', pkg.peerDependencies?.['react-dom'] === pkg.peerDependencies?.react && pkg.peerDependenciesMeta?.['react-dom']?.optional === true, pkg.peerDependencies);
   check('playwright is not a peer (the CLI imports it on demand)', !pkg.peerDependencies?.playwright && !pkg.peerDependenciesMeta?.playwright, pkg.peerDependencies);
   check('no runtime dependencies or install scripts', !pkg.dependencies && !pkg.scripts?.install && !pkg.scripts?.preinstall && !pkg.scripts?.postinstall, { dependencies: pkg.dependencies, scripts: pkg.scripts });
   const reactTypes = await readFile(`${staged.dir}/dist/typeset.release.react.d.ts`, 'utf8');
