@@ -86,7 +86,10 @@ export function boundPair(previous: string, next: string, before?: string): Boun
  */
 export function keptPhrases(texts: readonly string[], keep: readonly string[] | undefined): { start: number; end: number }[] {
   const normalize = (text: string) => text.toLowerCase().replace(/[\s\u00A0\u202F]+/gu, ' ').trim();
-  const phrases = [...new Set((keep || []).map(phrase => trailing(leading(normalize(phrase))))
+  // Invalid values (a string, non-string items) keep 4.2's behaviour: no
+  // phrase is kept, and nothing throws; development builds warn (validate.ts).
+  const list = Array.isArray(keep) ? keep.filter((phrase): phrase is string => typeof phrase === 'string') : [];
+  const phrases = [...new Set(list.map(phrase => trailing(leading(normalize(phrase))))
     .filter(phrase => phrase.includes(' ') || /[-\u2010\u2013\u2014/]./u.test(phrase)))];
   const found: { start: number; end: number }[] = [];
   if (!phrases.length) return found;
