@@ -15,7 +15,9 @@
 //   is within a viewport height of the pane, so blocks scrolled in soon after
 //   they mount (an entrance animation keeping frames pending) paint composed,
 //   never native lines rewrapped a few frames later; with TypesetText, and
-//   with mount() once its first pass could have run.
+//   with mount() once its first pass could have run. A pane that overflows
+//   only after its hosts registered (FAQ answers in closed <details>) counts
+//   as their scrollport once it does.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -66,6 +68,11 @@ window.mountCarousels = () => { const root = createRoot(document.getElementById(
   h('div', { style: { height: '3000px' } }),
   Array.from({ length: 11 }, (_, row) => h('div', { key: 'row' + row, className: 'row' },
     texts.slice(4 + row * 4, 8 + row * 4).map((text, i) => h(TypesetText, { key: i, text, className: 'r' }))))))); };
+// Twelve FAQ answers, two blocks each, in closed <details> in a scroll pane.
+const answers = ${JSON.stringify(corpus.filter((/** @type {string} */ text) => text.length > 250).slice(0, 24))};
+window.mountFaq = () => { const root = createRoot(document.getElementById('pane')); flushSync(() => root.render(h('div', null,
+  Array.from({ length: 12 }, (_, i) => h('details', { key: i }, h('summary', null, 'Question ' + (i + 1)),
+    h(TypesetText, { lang: 'en', text: answers[2 * i] }), h(TypesetText, { lang: 'en', text: answers[2 * i + 1] })))))); };
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
@@ -307,6 +314,42 @@ for (const { name, engine, executablePath } of browsers) {
       check(`React adapters in ${layout}: no scroll-container observer, so offscreen blocks are measured against the window`, result.rootedObservers === 0 && result.far >= 40 && result.composed === result.hosts, result);
       // Engines without idle callbacks compose offscreen work on a 50 ms timer.
       if (result.idleCallbacks) check(`React adapters in ${layout}: no offscreen block composes during a 900 ms screen push`, result.farComposedDuringSlide === 0, result);
+      await page.close();
+    }
+    // A pane that overflows only after its hosts registered: FAQ answers in
+    // closed <details> in a 600 px overflow-y:auto pane, all opened, then
+    // the pane scrolled one pane height while a frame loop keeps frames
+    // pending. The hosts' scrollport was found once, when the pane did not
+    // overflow, so they were measured against the window, which the pane
+    // clips: one of the two blocks brought on screen painted native lines
+    // ('unmeasurable') in the first frame after the jump, in 3 of 3 runs in
+    // Chromium and Firefox (the round-2 near observer, and 4.2.0: none).
+    for (let run = 0; run < 3; run++) {
+      const page = await browser.newPage({ viewport: { width: 800, height: 900 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:18px/1.5 Georgia,serif}p{margin:0 0 12px}#spin{width:20px;height:20px;background:#000;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div id="pane" style="height:600px;overflow-y:auto;width:420px"></div><div id="spin"></div></body></html>');
+      await page.addScriptTag({ content: reactFixture });
+      await page.evaluate(() => /** @type {any} */ (window).mountFaq());
+      await page.waitForFunction(() => document.querySelectorAll('[data-typeset-react]').length === 24);
+      await page.waitForTimeout(700);
+      const result = await page.evaluate(async () => {
+        const pane = /** @type {HTMLElement} */ (document.getElementById('pane'));
+        const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+        let live = true;
+        (function loop() { if (live) requestAnimationFrame(loop); })();
+        const overflowBefore = pane.scrollHeight > pane.clientHeight + 1;
+        for (const details of document.querySelectorAll('details')) details.open = true;
+        await frame(); await frame(); await frame();
+        const box = pane.getBoundingClientRect();
+        const band = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-typeset-react]')]).filter(el => { const top = el.getBoundingClientRect().top; return top >= box.bottom && top < box.bottom + pane.clientHeight; });
+        pane.scrollTop = pane.clientHeight;
+        await frame();
+        const firstFrame = band.map(el => el.dataset.tsOutcome || '(none)');
+        live = false;
+        return { overflowBefore, overflowAfter: pane.scrollHeight > pane.clientHeight + 1, band: band.length, firstFrame };
+      });
+      check(`TypesetText in a pane that overflows after it registers (FAQ answers in closed <details>), run ${run + 1}: every block scrolled in one pane height paints composed in the first frame`,
+        !result.overflowBefore && result.overflowAfter && result.band >= 2 && result.firstFrame.every(outcome => outcome.startsWith('composed')), result);
       await page.close();
     }
     // Text in an overflow:auto scroller, scrolled in soon after it mounts.

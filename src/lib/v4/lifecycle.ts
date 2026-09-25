@@ -110,48 +110,84 @@ export function rendered(element: Element): boolean {
 export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
 /** IntersectionObservers that report an element within a viewport height of
  * what shows it: the window, or the nearest container it scrolls in
- * vertically (one whose content overflows it when the element is first
- * observed). An app shell's overflow:auto pane clips its content, and a
- * root margin on the window does not reach past that clip, so text below
- * the fold there was never near until it was on screen. One observer per
- * scrollport, held only while it observes something, so a scroll container
- * a route removed is not kept alive; an element's scrollport is found once.
+ * vertically (one whose content overflows it). An app shell's overflow:auto
+ * pane clips its content, and a root margin on the window does not reach
+ * past that clip, so text below the fold there was never near until it was
+ * on screen. One observer per scrollport, held only while it observes
+ * something, so a scroll container a route removed is not kept alive.
  * Null without IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
   const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
-  const roots = new WeakMap<Element, Element | null>();
+  // Where each element is observed: its scrollport (null: the window), and
+  // the containers below that which could scroll it vertically but did not
+  // overflow when it was placed. Found once, and again only when one of
+  // those containers overflows.
+  const places = new WeakMap<Element, { root: Element | null; waiting: Element[] }>();
+  // The observed elements waiting on each such container.
+  const waiters = new Map<Element, Set<Element>>();
+  let queued = false;
   // Only a container that scrolls vertically: nearness is a vertical
   // distance. An overflow-x:hidden wrapper (its overflow-y computes to auto)
   // as tall as the page, or a horizontal carousel row, would make every
   // block in it near, however far below the fold, and those compose in
-  // animation frames during a screen push.
-  const scrollport = (element: Element): Element | null => {
+  // animation frames during a screen push. Such containers never overflow
+  // vertically; a pane that does not overflow yet (FAQ answers in closed
+  // <details>, a list still loading) may later, and the text in it is then
+  // clipped by the pane: it is placed again when that is seen.
+  const scrolls = (node: Element) => /^(?:auto|scroll|overlay)$/u.test(view.getComputedStyle(node).overflowY);
+  const overflows = (node: Element) => node.scrollHeight > node.clientHeight + 1;
+  const place = (element: Element) => {
+    const waiting: Element[] = [];
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
-      if (/^(?:auto|scroll|overlay)$/u.test(view.getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight + 1) return node;
+      if (!scrolls(node)) continue;
+      if (overflows(node)) return { root: node, waiting };
+      waiting.push(node);
     }
-    return null;
+    return { root: null, waiting };
   };
+  const add = (element: Element) => {
+    const at = places.get(element)!;
+    let entry = observers.get(at.root);
+    if (!entry) { entry = { observer: new view.IntersectionObserver(notify, { root: at.root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(at.root, entry); }
+    entry.observer.observe(element);
+    entry.targets.add(element);
+    for (const pane of at.waiting) { let set = waiters.get(pane); if (!set) waiters.set(pane, set = new Set()); set.add(element); }
+  };
+  const release = (element: Element) => {
+    const at = places.get(element);
+    const entry = at && observers.get(at.root);
+    if (!at || !entry) return;
+    entry.observer.unobserve(element);
+    entry.targets.delete(element);
+    // The window's observer stays; a scroll container's goes with its last target.
+    if (at.root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(at.root); }
+    for (const pane of at.waiting) { const set = waiters.get(pane); set?.delete(element); if (set && !set.size) waiters.delete(pane); }
+  };
+  // Whether a container observed elements wait on overflows now: one read
+  // per container, all together after the calls that asked (a commit, a
+  // mutation batch, an intersection change), so no read follows a write.
+  const recheck = () => {
+    queued = false;
+    const moving = new Set<Element>();
+    for (const [pane, set] of waiters) if (overflows(pane)) for (const element of set) moving.add(element);
+    for (const element of moving) { release(element); places.set(element, place(element)); add(element); }
+  };
+  const later = () => { if (!queued && waiters.size) { queued = true; queueMicrotask(recheck); } };
+  // An intersection change is when text in a pane that just overflowed
+  // (content added above it) drops out of view: check the panes then too.
+  function notify(entries: IntersectionObserverEntry[]) { callback(entries); later(); }
   return {
     observe(element) {
-      let root = roots.get(element);
-      if (root === undefined) { root = scrollport(element); roots.set(element, root); }
-      let entry = observers.get(root);
-      if (!entry) { entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
-      entry.observer.observe(element);
-      entry.targets.add(element);
+      const placed = places.has(element);
+      if (!placed) places.set(element, place(element));
+      add(element);
+      // Observed again (a recheck, a reveal, new text): a pane it waits on may overflow now.
+      if (placed) later();
     },
-    unobserve(element) {
-      const root = roots.get(element);
-      const entry = root === undefined ? undefined : observers.get(root);
-      if (!entry) return;
-      entry.observer.unobserve(element);
-      entry.targets.delete(element);
-      // The window's observer stays; a scroll container's goes with its last target.
-      if (root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(root); }
-    },
-    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); },
+    unobserve(element) { release(element); },
+    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); waiters.clear(); },
   };
 }
 
