@@ -24,6 +24,12 @@ const POPULAR_FONTS = [
   "Ubuntu", "Urbanist", "Vollkorn", "Zilla Slab",
 ].sort();
 
+// Shared links carry the pairing in the query string, which anyone can
+// write: only a listed font and a hex colour are taken from it.
+const HEX = /^[0-9a-f]{3,8}$/i;
+const hexParam = (value: string | null, fallback: string) => (value && HEX.test(value) ? value : fallback);
+const fontParam = (value: string | null, fallback: string) => (value && POPULAR_FONTS.includes(value) ? value : fallback);
+
 // nbsp bindings prevent bad breaks: prepositions, conjunctions, articles,
 // and sentence starters stay with the word that follows them.
 // \u00A0 = non-breaking space
@@ -197,16 +203,16 @@ function PairingCardBuilder() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [heading, setHeading] = useState(searchParams.get("heading") || "Playfair Display");
-  const [body, setBody] = useState(searchParams.get("body") || "Inter");
+  const [heading, setHeading] = useState(fontParam(searchParams.get("heading"), "Playfair Display"));
+  const [body, setBody] = useState(fontParam(searchParams.get("body"), "Inter"));
   const [hSize, setHSize] = useState(Number(searchParams.get("hSize")) || 48);
   const [bSize, setBSize] = useState(Number(searchParams.get("bSize")) || 18);
   const [leading, setLeading] = useState(Number(searchParams.get("leading")) || 1.5);
   const [colW, setColW] = useState(Number(searchParams.get("colW")) || 65);
-  const [bg, setBg] = useState(searchParams.get("bg") || "0a0a0a");
-  const [fg, setFg] = useState(searchParams.get("fg") || "e0e0e0");
-  const [hColor, setHColor] = useState(searchParams.get("hc") || "");
-  const [bColor, setBColor] = useState(searchParams.get("bc") || "");
+  const [bg, setBg] = useState(hexParam(searchParams.get("bg"), "0a0a0a"));
+  const [fg, setFg] = useState(hexParam(searchParams.get("fg"), "e0e0e0"));
+  const [hColor, setHColor] = useState(hexParam(searchParams.get("hc"), ""));
+  const [bColor, setBColor] = useState(hexParam(searchParams.get("bc"), ""));
   const [useCustomText, setUseCustomText] = useState(false);
   const [customText, setCustomText] = useState("");
   const [headingText, setHeadingText] = useState("The Art of Type");
@@ -251,31 +257,33 @@ function PairingCardBuilder() {
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");
 
-    const container = document.createElement("div");
-    container.style.cssText = `
-      position: fixed; left: -9999px; top: 0;
-      width: ${width}px; height: ${height}px;
-      background: #${bg}; color: #${fg};
-      display: flex; flex-direction: column; justify-content: center;
-      padding: ${width > 500 ? "80px" : "40px"};
-      box-sizing: border-box;
-      overflow: hidden;
-    `;
-
-    container.innerHTML = `
-      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: ${colW}ch;">
-        <h1 style="font-family: '${heading}', serif; font-size: ${hSize * (width > 500 ? 1 : 0.7)}px; line-height: 1.15; margin: 0 0 ${width > 500 ? 32 : 20}px 0; font-weight: 700; color: #${hColor || fg};">
-          ${typesetText(headingText)}
-        </h1>
-        <p style="font-family: '${body}', sans-serif; font-size: ${bSize * (width > 500 ? 1 : 0.9)}px; line-height: ${leading}; margin: 0; color: #${bColor || fg}; text-wrap: pretty;">
-          ${typesetText(rawText)}
-        </p>
-      </div>
-      <div style="font-family: monospace; font-size: 10px; color: #${fg}44; margin-top: auto; padding-top: 24px; letter-spacing: 0.1em; text-transform: uppercase;">
-        ${heading} ${hSize}px / ${body} ${bSize}px / Leading ${leading}<br/>
-        <span style="font-size: 9px;">fonts.google.com -- typeset.us</span>
-      </div>
-    `;
+    // Built with DOM properties and text, never markup: the fonts, colours
+    // and texts come from the page's state, which a shared link can set.
+    const element = <K extends keyof HTMLElementTagNameMap>(tag: K, style: Partial<CSSStyleDeclaration>, ...children: (string | Node)[]) => {
+      const node = document.createElement(tag);
+      Object.assign(node.style, style);
+      node.append(...children);
+      return node;
+    };
+    const container = element("div", {
+      position: "fixed", left: "-9999px", top: "0",
+      width: `${width}px`, height: `${height}px`,
+      background: `#${bg}`, color: `#${fg}`,
+      display: "flex", flexDirection: "column", justifyContent: "center",
+      padding: width > 500 ? "80px" : "40px",
+      boxSizing: "border-box",
+      overflow: "hidden",
+    });
+    container.append(
+      element("div", { flex: "1", display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: `${colW}ch` },
+        element("h1", { fontFamily: `"${heading}", serif`, fontSize: `${hSize * (width > 500 ? 1 : 0.7)}px`, lineHeight: "1.15", margin: `0 0 ${width > 500 ? 32 : 20}px 0`, fontWeight: "700", color: `#${hColor || fg}` }, typesetText(headingText)),
+        element("p", { fontFamily: `"${body}", sans-serif`, fontSize: `${bSize * (width > 500 ? 1 : 0.9)}px`, lineHeight: String(leading), margin: "0", color: `#${bColor || fg}` }, typesetText(rawText))),
+      element("div", { fontFamily: "monospace", fontSize: "10px", color: `#${fg}44`, marginTop: "auto", paddingTop: "24px", letterSpacing: "0.1em", textTransform: "uppercase" },
+        `${heading} ${hSize}px / ${body} ${bSize}px / Leading ${leading}`, document.createElement("br"),
+        element("span", { fontSize: "9px" }, "fonts.google.com -- typeset.us")),
+    );
+    const bodyText = container.querySelector("p");
+    if (bodyText) bodyText.style.setProperty("text-wrap", "pretty");
 
     document.body.appendChild(container);
     await new Promise((r) => setTimeout(r, 300));

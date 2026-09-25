@@ -655,6 +655,12 @@ table.
   plugins, `<base>`, refresh `<meta>`, event handlers and `javascript:` URLs
   removed; `/audit` in a shadow root, `/dna` in a sandboxed iframe). `/dna`
   no longer fails on pages with inline SVG.
+- `/pairing-cards` builds its downloadable cards from DOM properties and
+  text instead of markup, and takes from a shared link's query string only a
+  listed font and hex colours. A crafted link could insert markup into the
+  generated card with one click on "Generate Cards": under the new CSP a
+  refresh `<meta>` that redirected to any site and images that pinged one,
+  and without it (as on typeset.us until now) event handlers that ran.
 - Every page has a nonce-based Content Security Policy (`script-src` with a
   per-request nonce and `strict-dynamic`, `object-src 'none'`, `base-uri
   'self'`, `frame-ancestors 'self'`), plus `nosniff`, `X-Frame-Options:

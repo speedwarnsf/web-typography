@@ -7,7 +7,8 @@
 // security (K10): every page carries a nonce CSP, nosniff and frame
 //   protection, and loads with no CSP violation or page error; an attacker
 //   page run through /audit and /dna executes nothing and cannot restyle the
-//   site; /api/fetch-url refuses loopback, metadata and private addresses and
+//   site; a hostile /pairing-cards link inserts nothing into the card it
+//   generates; /api/fetch-url refuses loopback, metadata and private addresses and
 //   rate-limits; go@4.2.0.js still loads cross-origin with its SRI hash.
 //   --audit also requires `npm audit` to report no high or critical issue.
 // content (D4, D5): install lines pinned with sri.json's hash; titles,
@@ -142,6 +143,40 @@ try {
             check('security', `${route}: attacker HTML cannot restyle, redirect or rebase typeset.us`, !state.hidden && state.url === base + route && state.base === base + route, state, config.name);
           } catch (error) {
             check('security', `${route}: attacker HTML runs no script, handler or javascript: URL`, false, String(/** @type {Error} */ (error).message).slice(0, 300), config.name);
+          } finally { await page.close(); }
+        }
+
+        // A shared /pairing-cards link sets the fonts and colours the card
+        // generator renders. Hostile values insert no markup, run nothing,
+        // request nothing from another origin and navigate nowhere.
+        {
+          const page = await context.newPage();
+          page.setDefaultTimeout(20000);
+          /** @type {string[]} */
+          const outside = [];
+          await page.route(/^https:\/\/attacker\.invalid\//, route => { outside.push(route.request().url()); return route.abort(); });
+          const hostile = new URLSearchParams({
+            heading: 'Inter<img id="inj" src="https://attacker.invalid/heading.png" onerror="window.__pwned=\'heading\'">',
+            body: 'Inter\' onmouseover=\'window.__pwned="body"',
+            fg: 'e0e0e0;background:url(https://attacker.invalid/fg.png)',
+            bg: '000"><meta http-equiv="refresh" content="0;url=https://attacker.invalid/bg">',
+            hc: 'fff"><meta http-equiv="refresh" content="0;url=/faq">',
+            bc: 'fff" id="inj2',
+          });
+          try {
+            await page.goto(`${base}/pairing-cards?${hostile}`, { waitUntil: 'load' });
+            await page.evaluate(() => {
+              const w = /** @type {any} */ (window);
+              w.__injected = [];
+              new MutationObserver(records => { for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) for (const el of [/** @type {Element} */ (node), .../** @type {Element} */ (node).querySelectorAll('*')]) if (el.id === 'inj' || el.id === 'inj2' || el.hasAttribute('onerror') || el.hasAttribute('onmouseover') || /refresh/i.test(el.getAttribute('http-equiv') ?? '')) w.__injected.push(el.outerHTML.slice(0, 120)); }).observe(document, { childList: true, subtree: true });
+            });
+            await page.getByRole('button', { name: 'Generate Cards' }).click();
+            await page.waitForFunction(() => document.querySelectorAll('img[src^="data:image/png"]').length >= 2, undefined, { timeout: 20000 });
+            await page.waitForTimeout(500);
+            const state = await page.evaluate(() => ({ pwned: /** @type {any} */ (window).__pwned ?? null, injected: /** @type {any} */ (window).__injected, url: location.pathname }));
+            check('security', '/pairing-cards: hostile query parameters insert no markup, run nothing, request nothing and navigate nowhere', state.pwned === null && state.injected.length === 0 && outside.length === 0 && state.url === '/pairing-cards', { ...state, outside }, config.name);
+          } catch (error) {
+            check('security', '/pairing-cards: hostile query parameters insert no markup, run nothing, request nothing and navigate nowhere', false, String(/** @type {Error} */ (error).message).slice(0, 300), config.name);
           } finally { await page.close(); }
         }
 
