@@ -50,7 +50,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Does it phone home?',
-    a: <>No. No network requests, storage or telemetry, and no install scripts. The pinned file never changes, and its integrity hash makes the browser refuse it if it did.</>,
+    a: <>The script does not: no network requests, storage or telemetry, and no install scripts. The pinned file never changes, and its integrity hash makes the browser refuse it if it did. This website itself, not the script, sends an anonymous visit notification when one of its pages loads.</>,
   },
 ];
 
