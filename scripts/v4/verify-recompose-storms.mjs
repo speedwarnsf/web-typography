@@ -190,6 +190,29 @@ for (const { name, engine, executablePath } of browsers) {
       return { overheadMs: +(total / 20).toFixed(3), owned: document.querySelectorAll('article p[data-typeset-done]').length };
     });
     check('removing 1000 unrelated nodes costs the controller under 1 ms', removal.overheadMs < 1, removal);
+
+    // A container dragged narrower, one width per frame: every composed block
+    // changes width, but the settle timer is armed once per change, not once
+    // per block (4.3's first candidates set and cleared a timer per block per
+    // frame on both the observer and the attribute path).
+    const drag = await tab.evaluate(async () => {
+      const w = /** @type {any} */ (window);
+      await w.quiet();
+      const article = /** @type {HTMLElement} */ (document.querySelector('#wrap article'));
+      const native = window.setTimeout;
+      let timers = 0;
+      window.setTimeout = /** @type {any} */ (function (/** @type {any[]} */ ...args) { timers++; return native.apply(window, /** @type {any} */ (args)); });
+      try { await w.frames(20, (/** @type {number} */ i) => { article.style.width = (556 - 4 * i) + 'px'; }); }
+      finally { window.setTimeout = native; }
+      article.style.width = '';
+      await w.quiet();
+      // Blocks more than a viewport offscreen wait, stale, until they come near.
+      const onScreen = [...document.querySelectorAll('#wrap p')].filter(p => { const r = p.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+      const intact = onScreen.filter(p => w.Typeset.measureLayout(p).lines.length === p.querySelectorAll('br[data-ts-break]').length + 1 && !p.hasAttribute('data-ts-stale'));
+      return { timers, frames: 20, blocks: document.querySelectorAll('#wrap p').length, onScreen: onScreen.length, intact: intact.length };
+    });
+    check('a 20-frame container drag arms timers per change, not per block (under 5 a frame for 40 blocks)', drag.timers < 5 * drag.frames && drag.onScreen > 0 && drag.intact === drag.onScreen, drag);
+
     await context.close();
 
     // The React adapters under the same storms.

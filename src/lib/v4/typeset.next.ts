@@ -1102,12 +1102,18 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const state = states.get(el);
     if (state?.signature && el.hasAttribute('data-ts-stale') && !resizing.has(el) && (deferred.has(el) || hidden.has(el))) releaseOutput(el, state, new Set());
   };
-  /** A block's width is changing: recompose once it settles, not every frame. */
+  /** The size is changing: settle RESIZE_SETTLE_MS after the last change.
+   * Once per batch of resizeStarted() calls, not once per block (a drag
+   * over 1,000 blocks set and cleared 1,000 timers in every frame). */
+  const settleLater = () => {
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+    settleTimer = setTimeout(settle, RESIZE_SETTLE_MS);
+  };
+  /** A block's width is changing: recompose once it settles, not every
+   * frame. Callers then call settleLater() once. */
   const resizeStarted = (el: HTMLElement) => {
     resizing.add(el);
     if (deferred.delete(el)) viewport?.unobserve(el);
-    if (settleTimer !== undefined) clearTimeout(settleTimer);
-    settleTimer = setTimeout(settle, RESIZE_SETTLE_MS);
     // Widths the observers cannot see change ahead of layout (a stylesheet
     // rule, a sibling outside the root): check them before each frame.
     if (!guardFrame && view) guardFrame = view.requestAnimationFrame(function frame() {
@@ -1151,7 +1157,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // A width this change sets (a sidebar drag, a container animation):
     // guard the frame about to paint, and recompose once it settles.
     const resized = fontsReady && affected.length ? widthChanged(affected) : [];
-    if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
+    if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); settleLater(); }
     // A tab, dialog or card this change just showed: on-screen text that could
     // not be composed while hidden, or was hidden at another width, composes
     // before the reveal paints. A retained composition needs nothing.
@@ -1250,6 +1256,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
     // Reads only. A write here that changed any observed size would make every
     // engine report "ResizeObserver loop completed with undelivered notifications".
+    let widened = false;
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
       const previous = sizes.get(entry.target);
@@ -1268,7 +1275,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
           // paint alternating long and short lines this frame; from the next
           // it shows native wrapping until it is recomposed.
           if (!previous.w || hidden.has(el)) { revealed(el, VERIFY); shownNow.add(el); }
-          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
+          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) { resizeStarted(el); widened = true; }
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
         // Same width, new height: a font, a text-spacing override, a browser
@@ -1277,6 +1284,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
         recheck(entry.target as HTMLElement, VERIFY);
       }
     }
+    if (widened) settleLater();
     if (shownNow.size && !shownFrame && view) shownFrame = view.requestAnimationFrame(() => {
       shownFrame = 0;
       if (!stopped) guard(shownNow);
@@ -1417,6 +1425,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const changed = widthChanged(visible);
     guard(changed);
     for (const el of changed) resizeStarted(el);
+    if (changed.length) settleLater();
     for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY, visible.includes(el));
     schedule();
   };
