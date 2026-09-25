@@ -42,6 +42,19 @@ line boxes, outcomes, feature statuses, copy text and markup).
   generated breaks are now exposed and 16 hyphen breaks stay hidden; 0
   screenshots, 0 line boxes, 0 outcomes, 0 feature statuses and 0 copied texts
   changed.
+- **Live regions are no longer composed (accessibility, C4).** Text inside
+  `aria-live` (other than `off` on the nearest region), `role="status"`,
+  `alert`, `log`, `marquee` or `timer`, or `<output>`, keeps native wrapping.
+  4.2 composed it and rewrote it on every resize, font load and idle pass
+  (51 mutation records on mount and 180 more across two resizes for one status
+  paragraph), and Chrome announced those rewrites, so screen readers repeated
+  status messages. `typeset()` returns `native:live-region` and writes nothing,
+  `mount()` and both loaders skip such targets (and release one whose region
+  turns live), `TypesetRichText` reports `native:live-region`, and `auditJSON()`
+  counts them under that outcome. Golden diff: paragraphs inside live regions
+  change from composed to native (5 of 8 on the live-region fixture, per
+  loader and engine); 0 of 316 blocks change in the golden A/B, which has no
+  live regions.
 - The legacy `renderFrozenLines()` export no longer sets the non-ARIA
   `role="text"`, which emptied a composed heading's accessible name in WebKit,
   and clears the element with `replaceChildren()` instead of `innerHTML`, so it

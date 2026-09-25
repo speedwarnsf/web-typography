@@ -15,6 +15,7 @@ export const SUITES = [
   { name: 'verify-strict-csp', report: 'output/strict-csp.json', note: "style-src without 'unsafe-inline' and Trusted Types (C5)" },
   { name: 'verify-copy-privacy', report: 'output/copy-privacy.json', note: 'no hidden content on the clipboard (C11)' },
   { name: 'verify-framework-text', report: 'output/framework-text.json', note: 'framework text updates never show stale text (C6)' },
+  { name: 'verify-live-regions', report: 'output/live-regions.json', note: 'live regions are never composed (C4)' },
   { name: 'verify-inline-code', report: 'output/inline-code-regression.json' },
   { name: 'verify-inline-nowrap', report: 'output/inline-nowrap-regression.json' },
   { name: 'verify-name-groups', report: 'output/name-groups-regression.json' },

@@ -93,6 +93,11 @@ native overflow is never extra room for a newly composed line. The 0.5px
 layout rounding allowance remains; fallback is reported instead of presenting
 unprocessed native text as successful composition.
 
+Live regions stay native: from 4.3, text inside aria-live (unless the nearest
+region says off), role status, alert, log, marquee or timer, or <output> is
+never composed, measured or rewritten, because assistive technology announces
+every change there. Its outcome is `native:live-region`.
+
 Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
 for styles and no 'unsafe-eval'. It writes and restores styles through the
 CSSOM only, never the style attribute, injects no <style> element and uses no

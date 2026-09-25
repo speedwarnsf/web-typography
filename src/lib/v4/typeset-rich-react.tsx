@@ -2,7 +2,7 @@
 
 import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from 'react';
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
-import { BREAK_ATTRIBUTE, breakReplacesSpace, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
+import { BREAK_ATTRIBUTE, breakReplacesSpace, inLiveRegion, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
 import { measureLayout } from './layout-metrics';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
@@ -230,7 +230,10 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   private recompose = () => {
     if (!this.mounted || !this.host.current) return;
     this.observer?.disconnect();
-    const plan: RenderPlan = planRichText(this.host.current, this.props);
+    // A live region announces every change: never measure or break it.
+    const plan: RenderPlan = inLiveRegion(this.host.current)
+      ? { source: this.host.current.textContent || '', breaks: [], widths: [], outcome: 'native:live-region', styleSignature: '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 } }
+      : planRichText(this.host.current, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
     else this.observe();

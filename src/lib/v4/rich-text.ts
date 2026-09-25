@@ -367,6 +367,17 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   } finally { restoreMarkers.reverse().forEach(restore => restore()); }
 }
 
+const liveRegions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+/** Whether this element is inside a live region: aria-live other than off on
+ * the nearest region, or a status, alert, log, marquee or timer role, or
+ * <output>. Assistive technology announces every change there, and composing
+ * rewrites the text on each resize, font load and idle pass, so screen
+ * readers repeated status messages whose words had not changed. */
+export function inLiveRegion(element: Element): boolean {
+  const region = element.closest(liveRegions);
+  return !!region && (region.getAttribute('aria-live') ?? 'polite').trim().toLowerCase() !== 'off';
+}
+
 /** Whether a generated break at `offset` stands in for a collapsed space. */
 export function breakReplacesSpace(source: string, offset: number): boolean {
   return offset > 0 && /\s/u.test(source[offset - 1]);
