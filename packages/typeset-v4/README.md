@@ -73,6 +73,26 @@ Use ordinary inline host markup. Independently stateful custom children retain
 native rendering. Keep one owner per subtree. Framework-updated prose must not
 also be targeted by a script loader or imperative mount. See [support](SUPPORT.md).
 
+Both adapters take the core options as props (`mode`, `keep`, `maxLines`,
+`density`, `lineBreaks`, `smartQuotes`, `opticalHanging`, `spacing`,
+`tracking`, `contour`) plus:
+
+- `as`: the host element, one of `p` (default), `h1`-`h6`, `span`, `div`, `li`,
+  `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
+  `legend` or `summary`. The engine still decides at run time: an inline host,
+  such as a `label` in running text, reports `native:inline`.
+- `ref`: resolves to the host element (object or callback refs, React 18 and 19).
+- `onResult(result)`: called after each composition with the same `Result`
+  that `typeset()` returns (outcome, lines measured before and after, feature
+  statuses), so an app can log or assert what happened without a second pass.
+- `priority`: `'auto'` (default) or `'sync'`, below.
+
+```tsx
+<ul>
+  <TypesetText as="li" text={item.text} onResult={r => log(r.outcome)} />
+</ul>
+```
+
 All adapters in a document share one registry: one MutationObserver,
 ResizeObserver and IntersectionObserver, however many blocks render. A block on
 screen is composed before its first paint; offscreen blocks compose in idle

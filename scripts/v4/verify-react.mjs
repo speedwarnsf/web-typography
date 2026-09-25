@@ -59,7 +59,7 @@ for (const config of selected) {
         const mode = strict ? ' (StrictMode)' : '';
         // P4: re-renders that change nothing write nothing.
         await page.evaluate(strict => /** @type {any} */ (window).T.render('blocks', { n: 6, kind: 'both', inlineKeep: true }, strict), strict);
-        await page.evaluate(() => /** @type {any} */ (window).__quiet(400));
+        await page.evaluate(() => /** @type {any} */ (window).__quiet(300));
         const before = await page.evaluate(() => Array.from(document.querySelectorAll('.blk'), el => /** @type {HTMLElement} */ (el).dataset.tsOutcome));
         check('blocks compose' + mode, before.filter(o => o === 'composed:rich').length >= 6, before);
         const rerender = await page.evaluate(async () => {
@@ -68,7 +68,7 @@ for (const config of selected) {
           const started = performance.now();
           for (let i = 0; i < 100; i++) w.api.flushSync(() => w.api.bump());
           const ms = performance.now() - started;
-          await w.__quiet(400);
+          await w.__quiet(300);
           return { ms, writes: stop() };
         });
         report.timings[`${config.name} ${prefix}100 re-renders${mode}`] = Math.round(rerender.ms);
@@ -81,7 +81,7 @@ for (const config of selected) {
           for (let i = 0; i < 60; i++) { wrap.style.transform = `translateX(${i % 12}px)`; await new Promise(r => requestAnimationFrame(r)); }
           wrap.style.transform = '';
           for (let i = 0; i < 10; i++) { document.body.classList.toggle('unstyled-toggle'); await new Promise(r => requestAnimationFrame(r)); }
-          await w.__quiet(400);
+          await w.__quiet(300);
           return stop();
         });
         check('a 60-frame ancestor transform and no-op ancestor class toggles write nothing in TypesetText hosts' + mode, ancestor.text === 0, ancestor);
@@ -91,11 +91,11 @@ for (const config of selected) {
           const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
           const stop = w.__watch();
           wrap.classList.add('big');
-          await w.__quiet(400);
+          await w.__quiet(300);
           const writes = stop();
           const blocks = Array.from(document.querySelectorAll('.blk'), el => ({ outcome: /** @type {HTMLElement} */ (el).dataset.tsOutcome, overflow: el.scrollWidth > el.clientWidth + 1 }));
           wrap.classList.remove('big');
-          await w.__quiet(400);
+          await w.__quiet(300);
           return { writes, blocks };
         });
         check('a real ancestor style change still recomposes every block' + mode, restyle.writes.hosts.length === 12 && restyle.blocks.every(b => !b.overflow && b.outcome), restyle);
@@ -161,7 +161,7 @@ for (const config of selected) {
           }
           return last;
         }, { words, driver });
-        await page.evaluate(() => /** @type {any} */ (window).__quiet(400));
+        await page.evaluate(() => /** @type {any} */ (window).__quiet(300));
         const state = await page.evaluate(() => ['rapid', 'rapidrich'].map(id => {
           const el = /** @type {HTMLElement} */ (document.getElementById(id));
           return { id, text: el.textContent, outcome: el.dataset.tsOutcome, done: el.dataset.typesetDone, overflow: el.scrollWidth > el.clientWidth + 1 };
@@ -230,6 +230,33 @@ for (const config of selected) {
         });
         check('an Activity reveal paints composed with the text intact', activity.shown.length === 6 && activity.shown.every((/** @type {any} */ h) => h.composed && h.visible) && activity.text.every(t => t && t.length > 40), activity);
       }
+
+      // K5: refs, wider hosts and onResult.
+      const api = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        w.T.render('api');
+        await w.__quiet(400);
+        await new Promise(r => setTimeout(r, 50));
+        const r = w.__refs;
+        const outcome = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id))?.dataset.tsOutcome;
+        const ids = ['ref-text', 'ref-rich', 'cb-text', 'cb-rich', 'as-li', 'as-li-rich', 'as-div', 'as-blockquote', 'as-figcaption', 'as-dt', 'as-dd', 'as-td', 'as-label'];
+        return {
+          refs: { text: r.text.current === document.getElementById('ref-text'), rich: r.rich.current === document.getElementById('ref-rich'),
+            callbackText: r.callbackText === document.getElementById('cb-text'), callbackRich: r.callbackRich === document.getElementById('cb-rich'),
+            tags: [r.text.current?.tagName, r.rich.current?.tagName] },
+          outcomes: Object.fromEntries(ids.map(id => [id, outcome(id)])),
+          tags: Object.fromEntries(ids.map(id => [id, document.getElementById(id)?.tagName])),
+          results: { ...w.__results },
+          last: Object.fromEntries(Object.entries(w.__lastResult).map(([id, result]) => [id, { outcome: /** @type {any} */ (result).outcome, features: /** @type {any} */ (result).features, lines: /** @type {any} */ (result).after?.lines?.length }])),
+          listInLi: document.querySelector('#list > li#as-li') !== null,
+        };
+      });
+      check('a ref on TypesetText and TypesetRichText resolves to the host element (object and callback refs)', api.refs.text && api.refs.rich && api.refs.callbackText && api.refs.callbackRich && api.refs.tags.every(t => t === 'P'), api.refs);
+      check('as="li" inside a list composes, for both adapters', api.listInLi && api.outcomes['as-li'] === 'composed:rich' && api.outcomes['as-li-rich'] === 'composed:rich', api.outcomes);
+      check('as div, blockquote, figcaption, dd and td compose', ['as-div', 'as-blockquote', 'as-figcaption', 'as-dd', 'as-td'].every(id => api.outcomes[id] === 'composed:rich' && api.tags[id] === id.slice(3).toUpperCase()), { outcomes: api.outcomes, tags: api.tags });
+      check('an inline host (as="label") stays native, decided by the engine', api.outcomes['as-label'] === 'native:inline', api.outcomes['as-label']);
+      check('onResult reports each block with its outcome and features', Object.entries(api.outcomes).every(([id, o]) => api.results[id] >= 1 && api.last[id]?.outcome === o)
+        && api.last['ref-rich']?.outcome === 'composed:rich' && api.last['ref-rich']?.features?.spacing && api.last['ref-text']?.lines > 1, { results: api.results, last: api.last });
 
       // Lifecycle: nothing survives unmounting.
       await page.evaluate(() => /** @type {any} */ (window).T.render('blocks', { n: 10, kind: 'both' }));

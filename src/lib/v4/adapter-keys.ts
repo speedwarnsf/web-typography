@@ -1,5 +1,5 @@
 import { Children, Fragment, isValidElement } from 'react';
-import type { ReactNode } from 'react';
+import type { ForwardedRef, ReactNode, Ref } from 'react';
 import { contentWidth } from './layout-metrics';
 import { BREAK_ATTRIBUTE } from './rich-text';
 
@@ -8,13 +8,15 @@ import { BREAK_ATTRIBUTE } from './rich-text';
  * values; comparing by value keeps those renders free. */
 
 const json = (value: unknown): string => {
-  try { return JSON.stringify(value, (_key, item) => typeof item === 'function' || typeof item === 'symbol' ? undefined : item) ?? ''; }
-  catch { return String(Math.random()); }
+  try {
+    return JSON.stringify(value, (_key, item) => typeof item === 'function' || typeof item === 'symbol'
+      || (typeof Node === 'function' && item instanceof Node) ? undefined : item) ?? '';
+  } catch { return String(Math.random()); }
 };
 
 /** Every prop except children, refs and callbacks, by value. */
 export function propsKey(props: object): string {
-  const { children: _children, ref: _ref, ...rest } = props as Record<string, unknown>;
+  const { children: _children, ref: _ref, forwardedRef: _forwarded, ...rest } = props as Record<string, unknown>;
   return json(rest);
 }
 
@@ -90,4 +92,10 @@ export function layoutKey(element: HTMLElement, fonts = fontKey(element.ownerDoc
     element.closest('[lang]')?.getAttribute('lang'), cs.textAlign, cs.textIndent, cs.textWrap, cs.getPropertyValue('-webkit-line-clamp'),
     cs.overflow, cs.textOverflow, cs.writingMode, typeKey(element),
   ]);
+}
+
+/** Set a caller's ref to `node`; returns the cleanup a React 19 callback ref gave, if any. */
+export function assignRef(ref: Ref<HTMLElement> | ForwardedRef<HTMLElement> | undefined, node: HTMLElement | null): (() => void) | undefined {
+  if (typeof ref === 'function') { const cleanup = (ref as (node: HTMLElement | null) => unknown)(node); return typeof cleanup === 'function' ? cleanup as () => void : undefined; }
+  if (ref) (ref as { current: HTMLElement | null }).current = node;
 }

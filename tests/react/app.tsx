@@ -52,6 +52,27 @@ function Rapid({ text, deferred, inlineKeep }: { text: string; deferred?: boolea
     h(Rich, { id: 'rapidrich', lang: 'en' }, value));
 }
 
+/** K5: refs resolve to host elements, widened hosts compose, onResult reports. */
+const refs = { text: React.createRef<HTMLElement>(), rich: React.createRef<HTMLElement>(), callbackText: null as HTMLElement | null, callbackRich: null as HTMLElement | null };
+w.__refs = refs;
+function ApiScenario() {
+  const long = TEXTS[1];
+  const withResult = (id: string) => ({ id, lang: 'en', onResult: counted(id) });
+  return h('div', { className: 'col', style: { width: 340 } },
+    h(Text, { ...withResult('ref-text'), ref: refs.text, text: long }),
+    h(Rich, { ...withResult('ref-rich'), ref: refs.rich }, rich(1)),
+    h(Text, { ...withResult('cb-text'), ref: (node: HTMLElement | null) => { refs.callbackText = node; }, text: long }),
+    h(Rich, { ...withResult('cb-rich'), ref: (node: HTMLElement | null) => { refs.callbackRich = node; } }, rich(2)),
+    h('ul', { id: 'list' }, h(Text, { ...withResult('as-li'), as: 'li', text: long }), h(Rich, { ...withResult('as-li-rich'), as: 'li' }, rich(3))),
+    h(Text, { ...withResult('as-div'), as: 'div', text: long }),
+    h(Text, { ...withResult('as-blockquote'), as: 'blockquote', text: long }),
+    h('figure', null, h(Text, { ...withResult('as-figcaption'), as: 'figcaption', text: long })),
+    h('dl', null, h(Text, { ...withResult('as-dt'), as: 'dt', text: 'A term' }), h(Text, { ...withResult('as-dd'), as: 'dd', text: long })),
+    h('table', null, h('tbody', null, h('tr', null, h(Text, { ...withResult('as-td'), as: 'td', colSpan: 2, text: long })))),
+    // A label outside the flex column stays inline.
+    h('div', null, h(Text, { ...withResult('as-label'), as: 'label', htmlFor: 'x', text: 'A label beside a field' })));
+}
+
 function App({ scenario, props }: { scenario: string; props: any }) {
   const [tick, setTick] = useState(0);
   const [text, setText] = useState(TEXTS[0]);
@@ -66,6 +87,7 @@ function App({ scenario, props }: { scenario: string; props: any }) {
       case 'rapid': return h(Rapid, { text, ...props });
       case 'suspense': return h(Suspense, { fallback: h('p', { id: 'fallback' }, 'Loading') }, h(Suspender), h(Blocks, { n: 3, kind: 'both', tick }));
       case 'activity': return Activity ? h(Activity, { mode }, h('div', { id: 'wrap' }, h(Blocks, { n: 3, kind: 'both', tick }))) : h('p', { id: 'no-activity' }, 'no Activity');
+      case 'api': return h(ApiScenario);
       case 'key': return h('div', { className: 'col' }, h(Text, { key: k, id: 'keyed', lang: 'en', text: TEXTS[k % 3] }), h(Rich, { key: 'r' + k, id: 'keyedrich', lang: 'en' }, rich(k)));
       default: return null;
     }

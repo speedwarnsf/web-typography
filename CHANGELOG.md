@@ -49,6 +49,14 @@ Hashes for every published version live in
   commit, as 4.2 did. Measured on the V4 benchmark (Chromium, 38-block push):
   commit 164 to 17 ms, INP proxy 232 to 144 ms and total blocking time 138 to
   68 ms at 4x CPU; 1,000 blocks at 1x commit in 18 ms instead of 1,463 ms.
+- `ref` on `TypesetText` and `TypesetRichText` resolves to the host element
+  (both are `forwardRef` components; a ref was dropped before, and
+  `TypesetRichText`'s gave its class instance). `as` also accepts `div`, `li`,
+  `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
+  `legend` and `summary`, with `cite`, `colSpan`, `rowSpan`, `headers`,
+  `scope`, `htmlFor` and `value` attributes. New `onResult(result)` reports
+  each composition as a `Result`. New exported types `TypesetTag`,
+  `TypesetAdapterProps` and `Priority`.
 - Single-line blocks skip Unicode break analysis, and a first composition no
   longer computes an unused signature; outcomes are unchanged.
 

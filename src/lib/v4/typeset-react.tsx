@@ -1,45 +1,40 @@
 'use client';
 
-import { createElement, useLayoutEffect, useRef, useState } from 'react';
-import type { HTMLAttributes } from 'react';
+import { createElement, forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { restore, typeset } from './typeset.next';
-import type { Mode, Options, Result } from './typeset.next';
+import type { Options, Result } from './typeset.next';
 import { adapterRegistry } from './adapter-registry';
-import type { AdapterEntry, Priority } from './adapter-registry';
-import { layoutKey } from './adapter-keys';
+import type { AdapterEntry } from './adapter-registry';
+import { assignRef, layoutKey } from './adapter-keys';
+import type { TypesetAdapterProps } from './typeset-rich-react';
 export { TypesetRichText } from './typeset-rich-react';
-export type { TypesetRichTextProps } from './typeset-rich-react';
-export type { Priority } from './adapter-registry';
+export type { TypesetRichTextProps, TypesetAdapterProps, TypesetTag, Priority } from './typeset-rich-react';
 
-export interface TypesetTextProps extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'dangerouslySetInnerHTML'> {
+export interface TypesetTextProps extends TypesetAdapterProps {
   text: string;
-  as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span';
-  mode?: Mode;
-  keep?: readonly string[];
-  maxLines?: number;
-  density?: Options['density'];
-  lineBreaks?: Options['lineBreaks'];
-  smartQuotes?: Options['smartQuotes'];
-  opticalHanging?: Options['opticalHanging'];
-  spacing?: Options['spacing'];
-  tracking?: Options['tracking'];
-  contour?: Options['contour'];
-  /** 'auto' (default) composes in the commit only what is on screen, within
-   * a small time budget, and the rest before its first paint or in idle
-   * time. 'sync' composes in the commit, as 4.2 did, for hero text. */
-  priority?: Priority;
 }
 
 /**
  * React owns the semantic host and its attributes; this adapter owns only
  * its text subtree. The stable initial child also supplies readable SSR.
- * Inline interactive children belong outside this plain-text adapter.
+ * Inline interactive children belong outside this plain-text adapter. A ref
+ * resolves to the host element.
  */
-export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, priority = 'auto', ...attributes }: TypesetTextProps) {
-  const ref = useRef<HTMLElement>(null);
+export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, priority = 'auto', onResult, ...attributes }, forwarded) {
+  const ref = useRef<HTMLElement | null>(null);
+  const refCleanup = useRef<(() => void) | undefined>(undefined);
+  // A classic callback ref (node, then null), which React 18 and 19 both
+  // call; a React 19 caller's own cleanup is kept and run on detach.
+  const setHost = useCallback((node: HTMLElement | null) => {
+    ref.current = node;
+    if (node) refCleanup.current = assignRef(forwarded, node);
+    else { if (refCleanup.current) refCleanup.current(); else assignRef(forwarded, null); refCleanup.current = undefined; }
+  }, [forwarded]);
   const [initialText] = useState(text);
   const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
   options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
+  const report = useRef(onResult);
+  report.current = onResult;
   const entry = useRef<AdapterEntry | null>(null);
   // By value: an inline keep={[...]} is a new array on every parent render.
   const keepKey = keep?.join('\u0000');
@@ -57,6 +52,9 @@ export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lin
         widest = result.outcome.startsWith('composed') ? Math.max(0, ...result.after.lines.map(line => line.width)) : 0;
         delete element.dataset.tsStale;
         key = layoutKey(element);
+        const callback = report.current;
+        // After the commit, outside the registry's own writes.
+        if (callback) queueMicrotask(() => callback(result));
       },
       changed: fonts => layoutKey(element, fonts) !== key,
       widest: () => widest,
@@ -78,5 +76,5 @@ export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lin
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, 'force', true);
   }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
-  return createElement(as, { ...attributes, ref, 'data-typeset-react': '' }, initialText);
-}
+  return createElement(as, { ...attributes, ref: setHost, 'data-typeset-react': '' }, initialText);
+});

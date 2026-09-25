@@ -42,6 +42,24 @@
       ],
       "awaiting": "C2",
       "reason": "The CLI returns auditJSON, which reports hidden-break and isolated-space errors on composed output until C2."
+    },
+    {
+      "script": "verify-react",
+      "label": ".*",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed packages/typeset-v4/dist, the published 4.2.0 adapters, which recompose on every parent render and resize frame, keep a controller per block, drop refs and have no onResult (P4, P5, K5)."
+    },
+    {
+      "script": "verify-react-node",
+      "label": ".*",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "The committed 4.2.0 declarations reject as=\"div\", refs, onResult and priority, and inline @types/react 19.2 internals that fail with @types/react 18."
     }
   ]
 }
