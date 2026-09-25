@@ -15,8 +15,9 @@
  * very slow device, continues in the following frame). Hosts within a
  * viewport of the screen follow within a small frame budget, and the rest
  * compose in idle time. Triggers (ancestor class or style changes, fonts, window
- * resizes, and the document lifecycle hub's stylesheet, metric-transition and
- * content-visibility signals) first compare each host's computed layout key
+ * resizes, a host's height changing at the same width, and the document
+ * lifecycle hub's stylesheet, metric-transition and content-visibility
+ * signals) first compare each host's computed layout key
  * and do nothing when it is unchanged. During a continuous resize a host whose
  * composed lines no longer fit shows native lines (stale) and recomposes once
  * the size has held for RESIZE_SETTLE_MS. Hidden hosts keep their composition
@@ -63,6 +64,14 @@ const RESIZE_SETTLE_MS = 100;
 // Edge's translator tags the nodes it rewrites with these attributes.
 const OBSERVED = ['class', 'style', 'lang', '_msttexthash', '_msthash'];
 
+/** A content-box height as a ResizeObserver reports it (NaN for an inline box). */
+function contentHeight(el: Element): number {
+  const cs = getComputedStyle(el);
+  const height = parseFloat(cs.height);
+  return cs.boxSizing === 'border-box' ? height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0')
+    - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0') : height;
+}
+
 interface Registry {
   identity: symbol;
   entries: Map<HTMLElement, AdapterEntry>;
@@ -86,7 +95,8 @@ function createRegistry(doc: Document): Registry {
   const pending = new Map<AdapterEntry, Reason>();
   const near = new Set<AdapterEntry>();
   const resizing = new Set<AdapterEntry>();
-  const widths = new WeakMap<Element, number>();
+  // Content-box sizes as last seen by the ResizeObserver or left by our writes.
+  const sizes = new WeakMap<Element, { w: number; h: number }>();
   const watchers = new Map<Element, Set<AdapterEntry>>();
   const parents = new Map<AdapterEntry, Element | null>();
   const later = (fn: () => void, ms: number) => (win || globalThis).setTimeout(fn, ms);
@@ -95,7 +105,7 @@ function createRegistry(doc: Document): Registry {
   let costPerChar = 0;
   let frameQueued = false, idleQueued = false, staleQueued = false;
   let settle: ReturnType<typeof setTimeout> | undefined;
-  let mutations: MutationObserver | null = null, sizes: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
+  let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
   let writingDepth = 0;
   let started = false;
   let unsubscribe: (() => void) | undefined;
@@ -119,6 +129,10 @@ function createRegistry(doc: Document): Registry {
     // can decline a composition that would overrun it before starting it.
     const perChar = (performance.now() - begun) / length;
     costPerChar = costPerChar ? costPerChar * .8 + perChar * .2 : perChar;
+    // Our own write may change the host's height; that is no reason to check
+    // it again. (In a commit the update renders after this returns.)
+    const size = sizes.get(entry.element);
+    if (size && !inCommit) { const height = contentHeight(entry.element); if (!Number.isNaN(height)) size.h = height; }
   }
   /** Whether a composition of `entry` is expected to finish within `budget` ms from `start`. */
   const fits = (entry: AdapterEntry, start: number, budget: number): boolean =>
@@ -236,7 +250,7 @@ function createRegistry(doc: Document): Registry {
     for (const target of [entry.element, parent]) {
       if (!target) continue;
       let set = watchers.get(target);
-      if (!set) { set = new Set(); watchers.set(target, set); sizes?.observe(target); }
+      if (!set) { set = new Set(); watchers.set(target, set); observer?.observe(target); }
       set.add(entry);
     }
   }
@@ -245,22 +259,31 @@ function createRegistry(doc: Document): Registry {
       if (!target) continue;
       const set = watchers.get(target);
       set?.delete(entry);
-      if (set && !set.size) { watchers.delete(target); sizes?.unobserve(target); widths.delete(target); }
+      if (set && !set.size) { watchers.delete(target); observer?.unobserve(target); sizes.delete(target); }
     }
     parents.delete(entry);
   }
   function resized(observations: ResizeObserverEntry[]): void {
     const revealed = new Set<AdapterEntry>();
     for (const observation of observations) {
-      const width = observation.contentRect.width;
-      const previous = widths.get(observation.target);
-      widths.set(observation.target, width);
-      if (previous === undefined || Math.abs(previous - width) <= .01) continue;
+      const { width, height } = observation.contentRect;
+      const previous = sizes.get(observation.target);
+      sizes.set(observation.target, { w: width, h: height });
+      if (!previous) continue;
+      if (Math.abs(previous.w - width) <= .01) {
+        // Same width, new height: a CSSOM rule (a text-spacing override), the
+        // browser's font-size setting, text-only zoom or a FontFace added by
+        // script changes text metrics with no mutation and no event. Compare
+        // the host's layout key before the next frame.
+        const entry = entries.get(observation.target as HTMLElement);
+        if (entry && width && Math.abs(previous.h - height) > .5 && !pending.has(entry)) enqueue(entry, 'check');
+        continue;
+      }
       // Hidden (display:none, a closed dialog, an inactive tab): keep the
       // composition. Shown again at the same width, it paints composed.
       if (!width) continue;
       for (const entry of watchers.get(observation.target) || []) {
-        if (previous === 0 && entry.element.isConnected && visible(entry.element)) {
+        if (previous.w === 0 && entry.element.isConnected && visible(entry.element)) {
           // Revealed (display:none, a collapsed panel): compose before this
           // frame paints. A composition keeps the line count, so the host
           // keeps its size and no new observation is raised.
@@ -306,8 +329,8 @@ function createRegistry(doc: Document): Registry {
     started = true;
     if (win && typeof win.MutationObserver === 'function') { mutations = new win.MutationObserver(mutated); observeDocument(); }
     if (win && typeof win.ResizeObserver === 'function') {
-      sizes = new win.ResizeObserver(resized);
-      for (const target of watchers.keys()) sizes.observe(target);
+      observer = new win.ResizeObserver(resized);
+      for (const target of watchers.keys()) observer.observe(target);
     }
     if (win && typeof win.IntersectionObserver === 'function') viewport = new win.IntersectionObserver(observations => {
       for (const observation of observations) {
@@ -328,8 +351,8 @@ function createRegistry(doc: Document): Registry {
   }
   function stop(): void {
     started = false;
-    mutations?.disconnect(); sizes?.disconnect(); viewport?.disconnect();
-    mutations = sizes = viewport = null;
+    mutations?.disconnect(); observer?.disconnect(); viewport?.disconnect();
+    mutations = observer = viewport = null;
     unsubscribe?.(); unsubscribe = undefined;
     clearTimeout(settle); settle = undefined;
     pending.clear(); near.clear(); resizing.clear();

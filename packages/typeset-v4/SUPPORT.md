@@ -159,7 +159,8 @@ matches. Ancestor class and style changes recompose only when a computed
 layout key (fonts, metrics, width, effective scale and zoom) changes.
 `mount()` also works on the document or elements of a same-origin iframe.
 The React adapters share one registry per document, with the same
-triggers, one set of observers however many blocks render, and
+triggers (a host whose height changes at the same width has its layout key
+compared), one set of observers however many blocks render, and
 visible-first composition (`priority="sync"` composes in the commit).
 
 Machine translation: when a page is translated (Google Translate and Chrome set

@@ -181,7 +181,10 @@ Outside the changes below, 0 of these differ in any engine.
   text-spacing overrides of WCAG 1.4.12, a browser font-size setting, CSSOM
   rule changes, and transitions or animations of font, spacing or
   line-height properties now recompose. A same-width height change makes
-  the controller check rendered lines against the composition.
+  the controller check rendered lines against the composition, and makes
+  `TypesetText` and `TypesetRichText` compare their layout key, so a CSSOM
+  rule, the font-size setting or a FontFace added by script (none of which
+  mutates the DOM or fires an event) no longer leaves them double-wrapped.
 - **Hidden text keeps its composition (C8).** A tab, dialog, accordion or
   stack card hidden with `display:none`, the `hidden` attribute or
   `content-visibility`, and shown again at the same width, paints its

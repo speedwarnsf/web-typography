@@ -4,7 +4,8 @@
 // composed block must render exactly its composed lines (lines = breaks + 1)
 // once two frames and an idle period have passed and the controller's batches
 // (8 ms each) have run, and auditJSON must report no stale-layout. The audit
-// itself is checked against a known stale layout.
+// itself is checked against a known stale layout. The React adapters meet the
+// triggers that change no DOM and fire no event too.
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -30,7 +31,7 @@ import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TypesetText, TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
 const texts = ${JSON.stringify(corpus.slice(3, 7))};
-createRoot(document.getElementById('app')).render(h('main', { className: 'col late' },
+createRoot(document.getElementById('app')).render(h('main', { className: document.body.dataset.col || 'col late' },
   texts.map((text, i) => i % 2 ? h(TypesetText, { key: i, text, className: 'r' })
     : h(TypesetRichText, { key: i, className: 'r' }, text.split(' ').slice(0, 5).join(' ') + ' ', h('a', { href: '#x' }, text.split(' ').slice(5, 8).join(' ')), ' ' + text.split(' ').slice(8).join(' ')))));
 `, resolveDir: process.cwd(), loader: 'js' },
@@ -202,7 +203,45 @@ for (const { name, engine, executablePath } of browsers) {
       check('TypesetText and TypesetRichText rendered before their font: composed lines within 2 frames and an idle flush of its load', !result.timeout && within(settled.ms) && settled.audit === 0 && settled.outcomes.some((/** @type {string} */ o) => o === 'composed:rich'), { ...result, ...settled });
       await page.close();
     }
-    // 7. The audit catches a stale layout: composed, released, then respaced.
+    // 7. Both React adapters under triggers that change no DOM and fire no
+    // event: a CSSOM rule with the text-spacing values, the browser font-size
+    // setting (Chromium), and a FontFace loaded by script, then added to
+    // document.fonts. Only a same-width height change of the host shows them.
+    for (const trigger of ['insertRule', ...(name === 'chromium' ? ['setFontSizes'] : []), 'fontface']) {
+      const page = await open('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>' + css + '.col.face .r{font-family:ScriptFace,Georgia,serif}</style></head><body data-col="col"><div id="app"></div><script src="/react.js"></script></body></html>', { mount: false, react: true });
+      await page.waitForSelector('.r[data-ts-outcome]');
+      await page.addScriptTag({ url: '/engine.js' });
+      const before = await page.evaluate(async trigger => {
+        const w = /** @type {any} */ (window);
+        await w.settle();
+        const ms = await w.until('.r');
+        if (trigger !== 'fontface') return { ms };
+        // The family first, while its face is not in the set yet.
+        w.face = new FontFace('ScriptFace', 'url(/fixture.woff2)', { weight: '100 900' });
+        await w.face.load();
+        /** @type {HTMLElement} */ (document.querySelector('main')).classList.add('face');
+        await w.settle();
+        return { ms, fallback: await w.until('.r') };
+      }, trigger);
+      const cdp = trigger === 'setFontSizes' ? await page.context().newCDPSession(page) : null;
+      if (cdp) await cdp.send('Page.setFontSizes', { fontSizes: { standard: 21 } });
+      const result = await page.evaluate(async trigger => {
+        const w = /** @type {any} */ (window);
+        const lines = () => w.blocks('.r').map((/** @type {HTMLElement} */ el) => w.Typeset.measureLayout(el).lines.length).join(',');
+        const start = lines();
+        if (trigger === 'insertRule') {
+          const sheet = /** @type {CSSStyleSheet} */ (document.styleSheets[0]);
+          sheet.insertRule('.col .r{letter-spacing:.12em!important;word-spacing:.16em!important}', sheet.cssRules.length);
+        } else if (trigger === 'fontface') document.fonts.add(w.face);
+        await w.settle();
+        return { start, staleAfterSettle: w.stale('.r').length, ms: await w.until('.r'), audit: w.staleAudit('.r'), fontSize: getComputedStyle(/** @type {Element} */ (document.querySelector('.r'))).fontSize,
+          outcomes: w.blocks('.r').map((/** @type {HTMLElement} */ el) => el.dataset.tsOutcome) };
+      }, trigger);
+      check(`React adapters, ${trigger === 'insertRule' ? 'a CSSOM text-spacing rule' : trigger === 'setFontSizes' ? 'the browser font-size setting' : 'a FontFace added by script'}: composed lines within 2 frames and an idle flush`,
+        within(before.ms) && within(result.ms) && result.audit === 0 && result.outcomes.filter((/** @type {string} */ o) => o === 'composed:rich').length >= 2 && (trigger !== 'setFontSizes' || result.fontSize === '21px'), { before, ...result });
+      await page.close();
+    }
+    // 8. The audit catches a stale layout: composed, released, then respaced.
     {
       const page = await open(pageHTML());
       const result = await page.evaluate(async () => {
