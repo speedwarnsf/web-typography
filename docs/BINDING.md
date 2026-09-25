@@ -154,8 +154,13 @@ engines:
 | 2 | 6 | 53 |
 
 4.2.0 left 46 weak line ends on the same cells. 1 is the largest weight that
-adds none, the same rule that chose the toponym weight. Like the toponym
-weight it is a cost, never a weld: a pair still splits where every
+adds none at these four widths, the same rule that chose the toponym weight.
+Do not read more into it: across 105 widths (240 to 760 px, both fonts) the
+same 20 paragraphs show the trade the weight makes, since a split pair costs
+what a weak line end costs. Pairs split fall by about 86% (797 to 113 in
+Chromium) and weak line ends rise by about 7% (554 to 591), many of them on
+linking verbs such as "was", whose penalty is below the pair cost. Like the
+toponym weight it is a cost, never a weld: a pair still splits where every
 alternative is as bad. It changes no cell of the 85-paragraph corpus.
 
 ---

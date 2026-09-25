@@ -111,7 +111,11 @@ Outside the changes below, 0 of these differ in any engine.
   the legacy renderer. On that set, line-end review items (the C16 audit)
   fall from 111 under 4.2.0 to 68 (WebKit 109 to 68), against 322 in the
   browser's own layout; pairs split at line ends fall from 54 to 14 (WebKit
-  52 to 12). One recorded trade-off: at 320 px in Fraunces the recipe paragraph
+  52 to 12). The binding is a trade, not a free win: across 105 widths (240
+  to 760 px) of the first 20 of those paragraphs, split pairs fall by about
+  86% (797 to 113 in Chromium) while weak line ends rise by about 7% (554 to
+  591), because a split pair costs what a weak line end costs. One recorded
+  trade-off at the golden widths: at 320 px in Fraunces the recipe paragraph
   ends a line on "the", which neither the browser nor 4.2.0 does (the
   tight-line ranking, to be retuned in 4.4). No orphan, overflow or text
   change.

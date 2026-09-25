@@ -236,7 +236,9 @@ interface BindWeights { toponym: number; pair: number }
 // the adversarial set (20 paragraphs x 4 widths x 2 fonts, 3 engines):
 // 0.75 / 1 / 1.25 / 1.5 / 2 left 14 / 12 / 9 / 8 / 6 pairs split (native
 // 26, 4.2.0 46) and 46 / 46 / 49 / 52 / 53 weak line ends (4.2.0 46) in
-// Chromium. 1 is the largest weight that adds no weak line end.
+// Chromium. 1 is the largest weight that adds no weak line end at those four
+// widths. Across 105 widths it is a trade, not a free win: split pairs fall
+// about 86% (797 to 113) and weak line ends rise about 7% (554 to 591).
 const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600, pair: 1 };
 declare const __TYPESET_BIND_OVERRIDE__: Partial<BindWeights> | undefined;
 /** A kept phrase that fits the measure is split only when nothing else can
