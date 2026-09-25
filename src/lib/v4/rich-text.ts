@@ -86,18 +86,50 @@ export function selectionBookmark(element: HTMLElement): () => void {
   };
 }
 
-/** Temporarily modify only named properties and restore their priorities exactly. */
-function override(element: HTMLElement, properties: Record<string, string>): () => void {
-  const saved = element.getAttribute('style');
-  for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, 'important');
-  return () => {
-    // Resolve the live Attr first so lazy CSSOM serialization is synchronized.
-    if (saved === null) {
-      const attribute = element.getAttributeNode('style');
-      if (attribute) element.removeAttributeNode(attribute);
+interface InlineStyle { hadAttribute: boolean; cssText: string; longhands: Map<string, [string, string]> | null }
+
+/** Snapshot an inline style. Blink and WebKit reparse cssText with !important
+ * declarations last, so a mixed style also keeps its longhands to restore in
+ * place and keep the authored order. */
+function inlineStyle(element: HTMLElement): InlineStyle {
+  const style = element.style, names = Array.from({ length: style.length }, (_, i) => style[i]);
+  const mixed = new Set(names.map(name => style.getPropertyPriority(name))).size > 1;
+  return { hadAttribute: element.hasAttribute('style'), cssText: style.cssText,
+    longhands: mixed ? new Map(names.map(name => [name, [style.getPropertyValue(name), style.getPropertyPriority(name)]])) : null };
+}
+
+/** Put an inline style back through the CSSOM only. Writing the style
+ * attribute is inline-style injection: a style-src policy without
+ * 'unsafe-inline' refuses it, which left nowrap behind in Chromium and WebKit
+ * and erased author CSSOM styles in Firefox. The CSSOM (cssText included) and
+ * removing the attribute are allowed. One write unless a mixed-priority style
+ * needs its longhands put back one by one. */
+function restoreInlineStyle(element: HTMLElement, saved: InlineStyle): void {
+  const style = element.style;
+  if (!saved.hadAttribute) removeStyleAttribute(element);
+  else if (!saved.longhands) { if (style.cssText !== saved.cssText) style.cssText = saved.cssText; }
+  else {
+    for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.longhands.has(name)) style.removeProperty(name);
+    for (const [name, [value, priority]] of saved.longhands) {
+      if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
     }
-    else element.setAttribute('style', saved);
-  };
+  }
+}
+
+/** Resolve the live Attr first: Chromium serializes CSSOM changes into the
+ * attribute lazily, and removeAttribute('style') before that is a no-op that
+ * leaves style="" behind. */
+function removeStyleAttribute(element: HTMLElement): void {
+  const attribute = element.getAttributeNode('style');
+  if (attribute) element.removeAttributeNode(attribute);
+}
+
+/** Temporarily modify only named properties, then restore every declaration
+ * they touched (shorthands such as white-space and text-wrap) exactly. */
+function override(element: HTMLElement, properties: Record<string, string>): () => void {
+  const saved = inlineStyle(element);
+  for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, 'important');
+  return () => restoreInlineStyle(element, saved);
 }
 
 function unsupported(element: HTMLElement): string | null {
@@ -345,32 +377,154 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   } finally { restoreMarkers.reverse().forEach(restore => restore()); }
 }
 
-interface Split { head: Text; parts: Text[] }
-export interface RichOutput { cleanup: () => void; nodes: Node[] }
+const liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+/** Whether this element is inside a live region: the nearest region says
+ * aria-live polite or assertive, or has a status, alert, log, marquee or timer
+ * role, or is <output>, and does not say aria-live off. Assistive technology
+ * announces every change there, and composing rewrites the text on each
+ * resize, font load and idle pass, so screen readers repeated status messages
+ * whose words had not changed. */
+export function inLiveRegion(element: Element): boolean {
+  const region = element.closest('[aria-live], ' + liveRoles);
+  if (!region) return false;
+  const live = region.getAttribute('aria-live')?.trim().toLowerCase();
+  return live === 'polite' || live === 'assertive' || (live !== 'off' && region.matches(liveRoles));
+}
+
+/** Whether a generated break at `offset` stands in for a collapsed space. */
+export function breakReplacesSpace(source: string, offset: number): boolean {
+  return offset > 0 && /\s/u.test(source[offset - 1]);
+}
+
+/** Text nodes the engine created by splitting author text. Frameworks hold
+ * references only to their own nodes, never to these. */
+export const engineText = new WeakSet<Text>();
+
+/** Chromium leaves a whitespace-only Text node out of its accessibility tree
+ * when the node beside it, skipping comments and empty inline elements, is an
+ * empty Text node, which joins the words around it. The engine leaves author
+ * Text nodes empty in place (see renderRichText and renderTracking), so it
+ * puts an empty <wbr> between: a line-break opportunity where a space already
+ * is one, which Chromium does not skip. Returns the shields it inserted. */
+export function shieldWhitespace(element: HTMLElement): HTMLElement[] {
+  const shields: HTMLElement[] = [];
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const spaces: Text[] = [];
+  while (walker.nextNode()) if ((walker.currentNode as Text).length && !/\S/u.test((walker.currentNode as Text).data)) spaces.push(walker.currentNode as Text);
+  const emptyBeside = (node: Node, forward: boolean): boolean => {
+    let at = node;
+    for (let steps = 0; steps < 16; steps++) {
+      const sibling: Node | null = forward ? at.nextSibling : at.previousSibling;
+      if (!sibling) {
+        if (!at.parentNode || at.parentNode === element) return false;
+        at = at.parentNode; continue;
+      }
+      at = sibling;
+      // Chromium passes over comments and empty inline elements (our markers),
+      // not <br>, <wbr> or replaced elements.
+      if (sibling.nodeType === Node.COMMENT_NODE || (sibling.nodeType === Node.ELEMENT_NODE && !sibling.firstChild && !['BR', 'WBR', 'IMG', 'INPUT'].includes((sibling as Element).tagName)
+        && getComputedStyle(sibling as Element).display === 'inline')) continue;
+      return sibling.nodeType === Node.TEXT_NODE && !(sibling as Text).length;
+    }
+    return false;
+  };
+  for (const space of spaces) {
+    for (const forward of [false, true]) {
+      if (!emptyBeside(space, forward)) continue;
+      const shield = element.ownerDocument.createElement('wbr');
+      shield.setAttribute(BREAK_ATTRIBUTE, ''); shield.setAttribute('aria-hidden', 'true'); shield.dataset.tsShield = '';
+      if (forward) space.after(shield); else space.before(shield);
+      shields.push(shield);
+    }
+  }
+  return shields;
+}
+
+/** Whether a framework may find this author Text node by position rather
+ * than by reference: Solid writes parent.firstChild.data for a lone text
+ * child, and Lit writes the data of its part marker's next sibling (a
+ * `<!--?lit$...$-->` comment). Such a node must keep its place: nothing may go
+ * in front of it, and it may not move into a wrapper. Plain HTML text is
+ * often a first child too; for it the treatment is equivalent (an empty node
+ * in place, identical pixels). Other comments are not taken as part markers:
+ * Solid ends each dynamic text with one and reads the node's current text to
+ * skip unchanged writes, which an emptied node would defeat. */
+export function positional(node: Text): boolean {
+  const before = node.previousSibling;
+  return !before || (before.nodeType === Node.COMMENT_NODE && (before as Comment).data.startsWith('?lit$'));
+}
+
+/** React 17+ records its fiber on every Text node it renders, and removes or
+ * inserts relative to that node through the parent it knows, which throws if
+ * the node has moved into a wrapper. */
+export function reactOwned(node: Text): boolean {
+  return Object.keys(node).some(key => key.startsWith('__reactFiber$'));
+}
+
+/** Split Text nodes, head first, with every part's data as rendered. */
+export interface SplitRecord { head: Text; parts: Text[]; expected: string[] }
+
+/** Undo splits. A head still holding its rendered fragment gets its tails
+ * back. A head that was written to (a framework setting .data or .nodeValue)
+ * or removed now holds the author's whole value, or nothing: its tails are
+ * stale copies of the old text and are removed, never merged back. `written`
+ * names heads a mutation record showed were written, for writes that left
+ * the rendered value (an emptied author node set to '' again). */
+export function releaseSplits(element: HTMLElement, splits: Iterable<SplitRecord>, written?: ReadonlySet<Node>): void {
+  for (const { head, parts, expected } of splits) {
+    const edited = !element.contains(head) || head.data !== expected[0] || !!written?.has(head);
+    for (const tail of parts.slice(1)) {
+      // Tails already removed by someone else are never resurrected.
+      if (!element.contains(tail)) continue;
+      if (!edited) head.appendData(tail.data);
+      tail.remove();
+    }
+  }
+}
+
+export interface RichOutput {
+  /** Remove this output; `written` as in releaseSplits. */
+  cleanup: (written?: ReadonlySet<Node>) => void;
+  nodes: Node[];
+  /** Text nodes this output split, including author nodes; see releaseSplits. */
+  heads: ReadonlySet<Text>;
+}
 
 /** Insert breaks without moving or cloning author elements. Split Text nodes
- * are reversible; their original head object is retained for restoration. */
+ * are reversible; their original head object is retained for restoration.
+ * Nothing is inserted in front of a positional author Text node (see
+ * positional): a marker at its start goes after it, and the node is split
+ * there and left empty, or the framework's next write would land on the
+ * marker and be lost. */
 export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
   const restoreSelection = selectionBookmark(element);
-  const originalStyle = element.getAttribute('style');
+  const hadStyle = element.hasAttribute('style');
   const wrapStyle = element.style.getPropertyValue('text-wrap-style');
   const wrapPriority = element.style.getPropertyPriority('text-wrap-style');
   // Browser pretty/balance must not re-break an already composed source span.
   // Keep ordinary wrapping as the overflow safety net, and own only this property.
   if (breaks.length) element.style.setProperty('text-wrap-style', 'auto', 'important');
-  const renderedStyle = element.getAttribute('style');
   const runs = textRuns(element);
+  const source = element.textContent || '';
   const markers: HTMLElement[] = [];
-  const splits = new Map<Text, Split>();
+  const splits = new Map<Text, SplitRecord>();
   const insertions = [...breaks.map(offset => ({ offset, px: 0, spacing: false })), ...hangs.map(hang => ({ ...hang, spacing: false })),
     ...spaces.map(space => ({ ...space, spacing: true }))].sort((a, b) => b.offset - a.offset || b.px - a.px);
   for (const { offset, px, spacing } of insertions) {
     const point = pointAt(runs, offset);
     if (!point) continue;
     const head = point.node as Text;
+    // Chromium drops a whitespace-only Text node next to a comment from its
+    // accessibility tree (frameworks mark their text with comments). A word
+    // space that opens such a node takes its spacing marker in front of it,
+    // not behind it, so the node is never split down to the space alone.
+    if (spacing && point.offset && head.previousSibling?.nodeType === Node.COMMENT_NODE && !/\S/u.test(head.data.slice(0, point.offset))) point.offset = 0;
     const marker = element.ownerDocument.createElement(px ? 'span' : 'br');
     marker.setAttribute(BREAK_ATTRIBUTE, '');
-    marker.setAttribute('aria-hidden', 'true');
+    // The space before a generated break collapses at the line end, so the
+    // break is the only word separator left for assistive technology. A
+    // break after a hyphen or dash separates no words and stays hidden.
+    if (px || !breakReplacesSpace(source, offset)) marker.setAttribute('aria-hidden', 'true');
     if (spacing) {
       marker.dataset.tsSpace = String(offset);
       Object.assign(marker.style, spacingMarkerStyle(px));
@@ -378,21 +532,28 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       marker.dataset.tsHang = String(offset);
       Object.assign(marker.style, opticalMarkerStyle(px));
     } else marker.style.setProperty('display', 'inline', 'important');
-    if (point.offset === 0) head.before(marker);
+    if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
     else {
       const tail = head.splitText(point.offset);
-      const split = splits.get(head) || { head, parts: [head] };
+      engineText.add(tail);
+      const split = splits.get(head) || { head, parts: [head], expected: [] };
       split.parts.splice(1, 0, tail);
       splits.set(head, split);
       tail.before(marker);
     }
     markers.push(marker);
   }
+  for (const split of splits.values()) split.expected = split.parts.map(part => part.data);
+  if (splits.size) markers.push(...shieldWhitespace(element));
   restoreSelection();
   const releaseCopy = preserveRichCopy(element);
+  let released = false;
   return {
     nodes: [element, ...element.querySelectorAll('*'), ...textRuns(element).map(r => r.node)],
-    cleanup() {
+    heads: new Set(splits.keys()),
+    cleanup(written) {
+      if (released) return;
+      released = true;
       const restoreSelection = selectionBookmark(element);
       markers.forEach(marker => marker.remove());
       if (spaces.length) element.querySelectorAll('[data-ts-break][data-ts-space]').forEach(marker => marker.remove());
@@ -401,27 +562,74 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       // Only clean copied markers when this renderer owns line breaks. A
       // separate optical pass must not remove the underlying composition.
       if (breaks.length) element.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
-      for (const { head, parts } of splits.values()) {
-        // Only merge adjacent fragments we own. External replacements are
-        // never resurrected and unrelated author Text nodes are never normalized.
-        if (!element.contains(head)) continue;
-        for (const part of parts.slice(1)) {
-          if (head.nextSibling !== part || part.parentNode !== head.parentNode) break;
-          head.appendData(part.data); part.remove();
-        }
-      }
+      // Only fragments we own are merged or removed; unrelated author Text
+      // nodes are never normalized.
+      releaseSplits(element, splits.values(), written);
+      // Restore through the CSSOM only (strict CSP); see restoreInlineStyle.
       if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
         && element.style.getPropertyPriority('text-wrap-style') === 'important') {
-        if (element.getAttribute('style') === renderedStyle) {
-          if (originalStyle === null) element.removeAttribute('style');
-          else element.setAttribute('style', originalStyle);
-        } else if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
+        if (!hadStyle && element.style.length === 1) removeStyleAttribute(element);
+        else if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
         else element.style.removeProperty('text-wrap-style');
+        if (!hadStyle && !element.style.length) removeStyleAttribute(element);
       }
       releaseCopy();
       restoreSelection();
     },
   };
+}
+
+const unrendered = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+/** Whether the browser's own copy leaves this element and its subtree out. */
+function hiddenFromCopy(element: Element): boolean {
+  if (unrendered.has(element.tagName) || (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'hidden')) return true;
+  // display:none, and content-visibility:hidden descendants. Selected
+  // content-visibility:auto content is rendered, so it is kept. A
+  // display:contents element has no box of its own; its children decide.
+  const rendered = typeof element.checkVisibility === 'function' ? element.checkVisibility() : element.getClientRects().length > 0;
+  return !rendered && getComputedStyle(element).display !== 'contents';
+}
+
+/** range.cloneContents() without what native copy leaves out: unrendered
+ * elements, hidden inputs, script, style, template and noscript, and
+ * visibility:hidden text. Source and clone are walked in step (both in
+ * document order over the nodes the range touches); if they ever disagree,
+ * null, so the caller never ships a clone it could not check. */
+function visibleContents(range: Range): DocumentFragment | null {
+  const fragment = range.cloneContents();
+  const root = range.commonAncestorContainer;
+  const visibility = new Map<Element, boolean>();
+  const visibleText = (text: Node) => {
+    const parent = text.parentElement;
+    if (!parent) return true;
+    // Text directly inside a content-visibility:hidden element is skipped too;
+    // checkVisibility() covers only that element's descendant elements.
+    if (!visibility.has(parent)) { const cs = getComputedStyle(parent); visibility.set(parent, cs.visibility === 'visible' && cs.getPropertyValue('content-visibility') !== 'hidden'); }
+    return visibility.get(parent)!;
+  };
+  // Node types, not instanceof: a same-origin iframe's nodes come from another realm.
+  if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+    if (!visibleText(root)) fragment.replaceChildren();
+    return fragment;
+  }
+  const doc = range.startContainer.ownerDocument!;
+  const sources: Node[] = [];
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ALL,
+    { acceptNode: node => range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+  while (walker.nextNode()) sources.push(walker.currentNode);
+  const clones: Node[] = [];
+  const cloneWalker = doc.createTreeWalker(fragment, NodeFilter.SHOW_ALL);
+  while (cloneWalker.nextNode()) clones.push(cloneWalker.currentNode);
+  if (sources.length !== clones.length) return null;
+  for (let i = 0; i < sources.length; i++) {
+    const source = sources[i], clone = clones[i];
+    if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
+    const hidden = source.nodeType === Node.ELEMENT_NODE ? hiddenFromCopy(source as Element) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
+    if (!hidden) continue;
+    (clone as ChildNode).remove();
+    while (i + 1 < sources.length && source.contains(sources[i + 1])) i++;
+  }
+  return fragment;
 }
 
 const copyRoots = new WeakMap<Document, WeakMap<HTMLElement, number>>();
@@ -450,8 +658,9 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return Array.from(parent?.querySelectorAll<HTMLElement>('*') || []).some(el => registered.has(el) && range.intersectsNode(el));
       });
       if (!affected) return;
-      const html = ranges.map(range => {
-        const fragment = range.cloneContents();
+      const fragments = ranges.map(visibleContents);
+      const sourceText = fragments[0]?.textContent ?? null;
+      const html = fragments.some(fragment => !fragment) ? '' : (fragments as DocumentFragment[]).map(fragment => {
         fragment.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
         fragment.querySelectorAll('[data-ts-track]').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
         for (const el of fragment.querySelectorAll('*')) {
@@ -465,7 +674,8 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return container.innerHTML;
       }).join('');
       let text: string;
-      if (ranges.length === 1 && containingRoot(ranges[0])) text = ranges[0].toString();
+      // Inside one composed root: the source characters, whatever the lines.
+      if (ranges.length === 1 && containingRoot(ranges[0]) && sourceText !== null) text = sourceText;
       else {
         // Let the browser serialize real paragraphs, lists and authored breaks.
         // Hide only generated markers for this synchronous read; source nodes,
@@ -477,7 +687,8 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         finally { restore.forEach(undo => undo()); }
       }
       event.clipboardData.setData('text/plain', text);
-      event.clipboardData.setData('text/html', html);
+      // Without a checked clone, plain text only: formatting is lost, nothing hidden leaks.
+      if (html) event.clipboardData.setData('text/html', html);
       event.preventDefault();
     });
   }

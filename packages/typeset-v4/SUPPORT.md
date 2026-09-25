@@ -15,8 +15,21 @@ are not certification for every device, browser, font, or sentence.
   text-wrap required. Node 22+ for CLI/tooling.
 - ESM/CommonJS core; ESM-only client React entry; optional browser global.
 
-Never imperatively mount framework-owned text. Stateful custom React children
-remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
+Prefer the React adapters for text React renders. From 4.3, mount() and the
+website loader also keep framework-updated text correct: when a framework
+writes to or removes a Text node the engine split (Svelte, Vue, Solid, Lit and
+React set .data or .nodeValue on the node they created), the stale fragments
+are removed before the next frame and the paragraph recomposes; disconnect()
+leaves exactly the framework's text. Author Text nodes that Solid or Lit find by
+position, and React's, stay in place (emptied, with their text wrapped next to
+them) instead of moving into tracking wrappers. `verify-framework-text.mjs`
+runs a hand-rolled renderer, React 19, Svelte 5, Vue 3.5, Solid 1.9 and Lit 3
+through twenty updates each in three engines. Limits: direct typeset() and
+restore() without a controller see edits only by value, so an emptied node set
+to '' again is not noticed; the legacy .ts-line renderer (lineBreaks: 'legacy'
+on plain text) copies text and never sees framework writes; Lit text in arrays
+or nested templates is moved into wrappers as in 4.2. Stateful custom React
+children remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
 hyphens and editable content remain native. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 
@@ -55,7 +68,12 @@ and nonnegative sliced padding/borders/margins is measured with its surrounding
 text. Unsupported box decoration remains native. Identity and pure 2D translation
 transforms are supported; scale, rotation, perspective and nonzero Z are not.
 
-Smart quotes are explicit English, quotes-only. Optical hanging applies to
+Smart quotes are explicit English, quotes-only. Each quote keeps its kind:
+single quotes are never turned into double quotes, or the reverse. From 4.3
+TypesetText curls them during render, so server HTML already has them;
+TypesetRichText does so only with lang="en" (or en-*) on the component itself,
+since render cannot see an ancestor's lang, and warns in development builds
+when it is missing. Optical hanging applies to
 eligible left-aligned leading glyphs, not indented/centered or justified contexts.
 Clipped containers are supported only when the full glyph's measured geometry
 fits the available clip, padding and scrollport. Rounded clips are conservative;
@@ -80,6 +98,22 @@ native overflow is never extra room for a newly composed line. The 0.5px
 layout rounding allowance remains; fallback is reported instead of presenting
 unprocessed native text as successful composition.
 
+Live regions stay native: from 4.3, text inside aria-live (unless the nearest
+region says off), role status, alert, log, marquee or timer, or <output> is
+never composed, measured or rewritten, because assistive technology announces
+every change there. Its outcome is `native:live-region`.
+
+Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
+for styles and no 'unsafe-eval'. It writes and restores styles through the
+CSSOM only, never the style attribute, injects no <style> element and uses no
+HTML sink, so it also runs under require-trusted-types-for 'script' with
+trusted-types 'none'. Allow the origin that serves the script. 4.2 restored
+its measurement styles through the style attribute, which such a policy
+refuses: paragraphs kept white-space:nowrap in Chromium and WebKit, and
+Firefox erased author CSSOM styles. `scripts/v4/verify-strict-csp.mjs` runs
+typeset, recomposition, restore, copy, go.js and both React adapters under
+that policy in three engines.
+
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are
@@ -96,7 +130,10 @@ lane, at 320, 375 and 768 px. The 4.2.0 build fails these checks: its hidden
 generated line breaks join the words on either side of each break, including
 inside link and heading names, and Chromium also drops some word spaces beside
 spacing markers. `auditJSON()` reports both conditions as `hidden-break` and
-`isolated-space` errors. Local coverage also includes keyboard navigation,
+`isolated-space` errors. From 4.3, a generated break that stands in for a space
+is exposed, so assistive technology meets a line boundary there (WebKit names
+contain a newline), a break after a hyphen stays hidden, and spacing and
+hanging markers are empty, hidden and `display: inline`. Local coverage also includes keyboard navigation,
 emulated touch/rotation, 200%/400% text sizing,
 delayed variable fonts, source updates and no-JavaScript rendering. The macOS
 clipboard suite uses headed Chromium/WebKit/Firefox, trusted copy/paste events
@@ -105,7 +142,10 @@ It covers plain text and HTML pasted into browser editors, not Word/Pages,
 mobile selection handles, Windows clipboard, or spoken screen-reader output.
 Cross-paragraph copying retains native paragraph/authored-break boundaries;
 generated line breaks and engine metadata are excluded. Relative copied links
-resolve against the source page. Site copy handlers retain precedence.
+resolve against the source page. Site copy handlers retain precedence. From
+4.3 the copied HTML and text also leave out what the browser's own copy
+leaves out: display:none and content-visibility:hidden content, hidden inputs,
+script, style, template and noscript, and visibility:hidden text.
 
 At extreme text sizes, an unbreakable word can exceed the authored column.
 That remains a reported overflow, never a passing audit. Typeset does not

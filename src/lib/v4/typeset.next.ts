@@ -3,7 +3,7 @@ import type { FrozenLine } from './typeset';
 import { composeTitle } from './title-layout';
 import { contentWidth, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
-import { planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified } from './rich-text';
+import { inLiveRegion, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified } from './rich-text';
 import { applySmartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
@@ -68,8 +68,37 @@ interface State {
   optical?: RichOutput;
   spacing?: RichOutput;
   tracking?: RichOutput;
+  /** Every Text node an output split, with its data as composed. */
+  heads: Map<Text, string>;
 }
 const states = new WeakMap<HTMLElement, State>();
+
+/** A write to, or removal of, a Text node the engine split: its tails still
+ * show the old text. Frameworks do this for every text update (Svelte, Vue,
+ * Lit, Solid and React set .data or .nodeValue on the node they created). */
+function staleSplit(element: HTMLElement, state: State, record: MutationRecord, written: Set<Node>): boolean {
+  if (record.type === 'characterData') {
+    // A write from the composed value is external even when it writes the
+    // same value: a framework emptying a node the engine already emptied.
+    const composed = state.heads.get(record.target as Text);
+    if (composed === undefined || ((record.target as Text).data === composed && record.oldValue !== composed)) return false;
+    written.add(record.target);
+    return true;
+  }
+  return record.type === 'childList' && Array.from(record.removedNodes).some(node => state.heads.has(node as Text) && !element.contains(node));
+}
+
+/** Remove stale tails and every engine node now, before the next frame, and
+ * leave the element for recomposition. Quotes stay educated until then. */
+function releaseOutput(element: HTMLElement, state: State, written: ReadonlySet<Node>): void {
+  const restoreSelection = selectionBookmark(element);
+  state.optical?.cleanup(written);
+  state.tracking?.cleanup(written);
+  state.spacing?.cleanup(written);
+  state.rich?.cleanup(written);
+  state.signature = '';
+  restoreSelection();
+}
 // Controllers share composition state, so only one may write a given target.
 const mountOwners = new WeakMap<HTMLElement, symbol>();
 const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
@@ -261,6 +290,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
+  if (inLiveRegion(element)) {
+    // Release any earlier composition and apply adapter text, then leave the
+    // region alone: no measurement overrides, no markers, no attributes.
+    if (states.has(element)) restore(element);
+    if (options.text !== undefined && element.textContent !== options.text) element.textContent = options.text;
+    return { outcome: 'native:live-region', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
+  }
   const prior = states.get(element);
   const sig = signature(element, options);
   if (prior?.signature === sig && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
@@ -351,11 +387,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     element.dataset.tsSpacing = features.spacing;
     element.dataset.tsTracking = features.tracking;
     const result: Result = { outcome, mode, before, after: measureLayout(element), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
+    const heads = new Map<Text, string>();
+    for (const output of [rich, spacing, tracking, optical]) for (const head of output?.heads || []) heads.set(head, head.data);
     states.set(element, {
       nodes, outputNodes: Array.from(element.childNodes), source, output: element.textContent || '', markup: element.innerHTML, styles,
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
       signature: signature(element, options), result,
-      rich, hadStyle, quotes, optical, spacing, tracking,
+      rich, hadStyle, quotes, optical, spacing, tracking, heads,
     });
     return result;
   };
@@ -472,7 +510,7 @@ export function auditReport(selector = defaults): AuditReport {
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
     if (element.closest('[data-ts-generated], [data-ts-probe]')) continue;
     report.examined++;
-    const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? 'excluded' : 'unprocessed');
+    const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? 'excluded' : inLiveRegion(element) ? 'native:live-region' : 'unprocessed');
     report.outcomes[outcome] = (report.outcomes[outcome] || 0) + 1;
     for (const [feature, value] of [['quotes', element.dataset.tsQuotes], ['hanging', element.dataset.tsHanging], ['spacing', element.dataset.tsSpacing], ['tracking', element.dataset.tsTracking]] as const) {
       const status = value || 'off';
@@ -573,7 +611,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   const stats = { passes: 0, compositions: 0, maxBatchMs: 0, get overlappingTargets() { return blocked.size; } };
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
-  const eligible = (el: HTMLElement) => (el === root || root.contains(el)) && el.matches(selector) && !el.closest(excluded);
+  const eligible = (el: HTMLElement) => (el === root || root.contains(el)) && el.matches(selector) && !el.closest(excluded) && !inLiveRegion(el);
   const stopWaiting = (el: HTMLElement) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -614,7 +652,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
     if (scope instanceof HTMLElement && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter(el => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line'));
+    return elements.filter(el => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !inLiveRegion(el));
   };
   const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
     for (const entry of entries) {
@@ -639,16 +677,20 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     else timer = setTimeout(() => flush(), 16);
   };
   const observer = new MutationObserver(records => {
+    const stale = new Set<HTMLElement>(), written = new Set<Node>();
     for (const record of records) {
       const target = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
       for (let el = target; el && (el === root || root.contains(el)); el = el.parentElement) {
-        if (owned.has(el)) pending.add(el);
+        if (!owned.has(el)) continue;
+        pending.add(el);
+        const state = states.get(el);
+        if (state?.heads.size && staleSplit(el, state, record, written)) stale.add(el);
       }
       if (record.type === 'attributes' && target) {
         // An ancestor's styles can affect its entire subtree, but a clock tick
         // or an unrelated inserted node must not rescan the whole document.
         discover(target);
-        if (target.closest(excluded)) for (const el of owned) if (target.contains(el)) pending.add(el);
+        if (target.closest(excluded) || inLiveRegion(target)) for (const el of owned) if (target.contains(el)) pending.add(el);
       }
       if (record.type === 'childList') {
         for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
@@ -660,6 +702,13 @@ export function mount(root: ParentNode = document, selector = defaults, options:
           for (const el of blocked.keys()) if (node.contains(el) && !root.contains(el)) stopWaiting(el);
         }
       }
+    }
+    if (stale.size) {
+      // Still inside the mutation's microtask checkpoint, so no frame shows
+      // the stale tails. Our own writes here are not observed.
+      observer.disconnect();
+      for (const el of stale) { const state = states.get(el); if (state) releaseOutput(el, state, written); }
+      observe();
     }
     schedule();
   });
@@ -698,9 +747,9 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     parents.delete(el);
   };
   function observe() {
-    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode'] });
+    observer.observe(root, { subtree: true, childList: true, characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', 'aria-live', 'role'] });
     if (root instanceof HTMLElement) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang'] });
+      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang', 'aria-live', 'role'] });
     }
   }
   function flush(deadline?: IdleDeadline) {

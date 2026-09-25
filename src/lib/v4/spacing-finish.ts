@@ -80,9 +80,12 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics): 
   return result(adjustments.length ? 'applied' : 'unchanged', adjustments);
 }
 
-/** Empty, noninteractive markers change advances, never source characters. */
+/** Empty, noninteractive markers change advances, never source characters.
+ * An empty inline span keeps its horizontal margin without becoming an atomic
+ * inline: inline-block made Chromium drop the adjacent word space from its
+ * accessibility tree ('careful notes' read as 'carefulnotes'). */
 export function spacingMarkerStyle(px: number): Record<string, string> {
-  return { display: 'inline-block', position: 'static', float: 'none', width: '0px', height: '0px', minWidth: '0px', minHeight: '0px',
+  return { display: 'inline', position: 'static', float: 'none', width: '0px', height: '0px', minWidth: '0px', minHeight: '0px',
     margin: '0px', marginLeft: px + 'px', padding: '0px', border: '0px', boxShadow: 'none', outline: 'none', transform: 'none',
     fontSize: '0px', lineHeight: '0', verticalAlign: 'baseline', pointerEvents: 'none' };
 }

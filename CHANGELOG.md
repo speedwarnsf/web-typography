@@ -23,8 +23,94 @@ Hashes for every published version live in
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each default-output change in 4.3 is listed here with its golden-diff count:
+the published 4.2.0 build against the candidate over the same blocks in
+Chromium, WebKit and Firefox (element screenshots at DPR 2, `measureLayout`
+line boxes, outcomes, feature statuses, copy text and markup).
+
+- **Generated line breaks are word separators again (accessibility, C2).** A
+  generated `<br>` that stands in for a collapsed space is no longer
+  `aria-hidden`, so engine accessibility trees stop joining the words on either
+  side of it ("galleryguide"), including inside link and heading names. A break
+  after a hyphen or dash stays hidden, so "public-health" is still one word.
+  Spacing and hanging markers are `display: inline` instead of `inline-block`,
+  which stops Chromium dropping the word space beside them. The same applies
+  to `TypesetRichText`. Assistive technology now meets a line boundary at each
+  generated break, and WebKit accessible names contain a newline there.
+  Golden diff over 316 blocks (309 composed) in each engine: markup changed in
+  311 blocks (310 in WebKit), only in those two attributes; 1,087 of 1,103
+  generated breaks are now exposed and 16 hyphen breaks stay hidden; 0
+  screenshots, 0 line boxes, 0 outcomes, 0 feature statuses and 0 copied texts
+  changed.
+- **Live regions are no longer composed (accessibility, C4).** Text whose
+  nearest region has `aria-live="polite"` or `"assertive"`, or (without
+  `aria-live="off"`) `role="status"`, `alert`, `log`, `marquee` or `timer`, or
+  is an `<output>`, keeps native wrapping.
+  4.2 composed it and rewrote it on every resize, font load and idle pass
+  (51 mutation records on mount and 180 more across two resizes for one status
+  paragraph), and Chrome announced those rewrites, so screen readers repeated
+  status messages. `typeset()` returns `native:live-region` and writes nothing,
+  `mount()` and both loaders skip such targets (and release one whose region
+  turns live), `TypesetRichText` reports `native:live-region`, and `auditJSON()`
+  counts them under that outcome. Golden diff: paragraphs inside live regions
+  change from composed to native (5 of 8 on the live-region fixture, per
+  loader and engine); 0 of 316 blocks change in the golden A/B, which has no
+  live regions.
+- **Smart quote corrections (C15).** A single quote right after a curled
+  opening double quote now opens too: `"'Quoted' inside,"` gives
+  “‘Quoted’ inside,” (4.2 gave “’Quoted’). Rock ’n’ roll,
+  ’bout, ’round and ’nuff are elisions (4.2 gave ‘n’ and ‘bout).
+  Glyph substitutions only, length-preserving; ’90s, ’Tis, ’em, primes
+  such as 5'10" and possessives are unchanged, and single quotes never become
+  double. Golden diff: 0 of 173 corpus texts (14 with straight quotes) change;
+  the changes are exactly the patterns above. `TypesetText` also curls quotes
+  during render, so its server HTML has them (a Next production build: 8
+  curled, 0 straight, no hydration messages in three engines; 4.2 had 2 of 10
+  curled before hydration).
+- The legacy `renderFrozenLines()` export no longer sets the non-ARIA
+  `role="text"`, which emptied a composed heading's accessible name in WebKit,
+  and clears the element with `replaceChildren()` instead of `innerHTML`, so it
+  runs under Trusted Types.
+
+### Fixed
+
+- **Strict Content Security Policy and Trusted Types (C5).** Measurement and
+  line-wrap styles are restored property by property through the CSSOM, never
+  by writing the style attribute. Under `style-src` without `'unsafe-inline'`,
+  4.2 left `white-space: nowrap` on paragraphs and links in Chromium and WebKit,
+  erased the author's CSSOM styles in Firefox (a 300px width became the
+  container width), and logged a CSP error on every pass. `TypesetRichText`
+  declined as `native:rich-whitespace` under that policy. Published bundles no
+  longer read the bind-weight research global `__TYPESET_BIND__`; the research
+  harness builds its own loader.
+- **Hidden content stays off the clipboard (C11).** A copy that touches a
+  composed paragraph is serialized by the engine; 4.2 built its HTML from
+  `range.cloneContents()`, which keeps what native copy leaves out, so a
+  select-all or a cross-paragraph copy pasted `display:none` notes, hidden
+  inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts and
+  styles. The clone is now walked in step with its source and those nodes are
+  dropped; if the two ever disagree, only plain text is written.
+- **Framework text updates never leave stale text (C6).** Composition splits
+  author Text nodes, and frameworks keep the node they created. When Svelte,
+  Vue, Solid, Lit or React (outside the adapters) set its `.data`, 4.2 replaced
+  only line 1 and left the old lines 2..n on screen, merged them back on
+  `restore()`, and `disconnect()` kept them. Solid and Lit updates were lost
+  outright once a marker or tracking wrapper took their node's position, and
+  React threw (removeChild) when it removed a Text node tracking had moved,
+  unmounting the app. Now the mount observer removes the stale fragments
+  within the mutation's microtask, before any frame, and recomposes; every
+  cleanup drops the fragments of a node that was written to or removed instead
+  of merging them; and Text nodes Solid or Lit address by position, and React's,
+  stay in place (left empty, their text wrapped beside them). Chromium drops a
+  whitespace-only Text node beside an empty one or a comment from its
+  accessibility tree, so the engine puts an empty `<wbr>` between such a space
+  and an emptied node, and never splits a comment-adjacent node down to its
+  opening space. No rendering change: 0 pixel, line box, outcome or feature
+  differences on the framework fixtures (48 paragraphs per engine) or in the
+  golden A/B against 4.2.0.
+- `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
+  once in development builds; it leaves quotes as written, as before (C15).
+  The package build leaves `process.env.NODE_ENV` to the application's bundler.
 
 ### Development
 
@@ -42,6 +128,11 @@ count.
   fonts at 1x and 4x CPU, with long tasks, observers, listeners, DOM writes
   and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
   Runtime budgets run nightly and at release cut.
+- New suites in `npm test`: `verify-break-semantics` (C2), `verify-strict-csp`
+  (C5), `verify-copy-privacy` (C11), `verify-framework-text` (C6, with
+  committed Svelte, Vue, Solid and Lit fixture bundles in `tests/frameworks/`),
+  `verify-live-regions` (C4) and `verify-smart-quotes` (C15). Each fails on
+  the published 4.2.0 build.
 
 ## 4.1.0 - 2026-09-17
 

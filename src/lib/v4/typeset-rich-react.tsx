@@ -2,7 +2,7 @@
 
 import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from 'react';
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
-import { BREAK_ATTRIBUTE, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
+import { BREAK_ATTRIBUTE, breakReplacesSpace, inLiveRegion, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
 import { measureLayout } from './layout-metrics';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
@@ -72,7 +72,8 @@ function trackingForTree(plan: TrackingPlan, children: ReactNode): TrackingPlan 
 
 function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean): ReactNode {
   let offset = 0;
-  const educated = educate ? smartQuotes(quoteSource(children)) : null;
+  const source = quoteSource(children);
+  const educated = educate ? smartQuotes(source) : null;
   const optical = new Map(hangs.map(hang => [hang.offset, hang.px]));
   const spacing = new Map(spaces.map(space => [space.offset, space.px]));
   const visit = (nodes: ReactNode): ReactNode => Children.map(nodes, child => {
@@ -99,7 +100,8 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       for (const stop of stops) {
         const local = stop - start;
         append(text.slice(cursor, local), start + cursor);
-        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': true }), stop, true);
+        // Exposed where it stands in for the collapsed space; see renderRichText.
+        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true }), stop, true);
         if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
         if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
         cursor = local;
@@ -111,6 +113,13 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
     return cloneElement(child, undefined, visit(child.props.children));
   });
   return visit(children);
+}
+
+let warnedQuotesLang = false;
+/** Development builds only: bundlers replace process.env.NODE_ENV; without a
+ * bundler `process` is undefined and nothing is logged. */
+function development(): boolean {
+  try { return process.env.NODE_ENV !== 'production'; } catch { return false; }
 }
 
 function supportedTree(children: ReactNode): boolean {
@@ -228,7 +237,10 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   private recompose = () => {
     if (!this.mounted || !this.host.current) return;
     this.observer?.disconnect();
-    const plan: RenderPlan = planRichText(this.host.current, this.props);
+    // A live region announces every change: never measure or break it.
+    const plan: RenderPlan = inLiveRegion(this.host.current)
+      ? { source: this.host.current.textContent || '', breaks: [], widths: [], outcome: 'native:live-region', styleSignature: '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 } }
+      : planRichText(this.host.current, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
     else this.observe();
@@ -237,6 +249,11 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;
     const plan = this.state.plan;
     const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);
+    if (quotes === 'en' && !this.props.lang && !warnedQuotesLang && development()) {
+      warnedQuotesLang = true;
+      // Education happens during render, where an ancestor's lang is invisible.
+      console.warn('TypesetRichText: smartQuotes="en" needs lang="en" (or en-*) on the component itself; quotes are left as written.');
+    }
     return createElement(as, { ...attributes, ref: this.host, 'data-typeset-react-rich': '', 'data-typeset-done': plan ? '1' : undefined,
       'data-ts-outcome': plan?.outcome, 'data-ts-quotes': quotes ? educate ? 'enabled' : 'native:quotes-scope' : undefined,
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,

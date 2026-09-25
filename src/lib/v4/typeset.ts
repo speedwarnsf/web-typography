@@ -201,8 +201,10 @@ function bindOpenerOf(part: string): string | undefined {
 
 /**
  * Bind weights. Derived by measurement (see docs/BINDING.md), not chosen by
- * taste; `__TYPESET_BIND__` lets the derivation harness sweep them without a
- * rebuild.
+ * taste. A research build lets the derivation harness sweep them through
+ * `globalThis.__TYPESET_BIND__`: it defines `__TYPESET_BIND_OVERRIDE__` as that
+ * expression. Release builds define it as `undefined`, so no published bundle
+ * reads a page global that could change composition.
  *
  * There is deliberately no numberUnit weight. It was measured, found to have
  * no supporting evidence in any corpus, and therefore not shipped.
@@ -224,8 +226,9 @@ interface BindWeights { toponym: number }
 // value inside the plateau, so 1600 is a conservative point in a flat region,
 // not an optimum. See docs/BINDING.md for the full method and its limits.
 const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+declare const __TYPESET_BIND_OVERRIDE__: Partial<BindWeights> | undefined;
 function bindWeights(): BindWeights {
-  const o = (globalThis as { __TYPESET_BIND__?: Partial<BindWeights> }).__TYPESET_BIND__;
+  const o = typeof __TYPESET_BIND_OVERRIDE__ === 'undefined' ? undefined : __TYPESET_BIND_OVERRIDE__;
   return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
 }
 
@@ -1497,17 +1500,13 @@ function renderFrozenLines(p: HTMLElement, lines: FrozenLine[], runs?: InlineRun
   const fontSizePx = parseFloat(cs.fontSize) || 16;
   const measurer = makeMeasurer(p);
   safeWrite(() => {
-    p.innerHTML = "";
+    // Not innerHTML: a Trusted Types policy of 'none' rejects every HTML sink.
+    p.replaceChildren();
     p.dataset.typesetDone = "1";
-    // Plain paragraphs read as one text run. Rich-composed paragraphs carry
-    // cloned <a>/<em>/<code> inside their lines — role="text" would flatten
-    // them in WebKit/VoiceOver and take the links out of the accessibility
-    // tree, so those keep their native semantics. A plain-composed element
-    // can turn rich later (content mutated in place, then recomposed): shed
-    // OUR stale role then — only the exact value this engine sets, so an
-    // author-assigned role is never touched.
-    if (!runs) p.setAttribute("role", "text");
-    else if (p.getAttribute("role") === "text") p.removeAttribute("role");
+    // No role="text": it is not an ARIA role. WebKit honoured it by flattening
+    // the element, which emptied a composed heading's accessible name.
+    // Block-level lines already give every engine a word boundary between
+    // lines, in names and in reading order, so no line break is emitted.
 
 
     lines.forEach((line, i) => {

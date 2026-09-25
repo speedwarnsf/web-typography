@@ -4,6 +4,7 @@ import { createElement, useLayoutEffect, useRef, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { mount, restore, typeset } from './typeset.next';
 import type { Mode, Options } from './typeset.next';
+import { smartQuotes as educate } from './smart-quotes';
 export { TypesetRichText } from './typeset-rich-react';
 export type { TypesetRichTextProps } from './typeset-rich-react';
 
@@ -43,5 +44,10 @@ export function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lin
     if (element) typeset(element, options.current);
     return () => { if (element) restore(element); };
   }, [as, text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
-  return createElement(as, { ...attributes, ref, 'data-typeset-react': '' }, initialText);
+  // Curl quotes during render, so server HTML, no-JS readers and crawlers get
+  // them and hydration matches. Education is idempotent; typeset() still owns
+  // later text. An ancestor's lang is invisible here, so only a missing or
+  // English lang prop qualifies, as the DOM path's scope check would allow.
+  const curled = smartQuotes === 'en' && (!attributes.lang || /^en(?:-|$)/i.test(attributes.lang));
+  return createElement(as, { ...attributes, ref, 'data-typeset-react': '' }, curled ? educate(initialText) : initialText);
 }

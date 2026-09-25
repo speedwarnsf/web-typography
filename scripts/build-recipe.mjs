@@ -16,7 +16,12 @@ export const sri = bytes => 'sha384-' + createHash('sha384').update(bytes).diges
 /** @param {Uint8Array} bytes */
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
-const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true };
+// The bind-weight research hook (typeset.ts bindWeights) is compiled out of
+// every artifact. process.env.NODE_ENV is left for the consumer's bundler
+// (esbuild would otherwise bake in "development" or "production"), so the
+// React adapter's development warnings follow the application's build. A
+// source that mentions neither name builds unchanged.
+const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true, define: { __TYPESET_BIND_OVERRIDE__: 'undefined', 'process.env.NODE_ENV': 'process.env.NODE_ENV' } };
 
 /**
  * The npm package's dist/: ESM with a shared chunk, CJS, and the two IIFEs.
