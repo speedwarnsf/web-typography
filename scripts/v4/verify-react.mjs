@@ -243,7 +243,9 @@ for (const config of selected) {
         }
         return counts;
       });
-      check('observers and listeners do not grow with the number of blocks (8 vs 80 hosts)', footprint[0].mo === footprint[1].mo && footprint[0].ro === footprint[1].ro && footprint[0].io === footprint[1].io && footprint[0].listeners === footprint[1].listeners && footprint[1].mo <= 1 && footprint[1].ro <= 1 && footprint[1].io <= 1, footprint);
+      // Per document: the registry's MutationObserver and the lifecycle hub's
+      // (stylesheets and the translation class, shared with mount()).
+      check('observers and listeners do not grow with the number of blocks (8 vs 80 hosts)', footprint[0].mo === footprint[1].mo && footprint[0].ro === footprint[1].ro && footprint[0].io === footprint[1].io && footprint[0].listeners === footprint[1].listeners && footprint[1].mo <= 2 && footprint[1].ro <= 1 && footprint[1].io <= 1, footprint);
       await page.evaluate(() => /** @type {any} */ (window).T.render('none'));
       const push = await page.evaluate(async () => {
         const w = /** @type {any} */ (window);

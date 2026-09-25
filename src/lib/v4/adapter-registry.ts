@@ -256,6 +256,9 @@ function createRegistry(doc: Document): Registry {
       const previous = widths.get(observation.target);
       widths.set(observation.target, width);
       if (previous === undefined || Math.abs(previous - width) <= .01) continue;
+      // Hidden (display:none, a closed dialog, an inactive tab): keep the
+      // composition. Shown again at the same width, it paints composed.
+      if (!width) continue;
       for (const entry of watchers.get(observation.target) || []) {
         if (previous === 0 && entry.element.isConnected && visible(entry.element)) {
           // Revealed (display:none, a collapsed panel): compose before this
@@ -275,7 +278,7 @@ function createRegistry(doc: Document): Registry {
    * a same-depth notification (a ResizeObserver loop error). */
   function staleCheck(): void {
     staleQueued = false;
-    const doomed = [...resizing].filter(entry => entries.has(entry.element) && entry.widest() > contentWidth(entry.element) + .5);
+    const doomed = [...resizing].filter(entry => entries.has(entry.element) && rendered(entry.element) && entry.widest() > contentWidth(entry.element) + .5);
     for (const entry of doomed) writing(() => entry.stale());
   }
   function settled(): void {
