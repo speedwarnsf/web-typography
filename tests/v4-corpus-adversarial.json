@@ -1,5 +1,5 @@
 {
-  "note": "Health and public-information copy built around the constructions the 4.2 compositor split: abbreviations read as sentence ends, honorifics and names, numbers and units, labels and numbers, letter designators, initialisms and compounds, plus control paragraphs for the article 'a' and the pronoun 'I' (also after a capitalized word, which is not a letter designator) and abbreviations that end a sentence. Used by verify-golden (C13, C16).",
+  "note": "Health and public-information copy built around the constructions the 4.2 compositor split: abbreviations read as sentence ends, honorifics and names, numbers and units, labels and numbers, letter designators, initialisms and compounds, plus control paragraphs for the article 'a' and the pronoun 'I' (also after a capitalized word, which is not a letter designator) and abbreviations that end a sentence. Used by verify-golden (C13, C16). Round 2 of the 4.3 review added sentence ends after 'etc.', 'a.m.', 'p.m.', 'No.' and a letter designator.",
   "paragraphs": [
     { "id": "clinic", "text": "Your first visit is with Dr. Alvarez, who will review your labs and answer questions. Bring a list of medicines and arrive by 8 a.m. so Dr. Chen can see you before the clinic gets busy." },
     { "id": "academic", "text": "As shown in Fig. 4 and discussed on p. 17, the U.S. sample was smaller than the U.K. sample, but the effect held in both groups after adjustment for age and income." },
@@ -22,6 +22,10 @@
     { "id": "sentence-ends", "text": "Nobody told us what the money was for. We asked the board to explain what they voted on. They said that the plan was something to be proud of." },
     { "id": "control", "text": "The program opens in March. Staff will train volunteers in each county. Families can sign up online or by phone, and every call is answered by a person." },
     { "id": "first-person", "text": "In March I finally called the clinic, and on Sunday I rode my bike to the ocean to think it over. At Kaiser I learned the test was free, so that night in Phoenix I told my brother everything I had kept to myself." },
-    { "id": "sentence-final", "text": "The survey was run across the U.S. The results reached every clinic by 7 p.m. Most staff read them twice, with the notes on hepatitis C. Many people had never been tested, and some asked about Plan B. It was a long night of questions, forms, calls, etc. Everyone stayed." }
+    { "id": "sentence-final", "text": "The survey was run across the U.S. The results reached every clinic by 7 p.m. Most staff read them twice, with the notes on hepatitis C. Many people had never been tested, and some asked about Plan B. It was a long night of questions, forms, calls, etc. Everyone stayed." },
+    { "id": "abbrev-sentences", "text": "Bring your ID, insurance card, list of medicines, etc. Staff will make copies. Arrive by 9 a.m. Parking is free in the lot on Main St. Doors open at 8." },
+    { "id": "initial-end", "text": "The shots are free for anyone who needs vitamin K. Parents can ask for it at birth, and nurses will explain why newborns need it before they leave." },
+    { "id": "no-answer", "text": "Did the new schedule help? No. Staff on the night shift could not use it, and the clinic went back to the old one within a month of the change." },
+    { "id": "closing-times", "text": "Doors close at 5 p.m. Nurses stay until the last patient is seen, and we accept Aetna, Cigna, Kaiser, etc. Coverage details are printed on the back of the form." }
   ]
 }

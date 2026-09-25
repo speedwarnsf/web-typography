@@ -8,7 +8,8 @@
 //    The published 4.2.0 audit flags each of them (negative control).
 //  - Real line-end defects are reviewed: number/unit, honorific/name,
 //    label/number and letter-designator splits, line-initial dashes and
-//    closing punctuation, and split ellipses.
+//    closing punctuation, split ellipses, and a sentence opener stranded
+//    after "a.m." or "No." ending a sentence.
 //  - The JSON shape and schemaVersion stay those of 4.2.0.
 // (regressed-vs-native is checked against every golden cell by verify-golden.)
 import { readFile, writeFile } from 'node:fs/promises';
@@ -45,6 +46,8 @@ const loud = [
   ['She paused for a long time<br>— and then she spoke.', 'line-initial-punctuation'],
   ['The line kept going . .<br>. and then it ended.', 'split-ellipsis'],
   ['The meeting ran long<br>, so we left early.', 'line-initial-punctuation'],
+  ['Arrive by 9 a.m. Parking<br>is free in the lot on Main Street.', 'stranded-opener'],
+  ['Did the new schedule help? No. Staff<br>on the night shift could not use it.', 'stranded-opener'],
 ];
 
 for (const { name, engine, executablePath } of browsers) {

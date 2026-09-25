@@ -74,14 +74,29 @@ const openers = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those', 'it
   'how', 'where', 'who', 'which', 'most', 'many', 'more', 'some', 'all', 'both', 'each', 'every', 'one', 'no', 'nobody', 'none',
   'everyone', 'everything', 'nothing', 'someone', 'something', 'anyone', 'also', 'even', 'only', 'still', 'please', 'ask', 'call', 'take',
   'talk', 'bring', 'keep', 'try', 'do', 'don\'t', 'don\u2019t', 'it\'s', 'it\u2019s']);
+// After "a.m." or "p.m." these continue the sentence ("9 a.m. Monday", "5 p.m.
+// Eastern"); any other capitalized word starts a new one.
+const timeContext = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'tues', 'wed',
+  'thu', 'thur', 'thurs', 'fri', 'sat', 'sun', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september',
+  'october', 'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec', 'et', 'est',
+  'edt', 'ct', 'cst', 'cdt', 'mt', 'mst', 'mdt', 'pt', 'pst', 'pdt', 'akst', 'akdt', 'hst', 'gmt', 'utc', 'bst', 'cet', 'cest', 'eastern',
+  'central', 'mountain', 'pacific', 'local', 'daylight', 'standard', 'time']);
 /** proseBoundary with the next word as context: an abbreviation that is not
  * an honorific also ends its sentence when a capitalized common sentence
- * opener follows it. */
+ * opener follows it. "etc." ends one before any capitalized word, "a.m." and
+ * "p.m." before any but a day, a month or a time zone, and "No." before any
+ * but a roman numeral (a label takes a number, "No. 5"); the opener list
+ * stays for the ambiguous rest (initials, "St.", "U.S."). */
 export function boundaryBefore(text: string, next: string | undefined): boolean {
   if (proseBoundary(text)) return true;
-  if (next === undefined || !isAbbreviation(text) || honorifics.has(outer(text).slice(0, -1))) return false;
+  const stem = outer(text).slice(0, -1);
+  if (next === undefined || !isAbbreviation(text) || honorifics.has(stem)) return false;
   const opener = outer(next).replace(/[.,;:!?]+$/u, '');
-  return /^\p{Lu}/u.test(opener) && openers.has(opener.toLowerCase());
+  if (!/^\p{Lu}/u.test(opener)) return false;
+  if (stem === 'etc') return true;
+  if (/^[ap]\.m$/iu.test(stem)) return !timeContext.has(opener.toLowerCase());
+  if (stem === 'No') return !/^[IVXLC]+$/u.test(opener);
+  return openers.has(opener.toLowerCase());
 }
 
 export type BoundPair = 'unit' | 'honorific' | 'label' | 'designator';
