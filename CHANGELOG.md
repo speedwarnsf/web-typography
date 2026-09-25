@@ -77,8 +77,10 @@ Outside the changes below, 0 of these differ in any engine.
   the framework text an element holds is not split for it. Lines and
   characters are unchanged, and so are widths unless the element has
   horizontal padding, border or margin, which now starts its line as the
-  compositor planned. Golden diff: 173 of 680 rich cells per engine, markup
-  only (the break's position); 0 of the rest.
+  compositor planned. Golden diff: 173 of 680 rich cells per engine in
+  verify-golden, 3 (WebKit 5) of 316 blocks in the golden A/B and 71 of
+  2,160 React blocks, all markup only (the break's position), with 0
+  screenshots, line boxes, outcomes or copied texts changed; 0 of the rest.
 - **The automatic loader composes `.demo` and `[data-no-smooth]` content.**
   The website loader (go@4.2.0.js, and 4.3's `typeset.us/auto`) always
   skipped elements with the class `demo` or the attribute
@@ -177,7 +179,8 @@ Outside the changes below, 0 of these differ in any engine.
   In one, 4.3 now gives the same breaks as `typeset()` for the same markup,
   where 4.2.0's re-plan did not; the other is a block on which 4.2.0 differs
   from itself between runs. Chromium and Firefox: 0. (2,040 more differ only
-  in the C2 and C9 attributes and in the order of the host's attributes.)
+  in the C2 and C9 attributes and in the order of the host's attributes, 71
+  of them also in the position of a break before a link.)
 - The legacy `renderFrozenLines()` export no longer sets the non-ARIA
   `role="text"`, which emptied a composed heading's accessible name in
   WebKit, and clears the element with `replaceChildren()` instead of
