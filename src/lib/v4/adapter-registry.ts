@@ -171,12 +171,15 @@ function createRegistry(doc: Document): Registry {
     if (entry.element.dataset.tsOutcome === 'native:transformed') awaitTransforms(entry);
     return setup;
   }
-  /** Hosts declined under each running animation, composed again when it ends. */
+  /** Hosts declined under each running animation, composed again when it
+   * ends. One that never ends (infinite iterations) is not waited on, or its
+   * set would hold every host replaced or unmounted under it. */
   const animating = new WeakMap<Animation, Set<AdapterEntry>>();
   function awaitTransforms(entry: AdapterEntry): void {
     for (const animation of doc.getAnimations?.() ?? []) {
       const target = (animation.effect as KeyframeEffect | null)?.target;
       if (!target || animation.playState === 'finished' || !(target === entry.element || target.contains(entry.element))) continue;
+      if (animation.effect?.getComputedTiming().endTime === Infinity) continue;
       let waiting = animating.get(animation);
       if (!waiting) {
         const set = waiting = new Set();

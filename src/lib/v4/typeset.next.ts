@@ -1002,12 +1002,16 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, job, true);
     else { deferred.add(el); viewport.observe(el); }
   };
-  /** Owned text declined under each running animation, rechecked when it ends. */
+  /** Owned text declined under each running animation, rechecked when it
+   * ends. One that never ends (infinite iterations: a pulse, a breathing
+   * circle) is not waited on: its set would hold every block replaced or
+   * unmounted under it for as long as it runs. */
   const animating = new WeakMap<Animation, Set<HTMLElement>>();
   const awaitTransforms = (el: HTMLElement) => {
     for (const animation of doc.getAnimations?.() ?? []) {
       const target = (animation.effect as KeyframeEffect | null)?.target;
       if (!target || animation.playState === 'finished' || !(target === el || target.contains(el))) continue;
+      if (animation.effect?.getComputedTiming().endTime === Infinity) continue;
       let waiting = animating.get(animation);
       if (!waiting) {
         const set = waiting = new Set();

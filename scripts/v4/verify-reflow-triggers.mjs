@@ -41,6 +41,20 @@ createRoot(document.getElementById('app')).render(h('main', { className: documen
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
 
+// TypesetText blocks swapped for new ones under an infinite pulse (10).
+const pulseFixture = (await build({
+  stdin: { contents: `
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { TypesetText } from ${JSON.stringify(resolve(artifacts.react))};
+const texts = ${JSON.stringify(corpus.slice(3, 23))};
+const root = createRoot(document.getElementById('app'));
+window.swap = round => flushSync(() => root.render(round < 0 ? null : texts.map((text, i) => h(TypesetText, { key: round + '-' + i, text }))));
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
+
 /** @type {{ checks: { browser: string, label: string, pass: boolean, detail?: unknown }[], errors: { browser: string, error: string }[] }} */
 const report = { checks: [], errors: [] };
 // Milliseconds after settle() until every composed block is intact again: the
@@ -354,6 +368,43 @@ for (const { name, engine, executablePath } of browsers) {
           return [...document.querySelectorAll('#dlg .r')].map(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome + ':' + el.querySelectorAll('br[data-ts-break]').length);
         });
         check('React adapters: text in a @starting-style dialog composes once its entry transition ends', result.length === 4 && result.every(s => /^composed:rich:[1-9]/.test(s)), result);
+        await page.close();
+      }
+    }
+    // 10. Text declined under an ancestor animation that never ends (a
+    // pulsing card, a breathing-exercise circle) is not waited on, so blocks
+    // replaced or unmounted under it are not retained (Chromium, where the
+    // heap can be counted). 4.3's first candidates kept every one.
+    if (name === 'chromium') {
+      const pulseCSS = '<style>@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.04)}}#pulse{animation:pulse 3s infinite alternate}</style>';
+      for (const kind of ['mount', 'react']) {
+        const page = await open(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style>${pulseCSS}</head><body><main class="col" id="pulse">${kind === 'react' ? '<div id="app"></div>' : ''}</main></body></html>`, { mount: false, react: kind === 'react' });
+        if (kind === 'react') await page.addScriptTag({ content: pulseFixture });
+        const cdp = await page.context().newCDPSession(page);
+        const live = async () => {
+          await cdp.send('HeapProfiler.collectGarbage');
+          const { result: prototype } = await cdp.send('Runtime.evaluate', { expression: 'HTMLParagraphElement.prototype', objectGroup: 'heap' });
+          const { objects } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: /** @type {string} */ (prototype.objectId), objectGroup: 'heap' });
+          const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: /** @type {string} */ (objects.objectId), functionDeclaration: 'function () { return this.length; }', returnByValue: true });
+          await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'heap' });
+          return /** @type {number} */ (result.value);
+        };
+        const outcomes = await page.evaluate(async ({ kind, texts }) => {
+          const w = /** @type {any} */ (window);
+          const sleep = (/** @type {number} */ ms) => new Promise(resolve => setTimeout(resolve, ms));
+          const pulse = /** @type {HTMLElement} */ (document.getElementById('pulse'));
+          if (kind === 'mount') w.controller = w.Typeset.mount(document, '#pulse p');
+          const fill = (/** @type {number} */ round) => { if (kind === 'react') w.swap(round); else pulse.innerHTML = texts.map(t => '<p class="t">' + t + '</p>').join(''); };
+          fill(0);
+          await sleep(400);
+          const seen = [...new Set([...pulse.querySelectorAll('p')].map(p => /** @type {HTMLElement} */ (p).dataset.tsOutcome))];
+          for (let round = 1; round <= 10; round++) { fill(round); await sleep(150); }
+          if (kind === 'react') w.swap(-1); else pulse.innerHTML = '';
+          await sleep(300);
+          return seen;
+        }, { kind, texts: corpus.slice(3, 23).map(escape) });
+        const retained = await live();
+        check(`${kind === 'react' ? 'React adapters' : 'mount()'}: blocks replaced 10 times, then removed, under an infinite scale animation are not retained`, retained <= 5 && outcomes.length > 0, { retained, outcomes });
         await page.close();
       }
     }

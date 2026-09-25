@@ -345,7 +345,11 @@ Outside the changes below, 0 of these differ in any engine.
   class-driven scale, a card inserted with `element.animate()`, the drawer
   closing) is composed when that transition or animation ends, with
   `mount()`, the loaders and `TypesetText`; 4.2.0 and the earlier 4.3
-  candidate left it native until an unrelated trigger. In WebKit, font keys
+  candidate left it native until an unrelated trigger. An animation that
+  never ends (an infinite pulse) is not waited on, so text under it stays
+  native as in 4.2.0, and blocks replaced or unmounted under it are not
+  kept in memory (the first round-2 candidate held every one while the
+  animation ran). In WebKit, font keys
   no longer change when the engine collects an unreferenced `FontFace`
   wrapper, which made the first recheck after composition recompose every
   block on pages with `@font-face` rules. `verify-reflow-triggers` covers
