@@ -3,13 +3,13 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 44637,
-      "TypesetText-only": 46637,
-      "TypesetRichText-only": 41243,
-      "smartQuotes-only": 877,
-      "react.js+shared": 49833,
-      "go.js": 50419,
-      "typeset.global.js": 50206
+      "mount-only": 45809,
+      "TypesetText-only": 45457,
+      "TypesetRichText-only": 41473,
+      "smartQuotes-only": 1106,
+      "react.js+shared": 48401,
+      "go.js": 52057,
+      "typeset.global.js": 51726
     },
     "raised": [
       {
@@ -46,6 +46,28 @@
           "go.js": 42682,
           "typeset.global.js": 42493
         }
+      },
+      {
+        "by": "4.3 integration (all five groups merged)",
+        "reason": "Measured on the merged candidate with the release recipe (Node 24 zlib). The per-group raises above were each measured on one branch; merged, the lifecycle hub, adapter registry, environment guards, outcome list and license notices add up to these values. Against 4.2.0: mount-only +21.4%, TypesetText-only +19.5%, TypesetRichText-only +24.2%, react.js+shared +21.3%, go.js +22.0%, typeset.global.js +21.7%; smartQuotes-only -90.6% (K4's lazy line-break tables tree-shake away; C15's quote rules add 229 B over the react branch's 877).",
+        "before": {
+          "mount-only": 44637,
+          "TypesetText-only": 46637,
+          "TypesetRichText-only": 41243,
+          "smartQuotes-only": 877,
+          "react.js+shared": 49833,
+          "go.js": 50419,
+          "typeset.global.js": 50206
+        },
+        "after": {
+          "mount-only": 45809,
+          "TypesetText-only": 45457,
+          "TypesetRichText-only": 41473,
+          "smartQuotes-only": 1106,
+          "react.js+shared": 48401,
+          "go.js": 52057,
+          "typeset.global.js": 51726
+        }
       }
     ]
   },
@@ -57,12 +79,12 @@
     "writeTolerance": 1.05,
     "scenarios": {
       "mount-200": {
-        "visibleMs": 213,
-        "readyMs": 7817,
-        "tbtMs": 1041,
-        "longestTaskMs": 124,
+        "visibleMs": 254,
+        "readyMs": 7081,
+        "tbtMs": 454,
+        "longestTaskMs": 105,
         "mutationObservers": 2,
-        "mutationObserve": 197,
+        "mutationObserve": 196,
         "resizeObservers": 1,
         "resizeObserve": 201,
         "intersectionObservers": 1,
@@ -70,14 +92,14 @@
         "windowListeners": 1,
         "documentListeners": 4,
         "fontListeners": 3,
-        "nodeWrites": 53621
+        "nodeWrites": 53617
       },
       "mount-1000": {
-        "visibleMs": 258,
-        "tbtMs": 8152,
-        "longestTaskMs": 168,
+        "visibleMs": 307,
+        "tbtMs": 3640,
+        "longestTaskMs": 142,
         "mutationObservers": 2,
-        "mutationObserve": 1001,
+        "mutationObserve": 996,
         "resizeObservers": 1,
         "resizeObserve": 1001,
         "intersectionObservers": 1,
@@ -85,10 +107,10 @@
         "windowListeners": 1,
         "documentListeners": 4,
         "fontListeners": 3,
-        "nodeWrites": 268476
+        "nodeWrites": 268494
       },
       "react-plain-38": {
-        "commitMs": 4,
+        "commitMs": 6,
         "tbtMs": 0,
         "mutationObservers": 0,
         "mutationObserve": 0,
@@ -102,11 +124,11 @@
         "nodeWrites": 1
       },
       "react-typeset-38": {
-        "commitMs": 18,
-        "tbtMs": 73,
-        "longestTaskMs": 123,
+        "commitMs": 21,
+        "tbtMs": 84,
+        "longestTaskMs": 139,
         "mutationObservers": 2,
-        "mutationObserve": 39,
+        "mutationObserve": 41,
         "resizeObservers": 1,
         "resizeObserve": 39,
         "intersectionObservers": 1,
@@ -114,14 +136,14 @@
         "windowListeners": 1,
         "documentListeners": 4,
         "fontListeners": 3,
-        "nodeWrites": 1210
+        "nodeWrites": 1192
       },
       "react-rich-38": {
-        "commitMs": 20,
-        "tbtMs": 110,
-        "longestTaskMs": 151,
+        "commitMs": 27,
+        "tbtMs": 115,
+        "longestTaskMs": 170,
         "mutationObservers": 2,
-        "mutationObserve": 39,
+        "mutationObserve": 41,
         "resizeObservers": 1,
         "resizeObserve": 39,
         "intersectionObservers": 1,
@@ -132,10 +154,10 @@
         "nodeWrites": 941
       },
       "storm": {
-        "elapsedMs": 1357,
-        "tbtMs": 10,
-        "longestTaskMs": 56,
-        "passes": 33,
+        "elapsedMs": 1194,
+        "tbtMs": 0,
+        "longestTaskMs": 0,
+        "passes": 37,
         "mutationObservers": 0,
         "mutationObserve": 33,
         "resizeObservers": 0,
@@ -148,9 +170,9 @@
         "nodeWrites": 30
       },
       "hidden": {
-        "visibleMs": 489,
-        "tbtMs": 99,
-        "longestTaskMs": 122,
+        "visibleMs": 468,
+        "tbtMs": 94,
+        "longestTaskMs": 134,
         "mutationObservers": 0,
         "mutationObserve": 11,
         "resizeObservers": 0,
@@ -160,14 +182,14 @@
         "windowListeners": 0,
         "documentListeners": 1,
         "fontListeners": 0,
-        "nodeWrites": 2371
+        "nodeWrites": 2369
       },
       "late-font": {
-        "settledMs": 12565,
-        "tbtMs": 1809,
-        "longestTaskMs": 148,
+        "settledMs": 11873,
+        "tbtMs": 974,
+        "longestTaskMs": 154,
         "mutationObservers": 0,
-        "mutationObserve": 205,
+        "mutationObserve": 201,
         "resizeObservers": 0,
         "resizeObserve": 0,
         "intersectionObservers": 0,
@@ -175,17 +197,17 @@
         "windowListeners": 0,
         "documentListeners": 0,
         "fontListeners": 0,
-        "nodeWrites": 97885
+        "nodeWrites": 100720
       }
     }
   },
   "calibrated": {
     "size": {
-      "date": "2026-09-24",
+      "date": "2026-09-25",
       "dist": "output/candidate/dist"
     },
     "runtime": {
-      "date": "2026-09-24",
+      "date": "2026-09-25",
       "dist": "output/candidate/dist",
       "repeat": 3,
       "platform": "darwin-arm64"
@@ -412,6 +434,51 @@
         }
       ],
       "merged": "At integration the registry subscribes to the lifecycle hub: one more MutationObserver (the hub's) and the hub's document and font listeners; provisional until the post-merge recalibration."
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 integration: recalibrated on the merged candidate",
+      "policy": "Times are the Chromium 4x medians of three runs plus 10% headroom (the file's time tolerance still applies on top). Observer and listener counts, observe() calls and DOM mutation records are the measured medians exactly; their own tolerances (none for counts, callTolerance, writeTolerance) are the headroom.",
+      "lowered": [
+        "mount-200.readyMs 7817 -> 7081",
+        "mount-200.tbtMs 1041 -> 454",
+        "mount-200.longestTaskMs 124 -> 105",
+        "mount-200.mutationObserve 197 -> 196",
+        "mount-200.nodeWrites 53621 -> 53617",
+        "mount-1000.tbtMs 8152 -> 3640",
+        "mount-1000.longestTaskMs 168 -> 142",
+        "mount-1000.mutationObserve 1001 -> 996",
+        "react-typeset-38.nodeWrites 1210 -> 1192",
+        "storm.elapsedMs 1357 -> 1194",
+        "storm.tbtMs 10 -> 0",
+        "storm.longestTaskMs 56 -> 0",
+        "hidden.visibleMs 489 -> 468",
+        "hidden.tbtMs 99 -> 94",
+        "hidden.nodeWrites 2371 -> 2369",
+        "late-font.settledMs 12565 -> 11873",
+        "late-font.tbtMs 1809 -> 974",
+        "late-font.mutationObserve 205 -> 201"
+      ],
+      "raised": [
+        "mount-200.visibleMs 213 -> 254",
+        "mount-1000.visibleMs 258 -> 307",
+        "mount-1000.nodeWrites 268476 -> 268494",
+        "react-plain-38.commitMs 4 -> 6",
+        "react-typeset-38.commitMs 18 -> 21",
+        "react-typeset-38.tbtMs 73 -> 84",
+        "react-typeset-38.longestTaskMs 123 -> 139",
+        "react-typeset-38.mutationObserve 39 -> 41",
+        "react-rich-38.commitMs 20 -> 27",
+        "react-rich-38.tbtMs 110 -> 115",
+        "react-rich-38.longestTaskMs 151 -> 170",
+        "react-rich-38.mutationObserve 39 -> 41",
+        "storm.passes 33 -> 37",
+        "hidden.longestTaskMs 122 -> 134",
+        "late-font.longestTaskMs 148 -> 154",
+        "late-font.nodeWrites 97885 -> 100720"
+      ],
+      "reasonForRaises": "Times: a single group's earlier measurement against the merged build's median of three at load 4-7, within noise of 4.2.0 in a paired run (mount-200 first viewport 216 ms for 4.2.0 and 229 ms for 4.3.0; React 38-block commits 160 and 78 ms for 4.2.0). Counts: the React lanes gain the lifecycle hub's MutationObserver and its observe() calls (2 per document), which the react branch did not have. late-font nodeWrites 97885 -> 100720 and hidden intersectionObserve: C7 recomposes after a late font where 4.2.0 did not (WebKit left 59 of 195 paragraphs stale), and C8 observes revealed offscreen text until it comes near.",
+      "measured": "scripts/v4/verify-budgets.mjs --runtime --repeat 3, chromium@4x, darwin-arm64, load 4.5-7"
     }
   ]
 }
