@@ -409,8 +409,8 @@ changes only an isolated preview, never a deployed site.
 - **Indented paragraphs** keep the browser's layout: a paragraph with any
   `text-indent`, including a book-style first-line indent (`p + p {
   text-indent: 1.5em }`, which leaves every paragraph after the first
-  native) and a hanging indent, reports `native:rich-whitespace`, as in
-  4.2.0.
+  native) and a hanging indent, reports `native:rich-whitespace`
+  (`native:no-candidate` with `lineBreaks: 'legacy'`), as in 4.2.0.
 - **Right-to-left, vertical and non-Latin text** keeps the browser's layout.
 - **Browser floor.** Composes where `Intl.Segmenter`, `ResizeObserver` and
   `MutationObserver` exist; the supported browsers also have CSS
