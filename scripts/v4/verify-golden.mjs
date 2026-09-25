@@ -63,6 +63,13 @@ function linked(text) {
   html[8] = '<em>' + html[8] + '</em>';
   return html.filter(Boolean).join(' ');
 }
+/** React's server rendering between interpolated strings (Next, Astro islands):
+ * a comment at every fourth word boundary. @param {string} text */
+function separated(text) {
+  const words = text.split(' ').map(escape), chunks = [];
+  for (let i = 0; i < words.length; i += 4) chunks.push(words.slice(i, i + 4).join(' '));
+  return chunks.join(' <!-- -->');
+}
 /** @typedef {{ id: string, variant: string, tag: string, html: string, width: number, font: string, options: Record<string, unknown>, style?: string }} Cell */
 /** @type {Cell[]} */
 const cells = [];
@@ -73,6 +80,7 @@ for (const [index, text] of texts.entries()) for (const width of widths) for (co
   cells.push({ id: 'legacy ' + at, variant: 'legacy', tag: 'p', html: escape(text), width, font, options: { lineBreaks: 'legacy', contour: 'natural' } });
   if (index % 2 === 0) cells.push({ id: 'finishes ' + at, variant: 'finishes', tag: 'p', html: escape(text), width, font, options: { smartQuotes: 'en', opticalHanging: true } });
   if (index % 2 === 1) cells.push({ id: 'justified ' + at, variant: 'justified', tag: 'p', html: escape(text), width, font, options: {}, style: 'text-align:justify' });
+  if (index % 2 === 0) cells.push({ id: 'comments ' + at, variant: 'comments', tag: 'p', html: separated(text), width, font, options: {} });
   if (width <= 320) {
     const title = text.split(' ').slice(0, 9).join(' ');
     cells.push({ id: 'title ' + at, variant: 'title', tag: 'h2', html: escape(title), width: width - 60, font, options: {} });
@@ -178,13 +186,16 @@ function changeReasons(cell) {
   const reasons = [];
   // C3: justified text is declined instead of composed ragged.
   if (/text-align:\s*justify/.test(cell.style || '')) reasons.push('justify');
+  // C6: author text after a comment keeps its place, unwrapped, so a line
+  // holding some is left untracked (the rest of the paragraph keeps tracking).
+  if (cell.html.includes('<!--')) reasons.push('comment');
   // C13, English text: abbreviations end no sentence unless a common
   // sentence opener follows; numbers and units, honorifics and names, labels
   // and numbers, and words and letter designators are bound; of the single
   // letters only the article and the pronoun "I" pay the letter penalty ("I"
   // is a numeral only after a head such as War or Phase, or a regnal name).
   // Deliberately broader than the engine's own lists.
-  const words = cell.html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').split(/\s+/u).filter(Boolean);
+  const words = cell.html.replace(/<!--.*?-->/g, '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').split(/\s+/u).filter(Boolean);
   const bare = (/** @type {string} */ word) => word.replace(/^[("'\u201C\u2018[]+/u, '').replace(/[.,;:!?"'\u201D\u2019)\]]+$/u, '');
   for (const [i, word] of words.entries()) {
     const next = words[i + 1] ?? '', previous = words[i - 1] ?? '';
@@ -273,6 +284,18 @@ for (const { name, base, cand } of runs) {
       const composed = pairs.filter(({ c }) => !/^native:(justify|fits)$/.test(c.outcome) || /data-ts-(break|track)/.test(c.markup));
       check(name, 'justified: declined and untouched', !composed.length, composed.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
     }
+    if (variant === 'comments') {
+      // Text after a comment stays unwrapped: its line is left untracked, the
+      // rest keep tracking, and no line is tracked part way.
+      const partly = (/** @type {string} */ markup) => markup.split(/<br data-ts-break[^>]*>/).slice(0, -1).some(line => {
+        const bare = line.replace(/<span data-ts-break[^>]*><\/span>|<wbr[^>]*>|<!--.*?-->/g, '');
+        return /<span data-ts-track/.test(bare) && /\S/.test(bare.replace(/<span data-ts-track[^>]*>.*?<\/span>/g, '').replace(/<[^>]+>/g, ''));
+      });
+      const mixed = pairs.filter(({ c }) => partly(c.markup));
+      const rolledBack = pairs.filter(({ c }) => c.features?.tracking === 'native:tracking-verification');
+      check(name, 'comments: no line is tracked part way and tracking never rolls back', !mixed.length && !rolledBack.length,
+        { mixed: mixed.slice(0, 3).map(({ c }) => c.id), rolledBack: rolledBack.slice(0, 3).map(({ c }) => c.id), applied: pairs.filter(({ c }) => c.features?.tracking === 'applied').length });
+    }
     const damaged = pairs.filter(({ c }) => !c.textIntact || /^threw/.test(c.outcome));
     check(name, `${variant}: source text intact`, !damaged.length, damaged.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
     // The audit under test judges the native layout, 4.2.0's output and this
@@ -304,22 +327,24 @@ for (const { name, base, cand } of runs) {
 
 // Engines keep agreeing wherever 4.2.0 made the same decision in each. Where
 // a rendering change applies, near-equal costs can settle differently in each
-// engine's text metrics, as they already do in some 4.2.0 cells: those cells
-// may not disagree more often than 4.2.0's engines do across the corpus.
+// engine's text metrics, as they already do in some 4.2.0 cells: a change may
+// not make engines disagree where 4.2.0's agreed more often than 4.2.0's
+// engines disagree across the corpus. (Cells 4.2.0's engines already
+// disagreed on, such as copies of corpus paragraphs, do not count against it.)
 if (runs.length > 1) {
   const same = (/** @type {'base' | 'cand'} */ which, /** @type {number} */ index) => runs.every(run => JSON.stringify(run[which][index].breaks) === JSON.stringify(runs[0][which][index].breaks) && run[which][index].outcome === runs[0][which][index].outcome);
-  const unchanged = [], changed = { cells: 0, before: 0, after: 0 }, corpus = { cells: 0, before: 0 };
+  const unchanged = [], changed = { cells: 0, before: 0, after: 0, introduced: 0 }, corpus = { cells: 0, before: 0 };
   for (const [index, cell] of cells.entries()) {
     if (cell.variant === 'justified') continue;
     const reasons = changeReasons(cell).length > 0;
     if (!cell.variant.startsWith('adversarial')) { corpus.cells++; corpus.before += +!same('base', index); }
-    if (reasons) { changed.cells++; changed.before += +!same('base', index); changed.after += +!same('cand', index); }
+    if (reasons) { changed.cells++; changed.before += +!same('base', index); changed.after += +!same('cand', index); changed.introduced += +(same('base', index) && !same('cand', index)); }
     else if (same('base', index) && !same('cand', index)) unchanged.push({ id: cell.id, ...Object.fromEntries(runs.map(run => [run.name, [run.cand[index].outcome, ...run.cand[index].lines]])) });
   }
   report.counts.crossEngine = { corpus, changed };
   check('all', 'engines agree wherever 4.2.0 agreed and no change applies', !unchanged.length, unchanged.slice(0, 4));
-  check('all', 'engines disagree no more often where a change applies than 4.2.0 does across the corpus',
-    changed.after / Math.max(1, changed.cells) <= corpus.before / Math.max(1, corpus.cells), { corpus, changed });
+  check('all', 'a change makes engines disagree where 4.2.0 agreed no more often than 4.2.0 disagrees across the corpus',
+    changed.introduced / Math.max(1, changed.cells) <= corpus.before / Math.max(1, corpus.cells), { corpus, changed });
 }
 if (values.dump) await writeFile(values.dump, JSON.stringify({ cells, runs }));
 report.summary = { cells: cells.length, engines: runs.map(run => run.name), seconds: Math.round((performance.now() - started) / 1000),

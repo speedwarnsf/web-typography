@@ -115,6 +115,7 @@ export const FEATURE_DOCS = {
     'native:tracking-measurement': 'Not applied: letter or word spacing could not be resolved to pixels.',
     'native:tracking-budget': 'Not applied: more than 256 styled runs.',
     'native:tracking-script': 'Not applied: the letters are outside the Latin script, which is never tracked.',
+    'native:tracking-comment': 'Not applied: every line that needed tracking holds author text right after an HTML comment (a framework marker, a server-rendering separator), which keeps its place unwrapped. Lines without such text are tracked.',
     'native:tracking-mode': 'Not applied: titles and headings are not tracked.',
     'native:tracking-uncomposed': 'Not applied: the paragraph itself was left native.',
     'native:tracking-verification': 'Rolled back: tracking did not verify; word spacing was kept.',

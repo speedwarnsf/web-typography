@@ -32,12 +32,18 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
   const source = element.textContent || '', texts = textRuns(element);
   const segmenter = graphemes();
   const runs: TrackingRun[] = [];
-  let unsupported = false;
+  let unsupported = false, held = false;
   for (const [line, box] of layout.lines.slice(0, -1).entries()) {
     const desired = targets[line] - box.width;
     if (!Number.isFinite(desired) || Math.abs(desired) < .25) continue;
     // Joining scripts need a script-specific policy; never space their letters apart.
     if ([...box.text].some(char => /\p{L}/u.test(char) && !/\p{Script=Latin}/u.test(char))) { unsupported = true; continue; }
+    // Author text after a comment keeps its place, unwrapped (see
+    // renderTracking): a line holding some is left untracked, so no line is
+    // tracked part way and no run is left without a wrapper, which would roll
+    // tracking back for the whole paragraph. React's own text nodes (after its
+    // SSR separator, <!-- -->) are split off and tracked like any React text.
+    if (texts.some(text => text.start < box.sourceEnd && text.end > box.sourceStart && heldAfterComment(text.node))) { held = true; continue; }
     const pieces: (TrackingRun & { last: Text; count: number })[] = [];
     for (const text of texts) {
       const start = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
@@ -64,8 +70,12 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
     for (const { last: _last, count, ...run } of pieces) if (count) runs.push({ ...run, px: run.fontSize * em });
   }
   if (runs.length > 256) return result('native:tracking-budget');
-  return result(runs.length ? 'applied' : unsupported ? 'native:tracking-script' : 'unchanged', runs);
+  return result(runs.length ? 'applied' : unsupported ? 'native:tracking-script' : held ? 'native:tracking-comment' : 'unchanged', runs);
 }
+
+/** An author Text node after a comment that tracking must leave in place,
+ * whole and unwrapped (see afterComment). */
+const heldAfterComment = (node: Text): boolean => node.length > 0 && !engineText.has(node) && afterComment(node) && !reactOwned(node);
 
 export function trackingStyle(run: TrackingRun): Record<string, string> {
   return { all: 'unset', display: 'inline', letterSpacing: run.letterSpacing + run.px + 'px',
@@ -108,8 +118,8 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
     for (const node of nodes) {
       if (node.nodeType === Node.TEXT_NODE && !engineText.has(node as Text) && (!(node as Text).length || afterComment(node as Text) || positional(node as Text) || reactOwned(node as Text))) {
         // An author node that must keep its place: leave it, empty, and wrap
-        // its text; or, after a comment, leave it whole.
-        if (!(node as Text).length || afterComment(node as Text)) { wrapper = null; continue; }
+        // its text; or, after a comment (not React's), leave it whole.
+        if (!(node as Text).length || heldAfterComment(node as Text)) { wrapper = null; continue; }
         const piece = split(node as Text, 0);
         if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
         wrapper.append(piece);

@@ -9,7 +9,7 @@
  * not bundled. scripts/v4/verify-docs.mjs fails when a code appears in the
  * engine but not here, or here but not in the engine. 4.3 added
  * native:justify, native:live-region, native:translated and
- * native:environment.
+ * native:environment, and the tracking status native:tracking-comment.
  */
 export const OUTCOMES = [
   // Composed: Typeset chose the breaks.
@@ -36,7 +36,7 @@ export const FEATURE_STATUSES = {
   quotes: ['off', 'enabled', 'applied', 'unchanged', 'native:quotes-scope'],
   hanging: ['off', 'applied', 'applied:partial', 'unchanged', 'native:hanging-layout', 'native:hanging-clipped', 'native:hanging-font', 'native:hanging-uncomposed', 'native:hanging-verification'],
   spacing: ['off', 'applied', 'unchanged', 'native:spacing-layout', 'native:spacing-measurement', 'native:spacing-mode', 'native:spacing-uncomposed', 'native:spacing-verification'],
-  tracking: ['off', 'applied', 'unchanged', 'native:tracking-layout', 'native:tracking-measurement', 'native:tracking-budget', 'native:tracking-script', 'native:tracking-mode', 'native:tracking-uncomposed', 'native:tracking-verification'],
+  tracking: ['off', 'applied', 'unchanged', 'native:tracking-layout', 'native:tracking-measurement', 'native:tracking-budget', 'native:tracking-script', 'native:tracking-comment', 'native:tracking-mode', 'native:tracking-uncomposed', 'native:tracking-verification'],
 } as const;
 
 export type QuoteStatus = typeof FEATURE_STATUSES.quotes[number];
