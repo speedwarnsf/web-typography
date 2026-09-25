@@ -73,6 +73,18 @@ for (const { name, engine, executablePath } of browsers) {
       await page.waitForTimeout(20);
       record(name, `typeset(el, ${options}) warns once: ${expected}`, warnings.length === 1 && warnings[0] === expected, warnings);
     }
+    // Keys named like Object.prototype members (an options object parsed
+    // from JSON) warn like any unknown key and stop no later warning.
+    warnings.length = 0;
+    const polluted = await page.evaluate(() => {
+      const el = /** @type {HTMLElement} */ (document.getElementById('scratch'));
+      window.Typeset.typeset(el, JSON.parse('{"hasOwnProperty":1,"density":"airy","__proto__":{"polluted":1},"toString":"x"}'));
+      window.Typeset.restore(el);
+      return /** @type {any} */ ({}).polluted;
+    });
+    await page.waitForTimeout(20);
+    record(name, 'option keys named like Object.prototype members warn, and later keys still warn', polluted === undefined && ['hasOwnProperty', '__proto__', 'toString'].every(key => warnings.includes(`[typeset] typeset() has no option "${key}"; it is ignored`))
+      && warnings.includes('[typeset] density must be "compact" or "editorial" (received "airy")'), [...warnings]);
     warnings.length = 0;
     const thrown = await page.evaluate(() => {
       const w = /** @type {any} */ (window);

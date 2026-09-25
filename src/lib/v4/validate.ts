@@ -38,7 +38,10 @@ export function checkOptions(api: string, options: unknown): void {
   }
   for (const [key, value] of Object.entries(options)) {
     if (value === undefined) continue;
-    if (key in choices) {
+    // Own keys only: `in` also finds Object.prototype's members, and an
+    // options object parsed from JSON with a "constructor" key threw here,
+    // which check() swallowed with every later warning.
+    if (Object.prototype.hasOwnProperty.call(choices, key)) {
       if (!choices[key].includes(value)) warn(key + ' must be ' + list(choices[key]) + ' (received ' + describe(value) + ')');
     } else if (booleans.includes(key)) {
       if (typeof value !== 'boolean') warn(key + ' must be true or false (received ' + describe(value) + ')');
