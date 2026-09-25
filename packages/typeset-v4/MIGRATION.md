@@ -64,7 +64,8 @@ New and optional in 4.3: the `Outcome` and `FeatureStatus` types and the
 `result.outcome` and `result.features`. Existing code keeps compiling:
 the types still accept any string. Four outcomes are new:
 `native:justify`, `native:live-region`, `native:translated` and
-`native:environment`. Also new:
+`native:environment`, and one tracking status, `native:tracking-comment`.
+Also new:
 
 - React adapters: a `ref` resolves to the host element; `as` also takes
   `div`, `li`, `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`,

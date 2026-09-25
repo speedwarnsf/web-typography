@@ -441,10 +441,10 @@ Outside the changes below, 0 of these differ in any engine.
   `SpacingStatus` and `TrackingStatus` types name them. `Result.outcome` and
   `Result.features` use these types while still accepting any string, so
   existing code compiles unchanged. OUTCOMES.md (in the package and at
-  docs/outcomes.md) says what each of the 42 outcomes and 32 feature
+  docs/outcomes.md) says what each of the 42 outcomes and 33 feature
   statuses means, whether it is expected, and what to do. New outcomes:
   `native:justify`, `native:live-region`, `native:translated` and
-  `native:environment`.
+  `native:environment`; new tracking status: `native:tracking-comment`.
 - React adapters (K5): a `ref` resolves to the host element (both are
   `forwardRef` components; a ref was dropped before, and `TypesetRichText`'s
   gave its class instance). `as` also accepts `div`, `li`, `blockquote`,
