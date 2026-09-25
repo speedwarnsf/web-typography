@@ -50,6 +50,8 @@ Left as the browser set it, because the content or its CSS is outside what Types
 | `native:clamped` | The text is clamped or truncated with an ellipsis. | Yes | None. |
 | `native:inline` | The target is display: inline, so it has no box of its own to compose. | Yes | Target the block that contains it. |
 | `native:ui` | mode: 'ui' (or data-typeset-mode="ui") marks interface text, which is never composed. | Yes | None. |
+| `native:justify` | The text is justified (text-align: justify or justify-all), or its text-align-last differs from text-align, and it runs to more than one line. A generated break ends its line, so every composed line would take the last-line alignment. | Yes | None; justified text is left to the browser. Set text-align: start (with the default text-align-last) to have it composed. |
+| `native:live-region` | The element is inside a live region: the nearest one has aria-live="polite" or "assertive", or role status, alert, log, marquee or timer, or is an <output>, without aria-live="off". Screen readers announce every change there, so Typeset never measures, breaks or rewrites it. | Yes | None. If the element is not really a live region, remove the role or set aria-live="off". |
 | `native:rich-element` | The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code), such as an image, button or nested block. | Yes | None, or compose the text blocks inside it separately. |
 | `native:rich-excluded` | The block contains hidden, aria-hidden, editable or data-no-typeset content. | Yes | None. |
 | `native:rich-direction` | An inline element changes direction, bidi or writing mode, or is not visible. | Yes | None. |
@@ -81,7 +83,9 @@ Typeset did not look at the element.
 | --- | --- | --- | --- |
 | `skipped:excluded` | The element is inside data-no-typeset, code, pre, a form control, nav, a button or editable content. | Yes | None. |
 | `skipped:framework` | TypesetRichText owns this element, so imperative typeset() and mount() leave it alone. | Yes | None; keep one owner per element. |
-| `unmeasurable` | The element has no line boxes to measure (it is hidden, display: none or zero width). | No | None if hidden on purpose; mount() composes it when it is shown. |
+| `unmeasurable` | The element has no line boxes to measure (display: none, zero width, or inside a content-visibility subtree the browser is skipping). A composition made while it was visible is kept while it is hidden. | No | None if hidden on purpose; mount() and the React adapters compose it when it is shown or scrolled into range. After a direct typeset() call, call it again once the element is rendered. |
+| `native:translated` | The page is being machine-translated (the translated-ltr or translated-rtl class that Google Translate and Chrome set, a <font> wrapper inside composed text, or Edge's _msttexthash). Typeset removed its breaks by moving the existing Text nodes, and composes again when the translation ends. | Yes | None. TypesetRichText freezes instead: the breaks React rendered stay. |
+| `native:environment` | Nothing can be measured or kept correct here: a DOM emulation such as jsdom or happy-dom (Jest, Vitest), or an engine without Intl.Segmenter, Range geometry, MutationObserver or ResizeObserver. The text is left as authored and nothing throws. | Yes | None in component tests. In a browser, see the support floor in SUPPORT.md. |
 
 ## Finishing features
 

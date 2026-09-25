@@ -7,12 +7,9 @@
  * What each code means and what to do about it is in outcome-docs.ts, which
  * generates OUTCOMES.md and docs/outcomes.md (npm run docs:outcomes) and is
  * not bundled. scripts/v4/verify-docs.mjs fails when a code appears in the
- * engine but not here, or here but not in the engine.
- *
- * TODO(docs-sync): 4.3 behaviour groups add codes (C3 declines justified
- * text, C4 live regions, C9/C10 print and translated pages). Add each here and
- * in outcome-docs.ts when those changes are integrated; verify-docs lists any
- * that are missing.
+ * engine but not here, or here but not in the engine. 4.3 added
+ * native:justify, native:live-region, native:translated and
+ * native:environment.
  */
 export const OUTCOMES = [
   // Composed: Typeset chose the breaks.
@@ -22,13 +19,13 @@ export const OUTCOMES = [
   // Left as the browser set it: content or styling Typeset does not handle.
   'native:language', 'native:mixed-language', 'native:script', 'native:direction', 'native:transformed',
   'native:decorated', 'native:whitespace', 'native:author-breaks', 'native:soft-hyphen', 'native:auto-hyphens',
-  'native:break-policy', 'native:clamped', 'native:inline', 'native:ui',
+  'native:break-policy', 'native:clamped', 'native:inline', 'native:ui', 'native:justify', 'native:live-region',
   'native:rich-element', 'native:rich-excluded', 'native:rich-direction', 'native:rich-whitespace',
   'native:rich-layout', 'native:rich-box', 'native:rich-decorated', 'native:rich-tokens', 'native:react-component',
   // Left as the browser set it: Typeset could not improve it safely.
   'native:budget', 'native:no-candidate', 'native:line-budget', 'native:quality', 'native:render-failed', 'native:verification',
   // Not processed.
-  'skipped:excluded', 'skipped:framework', 'unmeasurable',
+  'skipped:excluded', 'skipped:framework', 'unmeasurable', 'native:translated', 'native:environment',
 ] as const;
 
 /** A `Result.outcome` / `data-ts-outcome` value. */
