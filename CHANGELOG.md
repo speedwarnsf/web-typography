@@ -51,9 +51,12 @@ Outside the changes below, 0 of these differ in any engine.
   unmatched paragraph words in Chromium and Firefox (WebKit's inspector
   exposes no paragraph text) and 0 wrong link or heading names in Chromium,
   WebKit and Firefox, also after a narrowing resize and, in Chromium and
-  Firefox, with a live tree across a translation; 4.2.0 left 581 words unmatched in Chromium and 381 in Firefox,
-  and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
-  WebKit. Attributes only: in the golden A/B, markup changed
+  Firefox, with a live tree across a translation. In the same lanes 4.2.0
+  leaves 1,138 words unmatched in Chromium and 761 in Firefox, and 69 of 108
+  link names and 41 of 42 heading names wrong in Chromium, 53 of 78 and 29
+  of 30 in WebKit, and 56 of 108 link names in Firefox (on the original
+  acceptance, corpus and React fixtures alone: 581 and 381 words, 38 of 63
+  links and 23 of 24 headings). Attributes only: in the golden A/B, markup changed
   in 311 (310 in WebKit) blocks, and 1,087 of 1,103 generated breaks
   are now exposed (16 hyphen breaks stay hidden), with 0
   screenshots, line boxes, outcomes, feature statuses or copied texts

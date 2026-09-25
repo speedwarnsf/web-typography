@@ -268,9 +268,10 @@ nightly, and requires them to match the source text. In 4.3.0 every word of
 every composed paragraph matches in Chromium and Firefox, and every link and
 heading name matches in all three engines; WebKit's inspector protocol
 exposes no paragraph text, so WebKit's paragraph words are not checked
-(4.2.0 left 581 words unmatched in Chromium's tree and 381 in Firefox's,
-and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
-WebKit). A generated break that replaces a space is exposed to assistive
+(across the script's lanes, 4.2.0 leaves 1,138 words unmatched in
+Chromium's tree and 761 in Firefox's, 69 of 108 link names and 41 of 42
+heading names wrong in Chromium, 53 of 78 and 29 of 30 in WebKit, and 56 of
+108 link names in Firefox). A generated break that replaces a space is exposed to assistive
 technology, so a screen reader meets a line boundary there, as at any line
 end, and reads the words apart; a break after a hyphen stays hidden, so
 "public-health" is still one word. `auditJSON()` fails if a generated break
