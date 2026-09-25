@@ -776,6 +776,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   };
   /** A recheck: near the screen means the next task, elsewhere idle time. */
   const recheck = (el: HTMLElement, job: number) => enqueue(el, job, onScreen(el));
+  /** Shown again: within a viewport of the screen, check it in the next task;
+   * further away, wait until it comes near, as offscreen resize work does. */
+  const revealed = (el: HTMLElement, job: number) => {
+    hidden.delete(el);
+    const box = el.getBoundingClientRect(), height = view?.innerHeight ?? 0;
+    if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, job, true);
+    else { deferred.add(el); viewport.observe(el); }
+  };
   /** Queue matching elements this controller does not own yet. */
   const discover = (scope: ParentNode = root) => {
     for (const el of select(scope)) if (!owned.has(el)) enqueue(el);
@@ -854,12 +862,13 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       guardFrame = view.requestAnimationFrame(frame);
     });
   };
-  /** Owned blocks whose content width differs from the last one observed. */
+  /** Owned blocks whose content width differs from the last one observed.
+   * A block last seen hidden (width 0) is being revealed, not resized. */
   const widthChanged = (elements: Iterable<HTMLElement>) => {
     const changed: HTMLElement[] = [];
     for (const el of elements) {
       const last = sizes.get(el), width = boxOf(el).w;
-      if (last && width && Math.abs(last.w - width) > .01) changed.push(el);
+      if (last?.w && width && Math.abs(last.w - width) > .01) changed.push(el);
     }
     return changed;
   };
@@ -888,14 +897,17 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // guard the frame about to paint, and recompose once it settles.
     const resized = fontsReady && affected.length ? widthChanged(affected) : [];
     if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
-    for (const el of affected) if (!resizing.has(el)) recheck(el, KEY);
-    // A tab, dialog or card this change just showed: text that could not be
-    // composed while hidden, or was hidden at another width, composes before
-    // the reveal paints. A retained composition needs nothing.
-    if (fontsReady && hidden.size && !printing(doc)) {
-      const shown = affected.filter(el => hidden.has(el) && rendered(el) && onScreen(el));
-      if (shown.length) composeNow(shown);
+    // A tab, dialog or card this change just showed: on-screen text that could
+    // not be composed while hidden, or was hidden at another width, composes
+    // before the reveal paints. A retained composition needs nothing.
+    const shown: HTMLElement[] = [];
+    const revealing = fontsReady && hidden.size > 0 && !printing(doc);
+    for (const el of affected) {
+      if (resizing.has(el)) continue;
+      if (revealing && hidden.has(el) && rendered(el)) { if (onScreen(el)) shown.push(el); else revealed(el, KEY); }
+      else recheck(el, KEY);
     }
+    if (shown.length) composeNow(shown);
     // An attribute on an author element inside owned text is new markup.
     for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
     discover(target);
@@ -963,7 +975,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       if (Math.abs(previous.w - width) > .01) {
         for (const el of watched.get(entry.target) || []) {
           // Revealed: a retained composition is already painting; verify it.
-          if (!previous.w || hidden.has(el)) { hidden.delete(el); recheck(el, VERIFY); }
+          if (!previous.w || hidden.has(el)) revealed(el, VERIFY);
           else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {

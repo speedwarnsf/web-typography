@@ -144,6 +144,9 @@ for (const { name, engine, executablePath } of browsers) {
       const result = await page.evaluate(async ({ hide, reveal, id }) => {
         const w = /** @type {any} */ (window);
         const section = w.__section = /** @type {any} */ (document.getElementById(id));
+        section.scrollIntoView({ block: 'center' });
+        await new Promise(r => setTimeout(r, 100));
+        const top = Math.round(section.getBoundingClientRect().top);
         (0, eval)(hide);
         await new Promise(r => setTimeout(r, 200));
         section.style.width = '290px';
@@ -153,7 +156,7 @@ for (const { name, engine, executablePath } of browsers) {
         (0, eval)(reveal);
         const first = await pending;
         await new Promise(r => setTimeout(r, 400));
-        return (/** @type {any[]} */ (first)).filter(b => b.kind === 'mount').map(b => ({ outcome: b.outcome, intact: b.lines.length === b.breaks + 1 }));
+        return (/** @type {any[]} */ (first)).filter(b => b.kind === 'mount').map(b => ({ outcome: b.outcome, intact: b.lines.length === b.breaks + 1, top }));
       }, { hide, reveal, id });
       check(`${label} at a new width: the mount() block is composed for it in the first frame`, result.length === 1 && result[0].outcome === 'composed:rich' && result[0].intact, result);
     }
