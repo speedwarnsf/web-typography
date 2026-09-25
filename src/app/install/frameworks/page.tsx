@@ -112,9 +112,10 @@ export default function Frameworks() {
       <p className="in-lede">
         Install the exact version, then pick one owner for each piece of text:
         the React adapters for text React renders and updates, or{' '}
-        <code>mount()</code> for content the framework renders once. Never
-        point <code>mount()</code> or a script tag at text a framework keeps
-        updating.
+        <code>mount()</code> for content the framework renders. Since 4.3,{' '}
+        <code>mount()</code> keeps text correct when Svelte, Vue, Solid or Lit
+        update it in place; the React adapters are still the better owner for
+        text React renders. Never give one piece of text two owners.
       </p>
       <div className="in-snippet" data-no-typeset>
         <code>{NPM_INSTALL}</code>
@@ -142,8 +143,6 @@ export default function Frameworks() {
           others: <Link href="/install">Install</Link>.
         </p>
       </section>
-      {/* TODO(docs-sync): C6 makes mount() safe when frameworks update text
-          nodes in place; relax the "renders once" advice then. */}
     </main>
   );
 }

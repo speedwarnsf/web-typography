@@ -59,10 +59,13 @@ export interface Options {
    * (outcome `native:ui`). */
   mode?: Mode;
   /** Default none. Phrases whose words should stay on one line, such as
-   * `['New York']`. Title and heading composition strongly avoids breaking
-   * inside them; in body text a non-empty `keep` stops Typeset from keeping
-   * the browser's lines as they are.
-   * TODO(docs-sync): C14 extends keep to body-text breaks; update this line. */
+   * `['New York']`. Matching ignores case, treats NBSP and runs of spaces as
+   * one space and ignores punctuation around the phrase. In body text a kept
+   * phrase that fits the measure is never split, a phrase the browser splits
+   * can earn one extra line (not with `density: 'compact'`), and a longer
+   * phrase is split as few times as possible. Titles and headings keep
+   * phrases within their minimum line count. The browser's lines are kept
+   * as they are only when they split no kept phrase. */
   keep?: readonly string[];
   /** Default none. The most lines a composition may use; a result that needs
    * more is declined with `native:line-budget`. */

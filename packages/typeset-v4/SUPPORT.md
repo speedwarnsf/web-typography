@@ -9,7 +9,8 @@ in the repository.
   Spanish. Untagged Latin uses neutral preferences.
 - Ordinary inline links, bold, italics and supported semantic spans. Author
   elements are not cloned/reparented by the imperative rich renderer.
-- React 18.2 and later, and every React 19 minor (peer `^18.2.0 || ^19.0.0`).
+- React 18.2 and later, and every React 19 minor (optional peers `react` and
+  `react-dom`, `^18.2.0 || ^19.0.0`).
   `scripts/v4/verify-react-matrix.mjs` installs the packed package beside
   18.2.0, 18.3.1, 19.0.8, 19.1.9, 19.2.8 and 19.3.0, then server-renders,
   hydrates and composes both adapters in Chromium, WebKit and Firefox, and
@@ -147,6 +148,20 @@ as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. Hidden text (display:none, the hidden attribute, a closed dialog,
 content-visibility) keeps its composition and is not measured until shown.
 
+Composed text follows text metrics as well as width: fonts that finish
+loading (including fonts a stylesheet requests late, for which WebKit fires
+no event), the WCAG 1.4.12 text-spacing overrides, a browser font-size
+setting, CSSOM rule changes and transitions or animations of font, spacing
+or line-height properties. A block whose height changes at the same width
+has its rendered lines checked against its composition, and `auditJSON()`
+reports `stale-layout` for a composed block whose line count no longer
+matches. Ancestor class and style changes recompose only when a computed
+layout key (fonts, metrics, width, effective scale and zoom) changes.
+`mount()` also works on the document or elements of a same-origin iframe.
+The React adapters share one registry per document, with the same
+triggers, one set of observers however many blocks render, and
+visible-first composition (`priority="sync"` composes in the commit).
+
 Machine translation: when a page is translated (Google Translate and Chrome set
 `translated-ltr`/`translated-rtl` on `<html>`; translators wrap text in `<font>`;
 Edge adds `_msttexthash`), `mount()` and `typeset()` step aside with outcome
@@ -228,9 +243,11 @@ A clean local Node 22 workflow or CPU throttle must never be labeled remote
 CI or representative-device proof. Pilot within your actual site and devices.
 
 No install hooks, telemetry, page-content uploads or required runtime service.
-Mount's incremental discovery, initial visible-text priority and yielded batches
-reduce redundant work; real text, font and width changes still recompose.
-The 8ms batch target cannot preempt one paragraph or a browser layout.
+Mount's incremental discovery, visible-first scheduling (text near the
+viewport composes in the next task, offscreen text in idle time or when it
+comes near) and yielded batches reduce redundant work; real text, font,
+metric and width changes still recompose. The 8ms batch target cannot
+preempt one paragraph or a browser layout.
 Large-document discovery/layout can still create long tasks. Benchmarks of a
 static snapshot of a client site are not live hydration, server, or
 physical-device proof.
@@ -245,25 +262,47 @@ changes only an isolated preview, never a deployed site.
   contain a newline at each. Copying through the browser's copy command is
   cleaned (no extra newlines), and the source text in the DOM is unchanged.
   A newline-free rendering is on the roadmap.
-- **Print.** <!-- TODO(docs-sync): C9 changes how composed text prints; describe the 4.3 behaviour. -->
-  Until then, printed pages can re-wrap composed lines at the paper width.
-- **Machine translation.** <!-- TODO(docs-sync): C10 steps aside on translated pages; describe it. -->
-  Browser translation of composed text can come out garbled, because
-  spacing and tracking wrappers split sentences into segments.
+- **Print.** Printed text wraps natively at the paper's width: in print,
+  `--ts-break-display` is `none` and spacing, hanging and tracking are
+  neutralized, and composition pauses until printing ends. Set
+  `--ts-break-display: inline` on an element in print CSS to print its
+  screen composition instead. 4.2.0 printed the screen breaks, which the
+  narrower page re-wrapped into alternating long and short lines.
+- **Machine translation.** While a page is translated (Google Translate and
+  Chrome set `translated-ltr`/`translated-rtl` on `<html>`, translators wrap
+  text in `<font>`, Edge adds `_msttexthash`), `mount()`, the loaders,
+  `typeset()` and `TypesetText` remove their breaks and wrappers by moving
+  the existing Text nodes, never splitting, merging or editing one, report
+  `native:translated`, and compose the current DOM again when the page
+  returns to its original language. `TypesetRichText` only freezes: the
+  breaks React rendered stay, so its translated text still breaks at the
+  composed positions. No network smoke test against a live translator runs
+  yet; the offline suite simulates each translator's marks.
 - **Content Security Policy and Trusted Types.** The 4.x composition path
   (`mount`, `typeset`, the loaders and the React adapters) assigns no HTML
-  strings, uses no `eval`, and injects no `<style>` elements, so it needs no
-  `unsafe-eval` and no Trusted Types policy. (The retained v3 helpers, such
-  as `renderFrozenLines`, are not part of that path.) <!-- TODO(docs-sync): C5 makes style restoration strict-CSP safe; state the exact policy that passes. -->
+  strings, uses no `eval`, injects no `<style>` elements and writes styles
+  only through the CSSOM. It runs under
+  `style-src 'self'; script-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'`
+  with no violation in Chromium, WebKit and Firefox
+  (`scripts/v4/verify-strict-csp.mjs`). The retained v3 helpers are not part
+  of that path, although `renderFrozenLines` also runs under Trusted Types
+  from 4.3.
 - **No hyphenation, no justification.** Text with `hyphens: auto` or soft
-  hyphens keeps the browser's layout.
-  <!-- TODO(docs-sync): C3 declines justified text with native:justify; confirm. -->
+  hyphens keeps the browser's layout, and so does justified text (a computed
+  `text-align` of `justify` or `justify-all`, or a `text-align-last` that
+  differs from `text-align`), which reports `native:justify`.
 - **Right-to-left, vertical and non-Latin text** keeps the browser's layout.
-- **Browser floor.** Needs `Intl.Segmenter`, `ResizeObserver`,
-  `MutationObserver`, `document.fonts` and CSS `text-wrap`: Chrome and Edge
-  114, Safari 17.4 and Firefox 125, or later. Tested in Playwright's
-  Chromium, WebKit and Firefox; the versions are in each report.
-  <!-- TODO(docs-sync): K4 keeps older engines native without throwing; say so. -->
-- **Framework-owned text.** Do not point `mount()` or a loader at text that
-  Vue, Svelte, Lit, Solid or React update in place; use the React adapters or
-  leave it native. <!-- TODO(docs-sync): C6 makes mount() safe under framework text updates; relax this. -->
+- **Browser floor.** Composes where `Intl.Segmenter`, `ResizeObserver` and
+  `MutationObserver` exist; the supported browsers also have CSS
+  `text-wrap`: Chrome and Edge 114, Safari 17.4 and Firefox 125, or later. Elsewhere, and in DOM emulations such as jsdom and
+  happy-dom, every entry point imports and the text keeps its native layout
+  with `native:environment`; nothing throws. Tested in Playwright's
+  Chromium, WebKit and Firefox, and with those APIs deleted; the versions
+  are in each report.
+- **Framework-owned text.** `mount()` and the loaders keep text that Vue,
+  Svelte, Lit, Solid or React update in place correct (see above for how and
+  for the limits). Direct `typeset()` and `restore()` calls without a
+  controller notice edits only by value, the legacy `.ts-line` renderer never
+  sees framework writes, and Lit text in arrays or nested templates still
+  moves into wrappers as in 4.2. Prefer the React adapters for text React
+  renders, and never give one text two owners.

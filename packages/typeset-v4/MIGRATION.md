@@ -22,19 +22,60 @@ in the CHANGELOG with the number of test paragraphs it changed.
    so in the console when nothing matches.
 5. Re-run `auditJSON()` or `npx typeset-audit`. 4.3 audits two accessibility
    conditions that 4.2.0's own output had (`hidden-break`, `isolated-space`);
-   4.3.0's output no longer has them.
-   <!-- TODO(docs-sync): confirm once C2 is integrated. -->
+   4.3.0's output no longer has them. It also reports `stale-layout` (a
+   composition double-wrapped by a later font or size change) and
+   `alignment-lost` as errors, adds line-end reviews (`bound-split`,
+   `split-ellipsis`, `line-initial-punctuation`, `regressed-vs-native`), and
+   stops flagging sentence-final words, abbreviations and letter designators.
+   `issue.target` selectors now resolve. `schemaVersion` is still 1.
 6. Check the "Rendering changes" list in the CHANGELOG against your pages.
-   <!-- TODO(docs-sync): C2, C3, C4, C9, C13 and C15 fill that list; summarise
-   any change a site owner must act on here (for example justified text is
-   now declined with native:justify). -->
+   What a site owner may notice:
+   - Justified paragraphs (`text-align: justify`, or a `text-align-last`
+     that differs from `text-align`) keep the browser's layout, as
+     `native:justify`. 4.2 set them ragged right.
+   - Text inside live regions (`aria-live`, `role="status"` and similar)
+     keeps the browser's layout, as `native:live-region`.
+   - Print wraps natively. To print a composition, set
+     `--ts-break-display: inline` in print CSS.
+   - A block that is being resized shows native wrapping (`data-ts-stale`)
+     until its size holds for 100 ms. Hidden text keeps its composition.
+   - While a page is machine-translated, composition steps aside
+     (`native:translated`).
+   - English abbreviations, units, honorifics, labels and letter designators
+     stay with their words ("Dr. Jones", "12 kg", "Fig. 3", "type A").
+   - Quote corrections: nested quotes open correctly and 'n', 'bout, 'round
+     and 'nuff are elisions; `TypesetText` curls quotes in its server HTML.
+   - Generated breaks that replace a space are exposed to assistive
+     technology, so screen readers read the words on either side apart.
+   - Direct `typeset()` on text in a skipped `content-visibility: auto`
+     section records `unmeasurable`; call it again once the text is
+     rendered, or use `mount()`, which does so itself.
 
 New and optional in 4.3: the `Outcome` and `FeatureStatus` types and the
 `OUTCOMES` list (OUTCOMES.md explains every code), and typed
 `result.outcome` and `result.features`. Existing code keeps compiling:
-the types still accept any string.
-<!-- TODO(docs-sync): K5 (React refs, a wider `as`, onResult), K11 (option
-validation) and C9 (break display option) add API; list them here. -->
+the types still accept any string. Four outcomes are new:
+`native:justify`, `native:live-region`, `native:translated` and
+`native:environment`. Also new:
+
+- React adapters: a `ref` resolves to the host element; `as` also takes
+  `div`, `li`, `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`,
+  `label`, `legend` and `summary`; `onResult(result)` reports each
+  composition; `priority="sync"` composes in the commit, as 4.2 did for
+  every block. The React entry has a CommonJS build (`require()`, Jest), and
+  `react-dom` is an optional peer beside `react`.
+- `mount('article p', options)` works without a root.
+- `typeset()` and `mount()` throw a clear `TypeError` for a wrong target,
+  and development builds warn once about an invalid option value or an
+  unknown option (SUPPORT.md lists the messages). Values keep their 4.2
+  behaviour.
+- The `--ts-break-display` custom property and the `data-ts-stale`
+  attribute are supported CSS hooks.
+- `typeset.us/auto` is the automatic loader on npm.
+
+Under Jest or Vitest (jsdom, happy-dom), 4.3 renders text unchanged with
+`native:environment` where 4.2 could throw at import; remove any mock you
+added for `Intl.Segmenter` or `ResizeObserver`.
 
 Rollback: restore the recorded lockfile and deployment, or
 `npm i -E typeset.us@4.2.0`, or pin `go@4.2.0.js` with its original

@@ -18,7 +18,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'What do screen readers hear?',
-    a: <>The same words as the source. The test suite reads the accessibility tree Chromium and WebKit actually build on every run, and Firefox&rsquo;s nightly, and requires every composed paragraph&rsquo;s words, and every link and heading name, to match the source text. {/* TODO(docs-sync): after C2, add what a screen reader does at a generated break (a line boundary in browse mode) and link the VoiceOver/NVDA note. */}</>,
+    a: <>The same words as the source, with a line boundary at each generated break, as at any line end. The test suite reads the accessibility tree Chromium and WebKit actually build on every run, and Firefox&rsquo;s nightly, and requires every composed paragraph&rsquo;s words, and every link and heading name, to match the source text. Text in live regions is never composed, so status messages are not announced again. Spoken VoiceOver and NVDA output has not yet been checked by a person; see <a href={`/releases/${PINNED_VERSION}/SUPPORT.md`}>SUPPORT.md</a>.</>,
   },
   {
     q: 'Does it cause layout shift?',
@@ -34,7 +34,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Printing and translation tools?',
-    a: <>Both are covered in the known limitations in <a href={`/releases/${PINNED_VERSION}/SUPPORT.md`}>SUPPORT.md</a>. {/* TODO(docs-sync): C9 (print) and C10 (translated pages) change these; summarise here. */}</>,
+    a: <>Printed text wraps natively at the paper&rsquo;s width; add <code>--ts-break-display: inline</code> to your print CSS to print the composition instead. When Google Translate, Chrome or Edge translates the page, Typeset removes its line breaks without touching the text the translator is filling in, and composes again when the page returns to its original language. Details in <a href={`/releases/${PINNED_VERSION}/SUPPORT.md`}>SUPPORT.md</a>.</>,
   },
   {
     q: 'What about readers without JavaScript?',
@@ -46,7 +46,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'What does it cost?',
-    a: <>About 5 to 8 milliseconds per paragraph on a fast laptop and about 25 at a mid-range phone&rsquo;s speed, on the main thread. The first screen of a 200-paragraph article is done in about 50 milliseconds. Measured by <code>npm run bench</code>; the tables are in the repository&rsquo;s docs/BENCHMARKS.md. {/* TODO(docs-sync): refresh from the 4.3.0 bench. */}</>,
+    a: <>About 5 milliseconds per paragraph on a fast laptop and about 21 at a mid-range phone&rsquo;s speed, on the main thread. The first screen of a 200-paragraph article is done in about 55 milliseconds. Measured by <code>npm run bench</code>; the tables are in the repository&rsquo;s docs/BENCHMARKS.md.</>,
   },
   {
     q: 'Does it phone home?',

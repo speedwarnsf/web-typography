@@ -18,15 +18,25 @@ and maxLines constraints remain respected.
 Languages: en, fr, de, es; neutral Latin-script preferences; no language inference.
 Unsupported: automatic hyphenation; soft hyphens; mixed languages in one block;
 RTL and vertical text; editable text; inline widgets; unsupported box decoration
-and scale/rotation/perspective transforms. Supported sliced inline-code boxes
+and scale/rotation/perspective transforms. Justified text (native:justify) and
+live regions (native:live-region: aria-live, or role status/alert/log/marquee/timer,
+or <output>) are declined on purpose. Supported sliced inline-code boxes
 and pure 2D translation are measured in context. Inspect native reasons.
 
 For DOM text: import mount, restore and auditJSON from 'typeset.us'; mount
 a narrow prose/title selector; await controller.ready; disconnect on teardown.
-For React: import TypesetText or TypesetRichText from 'typeset.us/react'.
-Supported React: 18.2 and later and every 19.x (peer ^18.2.0 || ^19.0.0);
-tested versions are in capabilities.json. Never imperatively mount
-a framework-owned subtree or overlap controllers. Custom stateful children
+For React: import TypesetText or TypesetRichText from 'typeset.us/react'
+(ESM, or CommonJS through require). Supported React: 18.2 and later and every
+19.x (optional peers react and react-dom, ^18.2.0 || ^19.0.0); tested versions
+are in capabilities.json. A ref resolves to the host; `as` takes p, h1-h6,
+span, div, li, blockquote, figcaption, dd, dt, td, th, caption, label, legend
+or summary; onResult(result) reports each composition; priority="sync"
+composes in the commit. Under jsdom or happy-dom both adapters, typeset()
+and mount() report native:environment and never throw, so component tests
+need no mocks. Give each text one owner and
+never overlap controllers. mount() and the loaders keep text that Svelte,
+Vue, Solid, Lit or React update in place correct (limits in SUPPORT.md), but
+prefer the adapters for text React renders. Custom stateful children
 remain native:react-component. Framework recipes (Next.js, Vite, Astro,
 SvelteKit, Vue): https://typeset.us/install/frameworks.
 
@@ -69,8 +79,12 @@ discovers changed subtrees, composes visible text first, and yields between
 batches while recomposing actual source, font, metric and width changes. Ancestor
 class/style changes recheck computed values and compose only if they changed.
 Hidden text keeps its composition; a resizing block shows native wrapping
-(data-ts-stale) until its size settles; print wraps natively; a translated page
-gets native:translated. Its 8ms batch target does not cap an individual
+(data-ts-stale) until its size settles; print wraps natively (the
+--ts-break-display custom property; set it to inline to print a composition);
+a translated page gets native:translated. mount() also accepts a selector
+alone, mount('article p', options), and works in same-origin iframes.
+Development builds warn once per invalid option value or unknown option;
+wrong targets throw a TypeError that says what was received. Its 8ms batch target does not cap an individual
 composition, DOM discovery, or browser layout.
 
 contour defaults to 'finished': candidate ranking predicts the same bounded
@@ -103,7 +117,7 @@ auditJSON schema 1 pass means:
 nonempty scope, no hard errors, no unprocessed targets. It does not mean aesthetic approval.
 Each issue.target is a selector document.querySelector resolves to the flagged
 element: a unique id, or a path from body. Errors: overflow, nested-output,
-alignment-lost, hidden-break, isolated-space, stale-output. Reviews: orphan,
+alignment-lost, hidden-break, isolated-space, stale-output, stale-layout. Reviews: orphan,
 first-singleton, weak-line-end, stranded-opener, bound-split (number/unit,
 honorific/name, label/number, word/letter designator), split-ellipsis,
 line-initial-punctuation, regressed-vs-native (more line-end reviews than the
