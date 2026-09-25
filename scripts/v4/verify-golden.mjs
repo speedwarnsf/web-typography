@@ -178,11 +178,12 @@ function changeReasons(cell) {
   const reasons = [];
   // C3: justified text is declined instead of composed ragged.
   if (/text-align:\s*justify/.test(cell.style || '')) reasons.push('justify');
-  // C13, English text: abbreviations end no sentence; numbers and units,
-  // honorifics and names, labels and numbers, and words and letter
-  // designators are bound; of the single letters only the article and the
-  // pronoun "I" pay the letter penalty. Deliberately broader than the
-  // engine's own lists.
+  // C13, English text: abbreviations end no sentence unless a common
+  // sentence opener follows; numbers and units, honorifics and names, labels
+  // and numbers, and words and letter designators are bound; of the single
+  // letters only the article and the pronoun "I" pay the letter penalty ("I"
+  // is a numeral only after a head such as War or Phase, or a regnal name).
+  // Deliberately broader than the engine's own lists.
   const words = cell.html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').split(/\s+/u).filter(Boolean);
   const bare = (/** @type {string} */ word) => word.replace(/^[("'\u201C\u2018[]+/u, '').replace(/[.,;:!?"'\u201D\u2019)\]]+$/u, '');
   for (const [i, word] of words.entries()) {
@@ -191,7 +192,8 @@ function changeReasons(cell) {
     if (/^(?:Mr|Mrs|Ms|Mx|Dr|Prof|Rev|St|Mt|Jr|Sr|vs|etc|e\.g|i\.e|E\.g|I\.e|a\.m|p\.m|p|pp|Fig|fig|No|Vol|Ch|Inc|Ltd|Co|(?:\p{Lu}\.)+\p{Lu}|[B-HJ-Z])\.$/u.test(core)) reasons.push('abbreviation');
     const letter = bare(word);
     const designated = letter === 'A' ? /^(?:type|grade|class|size|plan|part|vitamin|hepatitis|blood|group|section|model|exhibit|appendix|schedule|title|category|level|phase|stage|tier|zone|option|list|team)$/iu.test(previous)
-      : /^\p{Lu}\p{L}*$/u.test(previous) && !/[.!?:]["'\u201D\u2019)]*$/u.test(words[i - 2] ?? '.');
+      : /^\p{Lu}\p{L}*$/u.test(previous) && (/^(?:war|part|title|phase|stage|type|class|grade|level|tier|chapter|book|act|volume|section|schedule|appendix|bowl)$/iu.test(previous)
+        || /^(?:king|queen|pope|emperor|empress|tsar|czar|tsarina|pharaoh|kaiser|prince|princess|duke|sultan|shah)$/iu.test(bare(words[i - 2] ?? '')));
     if (/^\p{L}$/u.test(letter) && letter !== 'a' && (!['A', 'I'].includes(letter) || designated)) reasons.push('single letter');
     if (/^[$€£¥]?\d/u.test(word) && /^(?:[\p{L}°%‰µμ]{1,4}|a\.m|p\.m|million|billion|trillion|percent)$/u.test(bare(next))) reasons.push('number and unit');
     if (/^(?:table|figure|chapter|section|page|part|step|room|level|grade|stage|phase|type|class|category|tier|zone|appendix|exhibit|schedule|version)$/iu.test(bare(word)) && /^\d|^[IVX]{2,}/u.test(next)) reasons.push('label and number');

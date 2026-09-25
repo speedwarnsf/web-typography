@@ -96,19 +96,25 @@ Outside the changes below, 0 of these differ in any engine.
   designators to the next line ("1,200 / m", "hepatitis / C", "World War /
   I"). Now an abbreviation (Mr, Mrs, Ms, Mx, Dr, Prof, Rev, St, Mt, Jr, Sr,
   vs, etc, e.g, i.e, a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted
-  initialisms and single initials) ends no sentence; splitting a number from
-  its unit, an honorific from a name, a label from its number or a word from
-  its letter designator costs what a weak line end costs; and only the
-  article and the pronoun "I" pay the single-letter penalty. Golden diff: 0
-  of 2,724 corpus cells per engine (the corpus has none of these
-  constructions); 43 (Chromium, Firefox) or 44 (WebKit) of 160 cells of the
-  new adversarial set (`tests/v4-corpus-adversarial.json`), and 41 of 160
-  through the legacy renderer. On that set, line-end review items (the C16
-  audit) fall from 93 under 4.2.0 to 58 (WebKit 91 to 59), against 271 in the
-  browser's own layout; pairs split at line ends fall from 46 to 12. One
-  recorded trade-off: at 320 px in Fraunces the recipe paragraph ends a line
-  on "the", which neither the browser nor 4.2.0 does (the tight-line
-  ranking, to be retuned in 4.4). No orphan, overflow or text change.
+  initialisms and single initials) ends no sentence unless a capitalized
+  common sentence opener follows it ("…in the U.S. The results", "at 7 p.m.
+  Most", "Plan B. It"); splitting a number from its unit, an honorific from
+  a name, a label from its number or a word from its letter designator
+  costs what a weak line end costs; and only the article and the pronoun
+  "I" pay the single-letter penalty. "I" is a letter designator only after a
+  head that takes a roman numeral ("World War I", "Phase I", "Title I") or a
+  name after a regnal title ("King Henry I"), never after any other
+  capitalized word ("In March I", "At Kaiser I"). Golden diff: 0 of 2,724
+  corpus cells per engine (the corpus has none of these constructions); 47
+  (Chromium, Firefox) or 49 (WebKit) of 176 cells of the new adversarial set
+  (`tests/v4-corpus-adversarial.json`, 22 paragraphs), and 44 of 176 through
+  the legacy renderer. On that set, line-end review items (the C16 audit)
+  fall from 111 under 4.2.0 to 68 (WebKit 109 to 68), against 322 in the
+  browser's own layout; pairs split at line ends fall from 54 to 14 (WebKit
+  52 to 12). One recorded trade-off: at 320 px in Fraunces the recipe paragraph
+  ends a line on "the", which neither the browser nor 4.2.0 does (the
+  tight-line ranking, to be retuned in 4.4). No orphan, overflow or text
+  change.
 - **Live regions are no longer composed** (accessibility, C4). Text whose
   nearest region has `aria-live="polite"` or `"assertive"`, or (without
   `aria-live="off"`) `role="status"`, `alert`, `log`, `marquee` or `timer`,

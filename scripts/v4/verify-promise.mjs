@@ -7,7 +7,7 @@ import { releaseIdentity } from './release-evidence.mjs';
 import { reactUnderTest } from './candidate.mjs';
 
 const report={...await releaseIdentity(),checks:[],samples:[],errors:[],browsers:{}};
-const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize,isWeakEnding} from './src/lib/v4/typeset';export {isAbbreviation,proseBoundary,boundPair,keptPhrases,strandedOpener} from './src/lib/v4/phrase-boundaries';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
+const helpers=await build({stdin:{contents:`export {planOpticalHanging} from './src/lib/v4/optical-hanging';export {planRichText,richLayoutVerified} from './src/lib/v4/rich-text';export {searchParagraph,createParagraphProblem,rankParagraphLayouts,tokenize,isWeakEnding} from './src/lib/v4/typeset';export {isAbbreviation,proseBoundary,boundaryBefore,boundPair,keptPhrases,strandedOpener} from './src/lib/v4/phrase-boundaries';`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'Internals',target:'es2022'});
 const texts=JSON.parse(await readFile('tests/v4-corpus.json','utf8')).paragraphs;
 const specimenFont=(await readFile('lab/fraunces-latin-variable.woff2')).toString('base64');
 const react=await build({stdin:{contents:`
@@ -40,10 +40,14 @@ for(const config of browsers){
         ['no.',false],['I.',false],['A.',false],['through.',false],['Ohio.',false],['Ph.D.',false],['Dr',false],['Dr.,',false]])check('isAbbreviation '+text,internals.isAbbreviation(text)===expected);
       for(const [text,expected] of [['through.',true],['done!',true],['why?',true],['note:',true],['end.\u201d',true],['end.)',true],['so did I.',true],
         ['Dr.',false],['a.m.',false],['U.S.',false],['word',false],['word,',false]])check('proseBoundary '+text,internals.proseBoundary(text)===expected);
+      // An abbreviation ends its sentence when a common opener follows it.
+      for(const [text,next,expected] of [['U.S.','The',true],['p.m.','Most',true],['B.','It',true],['C.','Most',true],['etc.','Everyone',true],['No.','Nobody',true],['through.','anything',true],
+        ['U.S.','Army',false],['J.','Smith',false],['Dr.','The',false],['p.m.','on',false],['U.S.',undefined,false],['word','The',false]])check('boundaryBefore '+text+' / '+next,internals.boundaryBefore(text,next)===expected);
+      check('strandedOpener after a sentence-final abbreviation',internals.strandedOpener('The survey was run in the U.S. The')&&!internals.strandedOpener('a report from the U.S. Army'));
       for(const [previous,next,before,expected] of [['1,200','m',undefined,'unit'],['8','a.m.',undefined,'unit'],['500','mg,',undefined,'unit'],['38','\u00b0C',undefined,'unit'],['$2.5','million',undefined,'unit'],
         ['Dr.','Jones',undefined,'honorific'],['Ms.','Lindqvist',undefined,'honorific'],['Fig.','3',undefined,'label'],['p.','17,',undefined,'label'],['type','2',undefined,'label'],['Table','3',undefined,'label'],
-        ['hepatitis','C,',undefined,'designator'],['vitamin','D',undefined,'designator'],['Plan','B',undefined,'designator'],['type','A',undefined,'designator'],['War','I','World','designator'],
-        ['When','I','fine.',null],['When','I',undefined,null],['and','I','then',null],['such','A','as',null],['20','years',undefined,null],['2','in',undefined,null],['St.','Louis',undefined,null],['U.S.','sample',undefined,null],['with','Dr.',undefined,null]])
+        ['hepatitis','C,',undefined,'designator'],['vitamin','D',undefined,'designator'],['Plan','B',undefined,'designator'],['type','A',undefined,'designator'],['War','I','World','designator'],['Phase','I',undefined,'designator'],['Henry','I','King','designator'],
+        ['March','I','In',null],['Sunday','I','on',null],['Kaiser','I','At',null],['Paul','I','told',null],['When','I','fine.',null],['When','I',undefined,null],['and','I','then',null],['such','A','as',null],['20','years',undefined,null],['2','in',undefined,null],['St.','Louis',undefined,null],['U.S.','sample',undefined,null],['with','Dr.',undefined,null]])
         check('boundPair '+previous+' / '+next,internals.boundPair(previous,next,before)===expected,internals.boundPair(previous,next,before));
       const kept=(units,keep)=>JSON.stringify(internals.keptPhrases(units,keep));
       check('keep matches across a dash unit',kept(['the','price','tag\u2014','it\u2019s'],['price tag'])==='[{"start":1,"end":3}]');

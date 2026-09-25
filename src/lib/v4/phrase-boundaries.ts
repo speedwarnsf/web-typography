@@ -35,6 +35,14 @@ const labelWords = new Set(['table', 'figure', 'chapter', 'section', 'page', 'pa
 // designators after any word; "A" is also the article, so it needs a head.
 const designatorHeads = new Set(['type', 'grade', 'class', 'size', 'plan', 'part', 'vitamin', 'hepatitis', 'blood', 'group', 'section',
   'model', 'exhibit', 'appendix', 'schedule', 'title', 'category', 'level', 'phase', 'stage', 'tier', 'zone', 'option', 'list', 'team']);
+// "I" is also the pronoun, which follows any capitalized word ("In March I",
+// "At Kaiser I"). It is a roman numeral only after a capitalized head that
+// takes one ("World War I", "Phase I", "Title I", "Super Bowl I"), or after a
+// name that follows a regnal title ("King Henry I").
+const romanHeads = new Set(['war', 'part', 'title', 'phase', 'stage', 'type', 'class', 'grade', 'level', 'tier', 'chapter', 'book', 'act',
+  'volume', 'section', 'schedule', 'appendix', 'bowl']);
+const regnalTitles = new Set(['king', 'queen', 'pope', 'emperor', 'empress', 'tsar', 'czar', 'tsarina', 'pharaoh', 'kaiser', 'prince',
+  'princess', 'duke', 'sultan', 'shah']);
 const units = new Set(['%', '‰', '°', '°C', '°F', 'K', 'm', 'km', 'cm', 'mm', 'µm', 'μm', 'nm', 'g', 'kg', 'mg', 'µg', 'μg', 'mcg', 'ng', 'l', 'L', 'ml', 'mL',
   'dl', 'dL', 's', 'ms', 'min', 'h', 'hr', 'hrs', 'Hz', 'kHz', 'MHz', 'GHz', 'W', 'kW', 'MW', 'kWh', 'V', 'mA', 'J', 'kJ', 'cal', 'kcal',
   'Pa', 'kPa', 'mmHg', 'dB', 'lb', 'lbs', 'oz', 'ft', 'yd', 'mi', 'mph', 'km/h', 'kph', 'gal', 'IU', 'mol', 'mmol', 'bpm', 'KB', 'MB', 'GB',
@@ -53,15 +61,36 @@ export function isAbbreviation(text: string): boolean {
 }
 
 /** A colon can introduce a thought without introducing a new sentence.
- * The period of an abbreviation ends no sentence. */
+ * The period of an abbreviation ends no sentence (see boundaryBefore). */
 export const proseBoundary = (text: string): boolean => /[.!?:]["'\u201D\u2019)\]]*$/u.test(text) && !isAbbreviation(text);
+
+// Capitalized words that open sentences and are not names. After "U.S.",
+// "p.m.", "etc.", "Co.", "No." or "hepatitis C." one starts a new sentence
+// ("…in the U.S. The results"); a name or other capitalized word continues it
+// ("the U.S. Army", "J. Smith").
+const openers = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those', 'it', 'its', 'he', 'she', 'we', 'they', 'you', 'i', 'his',
+  'her', 'our', 'their', 'your', 'my', 'there', 'here', 'then', 'now', 'today', 'in', 'on', 'at', 'for', 'as', 'by', 'with', 'from', 'but',
+  'and', 'or', 'so', 'yet', 'if', 'when', 'while', 'after', 'before', 'once', 'since', 'because', 'although', 'though', 'what', 'why',
+  'how', 'where', 'who', 'which', 'most', 'many', 'more', 'some', 'all', 'both', 'each', 'every', 'one', 'no', 'nobody', 'none',
+  'everyone', 'everything', 'nothing', 'someone', 'something', 'anyone', 'also', 'even', 'only', 'still', 'please', 'ask', 'call', 'take',
+  'talk', 'bring', 'keep', 'try', 'do', 'don\'t', 'don\u2019t', 'it\'s', 'it\u2019s']);
+/** proseBoundary with the next word as context: an abbreviation that is not
+ * an honorific also ends its sentence when a capitalized common sentence
+ * opener follows it. */
+export function boundaryBefore(text: string, next: string | undefined): boolean {
+  if (proseBoundary(text)) return true;
+  if (next === undefined || !isAbbreviation(text) || honorifics.has(outer(text).slice(0, -1))) return false;
+  const opener = outer(next).replace(/[.,;:!?]+$/u, '');
+  return /^\p{Lu}/u.test(opener) && openers.has(opener.toLowerCase());
+}
 
 export type BoundPair = 'unit' | 'honorific' | 'label' | 'designator';
 /**
  * The kind of unit `next` forms with `previous`, if a line break between them
  * would split it. `before` is the word ahead of `previous`, if any: a capital
- * "I" is a designator ("World War I") only after a capitalized word that is
- * not itself opening a sentence ("When I" is a pronoun).
+ * "I" is a designator only after a capitalized head that takes a roman
+ * numeral ("World War I") or a name after a regnal title ("King Henry I");
+ * elsewhere it is the pronoun ("When I", "In March I").
  */
 export function boundPair(previous: string, next: string, before?: string): BoundPair | null {
   const tail = trailing(next);
@@ -72,7 +101,8 @@ export function boundPair(previous: string, next: string, before?: string): Boun
     && /^(?:\d[\p{L}\d.,–-]*|[IVX]{2,})$/u.test(tail)) return 'label';
   if (/^\p{L}+$/u.test(previous) && /^\p{Lu}$/u.test(tail)) {
     if (tail === 'A') return designatorHeads.has(previous.toLowerCase()) ? 'designator' : null;
-    if (tail === 'I') return /^\p{Lu}/u.test(previous) && before !== undefined && !proseBoundary(before) ? 'designator' : null;
+    if (tail === 'I') return /^\p{Lu}/u.test(previous) && (romanHeads.has(previous.toLowerCase())
+      || (before !== undefined && regnalTitles.has(outer(before).toLowerCase()))) ? 'designator' : null;
     return 'designator';
   }
   return null;
@@ -108,7 +138,7 @@ export function keptPhrases(texts: readonly string[], keep: readonly string[] | 
 }
 export function strandedOpener(line: string): boolean {
   const words = line.trim().split(/\s+/u);
-  return words.length > 1 && proseBoundary(words.at(-2)!)
+  return words.length > 1 && boundaryBefore(words.at(-2)!, words.at(-1))
     && /^["'\u201C\u2018(\[]*[A-Za-z][A-Za-z'\u2019-]*$/u.test(words.at(-1)!);
 }
 

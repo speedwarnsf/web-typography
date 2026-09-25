@@ -1,6 +1,6 @@
 'use client';
 
-import { boundPair, keptPhrases, proseBoundary } from './phrase-boundaries';
+import { boundPair, boundaryBefore, keptPhrases, proseBoundary } from './phrase-boundaries';
 
 /**
  * typeset.ts — Typographic refinement utility
@@ -890,7 +890,8 @@ export function createParagraphProblem(
     lexicalPrefix[i + 1] = lexicalPrefix[i] + (lexical ? t.text.split(/\s+/u).filter(Boolean).length : 0);
     lastLexicalAt[i] = lexical ? i : i ? lastLexicalAt[i - 1] : -1;
     linkingEnd[i] = LINKING_END_WORDS.has(t.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, ""));
-    boundary[i] = proseBoundary(t.text);
+    // A sentence end, including an abbreviation that ends one ("…the U.S. The").
+    boundary[i] = boundaryBefore(t.text, contentTokens[i + 1]?.text);
     lastBoundaryAt[i] = boundary[i] ? i : i ? lastBoundaryAt[i - 1] : -1;
     openerLength[i] = t.text.replace(/[^A-Za-z0-9]/g, "").length;
   }
@@ -901,7 +902,7 @@ export function createParagraphProblem(
   // A letter designator may end a line ("…hepatitis C"), so of the single
   // letters only the article ("a", "A") and the pronoun "I" pay the letter
   // penalty, and "A" and "I" only when they are not designators ("type A",
-  // "World War I").
+  // "World War I"; "In March I" is the pronoun).
   const english = opts.englishLexical !== false;
   const pairCost = english ? new Float64Array(count + 1) : null;
   const pairWeight = profile.weakEndPenalty * bindWeights().pair;

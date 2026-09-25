@@ -11,7 +11,7 @@ import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
 import { languageOf, languageWeakEnding } from './break-opportunities';
-import { boundPair, proseBoundary, strandedOpener } from './phrase-boundaries';
+import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
@@ -681,7 +681,7 @@ function lineReview(layout: LayoutMetrics, language: string, english: boolean): 
     // A word before sentence punctuation ends its sentence ("through."), and
     // a letter designator completes its phrase ("type A"); both may end a line.
     const designated = previous !== undefined && boundPair(previous, word, earlier) === 'designator';
-    const weak = !proseBoundary(word) && !designated && (english ? isWeakEnding(word)
+    const weak = !boundaryBefore(word, first) && !designated && (english ? isWeakEnding(word)
       : language !== 'und' && language !== 'en' && language !== 'invalid' && languageWeakEnding(word, language));
     if (weak) add('weak-line-end', at + ' ends on "' + word + '"');
     if (english && strandedOpener(line.text)) add('stranded-opener', at + ' leaves a sentence or clause opener at its end');
