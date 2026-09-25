@@ -149,11 +149,15 @@ function start(doc: Document): Hub {
   doc.addEventListener('contentvisibilityautostatechange', visibility, true);
   view?.addEventListener('resize', resize);
   const print = view?.matchMedia?.('print');
-  const printed = () => { if (!print?.matches) resize(); };
+  // Print shows native wrapping through the lifecycle sheet's print rules.
+  const printed = () => { if (print?.matches) ensureLifecycleStyles(doc); else resize(); };
+  const beforePrint = () => ensureLifecycleStyles(doc);
   print?.addEventListener?.('change', printed);
+  view?.addEventListener('beforeprint', beforePrint);
   hub.stop = () => {
     view?.removeEventListener('resize', resize);
     print?.removeEventListener?.('change', printed);
+    view?.removeEventListener('beforeprint', beforePrint);
     observer.disconnect();
     faces?.removeEventListener?.('loadingdone', fonts);
     faces?.removeEventListener?.('loading', loading);
@@ -190,17 +194,30 @@ export const LIFECYCLE_CSS = '[data-ts-stale]{--ts-break-display:none}'
   + '[data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}'
   + '.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}}';
 
-const styled = new WeakSet<Document>();
+// The document's lifecycle sheet, or null where none can be installed.
+const sheets = new WeakMap<Document, CSSStyleSheet | null>();
 /** One constructable stylesheet per document: no <style> element, so a strict
- * style-src policy is not involved. Skipped where unsupported. */
+ * style-src policy is not involved. Skipped where unsupported. A page that
+ * assigns document.adoptedStyleSheets (a theme switcher, the MDN example)
+ * drops it; installing again, and ensureLifecycleStyles() before print and
+ * stale mode, put it back. */
 export function installLifecycleStyles(doc: Document): void {
-  if (styled.has(doc)) return;
-  styled.add(doc);
+  const known = sheets.get(doc);
+  if (known === null) return;
+  if (known) { ensureLifecycleStyles(doc); return; }
   try {
     const Sheet = (doc.defaultView as (Window & typeof globalThis) | null)?.CSSStyleSheet;
-    if (!Sheet || !('adoptedStyleSheets' in doc)) return;
+    if (!Sheet || !('adoptedStyleSheets' in doc)) { sheets.set(doc, null); return; }
     const sheet = new Sheet();
     sheet.replaceSync(LIFECYCLE_CSS);
+    sheets.set(doc, sheet);
     doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
-  } catch { /* dist/styles.css carries the same rules. */ }
+  } catch { sheets.set(doc, null); /* dist/styles.css carries the same rules. */ }
+}
+/** Put an installed lifecycle sheet back if the page's own assignment to
+ * document.adoptedStyleSheets removed it. Installs nothing new. */
+export function ensureLifecycleStyles(doc: Document): void {
+  const sheet = sheets.get(doc);
+  if (!sheet) return;
+  try { if (!doc.adoptedStyleSheets.includes(sheet)) doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet]; } catch { /* dist/styles.css */ }
 }

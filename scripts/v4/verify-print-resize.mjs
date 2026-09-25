@@ -5,7 +5,8 @@
 // resize, a block narrower than its widest composed line shows its native
 // wrapping ([data-ts-stale]) until the size settles and it is recomposed.
 // Every sampled frame must be either the intact composition (lines = breaks
-// + 1) or the native wrapping (lines = an uncomposed twin's lines).
+// + 1) or the native wrapping (lines = an uncomposed twin's lines). The rules
+// come back when a page's own document.adoptedStyleSheets assignment drops them.
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
@@ -135,6 +136,19 @@ for (const { name, engine, executablePath } of browsers) {
     await page.emulateMedia({ media: 'screen' });
     const back = await page.evaluate(async () => { const w = /** @type {any} */ (window); await w.quiet(300); return { markup: [...document.querySelectorAll('p.t, #r')].map(el => el.outerHTML), samples: ['a', 'b', 'k', 'f', 'r'].map(id => w.sample(id)) }; });
     check('screen output is unchanged after print', JSON.stringify(back.markup) === JSON.stringify(screen.markup) && back.samples.every(s => s.ok && !s.stale), back.samples);
+    // A page that assigns document.adoptedStyleSheets (a theme switcher, the
+    // MDN example) drops the engine's lifecycle sheet; print still wraps natively.
+    await page.evaluate(() => { const sheet = /** @type {any} */ (window).pageSheet = new CSSStyleSheet(); sheet.replaceSync('.theme{color:#111}'); document.adoptedStyleSheets = [sheet]; });
+    await page.emulateMedia({ media: 'print' });
+    const adopted = await page.evaluate(async () => {
+      const w = /** @type {any} */ (window);
+      await w.quiet(100);
+      const sheets = [...document.adoptedStyleSheets];
+      return { a: w.sample('a'), b: w.sample('b'), pageSheetKept: sheets.includes(w.pageSheet), lifecycleSheets: sheets.filter(sheet => [...sheet.cssRules].some(rule => rule.cssText.includes('--ts-break-display'))).length };
+    });
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(() => /** @type {any} */ (window).quiet(300));
+    check('print wraps natively after the page replaces document.adoptedStyleSheets', [adopted.a, adopted.b].every(s => s.lines === s.native && s.breaks > 0) && adopted.pageSheetKept && adopted.lifecycleSheets >= 1, adopted);
     // Resize: a container width animated from script, one change per frame.
     const drag = await page.evaluate(async () => {
       const w = /** @type {any} */ (window);

@@ -31,7 +31,7 @@ import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
-import { armFonts, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
 
 export type Priority = 'auto' | 'sync';
 export type Reason = 'mount' | 'force' | 'check';
@@ -393,6 +393,7 @@ function createRegistry(doc: Document): Registry {
    * native lines from now, a write inside a hidden subtree that moves nothing. */
   function staleCheck(): void {
     staleQueued = false;
+    ensureLifecycleStyles(doc);
     const doomed = [...resizing].filter(entry => entries.has(entry.element) && entry.widest()
       && (rendered(entry.element) ? entry.widest() > contentWidth(entry.element) + .5 : entry.element.isConnected));
     for (const entry of doomed) writing(() => entry.stale());

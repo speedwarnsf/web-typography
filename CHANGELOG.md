@@ -271,7 +271,10 @@ Outside the changes below, 0 of these differ in any engine.
   every frame (with `mount()` and the loaders, a block more than a viewport
   height offscreen once it comes that near); meanwhile, if it is narrower
   than its widest composed line, it shows native wrapping. The switch is
-  written before the frame's layout. Offscreen text left waiting is released
+  written before the frame's layout. The rules live in a constructable
+  stylesheet, which the engine adds back if the page's own assignment to
+  `document.adoptedStyleSheets` removed it (printed text was double-wrapped
+  in three engines after such an assignment). Offscreen text left waiting is released
   to native in idle time, so assistive technology never reads it with its
   breaks hidden: Chromium drops the word space beside a hidden break and
   WebKit joins words at the engine's markers, which after a narrowing

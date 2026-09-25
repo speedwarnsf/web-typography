@@ -15,7 +15,7 @@ import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
@@ -1058,6 +1058,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
    * wrapping until they are recomposed. All reads come before any write. */
   const guard = (elements: Iterable<HTMLElement>) => {
     if (printing(doc)) return;
+    ensureLifecycleStyles(doc);
     const stale: HTMLElement[] = [];
     for (const el of elements) {
       const widest = states.get(el)?.widest;
