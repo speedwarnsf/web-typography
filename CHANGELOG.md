@@ -131,6 +131,10 @@ at 320, 440 and 600 px by 4.2.0 and by 4.3 in Chromium, WebKit and Firefox.
   fonts at 1x and 4x CPU, with long tasks, observers, listeners, DOM writes
   and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
   Runtime budgets run nightly and at release cut.
+- Lifecycle suites in `test:v4`, each in Chromium, WebKit and Firefox:
+  `verify-iframe-mount`, `verify-recompose-storms`, `verify-reflow-triggers`,
+  `verify-visibility`, `verify-print-resize`, `verify-scheduler`,
+  `verify-translation` and `verify-options`.
 
 ## 4.1.0 - 2026-09-17
 
