@@ -178,14 +178,14 @@ what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the ca
 
 | What a consumer imports | Minified | gzip | brotli |
 |---|---|---|---|
-| mount-only | 124,099 | 48,714 | 43,022 |
-| TypesetText-only | 124,012 | 48,544 | 42,800 |
-| TypesetRichText-only | 109,515 | 44,547 | 39,449 |
+| mount-only | 124,016 | 48,692 | 43,009 |
+| TypesetText-only | 123,929 | 48,531 | 42,781 |
+| TypesetRichText-only | 109,432 | 44,521 | 39,464 |
 | smartQuotes-only | 2,450 | 1,349 | 1,244 |
-| react.js+shared | 134,928 | 51,858 | 45,837 |
-| TypesetText-no-tree-shaking | 159,165 | 60,562 | 52,775 |
-| go.js | 140,386 | 54,902 | 47,952 |
-| typeset.global.js | 139,478 | 54,565 | 47,606 |
+| react.js+shared | 134,845 | 51,848 | 45,761 |
+| TypesetText-no-tree-shaking | 159,088 | 60,528 | 52,793 |
+| go.js | 140,303 | 54,889 | 47,866 |
+| typeset.global.js | 139,395 | 54,553 | 47,751 |
 
 ## Reading the numbers
 

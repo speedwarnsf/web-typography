@@ -571,7 +571,7 @@ table.
   `typeset.global.js` 42.1 to 54.6 KB. A bundler that does not tree-shake
   (Metro, the Expo and React Native Web default) ships all of
   `typeset.us/react`, `dist/react.js` and its shared chunk: `TypesetText`
-  43.2 to 60.6 KB, a larger increase than any tree-shaken figure (an Expo
+  43.2 to 60.5 KB, a larger increase than any tree-shaken figure (an Expo
   web export of one app grew by 14.3 KB gzip with the first candidate).
   The growth is the code the fixes above need, measured per group and
   recorded in scripts/v4/budgets.json.

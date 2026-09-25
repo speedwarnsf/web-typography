@@ -243,6 +243,7 @@ function createRegistry(doc: Document): Registry {
     frameQueued = false;
     // Print shows native wrapping; the work waits until printing ends.
     if (!pending.size || printing(doc)) return;
+    ensureLifecycleStyles(doc);
     const start = performance.now();
     const fonts = fontKey(doc);
     // All reads first: one layout, then the compositions.

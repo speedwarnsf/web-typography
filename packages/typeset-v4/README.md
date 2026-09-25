@@ -213,7 +213,7 @@ Composition runs in the browser, on the main thread.
   Rollup, webpack or Vite, which tree-shake, 48.7 KB for a bundle that
   imports only `mount` and 48.5 KB for `TypesetText`. A bundler that does
   not tree-shake, such as Metro (Expo, React Native Web), ships all of
-  `typeset.us/react`: 60.6 KB for `TypesetText` (4.2.0: 43.2 KB). No
+  `typeset.us/react`: 60.5 KB for `TypesetText` (4.2.0: 43.2 KB). No
   runtime dependencies.
 
 These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the

@@ -193,15 +193,13 @@ function start(doc: Document): Hub {
   doc.addEventListener('contentvisibilityautostatechange', visibility, true);
   view?.addEventListener('resize', resize);
   const print = view?.matchMedia?.('print');
-  // Print shows native wrapping through the lifecycle sheet's print rules.
+  // Print shows native wrapping through the lifecycle sheet's print rules;
+  // this listener runs as printing starts, before the print layout.
   const printed = () => { if (print?.matches) ensureLifecycleStyles(doc); else resize(); };
-  const beforePrint = () => ensureLifecycleStyles(doc);
   print?.addEventListener?.('change', printed);
-  view?.addEventListener('beforeprint', beforePrint);
   hub.stop = () => {
     view?.removeEventListener('resize', resize);
     print?.removeEventListener?.('change', printed);
-    view?.removeEventListener('beforeprint', beforePrint);
     observer.disconnect();
     faces?.removeEventListener?.('loadingdone', fonts);
     faces?.removeEventListener?.('loading', loading);
@@ -243,8 +241,8 @@ const sheets = new WeakMap<Document, CSSStyleSheet | null>();
 /** One constructable stylesheet per document: no <style> element, so a strict
  * style-src policy is not involved. Skipped where unsupported. A page that
  * assigns document.adoptedStyleSheets (a theme switcher, the MDN example)
- * drops it; installing again, and ensureLifecycleStyles() before print and
- * stale mode, put it back. */
+ * drops it; installing again, and ensureLifecycleStyles() as printing starts,
+ * before stale mode and in each pass, put it back. */
 export function installLifecycleStyles(doc: Document): void {
   const known = sheets.get(doc);
   if (known === null) return;

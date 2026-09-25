@@ -1350,6 +1350,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Print shows native wrapping; the work waits until printing ends.
     if (stopped || printing(doc)) return;
     observer.disconnect();
+    ensureLifecycleStyles(doc);
     const start = performance.now();
     stats.passes++;
     // While fonts load, text may be about to change metrics again: recheck

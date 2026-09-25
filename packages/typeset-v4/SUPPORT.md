@@ -173,8 +173,8 @@ marker is left beside a hidden break for assistive technology to join words
 at; its outcome is kept. Both hooks are supported; the engine installs their rules
 as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. A page that assigns `document.adoptedStyleSheets` (a theme
-switcher) drops that sheet; the engine adds it back before print and before
-it marks a block stale. Hidden text (display:none, the hidden attribute, a closed dialog,
+switcher) drops that sheet; the engine adds it back as printing starts,
+before it marks a block stale and on each composition pass. Hidden text (display:none, the hidden attribute, a closed dialog,
 content-visibility) keeps its composition and is not measured until shown.
 Text that is hidden while the window's width changes shows native wrapping
 until it is shown and recomposed, since it will likely be shown at another
