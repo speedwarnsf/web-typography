@@ -42,9 +42,10 @@ line boxes, outcomes, feature statuses, copy text and markup).
   generated breaks are now exposed and 16 hyphen breaks stay hidden; 0
   screenshots, 0 line boxes, 0 outcomes, 0 feature statuses and 0 copied texts
   changed.
-- **Live regions are no longer composed (accessibility, C4).** Text inside
-  `aria-live` (other than `off` on the nearest region), `role="status"`,
-  `alert`, `log`, `marquee` or `timer`, or `<output>`, keeps native wrapping.
+- **Live regions are no longer composed (accessibility, C4).** Text whose
+  nearest region has `aria-live="polite"` or `"assertive"`, or (without
+  `aria-live="off"`) `role="status"`, `alert`, `log`, `marquee` or `timer`, or
+  is an `<output>`, keeps native wrapping.
   4.2 composed it and rewrote it on every resize, font load and idle pass
   (51 mutation records on mount and 180 more across two resizes for one status
   paragraph), and Chrome announced those rewrites, so screen readers repeated
@@ -107,7 +108,6 @@ line boxes, outcomes, feature statuses, copy text and markup).
   opening space. No rendering change: 0 pixel, line box, outcome or feature
   differences on the framework fixtures (48 paragraphs per engine) or in the
   golden A/B against 4.2.0.
-
 - `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
   once in development builds; it leaves quotes as written, as before (C15).
   The package build leaves `process.env.NODE_ENV` to the application's bundler.
@@ -128,6 +128,11 @@ line boxes, outcomes, feature statuses, copy text and markup).
   fonts at 1x and 4x CPU, with long tasks, observers, listeners, DOM writes
   and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
   Runtime budgets run nightly and at release cut.
+- New suites in `npm test`: `verify-break-semantics` (C2), `verify-strict-csp`
+  (C5), `verify-copy-privacy` (C11), `verify-framework-text` (C6, with
+  committed Svelte, Vue, Solid and Lit fixture bundles in `tests/frameworks/`),
+  `verify-live-regions` (C4) and `verify-smart-quotes` (C15). Each fails on
+  the published 4.2.0 build.
 
 ## 4.1.0 - 2026-09-17
 
