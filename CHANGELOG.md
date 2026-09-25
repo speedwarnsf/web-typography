@@ -57,6 +57,26 @@ Hashes for every published version live in
   `scope`, `htmlFor` and `value` attributes. New `onResult(result)` reports
   each composition as a `Result`. New exported types `TypesetTag`,
   `TypesetAdapterProps` and `Priority`.
+- Nothing throws in test runners or older engines. Under jsdom and happy-dom
+  (Jest, Vitest), and where `Intl.Segmenter`, `ResizeObserver` or
+  `MutationObserver` is missing, `typeset()` and `planRichText()` return and
+  both adapters report the new outcome `native:environment`, `mount()`
+  returns an inert controller, and `document.fonts` is optional. Importing
+  no longer constructs an `Intl.Segmenter` or inflates the Unicode line-break
+  trie (the vendored module now initializes on first use; all 19,338
+  LineBreakTest cases give identical breaks), so a missing API can no longer
+  blank an application at import, and a bundle that imports only
+  `smartQuotes` drops from 11.7 KB to 0.9 KB gzip. The script-tag builds do
+  nothing where there is no `window`.
+- Packaging: a CommonJS React entry (`dist/react.cjs`) for `require()` and
+  Jest; `.` and `./react` give `import` and `require` their own types
+  (`.d.ts` and `.d.cts`), so CommonJS consumers are no longer told the
+  package is ESM-only (attw FalseESM); `./react` has a `default` condition;
+  `./global` and `./go` ship `global.d.ts` and `go.d.ts` declaring
+  `window.Typeset` and `window.TypesetReady`. The build recipe adds these
+  files only when the package's exports name them, so a dry run at v4.2.0
+  still reproduces its tarball. The 4.3.0 tarball grows from 48 to 83 files
+  (2.57 to 3.42 MB unpacked), mostly `react.cjs` and its source map.
 - Single-line blocks skip Unicode break analysis, and a first composition no
   longer computes an unused signature; outcomes are unchanged.
 

@@ -17,6 +17,7 @@ import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
+import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -82,12 +83,12 @@ function fontVersion(doc: Document): string {
     version = { epoch: 0 };
     fontVersions.set(doc, version);
     const current = version;
-    doc.fonts.addEventListener('loadingdone', () => { current.epoch++; });
+    doc.fonts?.addEventListener?.('loadingdone', () => { current.epoch++; });
   }
   // FontFace objects can be added already loaded, or replaced while the set
   // remains "loaded". Those changes need not fire a loadingdone event.
   const faces: string[] = [];
-  doc.fonts.forEach(face => {
+  doc.fonts?.forEach(face => {
     if (!fontIds.has(face)) fontIds.set(face, ++nextFontId);
     faces.push([fontIds.get(face), face.family, face.status, face.weight, face.style, face.stretch].join(':'));
   });
@@ -110,7 +111,7 @@ function signature(el: HTMLElement, options: Options): string {
     context.push(ancestor.id, ancestor.getAttribute('class'), ancestor.getAttribute('style'));
   }
   return JSON.stringify([
-    el.innerHTML, fontVersion(el.ownerDocument), el.ownerDocument.fonts.status,
+    el.innerHTML, fontVersion(el.ownerDocument), el.ownerDocument.fonts?.status,
     contentWidth(el), el.parentElement && contentWidth(el.parentElement), cs.font, cs.fontFamily, cs.fontSize,
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
@@ -165,7 +166,7 @@ export function restore(element: HTMLElement): void {
 function makeMeasurer(element: HTMLElement): { prepare: (texts: string[]) => void; measure: (text: string) => number; dispose: () => void } {
   const cs = getComputedStyle(element);
   const styleKey = JSON.stringify([
-    fontVersion(element.ownerDocument), element.ownerDocument.fonts.status,
+    fontVersion(element.ownerDocument), element.ownerDocument.fonts?.status,
     cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle, cs.fontStretch,
     cs.fontVariant, cs.fontFeatureSettings, cs.fontVariationSettings,
     cs.fontOpticalSizing, cs.fontKerning, cs.fontSizeAdjust, cs.letterSpacing,
@@ -259,6 +260,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (element.closest('[data-typeset-react-rich]')) return { outcome: 'skipped:framework', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
+  }
+  // No layout engine (jsdom, happy-dom) or no Intl.Segmenter: leave the text
+  // as authored and say why, rather than throw.
+  if (!canCompose(element.ownerDocument)) {
+    element.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    return { outcome: ENVIRONMENT_OUTCOME, mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   }
   const prior = states.get(element);
   // Only a prior composition can be current; a first one needs no signature yet.
@@ -534,7 +541,8 @@ export function auditJSON(selector = defaults) {
   const identify = (element: HTMLElement) => {
     const path: string[] = [];
     for (let el: HTMLElement | null = element; el; el = el.parentElement) {
-      if (el.id) { path.unshift('#' + CSS.escape(el.id)); break; }
+      // CSS.escape is missing in jsdom.
+      if (el.id) { path.unshift('#' + (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(el.id) : el.id.replace(/[^\w-]/gu, c => '\\' + c))); break; }
       path.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + (Array.from(el.parentElement?.children || []).filter(sibling => sibling.tagName === el!.tagName).indexOf(el) + 1) + ')');
     }
     return path.join(' > ');
@@ -559,6 +567,15 @@ export interface Controller {
 
 /** One lifecycle owner per mount. Observers are disconnected during our writes. */
 export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
+  // Without observers or layout (jsdom, happy-dom, older engines) nothing can
+  // be kept correct: mark the scope native and return an inert controller.
+  const rootDocument = root instanceof Document ? root : (root as Node).ownerDocument;
+  if (!rootDocument || !canMaintain(rootDocument)) {
+    const scope = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    if (root instanceof HTMLElement && root.matches(selector)) scope.unshift(root);
+    for (const el of scope) if (!el.closest(excluded)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    return { ready: Promise.resolve(), refresh() {}, disconnect() {}, stats: { passes: 0, compositions: 0, maxBatchMs: 0, overlappingTargets: 0 } };
+  }
   const identity = Symbol('typeset-mount');
   const claimed = new Set<HTMLElement>();
   const blocked = new Map<HTMLElement, () => void>();
@@ -745,7 +762,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     }
     refresh();
   };
-  document.fonts.ready.then(() => {
+  (document.fonts?.ready ?? Promise.resolve()).then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
     discover();
@@ -753,7 +770,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  document.fonts.addEventListener('loadingdone', fontsChanged);
+  document.fonts?.addEventListener?.('loadingdone', fontsChanged);
   window.addEventListener('resize', resized);
   return {
     ready, refresh, stats,
@@ -762,7 +779,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       if (timer !== undefined) clearTimeout(timer);
       if (idle !== undefined) window.cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
-      document.fonts.removeEventListener('loadingdone', fontsChanged);
+      document.fonts?.removeEventListener?.('loadingdone', fontsChanged);
       window.removeEventListener('resize', resized);
       if (restoreContent) for (const el of owned) restore(el);
       owned.clear(); pending.clear(); nearby.clear();

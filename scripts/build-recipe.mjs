@@ -19,6 +19,17 @@ export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true };
 
 /**
+ * Files the package's exports map names, so the recipe builds exactly what
+ * the package at `root` ships: 4.2.0's package.json has no react.cjs, .d.cts
+ * or global.d.ts, and a dry run at that tag still reproduces its bytes.
+ * @param {string} root
+ */
+async function exported(root) {
+  try { return JSON.stringify(JSON.parse(await readFile(join(root, 'packages/typeset-v4/package.json'), 'utf8')).exports ?? {}); }
+  catch { return '{}'; }
+}
+
+/**
  * The npm package's dist/: ESM with a shared chunk, CJS, and the two IIFEs.
  * `distDir` must sit three directories below `root` (packages/typeset-v4/dist
  * or output/candidate/dist) so source-map paths match the published maps.
@@ -28,6 +39,11 @@ export async function buildPackageDist({ root, distDir, plugins = [] }) {
   const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning') };
   await build({ ...base, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react', 'react-dom'], outdir: distDir, chunkNames: 'shared-[hash]' });
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
+  // CommonJS React entry for require() and Jest. It bundles its own engine
+  // copy, as index.cjs does; an app should load one format, not both.
+  if ((await exported(root)).includes('react.cjs')) {
+    await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.react.tsx'], format: 'cjs', external: ['react', 'react-dom'], outfile: `${distDir}/react.cjs` });
+  }
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], format: 'iife', minify: true, outfile: `${distDir}/typeset.global.js` });
   await build({ ...base, entryPoints: ['src/lib/v4/typeset.go.ts'], format: 'iife', minify: true, outfile: `${distDir}/go.js` });
   await copyFile(join(root, 'src/lib/v4/typeset-lists.css'), join(root, distDir, 'styles.css'));
@@ -41,11 +57,37 @@ export async function buildPackageDist({ root, distDir, plugins = [] }) {
 export async function emitDeclarations({ root, distDir, declarationDir, tsc = join(root, 'node_modules/.bin/tsc') }) {
   await rm(join(root, declarationDir), { recursive: true, force: true });
   execFileSync(tsc, ['src/lib/v4/typeset.release.ts', 'src/lib/v4/typeset.release.react.tsx', '--declaration', '--emitDeclarationOnly', '--outDir', declarationDir, '--target', 'es2022', '--moduleResolution', 'bundler', '--module', 'esnext', '--lib', 'es2022,dom,dom.iterable', '--skipLibCheck', '--strict', '--jsx', 'react-jsx'], { cwd: root, stdio: 'inherit' });
+  const exports = await exported(root);
   for (const file of await readdir(join(root, declarationDir))) {
     if (!file.endsWith('.d.ts')) continue;
     let text = await readFile(join(root, declarationDir, file), 'utf8');
     text = text.replace(/(from\s+['"])(\.\.?\/[^'"]+)(['"])/g, (m, a, b, c) => a + (b.endsWith('.js') ? b : b + '.js') + c);
     await writeFile(join(root, distDir, file), text);
+    // CommonJS twins: under "require" TypeScript reads .d.cts as CommonJS, so
+    // CJS consumers are not told the package is ESM-only (FalseESM).
+    if (exports.includes('.d.cts')) await writeFile(join(root, distDir, file.replace(/\.d\.ts$/, '.d.cts')), text.replace(/(from\s+['"]\.\.?\/[^'"]+)\.js(['"])/g, '$1.cjs$2'));
+  }
+  // Globals set by the script-tag builds (./global and ./go).
+  if (exports.includes('global.d.ts')) {
+    await writeFile(join(root, distDir, 'global.d.ts'), `import type * as Typeset from './typeset.release.js';
+declare global {
+  interface Window {
+    /** The API, set by typeset.us/global (dist/typeset.global.js) and typeset.us/go (dist/go.js). */
+    Typeset: typeof Typeset;
+  }
+}
+export {};
+`);
+    await writeFile(join(root, distDir, 'go.d.ts'), `import type { Controller } from './typeset.release.js';
+import './global.js';
+declare global {
+  interface Window {
+    /** Set by typeset.us/go: resolves with the page's controller once it has mounted. */
+    TypesetReady: Promise<Controller>;
+  }
+}
+export {};
+`);
   }
 }
 

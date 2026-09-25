@@ -58,7 +58,8 @@ use exhaustive search within the declared budget.
 
 ## React
 
-React is optional. The ESM-only entry includes its client-component directive:
+React is optional. The entry (ESM, and CommonJS for `require()` and Jest)
+includes its client-component directive:
 
 ```tsx
 import { TypesetRichText, TypesetText } from 'typeset.us/react';
@@ -92,6 +93,12 @@ Both adapters take the core options as props (`mode`, `keep`, `maxLines`,
   <TypesetText as="li" text={item.text} onResult={r => log(r.outcome)} />
 </ul>
 ```
+
+Component tests work as they are: under jsdom or happy-dom (Jest, Vitest)
+nothing can be measured, so both adapters render the text unchanged with
+`data-ts-outcome="native:environment"` and never throw. The same holds for
+`typeset()`, `mount()` and `auditJSON()`, and for browsers without
+`Intl.Segmenter` or `ResizeObserver`.
 
 All adapters in a document share one registry: one MutationObserver,
 ResizeObserver and IntersectionObserver, however many blocks render. A block on

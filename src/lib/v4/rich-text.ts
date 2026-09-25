@@ -14,6 +14,7 @@ import { spacingMarkerStyle } from './spacing-finish';
 import { inlineBoxInsets } from './inline-box';
 import { preservesAdvances } from './geometry';
 import type { SpaceAdjustment } from './spacing-finish';
+import { canCompose, ENVIRONMENT_OUTCOME } from './environment';
 
 export const BREAK_ATTRIBUTE = 'data-ts-break';
 const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE', 'CODE']);
@@ -122,6 +123,9 @@ function unsupported(element: HTMLElement): string | null {
 /** Read the real styled DOM. No clone can reproduce contextual selectors reliably. */
 export function planRichText(element: HTMLElement, options: Options = {}, nativeLayout?: RichPlan['before']): RichPlan {
   const source = element.textContent || '';
+  if (!canCompose(element.ownerDocument)) {
+    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: '' };
+  }
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));
   const tracking = Array.from(element.querySelectorAll<HTMLElement>('[data-ts-track]'));

@@ -22,6 +22,7 @@
 import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
+import { canCompose, canMaintain } from './environment';
 
 export type Priority = 'auto' | 'sync';
 export type Reason = 'mount' | 'force' | 'check';
@@ -39,6 +40,9 @@ export interface AdapterEntry {
   stale(): void;
   /** A composition request was deferred: make the host correct in the meantime. */
   deferred?(reason: Reason): void;
+  /** Nothing can be composed or kept correct here (jsdom, happy-dom, an engine
+   * without the observers): report 'native:environment' and leave the text. */
+  unsupported(): void;
 }
 
 export const COMMIT_BUDGET_MS = 6;
@@ -60,11 +64,6 @@ interface Registry {
   writing<T>(write: () => T): T;
 }
 const registries = new WeakMap<Document, Registry>();
-
-/** Whether this document has a layout engine (not jsdom or happy-dom). */
-export function hasLayout(doc: Document): boolean {
-  return !!doc.documentElement && doc.documentElement.getClientRects().length > 0;
-}
 
 export function adapterRegistry(doc: Document): Registry {
   let registry = registries.get(doc);
@@ -91,6 +90,9 @@ function createRegistry(doc: Document): Registry {
   let mutations: MutationObserver | null = null, sizes: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
   let writingDepth = 0;
 
+  // The adapters render synchronously in test runners, so a DOM emulation
+  // (no layout yet or ever) is answered at once rather than queued.
+  const supported = () => canMaintain(doc) && canCompose(doc);
   const visible = (el: HTMLElement): boolean => {
     const rect = el.getBoundingClientRect();
     const height = win?.innerHeight ?? 0, width = win?.innerWidth ?? 0;
@@ -301,7 +303,7 @@ function createRegistry(doc: Document): Registry {
   return {
     identity, entries, writing,
     add(entry) {
-      if (!entries.size) start();
+      if (!entries.size && supported()) start();
       entries.set(entry.element, entry);
       // A page-level mount() must not compose a host React's adapter owns.
       if (!mountOwners.has(entry.element)) mountOwners.set(entry.element, identity);
@@ -318,7 +320,8 @@ function createRegistry(doc: Document): Registry {
     },
     request(entry, reason, inCommit) {
       if (!entries.has(entry.element)) return;
-      if (entry.priority === 'sync' || !hasLayout(doc)) { run(entry, reason, inCommit); return; }
+      if (!supported()) { entry.unsupported(); return; }
+      if (entry.priority === 'sync') { run(entry, reason, inCommit); return; }
       if (inCommit) {
         if (!commitStart) { commitStart = performance.now(); queueMicrotask(() => { commitStart = 0; }); }
         // A prop change of an on-screen block recomposes in its commit, as

@@ -15,7 +15,8 @@ import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { browsers } from './browsers.mjs';
-import { reactUnderTest } from './candidate.mjs';
+import { artifacts, reactUnderTest } from './candidate.mjs';
+import { join } from 'node:path';
 import { releaseIdentity } from './release-evidence.mjs';
 import { ensureReactEnv, reactMajor } from './react-env.mjs';
 
@@ -38,6 +39,57 @@ for (const config of selected) {
   const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
   report.browsers[config.name] = browser.version();
   try {
+    // K4: an engine without Intl.Segmenter, ResizeObserver or
+    // requestIdleCallback imports every entry and leaves text native.
+    {
+      /** @param {string} label @param {unknown} pass @param {unknown} [detail] */
+      const check = (label, pass, detail) => report.checks.push({ browser: config.name, label: 'Missing APIs: ' + label, pass: !!pass, ...(pass ? {} : { detail }) });
+      const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
+      page.setDefaultTimeout(20000);
+      /** @type {string[]} */
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      await page.addInitScript(instrument);
+      await page.addInitScript(() => {
+        const w = /** @type {any} */ (window);
+        delete (/** @type {any} */ (Intl)).Segmenter; delete w.ResizeObserver; delete w.requestIdleCallback; delete w.cancelIdleCallback;
+      });
+      await page.route('http://react.test/**', async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundles[majors.at(-1) ?? '19'] });
+        if (path.startsWith('/dist/')) return route.fulfill({ contentType: path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream', body: await readFile(join(artifacts.dist, path.slice(6))) });
+        return route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<!doctype html><html lang="en"><body><p id="plain">A paragraph in an engine without the APIs Typeset needs to compose.</p><div id="root"></div><script src="/app.js"></script></body></html>' });
+      });
+      await page.goto('http://react.test/index.html');
+      // A module-level API use (4.2.0's Intl.Segmenter) stops the page booting.
+      const booted = await page.waitForFunction(() => /** @type {any} */ (window).booted, null, { timeout: 5000 }).then(() => true, () => false);
+      check('an application bundling the React entry boots', booted, pageErrors.slice(0, 3));
+      const bare = !booted ? null : await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const apis = { segmenter: typeof (/** @type {any} */ (Intl)).Segmenter, resize: typeof w.ResizeObserver, idle: typeof w.requestIdleCallback };
+        const url = '/dist/index.js';
+        const core = await import(/* @vite-ignore */ url);
+        const plain = /** @type {HTMLElement} */ (document.getElementById('plain'));
+        const direct = core.typeset(plain).outcome;
+        const controller = core.mount(document, 'p');
+        await controller.ready;
+        const mounted = plain.dataset.tsOutcome;
+        w.T.render('blocks', { n: 3, kind: 'both' });
+        await w.__quiet(200);
+        const blocks = Array.from(document.querySelectorAll('.blk'), el => ({ outcome: /** @type {HTMLElement} */ (el).dataset.tsOutcome, text: (el.textContent || '').length }));
+        for (const src of ['/dist/typeset.global.js', '/dist/go.js']) await new Promise(resolve => { const s = document.createElement('script'); s.src = src; s.onload = s.onerror = resolve; document.head.append(s); });
+        const ready = await Promise.race([w.TypesetReady?.then(() => 'resolved'), new Promise(r => setTimeout(() => r('pending'), 2000))]);
+        return { apis, direct, mounted, blocks, global: typeof w.Typeset?.typeset, ready };
+      });
+      if (bare) {
+        check('the test really removed them', bare.apis.segmenter === 'undefined' && bare.apis.resize === 'undefined' && bare.apis.idle === 'undefined', bare.apis);
+        check('index.js imports; typeset() and mount() report native:environment', bare.direct === 'native:environment' && bare.mounted === 'native:environment', bare);
+        check('both React adapters render their text and report native:environment', bare.blocks.length === 6 && bare.blocks.every(b => b.outcome === 'native:environment' && b.text > 40), bare.blocks);
+        check('typeset.global.js and go.js load, and TypesetReady resolves', bare.global === 'function' && bare.ready === 'resolved', bare);
+      }
+      check('no page errors', pageErrors.length === 0, pageErrors.slice(0, 3));
+      await page.close();
+    }
     for (const major of majors) {
       const prefix = `React ${major}: `;
       /** @param {string} label @param {unknown} pass @param {unknown} [detail] */

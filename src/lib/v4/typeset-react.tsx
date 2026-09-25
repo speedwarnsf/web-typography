@@ -6,6 +6,7 @@ import type { Options, Result } from './typeset.next';
 import { adapterRegistry } from './adapter-registry';
 import type { AdapterEntry } from './adapter-registry';
 import { assignRef, layoutKey } from './adapter-keys';
+import { ENVIRONMENT_OUTCOME } from './environment';
 import type { TypesetAdapterProps } from './typeset-rich-react';
 export { TypesetRichText } from './typeset-rich-react';
 export type { TypesetRichTextProps, TypesetAdapterProps, TypesetTag, Priority } from './typeset-rich-react';
@@ -62,6 +63,13 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
       deferred() {
         // Until it composes, the host shows the current text natively.
         if (element.textContent !== options.current.text) { restore(element); element.textContent = options.current.text ?? ''; widest = 0; }
+      },
+      unsupported() {
+        if (element.textContent !== options.current.text) element.textContent = options.current.text ?? '';
+        element.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+        const callback = report.current;
+        const none = { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 };
+        if (callback) queueMicrotask(() => callback({ outcome: ENVIRONMENT_OUTCOME, mode: options.current.mode || (/^H[1-6]$/.test(element.tagName) ? 'title' : 'body'), before: none, after: none, changed: false, durationMs: 0 }));
       },
     };
     entry.current = current;

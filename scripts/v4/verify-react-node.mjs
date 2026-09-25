@@ -6,7 +6,14 @@
 // TypeScript contract: tests/react/types.tsx, a consumer of typeset.us/react,
 // compiles against the candidate's declarations with @types/react 18.3 and
 // 19.2 and skipLibCheck off (as="div"/"li"/"td", refs, onResult, priority).
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+//
+// Test runners (K4): the candidate, staged as an installed package, is
+// imported (ESM) and required (CommonJS, react.cjs) under jsdom and
+// happy-dom, the DOM emulations of Jest and Vitest, with React 18.3.1 and
+// 19.2.3. Both adapters render with act(), keep their text and links,
+// resolve refs, and report native:environment instead of throwing; typeset(),
+// mount() and auditJSON() do the same.
+import { mkdir, writeFile, rm, cp, symlink, copyFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { buildCandidate } from '../build-candidate.mjs';
@@ -50,8 +57,39 @@ for (const [major, types] of /** @type {const} */ ([['18', join(env.modules, '@t
   check(`TypeScript: typeset.us/react with @types/react ${major} accepts wider hosts, refs, onResult and priority, and rejects the rest`, run.status === 0, (run.stdout + run.stderr).split('\n').filter(Boolean).slice(0, 12));
 }
 
+// ---------- test runners: jsdom and happy-dom ----------
+const lanes = resolve('output/react-node/lanes');
+await rm(lanes, { recursive: true, force: true });
+for (const major of ['18', '19']) {
+  const consumer = join(lanes, 'react' + major);
+  const modules = join(consumer, 'node_modules');
+  await mkdir(join(modules, 'typeset.us'), { recursive: true });
+  await cp(resolve(artifacts.dist), join(modules, 'typeset.us/dist'), { recursive: true });
+  await copyFile('packages/typeset-v4/package.json', join(modules, 'typeset.us/package.json'));
+  const from = major === '18' ? env.modules : resolve('node_modules');
+  for (const name of ['react', 'react-dom', 'scheduler']) await symlink(join(from, name), join(modules, name), 'dir');
+  await copyFile('tests/react/dom-lane.cjs', join(consumer, 'dom-lane.cjs'));
+  for (const emulation of ['jsdom', 'happy-dom']) for (const format of ['esm', 'cjs']) {
+    const lane = `React ${major}, ${emulation}, ${format === 'cjs' ? "require('typeset.us/react')" : "import 'typeset.us/react'"}`;
+    const run = spawnSync(process.execPath, [join(consumer, 'dom-lane.cjs'), emulation, format, env.modules], { cwd: consumer, encoding: 'utf8', timeout: 60000 });
+    /** @type {any} */
+    let seen = null;
+    try { seen = JSON.parse(run.stdout.trim().split('\n').at(-1) || 'null'); } catch {}
+    if (!seen) { check(`${lane}: the lane ran`, false, (run.stderr || run.stdout).slice(0, 600)); continue; }
+    const text = 'Hello world, this is a paragraph composed in a test runner.';
+    check(`${lane}: runs the expected React and loads every entry`, seen.react?.startsWith(major + '.') && seen.entries?.core === 'function' && seen.entries?.text === 'object' && seen.entries?.rich === 'object', seen);
+    check(`${lane}: rendering, updating and unmounting both adapters throws nothing`, !seen.errors.length && seen.unmounted, seen.errors);
+    check(`${lane}: the text stays readable, links and emphasis included`, seen.rendered?.text === text && seen.rendered?.rich === 'Hello world, with a link.' && seen.rendered?.richLink && seen.updated === 'Updated text.', seen.rendered);
+    check(`${lane}: both adapters report native:environment, to the DOM and onResult`, seen.rendered?.textOutcome === 'native:environment' && seen.rendered?.richOutcome === 'native:environment'
+      && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'text' && r[1] === 'native:environment') && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'rich' && r[1] === 'native:environment'), { rendered: seen.rendered, results: seen.results });
+    check(`${lane}: refs resolve to the host elements`, seen.refs?.text && seen.refs?.rich, seen.refs);
+    check(`${lane}: typeset(), mount() and auditJSON() report native:environment and do not throw`, seen.typeset === 'native:environment' && seen.mount === 'native:environment' && seen.audit === 'boolean', seen);
+    check(`${lane}: no console errors`, !seen.consoleErrors.length, seen.consoleErrors.slice(0, 4));
+  }
+}
+
 const summary = { checks: report.checks.length, failed: report.checks.filter(c => !c.pass).length, errors: report.errors.length };
 await mkdir('output', { recursive: true });
 await writeFile('output/react-node.json', JSON.stringify({ ...report, summary }, null, 2));
-console.log(JSON.stringify({ ...summary, failures: report.checks.filter(c => !c.pass), errors: report.errors }, null, 2));
+console.log(JSON.stringify({ ...summary, failures: report.checks.filter(c => !c.pass).slice(0, 12), errors: report.errors }, null, 2));
 if (summary.failed || summary.errors) process.exitCode = 1;

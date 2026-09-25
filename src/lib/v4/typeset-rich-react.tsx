@@ -7,6 +7,7 @@ import { BREAK_ATTRIBUTE, planRichText, preserveRichCopy, selectionBookmark, ric
 import { measureLayout } from './layout-metrics';
 import { assignRef, childrenKey, layoutKey, propsKey } from './adapter-keys';
 import { adapterRegistry } from './adapter-registry';
+import { ENVIRONMENT_OUTCOME } from './environment';
 import type { AdapterEntry, Priority } from './adapter-registry';
 export type { Priority } from './adapter-registry';
 import type { RichPlan } from './rich-text';
@@ -204,6 +205,12 @@ class RichText extends Component<RichProps, State> {
       changed: fonts => this.state.stale || layoutKey(el, fonts) !== this.layout,
       widest: () => this.state.stale || !this.state.plan?.breaks.length ? 0 : this.widest,
       stale: () => flushSync(() => this.setState({ stale: true })),
+      unsupported: () => {
+        this.reporting = performance.now();
+        this.planned = propsKey(this.props);
+        this.setState({ plan: { source: el.textContent || '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 },
+          outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: '' }, stale: false });
+      },
     };
     this.entry = entry;
     const registry = adapterRegistry(el.ownerDocument);
@@ -286,7 +293,8 @@ class RichText extends Component<RichProps, State> {
       this.widest = Math.max(0, ...after.lines.map(line => line.width));
     }
     if (!this.state.stale) {
-      this.layout = layoutKey(el);
+      // No layout key where nothing can be measured (jsdom, happy-dom).
+      if (plan?.outcome !== ENVIRONMENT_OUTCOME) this.layout = layoutKey(el);
       if (this.reporting) this.report(el, plan);
     }
   }
@@ -300,7 +308,7 @@ class RichText extends Component<RichProps, State> {
     const mode: Mode = props.mode || (el.dataset.typesetMode as Mode | undefined) || (el.closest('h1,h2,h3,h4,h5,h6') ? 'title' : 'body');
     const educate = props.smartQuotes === 'en' && /^en(?:-|$)/i.test(props.lang || '') && quoteTreeSupported(props.children);
     const result: Result = {
-      outcome: plan.outcome, mode, before: plan.before, after: measureLayout(el),
+      outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME ? plan.before : measureLayout(el),
       changed: !!(plan.breaks.length || plan.hangs?.length || plan.spacing?.adjustments.length || plan.tracking?.runs.length),
       durationMs: performance.now() - started,
       ...(plan.constraint && { constraint: plan.constraint }), ...(plan.search && { search: plan.search }),
