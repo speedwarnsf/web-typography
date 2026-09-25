@@ -2,13 +2,17 @@
 // Renders docs/BENCHMARKS.md from a bench-v4.mjs result, so the published
 // numbers are always the output of the benchmark rather than prose.
 //
-//   node scripts/v4/bench-report.mjs <bench.json> [--out docs/BENCHMARKS.md]
+//   node scripts/v4/bench-report.mjs <bench.json> [--out docs/BENCHMARKS.md] [--baseline <bench.json>]
+//
+// --baseline adds a table comparing the headline numbers with an earlier run
+// (for example 4.2.0, measured back to back on the same machine).
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' } } });
-if (!positionals[0]) throw new Error('Usage: bench-report.mjs <bench.json> [--out file]');
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' }, baseline: { type: 'string' } } });
+if (!positionals[0]) throw new Error('Usage: bench-report.mjs <bench.json> [--out file] [--baseline <bench.json>]');
 const bench = JSON.parse(await readFile(positionals[0], 'utf8'));
+const baseline = values.baseline ? JSON.parse(await readFile(values.baseline, 'utf8')) : null;
 const lanes = Object.keys(bench.results);
 /** @param {unknown} v */
 const n = v => typeof v === 'number' ? v.toLocaleString('en-US') : v === null || v === undefined ? '-' : String(v);
@@ -54,12 +58,49 @@ const reading = [];
   const longest = Math.max(...lanes.flatMap(lane => [50, 200, 1000].map(size => get(lane, `mount-${size}`)?.longestTaskMs ?? 0)));
   if (m200 && !m200.error) reading.push(`Composition runs on the main thread. \`mount()\` composes the first viewport first and yields after about 8 ms of work, but a single paragraph can exceed a frame: at 4x CPU its long tasks reach ${ms(longest)}, and a 200-paragraph page accumulates ${ms(m200.tbtMs)} of blocking time${m1000 && !m1000.error ? ` (${ms(m1000.tbtMs)} for 1,000 paragraphs, which take ${ms(m1000.readyMs)} to finish)` : ''}.`);
   const plain = get('chromium@1x', 'react-plain-38'), text = get('chromium@1x', 'react-typeset-38'), text4 = get('chromium@4x', 'react-typeset-38'), plain4 = get('chromium@4x', 'react-plain-38');
-  if (plain && text && !text.error) reading.push(`One \`mount()\` creates one observer of each kind however many paragraphs it owns. Each React block creates its own controller: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObservers and ${text.counts.windowListeners} window listeners, and commit in ${ms(text.commitMs)} against ${ms(plain.commitMs)} for plain React${text4 && plain4 ? ` (${ms(text4.commitMs)} against ${ms(plain4.commitMs)} at 4x)` : ''}, although ${text.outcomes?.['native:fits'] ?? 0} of the 38 end as native:fits.`);
+  if (plain && text && !text.error) reading.push(text.counts.resizeObservers > 1
+    ? `One \`mount()\` creates one observer of each kind however many paragraphs it owns. Each React block creates its own controller: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObservers and ${text.counts.windowListeners} window listeners, and commit in ${ms(text.commitMs)} against ${ms(plain.commitMs)} for plain React${text4 && plain4 ? ` (${ms(text4.commitMs)} against ${ms(plain4.commitMs)} at 4x)` : ''}, although ${text.outcomes?.['native:fits'] ?? 0} of the 38 end as native:fits.`
+    : `One \`mount()\` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers (the registry's and the document lifecycle hub's) with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObserver and ${text.counts.windowListeners} window listener, and commit in ${ms(text.commitMs)} against ${ms(plain.commitMs)} for plain React${text4 && plain4 ? ` (${ms(text4.commitMs)} against ${ms(plain4.commitMs)} at 4x)` : ''}; blocks on screen compose before the first paint and the rest in idle time.`);
   const wkFont = get('webkit@1x', 'late-font');
   if (wkFont && !wkFont.error) reading.push(wkFont.staleAfterFont ? `WebKit does not recompose after a web font that CSS applies late: ${wkFont.staleAfterFont} of ${wkFont.composed} composed paragraphs were left with breaks measured for the old font.` : 'After a late web font, every composed paragraph was recomposed in each engine.');
   const storm = get('chromium@1x', 'storm');
   if (storm && !storm.error) reading.push(`Toggling a class on an ancestor 30 times re-ran composition ${n(storm.compositions)} times over 200 paragraphs whose layout the class does not change.`);
-  reading.push('Budgets in `scripts/v4/budgets.json` hold the size, count and time values measured when they were introduced (sizes on every change; time, observer and write counts nightly and at release cut) and are lowered as the 4.3 performance work lands.');
+  reading.push('Budgets in `scripts/v4/budgets.json` hold the size, count and time values last calibrated, with the reason for every raise (sizes on every change; time, observer and write counts nightly and at release cut).');
+}
+/** Headline numbers against the baseline run, one row per metric. */
+const compared = [];
+if (baseline) {
+  /** @param {string} lane @param {string} key @param {(r: any) => unknown} pick @param {string} label @param {(v: any) => string} [fmt] */
+  const row = (lane, key, pick, label, fmt = ms) => {
+    const a = baseline.results?.[lane]?.[key], b = bench.results?.[lane]?.[key];
+    if (!a || !b || a.error || b.error) return;
+    const x = pick(a), y = pick(b);
+    if (x === undefined || y === undefined) return;
+    compared.push([lane, label, fmt(x), fmt(y)]);
+  };
+  for (const lane of lanes) {
+    row(lane, 'typesetAll-200', r => r.perParagraph?.median, 'Per paragraph, median (200)');
+    row(lane, 'typesetAll-200', r => r.perParagraph?.p95, 'Per paragraph, p95 (200)');
+    row(lane, 'mount-200', r => r.visibleMs, 'mount-200: first viewport');
+    row(lane, 'mount-200', r => r.readyMs, 'mount-200: all composed');
+    row(lane, 'mount-200', r => r.tbtMs, 'mount-200: total blocking time');
+    row(lane, 'mount-1000', r => r.readyMs, 'mount-1000: all composed');
+    row(lane, 'mount-1000', r => r.tbtMs, 'mount-1000: total blocking time');
+    for (const kind of ['typeset', 'rich']) for (const size of [38, 1000]) {
+      const label = kind === 'typeset' ? 'TypesetText' : 'TypesetRichText';
+      row(lane, `react-${kind}-${size}`, r => r.commitMs, `${size} ${label}: commit`);
+      row(lane, `react-${kind}-${size}`, r => r.inpProxyMs, `${size} ${label}: INP proxy`);
+      row(lane, `react-${kind}-${size}`, r => r.tbtMs, `${size} ${label}: total blocking time`);
+      row(lane, `react-${kind}-${size}`, r => r.counts?.mutationObservers, `${size} ${label}: MutationObservers`, n);
+    }
+    row(lane, 'storm', r => r.compositions, 'Ancestor class storm: recompositions', n);
+    row(lane, 'storm', r => r.nodeWrites, 'Ancestor class storm: DOM mutation records', n);
+    row(lane, 'hidden', r => r.compositions, 'Hidden, then shown: compositions', n);
+    row(lane, 'hidden', r => r.visibleMs, 'Hidden, then shown: first viewport');
+    row(lane, 'hidden', r => r.tbtMs, 'Hidden, then shown: total blocking time');
+    row(lane, 'late-font', r => r.settledMs, 'Late web font: settled');
+    row(lane, 'late-font', r => `${r.staleAfterFont} of ${r.composed}`, 'Late web font: paragraphs left stale', String);
+  }
 }
 const sizes = bench.sizes ? Object.entries(bench.sizes).map(([name, s]) => [name, n(/** @type {any} */ (s).min), n(/** @type {any} */ (s).gzip), n(/** @type {any} */ (s).brotli)]) : [];
 const env = bench.environment ?? {};
@@ -75,9 +116,15 @@ then \`node scripts/v4/bench-report.mjs output/bench-v4.json\`.*
 
 These numbers replace the 3.x figures (about 1.6 ms per paragraph) that were
 published here, in SKILL.md and in the essay until 4.3. They describe
-${bench.label === '4.2.0' ? 'the published 4.2.0 build' : `the ${bench.label} build`}: one composition costs several
-milliseconds, and the React adapters pay for one controller per block.
+${bench.label === '4.2.0' ? 'the published 4.2.0 build: one composition costs several\nmilliseconds, and the React adapters pay for one controller per block.' : `the ${bench.label} build: one composition still costs several milliseconds.`}
+${baseline ? `
+## Against ${baseline.label}
 
+${baseline.label} (load average ${baseline.environment?.loadAverageAtStart?.[0] ?? '?'} at start) and ${bench.label} measured back to back on the same machine.
+Wall times move with machine load by several percent; counts do not.
+
+${table(['Lane', 'Measure', baseline.label, bench.label], compared)}
+` : ''}
 ## Cost per paragraph
 
 \`Typeset.typesetAll('article p')\` in one synchronous call; per-paragraph
