@@ -348,6 +348,25 @@ changes only an isolated preview, never a deployed site.
   animation keeps frames pending) paints its native lines for one frame and
   rewraps in the next. With the React adapters, `priority="sync"` composes a
   block in its commit instead.
+- **A very long unbreakable run, in WebKit.** Measuring a paragraph reads
+  each word's boxes, and a word the browser splits across lines is read one
+  character at a time, so that each character counts on its own line.
+  WebKit's `Range.getClientRects()` takes time in proportion to the length
+  of the line the range is on, so a word whose first line holds thousands
+  of characters costs the square of that length. A paragraph with 11,000
+  consecutive closing quotes (U+201D) followed directly by a letter, which
+  WebKit may break before, takes about 37 s in `typeset()` in WebKit
+  (4.2.0: 50 to 90 s), and one with 11,000 letters then a hyphen and a
+  letter about 15 s (Chromium 1.4 s, Firefox 0.2 s; the quotes take under
+  0.1 s in both). Both are under the 12,000-character budget. Prose has no
+  such runs, but untrusted text (comments, profiles) can use one to freeze
+  a Safari tab. Mitigation: set `overflow-wrap: break-word`, which Typeset
+  supports, on containers of user-generated text, so the run wraps at the
+  measure (the same two paragraphs: 0.8 s and 0.5 s); or leave such text
+  out of composition (`data-no-typeset`, or a selector that does not match
+  it); or collapse long runs of one punctuation mark before rendering.
+  Reading fewer characters would change the line metrics a result
+  reports, so 4.3 keeps the exact measurement.
 - **Machine translation.** While a page is translated (Google Translate and
   Chrome set `translated-ltr`/`translated-rtl` on `<html>`, translators wrap
   text in `<font>`, Edge adds `_msttexthash`), `mount()`, the loaders,
