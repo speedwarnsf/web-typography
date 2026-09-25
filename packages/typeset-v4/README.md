@@ -141,7 +141,11 @@ Both log a console note if nothing matches.
 
 ## What happened to my paragraph?
 
-Every element gets an outcome in `data-ts-outcome` and `result.outcome`.
+Every element Typeset composes or declines gets an outcome in
+`data-ts-outcome` and `result.outcome`. Excluded content (`data-no-typeset`,
+`nav`, code, forms) and live regions are skipped without an attribute:
+`typeset()` returns `skipped:excluded` or `native:live-region` for them,
+and `auditJSON()` counts them as `excluded` and `native:live-region`.
 `native:` means Typeset left the browser's layout in place, and says why;
 it is not an error. The ones you will see most:
 

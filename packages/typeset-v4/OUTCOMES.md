@@ -4,7 +4,10 @@
 
 Every element Typeset looks at gets an outcome: `result.outcome` from
 `typeset()`, and `data-ts-outcome` on the element. `auditJSON()` counts
-them. A `native:` outcome is not an error: it means Typeset left the
+them. Excluded content and live regions get no attribute: `typeset()`
+returns `skipped:excluded` or `native:live-region` for them, and
+`auditJSON()` counts them as `excluded` and `native:live-region`.
+A `native:` outcome is not an error: it means Typeset left the
 browser's layout in place, and says why. The TypeScript types are
 `Outcome` and `FeatureStatus`, and `OUTCOMES` lists every code at runtime.
 

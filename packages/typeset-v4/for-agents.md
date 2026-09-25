@@ -40,9 +40,11 @@ prefer the adapters for text React renders. Custom stateful children
 remain native:react-component. Framework recipes (Next.js, Vite, Astro,
 SvelteKit, Vue): https://typeset.us/install/frameworks.
 
-Every element gets an outcome (result.outcome, data-ts-outcome). native:
-means the browser's layout was kept on purpose, with the reason; it is not
-an error. OUTCOMES.md in this package explains every code and what to do;
+Every element composed or declined gets an outcome (result.outcome,
+data-ts-outcome); excluded content and live regions get no attribute, and
+auditJSON counts them as excluded and native:live-region. native: means
+the browser's layout was kept on purpose, with the reason; it is not an
+error. OUTCOMES.md in this package explains every code and what to do;
 the Outcome type and OUTCOMES const list them. Explain a declined paragraph
 from its outcome and result.constraint, not by guessing.
 
