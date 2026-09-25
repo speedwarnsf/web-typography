@@ -110,6 +110,9 @@ import { createRoot } from 'react-dom/client';
 window.recoverable = [];
 hydrateRoot(document.getElementById('root'), h(App), { onRecoverableError: (error) => window.recoverable.push(String(error && error.message || error)) });
 window.warnWithoutLang = () => { const host = document.createElement('div'); document.body.append(host); createRoot(host).render(h('div', null, h(Rich, { smartQuotes: 'en' }, h('span', null, 'one')), h(Rich, { smartQuotes: 'en' }, h('span', null, 'two')))); };
+// A component child, as next/link's <Link> is: the paragraph stays native.
+const Link = props => h('a', props);
+window.warnComponent = () => { const host = document.createElement('div'); document.body.append(host); createRoot(host).render(h('div', null, h(Rich, { id: 'component', lang: 'en' }, 'Read the notes at ', h(Link, { href: '/gallery' }, 'the neighborhood gallery'), ' before the tour and the talk.'), h(Rich, { lang: 'en' }, 'Two ', h(Link, { href: '/two' }, 'links'), '.'))); };
 `, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': JSON.stringify(mode) }, logLevel: 'silent' })).outputFiles[0].text;
 const clients = { production: await bundle('production'), development: await bundle('development') };
 const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia}main{width:320px}</style></head><body><div id="root">${serverHTML}</div><script src="/client.js"></script></body></html>`;
@@ -139,6 +142,12 @@ await Promise.all(browsers.map(async config => {
       await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
       const warnings = console_.slice(before).filter(line => line.includes('smartQuotes="en" needs lang'));
       check(`${mode}: TypesetRichText without lang warns ${mode === 'development' ? 'once' : 'never'}`, warnings.length === (mode === 'development' ? 1 : 0), warnings, config.name);
+      const beforeComponent = console_.length;
+      await page.evaluate(() => /** @type {any} */ (window).warnComponent());
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 300)));
+      const component = console_.slice(beforeComponent).filter(line => line.includes('native:react-component'));
+      const componentOutcome = await page.evaluate(() => document.getElementById('component')?.dataset.tsOutcome);
+      check(`${mode}: TypesetRichText with a component child stays native and warns ${mode === 'development' ? 'once' : 'never'}`, componentOutcome === 'native:react-component' && component.length === (mode === 'development' ? 1 : 0), { componentOutcome, component }, config.name);
       await page.close();
     }
   } catch (error) {

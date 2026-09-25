@@ -44,7 +44,8 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
   contour?: Options['contour'];
   /** 'auto' (default) composes in the commit only what is on screen, within
    * a small time budget, and the rest before its first paint or in idle
-   * time. 'sync' composes in the commit, as 4.2 did, for hero text. */
+   * time. 'sync' composes in the commit, as 4.2 did, for hero text.
+   * Server-rendered HTML paints natively first and composes after hydration. */
   priority?: Priority;
   /** Called after each composition of the block with the engine's result
    * (outcome, measured lines before and after, and feature statuses). */
@@ -162,7 +163,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
   return visit(children);
 }
 
-let warnedQuotesLang = false;
+let warnedQuotesLang = false, warnedComponent = false;
 /** Development builds only: bundlers replace process.env.NODE_ENV; without a
  * bundler `process` is undefined and nothing is logged. */
 function development(): boolean {
@@ -404,7 +405,14 @@ class RichText extends Component<RichProps, State> {
       // <details>): nothing can be measured until it is shown.
       : !rendered(el) ? { source: el.textContent || '', breaks: [], widths: [], outcome: 'unmeasurable', styleSignature: '', before: none }
       : planRichText(el, this.props);
-    if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
+    if (!supportedTree(this.props.children)) {
+      plan.breaks = []; plan.outcome = 'native:react-component';
+      if (!warnedComponent && development()) {
+        warnedComponent = true;
+        // React renders a component child itself, so the adapter cannot place breaks inside it.
+        console.warn('TypesetRichText: a component child (next/link\'s <Link>, a router link, any function or class component) keeps the paragraph native (native:react-component). Use host elements such as <a>, <strong> and <em> inside it, or compose the rendered HTML with mount().');
+      }
+    }
     const base = planKey(plan, this.props);
     if (this.state.plan && base === this.base && healthy(this.state.plan)) {
       // The same breaks at the same width: keep the spacing, tracking and

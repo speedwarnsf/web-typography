@@ -48,8 +48,9 @@ render()) through twenty updates each in three engines. Limits: direct
 typeset() and restore() without a controller see edits only by value, so an
 emptied node set to '' again is not noticed; the legacy .ts-line renderer
 (lineBreaks: 'legacy' on plain text) copies text and never sees framework
-writes. Stateful custom React
-children remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
+writes. `TypesetRichText` with any component child (next/link's `<Link>`,
+a router link, a function or class component) stays native
+(`native:react-component`); its children must be text and host elements. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
 hyphens and editable content remain native. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 

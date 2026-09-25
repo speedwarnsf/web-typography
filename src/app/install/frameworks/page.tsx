@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 };
 
 const NEXT = `// app/page.tsx: a server component can use the adapters directly;
-// typeset.us/react is already a client component.
+// typeset.us/react is already a client component. The server HTML paints
+// with native wrapping and is composed after hydration. Inside
+// TypesetRichText use <a>, not next/link's <Link>: a component child keeps
+// the paragraph native (native:react-component).
 import { TypesetRichText, TypesetText } from 'typeset.us/react';
 
 export default function Page() {

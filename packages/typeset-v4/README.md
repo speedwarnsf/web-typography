@@ -79,8 +79,16 @@ import { TypesetText, TypesetRichText } from 'typeset.us/react';
 `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
 `legend` or `summary`. A `ref` resolves to that element. `onResult(result)`
 receives each composition's `Result`, as `typeset()` returns it.
-`priority="sync"` composes in the React commit; by default a block on screen
-composes before its first paint and offscreen blocks follow in idle time.
+`priority="sync"` composes in the React commit; by default a block React
+renders in the browser composes before its first paint and offscreen blocks
+follow in idle time. Server-rendered HTML (Next.js, Remix) first paints with
+the browser's own wrapping and is composed after hydration, rewrapping
+without adding a line (see the FAQ on layout shift).
+`TypesetRichText` children must be text and host elements (`a`, `strong`,
+`em`, `span` and the like): a component child, such as next/link's `<Link>`
+or a router link, keeps the whole paragraph native
+(`native:react-component`, with a console warning in development builds).
+Use `<a>` there, or compose the rendered HTML with `mount()`.
 Under jsdom or happy-dom (Jest, Vitest) nothing can be measured, so both
 adapters render the text unchanged, report `native:environment` and never
 throw. Both take the options below as props.
