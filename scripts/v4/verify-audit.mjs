@@ -7,7 +7,8 @@
 //    ("type A") and untagged text, which the compositor treats neutrally.
 //    The published 4.2.0 audit flags each of them (negative control).
 //  - Real line-end defects are reviewed: number/unit, honorific/name,
-//    label/number and letter-designator splits, line-initial dashes and
+//    label/number and letter-designator splits (also a capital letter cut
+//    off from the noun it modifies, "B | students"), line-initial dashes and
 //    closing punctuation, split ellipses, and a sentence opener stranded
 //    after "a.m." or "No." ending a sentence.
 //  - The JSON shape and schemaVersion stay those of 4.2.0.
@@ -48,6 +49,7 @@ const loud = [
   ['The meeting ran long<br>, so we left early.', 'line-initial-punctuation'],
   ['Arrive by 9 a.m. Parking<br>is free in the lot on Main Street.', 'stranded-opener'],
   ['Did the new schedule help? No. Staff<br>on the night shift could not use it.', 'stranded-opener'],
+  ['A study found that A students and B<br>students differ less than people think.', 'bound-split'],
 ];
 
 for (const { name, engine, executablePath } of browsers) {

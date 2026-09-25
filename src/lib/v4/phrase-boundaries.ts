@@ -120,6 +120,10 @@ export function boundPair(previous: string, next: string, before?: string): Boun
       || (before !== undefined && regnalTitles.has(outer(before).toLowerCase()))) ? 'designator' : null;
     return 'designator';
   }
+  // A capital letter after a function word modifies the word that follows
+  // ("and B students", "the X chromosome", "an F grade"): the letter and that
+  // word are one unit too, so the letter does not end a line cut off from it.
+  if (/^[B-HJ-Z]$/u.test(previous) && before !== undefined && stops.has(word(before)) && /^\p{Ll}/u.test(next)) return 'designator';
   return null;
 }
 
