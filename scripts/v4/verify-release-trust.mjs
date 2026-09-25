@@ -83,6 +83,12 @@ try {
   }
   const draft = await readFile('docs/security/advisory-3x-heading-xss.md', 'utf8');
   check('the 3.x advisory draft states range, patch, severity and CWE', /`>= 3\.0\.0, < 3\.4\.1`/.test(draft) && /`3\.4\.1`/.test(draft) && /CWE-79/.test(draft) && /CVSS 3\.1/.test(draft));
+  // release.json and sri.json link to this file, so it reads as the advisory,
+  // not a draft with owner instructions. Its proof of concept must fire on
+  // 3.4.0: the 3.x heading pass curls straight quotes before reparsing, so a
+  // quoted handler never compiles and the page would look safe.
+  const handler = /<h2 data-typeset-heading>[^\n]*?onerror=([^\n]*?)&gt;<\/h2>/.exec(draft)?.[1];
+  check('the 3.x advisory reads as published text and its proof of concept uses an unquoted handler', !/^# DRAFT|^Status: draft/m.test(draft) && !!handler && !/["']/.test(handler), { handler });
   const deprecate = await readFile('docs/security/deprecate-3x.sh', 'utf8');
   check('npm deprecate targets exactly the affected range', deprecate.includes(`npm deprecate 'typeset.us@${advisories[0].npm.affected}'`));
 

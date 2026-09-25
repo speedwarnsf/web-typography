@@ -695,7 +695,8 @@ table.
   commit SHA, and Dependabot watches npm and GitHub Actions.
 - SECURITY.md (also in the package): supported versions, private reporting,
   response targets. The DOM XSS in the 3.x `Typeset.auto()` heading branch,
-  fixed silently in 3.4.1, now has an advisory draft, a deprecation command
+  fixed silently in 3.4.1, now has an advisory (its proof of concept
+  reproduced against the 3.3.2 and 3.4.0 pins), a deprecation command
   for 3.0.0 to 3.4.0 and an `advisories` list that each cut copies into
   release.json and sri.json. The vulnerable files stay online unchanged.
 - STABILITY.md states what a version number promises: API names,

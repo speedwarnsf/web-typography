@@ -1,11 +1,11 @@
-# DRAFT advisory: DOM XSS in the typeset.us 3.x `Typeset.auto()` heading branch
+# Advisory: DOM XSS in the typeset.us 3.x `Typeset.auto()` heading branch
 
-Status: draft, not published. The owner publishes it as a GitHub Security
-Advisory (Security > Advisories > New draft advisory), requests a CVE from
-GitHub in the same form, then runs [deprecate-3x.sh](deprecate-3x.sh). The
-fields below map to the advisory form.
+This is the advisory's text, linked from the `advisories` list in
+release.json and sri.json. It is also published as a GitHub Security
+Advisory once the owner files it (steps in docs/OWNER-ACTIONS.md); the
+fields below map to that form.
 
-## Form fields
+## Summary
 
 - **Ecosystem:** npm
 - **Package:** typeset.us
@@ -49,14 +49,18 @@ this code: 4.x `mount()` and `typeset()` never parse HTML strings.
 ## Proof of concept
 
 ```html
-<h2 data-typeset-heading>Welcome back, &lt;img src=x onerror="window.__pwned=document.domain"&gt;</h2>
+<h2 data-typeset-heading>Welcome back, &lt;img/src/onerror=window.__pwned=document.domain&gt;</h2>
 <script src="https://typeset.us/go@3.4.0.js"></script>
 <script>addEventListener('load', () => Typeset.auto());</script>
 ```
 
-On 3.3.2 and 3.4.0, Chromium creates an `<img>` and sets `window.__pwned`.
-On 3.4.1 and 4.2.0 the text stays text. (Audit reproduction,
-scratch script `lens6/run-legacy.mjs`, 2026-09-23.)
+On 3.3.2 and 3.4.0, Chromium, Firefox and WebKit create an `<img>` and set
+`window.__pwned`. On 3.4.1 the text stays text; 3.5.0 and 4.x have no
+`Typeset.auto()`. The payload uses no quotation marks because the 3.x
+heading pass curls straight quotes before the text is parsed again, which
+breaks a quoted handler (`onerror="..."` fails to compile) without
+protecting the page: any unquoted handler runs. (Reproduced against the
+published pins in all three engines, 2026-09-25.)
 
 ## Workarounds
 

@@ -60,7 +60,8 @@ need a malicious browser extension or a compromised device.
   `[data-typeset-heading]` elements as HTML when a page calls
   `Typeset.auto()`, so escaped markup in that text runs. Fixed in 3.4.1;
   4.x does not have this code. Upgrade to 4.3, or to 3.4.1 or later if you
-  must stay on 3.x. Advisory draft: docs/security/advisory-3x-heading-xss.md.
+  must stay on 3.x. Advisory text, with a proof of concept:
+  https://github.com/speedwarnsf/web-typography/blob/master/docs/security/advisory-3x-heading-xss.md.
 
 ## How releases are made
 
