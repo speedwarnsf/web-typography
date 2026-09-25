@@ -109,7 +109,11 @@ try {
     ['API names', /API names/], ['auditJSON schemaVersion', /schemaVersion/], ['outcome codes', /Outcome codes/], ['default rendering only for verified defects', /only to fix a\s+verified defect/],
     ['a "Rendering changes" list with golden-diff counts', /"Rendering changes"[\s\S]*number of test\s+paragraphs/], ['exact installs (npm i -E)', /npm i -E typeset\.us@/], ['go.js never moves to 5.0', /never move to 5\.0/], ['release cadence', /two to four weeks/],
   ])) check('stability', `STABILITY.md covers ${label}`, pattern.test(stability));
-  check('stability', `the CHANGELOG's first version (${target}) is the package version or the next release`, !!target && (released || /^## \d+\.\d+\.\d+ - Unreleased$/m.test(changelog.split('\n').find(line => line.startsWith(`## ${target}`)) ?? '')), { target, package: pkg.version });
+  // Before the cut the next release's heading says "Unreleased"; release-cut
+  // needs it dated, and runs this suite before it bumps package.json.
+  const { compareVersions } = await import('../build-recipe.mjs');
+  const heading = changelog.split('\n').find(line => line.startsWith(`## ${target}`)) ?? '';
+  check('stability', `the CHANGELOG's first version (${target}) is the package version or the next release`, !!target && (released || (compareVersions(target, pkg.version) > 0 && /^## \S+ - (?:Unreleased|\d{4}-\d{2}-\d{2})$/.test(heading))), { target, package: pkg.version, heading });
   /** @type {string[]} */
   const hardcoded = [];
   const ALLOWED = new Set(['src/lib/install-snippet.ts', 'src/app/fix/page.tsx', 'src/lib/go-entry.ts', 'src/lib/typeset.standalone.ts']);
