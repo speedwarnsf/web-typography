@@ -90,10 +90,17 @@ Outside the changes below, 0 of these differ in any engine.
   (there also when the text before it ends inside another element or a
   fragment, as in `<strong>Note: </strong><a>`, where the first 4.3
   candidates still broke inside the link); the framework text an element
-  holds is not split for it. Lines and
-  characters are unchanged, and so are widths unless the element has
-  horizontal padding, border or margin, which now starts its line as the
-  compositor planned. Where the element that starts the line has other font
+  holds is not split for it. Characters are unchanged, and so are lines
+  and widths unless the element has horizontal padding, border or margin,
+  which now starts its line as the compositor planned. 4.2.0's stub put
+  that padding on the line before, and where the planned widths then
+  failed verification the paragraph kept its native layout
+  (`native:verification`); such a paragraph now composes: in a probe of
+  inline `<code>` starting lines at 280 to 800 px (step 8) in three fonts,
+  2 of 198 cells per engine with horizontal padding and 1 of 198 with
+  horizontal borders go from `native:verification` to `composed:rich`, in
+  Chromium, WebKit and Firefox, and none the other way (0 of 198 without
+  padding or border). Where the element that starts the line has other font
   metrics, such as inline `<code>`, 4.2.0's empty fragment also made the
   paragraph taller than the browser's own layout, by 1 px in Chromium and
   about 0.5 px in WebKit and Firefox; its height now matches native (a
@@ -104,7 +111,7 @@ Outside the changes below, 0 of these differ in any engine.
   verify-golden, 3 (WebKit 5) of 316 blocks in the golden A/B and 71 of
   2,160 React blocks, all markup only (the break's position), with 0
   screenshots, line boxes, outcomes or copied texts changed; 0 of the rest
-  (these sets have no inline code at a line start).
+  (these sets have no inline code or padded element at a line start).
 - **The automatic loader composes `.demo` and `[data-no-smooth]` content.**
   The website loader (go@4.2.0.js, and 4.3's `typeset.us/auto`) always
   skipped elements with the class `demo` or the attribute
