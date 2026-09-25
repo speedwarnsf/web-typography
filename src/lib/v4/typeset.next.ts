@@ -160,6 +160,9 @@ const authorTexts = new WeakMap<HTMLElement, string>();
 const measurements = new WeakMap<Document, Map<string, Map<string, number>>>();
 const fontVersions = new WeakMap<Document, { epoch: number }>();
 const fontIds = new WeakMap<FontFace, number>();
+// WebKit may collect and re-create the wrapper of a face nothing references,
+// which a WeakMap would count as a new face: every key would change once.
+const fontsSeen = new WeakMap<Document, FontFace[]>();
 let nextFontId = 0;
 function fontVersion(doc: Document): string {
   let version = fontVersions.get(doc);
@@ -171,11 +174,13 @@ function fontVersion(doc: Document): string {
   }
   // FontFace objects can be added already loaded, or replaced while the set
   // remains "loaded". Those changes need not fire a loadingdone event.
-  const faces: string[] = [];
+  const faces: string[] = [], seen: FontFace[] = [];
   doc.fonts?.forEach(face => {
     if (!fontIds.has(face)) fontIds.set(face, ++nextFontId);
+    seen.push(face);
     faces.push([fontIds.get(face), face.family, face.status, face.weight, face.style, face.stretch].join(':'));
   });
+  fontsSeen.set(doc, seen);
   return version.epoch + '|' + faces.join('|');
 }
 const excluded = '[data-no-typeset], pre, code, script, style, template, textarea, input, select, button, nav, [contenteditable]:not([contenteditable="false"])';

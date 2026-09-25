@@ -50,17 +50,22 @@ export function childrenKey(children: ReactNode): string {
 }
 
 const fontIds = new WeakMap<FontFace, number>();
+// WebKit may collect and re-create the wrapper of a face nothing references,
+// which a WeakMap would count as a new face: every key would change once.
+const fontsSeen = new WeakMap<Document, FontFace[]>();
 let nextFont = 0;
 /** Every FontFace and its status. A face can be added already loaded, or
  * replaced while the set stays loaded, without any loading event. */
 export function fontKey(doc: Document): string {
   const fonts = doc.fonts as FontFaceSet | undefined;
   if (!fonts) return '';
-  const faces: string[] = [fonts.status];
+  const faces: string[] = [fonts.status], seen: FontFace[] = [];
   fonts.forEach(face => {
     if (!fontIds.has(face)) fontIds.set(face, ++nextFont);
+    seen.push(face);
     faces.push(fontIds.get(face) + ':' + face.status);
   });
+  fontsSeen.set(doc, seen);
   return faces.join('|');
 }
 
