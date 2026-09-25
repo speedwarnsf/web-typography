@@ -26,6 +26,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      # test:release includes verify-recipe-reproduces, which re-packs 4.2.0.
+      - name: The npm that packs release tarballs
+        run: npm install -g npm@11.6.0
+
       - name: Install dependencies
         run: npm ci
 
