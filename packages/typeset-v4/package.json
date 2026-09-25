@@ -13,7 +13,7 @@
   "types": "./dist/typeset.release.d.ts",
   "jsdelivr": "./dist/typeset.global.js",
   "unpkg": "./dist/typeset.global.js",
-  "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"] } },
+  "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"], "global": ["dist/global.d.ts"], "go": ["dist/go.d.ts"], "auto": ["dist/go.d.ts"] } },
   "exports": {
     ".": {
       "import": { "types": "./dist/typeset.release.d.ts", "default": "./dist/index.js" },
@@ -26,7 +26,7 @@
     },
     "./global": { "types": "./dist/global.d.ts", "default": "./dist/typeset.global.js" },
     "./go": { "types": "./dist/go.d.ts", "default": "./dist/go.js" },
-    "./auto": "./dist/auto.js",
+    "./auto": { "types": "./dist/go.d.ts", "default": "./dist/auto.js" },
     "./styles.css": "./dist/styles.css",
     "./capabilities.json": "./capabilities.json",
     "./package.json": "./package.json"

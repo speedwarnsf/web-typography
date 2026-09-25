@@ -355,7 +355,8 @@ Outside the changes below, 0 of these differ in any engine.
   `.d.cts`), so CommonJS consumers are not told the package is ESM-only;
   `./react` has a `default` condition; `./global` and `./go` ship
   `global.d.ts` and `go.d.ts` declaring `window.Typeset` and
-  `window.TypesetReady`. `react-dom`, which the React entry imports for
+  `window.TypesetReady`, `./auto` has the same types as `./go`, and
+  `typesVersions` maps all three for `moduleResolution: node`. `react-dom`, which the React entry imports for
   `flushSync`, is an optional peer beside `react`.
 - `mount('article p', options)`, the same as `mount(document, 'article p',
   options)`; a string first argument used to throw.

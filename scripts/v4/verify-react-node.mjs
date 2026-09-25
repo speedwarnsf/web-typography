@@ -57,6 +57,23 @@ for (const [major, types] of /** @type {const} */ ([['18', join(env.modules, '@t
   check(`TypeScript: typeset.us/react with @types/react ${major} accepts wider hosts, refs, onResult and priority, and rejects the rest`, run.status === 0, (run.stdout + run.stderr).split('\n').filter(Boolean).slice(0, 12));
 }
 
+// The script-tag entries' globals, through the package's own exports map:
+// typeset.us/auto and typeset.us/go declare window.Typeset and TypesetReady,
+// typeset.us/global window.Typeset.
+{
+  const consumer = join(work, 'globals');
+  await mkdir(join(consumer, 'node_modules/typeset.us'), { recursive: true });
+  await cp(declarations, join(consumer, 'node_modules/typeset.us/dist'), { recursive: true });
+  await copyFile('packages/typeset-v4/package.json', join(consumer, 'node_modules/typeset.us/package.json'));
+  for (const [entry, body] of /** @type {const} */ ([['auto', 'const c = await window.TypesetReady; c.refresh(); window.Typeset.auditJSON();'],
+    ['go', 'const c = await window.TypesetReady; c.disconnect(); window.Typeset.auditJSON();'], ['global', 'window.Typeset.typeset(document.body);']])) {
+    await writeFile(join(consumer, `${entry}.ts`), `import 'typeset.us/${entry}';\n${body}\nexport {};\n`);
+    await writeFile(join(consumer, `tsconfig.${entry}.json`), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, skipLibCheck: false, target: 'es2022', module: 'esnext', moduleResolution: 'bundler', lib: ['es2022', 'dom'], types: [] }, files: [`${entry}.ts`] }, null, 2));
+    const run = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(consumer, `tsconfig.${entry}.json`)], { encoding: 'utf8', timeout: 120000 });
+    check(`TypeScript: import 'typeset.us/${entry}' types the globals it sets`, run.status === 0, (run.stdout + run.stderr).split('\n').filter(Boolean).slice(0, 6));
+  }
+}
+
 // ---------- test runners: jsdom and happy-dom ----------
 const lanes = resolve('output/react-node/lanes');
 await rm(lanes, { recursive: true, force: true });

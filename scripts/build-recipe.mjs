@@ -132,12 +132,12 @@ export async function emitDeclarations({ root, distDir, declarationDir, tsc = jo
     // CJS consumers are not told the package is ESM-only (FalseESM).
     if (exports.includes('.d.cts')) await writeFile(join(root, distDir, file.replace(/\.d\.ts$/, '.d.cts')), text.replace(/(from\s+['"]\.\.?\/[^'"]+)\.js(['"])/g, '$1.cjs$2'));
   }
-  // Globals set by the script-tag builds (./global and ./go).
+  // Globals set by the script-tag builds (./global, and ./go and ./auto, which share go.d.ts).
   if (exports.includes('global.d.ts')) {
     await writeFile(join(root, distDir, 'global.d.ts'), `import type * as Typeset from './typeset.release.js';
 declare global {
   interface Window {
-    /** The API, set by typeset.us/global (dist/typeset.global.js) and typeset.us/go (dist/go.js). */
+    /** The API, set by typeset.us/global (dist/typeset.global.js), typeset.us/go (dist/go.js) and typeset.us/auto (dist/auto.js). */
     Typeset: typeof Typeset;
   }
 }
@@ -147,7 +147,7 @@ export {};
 import './global.js';
 declare global {
   interface Window {
-    /** Set by typeset.us/go: resolves with the page's controller once it has mounted. */
+    /** Set by typeset.us/go and typeset.us/auto: resolves with the page's controller once it has mounted. */
     TypesetReady: Promise<Controller>;
   }
 }

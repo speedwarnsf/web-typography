@@ -53,8 +53,8 @@ try {
   check('@arethetypeswrong/cli --pack: "." and "./react" resolve with matching types in node10, node16 (CJS and ESM) and bundler (no FalseESM)', attw.status === 0, (attw.stdout + attw.stderr).split('\n').slice(0, 30));
   // The script-tag builds are browser scripts, never require()d; their types
   // declare the globals they set.
-  const scripts = run('npx', ['--no-install', 'attw', '--pack', stage, '--entrypoints', './global', './go', '--profile', 'esm-only', '--format', 'table-flipped'], consumer);
-  check('@arethetypeswrong/cli --pack: "./global" and "./go" have types (ESM and bundler resolution)', scripts.status === 0, (scripts.stdout + scripts.stderr).split('\n').slice(0, 30));
+  const scripts = run('npx', ['--no-install', 'attw', '--pack', stage, '--entrypoints', './global', './go', './auto', '--profile', 'esm-only', '--format', 'table-flipped'], consumer);
+  check('@arethetypeswrong/cli --pack: "./global", "./go" and "./auto" have types (ESM and bundler resolution)', scripts.status === 0, (scripts.stdout + scripts.stderr).split('\n').slice(0, 30));
   const publint = run('npx', ['--no-install', 'publint', '--strict', stage], consumer);
   check('publint --strict is clean', publint.status === 0 && !/Warnings?:|Errors?:/.test(publint.stdout), (publint.stdout + publint.stderr).split('\n').slice(0, 30));
 

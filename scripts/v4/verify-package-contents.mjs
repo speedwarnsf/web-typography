@@ -58,7 +58,8 @@ try {
   check('relative links in packaged docs name files in the package', broken.length === 0, broken);
 
   // K6: the automatic loader on npm, and CDN defaults that run in a browser.
-  check('exports ./auto -> dist/auto.js, packed', pkg.exports?.['./auto'] === './dist/auto.js' && files.has('dist/auto.js'), pkg.exports);
+  check('exports ./auto -> dist/auto.js with the loader globals\' types (go.d.ts), packed', pkg.exports?.['./auto']?.default === './dist/auto.js' && pkg.exports?.['./auto']?.types === './dist/go.d.ts'
+    && files.has('dist/auto.js') && files.has('dist/go.d.ts') && pkg.typesVersions?.['*']?.auto?.[0] === 'dist/go.d.ts', { auto: pkg.exports?.['./auto'], typesVersions: pkg.typesVersions });
   check('dist/auto.js is side-effectful (never tree-shaken away)', pkg.sideEffects?.includes('./dist/auto.js'), pkg.sideEffects);
   check('bare jsDelivr and unpkg URLs serve the browser global, not CommonJS', pkg.jsdelivr === './dist/typeset.global.js' && pkg.unpkg === './dist/typeset.global.js' && files.has('dist/typeset.global.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
   const siteGo = artifacts.siteGo;
