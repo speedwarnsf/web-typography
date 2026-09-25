@@ -21,13 +21,22 @@ const script = await readFile(artifacts.bundle, 'utf8');
 const corpus = JSON.parse(await readFile('tests/v4-corpus.json', 'utf8')).paragraphs.slice(0, 40);
 const escape = (/** @type {string} */ text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const paragraphs = corpus.map((/** @type {string} */ text, /** @type {number} */ i) => `<p${i % 5 === 0 ? ' class="vw"' : ''}>${escape(text)}</p>`).join('');
-const page = `<!doctype html><html lang="en"><head><style>
+const page = `<!doctype html><html lang="en"><head><title>Storms</title><link rel="icon" href="data:,a"><style>
 body{margin:0;font:17px/1.5 Georgia,serif}article{width:560px;padding:0 16px}
 .theme p{font-size:19px;letter-spacing:.01em}.scaled{transform:scale(.9);transform-origin:0 0}.zoomed{zoom:1.1}
 p.vw{font-size:clamp(12px,2.1vw,30px);width:480px}
 </style></head><body><div id="shell"><div id="wrap"><article>${paragraphs}</article></div></div>
 <article id="notes">${Array.from({ length: 400 }, (_, i) => `<p>Note ${i + 1}.</p>`).join('')}</article><ul id="list"></ul></body></html>`;
 
+// Writes to <head> that change no stylesheet (4.3's first candidates took
+// each for a stylesheet change and rechecked every block).
+const HEAD_STORM = `frames(20, i => {
+  document.title = 'Tick ' + i;
+  const script = document.createElement('script'); script.type = 'application/json'; script.textContent = '{}'; document.head.append(script);
+  const meta = document.createElement('meta'); meta.name = 'tick'; meta.content = String(i); document.head.append(meta);
+  const link = document.createElement('link'); link.rel = 'preconnect'; link.href = 'https://example.invalid/' + i; document.head.append(link);
+  document.querySelector('link[rel=icon]').href = 'data:,' + i;
+})`;
 const reactTexts = corpus.slice(0, 16);
 const reactFixture = (await build({
   stdin: { contents: `
@@ -39,7 +48,7 @@ flushSync(() => createRoot(document.getElementById('app')).render(${JSON.stringi
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
-const reactPage = `<!doctype html><html lang="en"><head><style>body{margin:16px;font:17px/1.5 Georgia,serif}#wrap{width:560px}#wrap.big{font-size:21px}#wrap.ease{transition:font-size 1.2s linear}</style>
+const reactPage = `<!doctype html><html lang="en"><head><title>Storms</title><link rel="icon" href="data:,a"><style>body{margin:16px;font:17px/1.5 Georgia,serif}#wrap{width:560px}#wrap.big{font-size:21px}#wrap.ease{transition:font-size 1.2s linear}</style>
 <script>
 window.styleReads = 0; const read = window.getComputedStyle; window.getComputedStyle = function () { window.styleReads++; return read.apply(this, arguments); };
 window.longTasks = []; try { new PerformanceObserver(list => { for (const e of list.getEntries()) window.longTasks.push(Math.round(e.duration)); }).observe({ type: 'longtask' }); } catch {}
@@ -101,6 +110,8 @@ for (const { name, engine, executablePath } of browsers) {
       ['30 toggles of a body class with no styles', `frames(30, () => document.body.classList.toggle('menu-open'))`],
       ['60 frames of a scroll-linked custom property on html', `frames(60, i => document.documentElement.style.setProperty('--scroll', String(i / 60)))`],
       ['60 frames of an ancestor fade and slide', `frames(60, i => { const s = document.getElementById('shell').style; s.opacity = String(1 - i / 120); s.translate = (i % 7) + 'px 0'; })`],
+      // A ticking title, a tag manager's scripts, a favicon badge: no stylesheet.
+      ['20 frames of <head> writes (title, script, meta, preconnect, favicon href)', HEAD_STORM],
     ])) {
       const result = await tab.evaluate(async run => {
         const w = /** @type {any} */ (window);
@@ -111,8 +122,8 @@ for (const { name, engine, executablePath } of browsers) {
         return { compositions: w.controller.stats.compositions - before, passes: w.controller.stats.passes - passes, unchanged: html === [...document.querySelectorAll('article p')].map(p => p.innerHTML).join(''), stale: w.stale() };
       }, run);
       check(`${label}: 0 compositions`, result.compositions === 0 && result.unchanged && result.stale === 0, result);
-      // A translation or fade moves no line: not even a layout-key recheck.
-      if (/transform|fade/.test(label)) check(`${label}: no recheck pass at all`, result.passes === 0, result);
+      // A translation, a fade or a <head> write that adds no stylesheet moves no line: not even a layout-key recheck.
+      if (/transform|fade|head/.test(label)) check(`${label}: no recheck pass at all`, result.passes === 0, result);
     }
     await tab.evaluate(() => { const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap')); wrap.style.transform = ''; document.documentElement.style.removeProperty('--scroll'); const shell = /** @type {HTMLElement} */ (document.getElementById('shell')); shell.style.opacity = ''; shell.style.translate = ''; });
 
@@ -222,6 +233,14 @@ for (const { name, engine, executablePath } of browsers) {
       return { styleReads: w.styleReads, compositions: w.compositions, intact: w.intact() };
     });
     check('React: a translate and fade storm on the container reads no computed style and composes nothing', storm.styleReads < 50 && storm.compositions === 0 && storm.intact === 16, storm);
+    const head = await react.evaluate(async run => {
+      const w = /** @type {any} */ (window);
+      w.styleReads = 0; w.compositions = 0;
+      await (0, eval)(run);
+      await new Promise(r => setTimeout(r, 500));
+      return { styleReads: w.styleReads, compositions: w.compositions, intact: w.intact() };
+    }, HEAD_STORM);
+    check('React: <head> writes that add no stylesheet (title, script, meta, preconnect, favicon href) read no computed style and compose nothing', head.styleReads < 50 && head.compositions === 0 && head.intact === 16, head);
     if (name === 'chromium') {
       const cdp = await reactContext.newCDPSession(react);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });

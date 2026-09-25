@@ -561,7 +561,9 @@ table.
   on-screen reveals compose for at most 24 ms before the frame and
   offscreen revealed text waits until it is near.
 - Per document the engine now adds one lifecycle hub: one MutationObserver
-  (stylesheets and the translation class), three document listeners
+  (stylesheets and the translation class; other `<head>` writes, such as a
+  ticking title, an injected script or a favicon badge, trigger no
+  recheck), three document listeners
   (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
   one more font listener, shared by every controller and adapter.
 - Download, gzip (esbuild bundles importing one entry point, tree-shaken):

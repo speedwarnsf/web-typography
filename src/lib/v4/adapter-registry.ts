@@ -32,7 +32,7 @@ import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, styleMutation, subscribe, translationActive } from './lifecycle';
 import type { NearObserver } from './lifecycle';
 
 export type Priority = 'auto' | 'sync';
@@ -315,7 +315,9 @@ function createRegistry(doc: Document): Registry {
       // commits of TypesetRichText leave its layout key unchanged.
       if (host) { if (!pending.has(host)) enqueue(host, 'check'); continue; }
       if (record.type === 'attributes') targets.add(target);
-      else if (target.closest('head') || target.localName === 'style') styles = true;
+      // A stylesheet edit; a <title> tick or an injected <script> in <head>
+      // changes no text metrics (see styleMutation).
+      else if (target.closest('head') ? styleMutation(record) : target.localName === 'style') styles = true;
     }
     if (styles) { check(); return; }
     // An attribute on an element with no element children can only affect

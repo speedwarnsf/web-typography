@@ -42,6 +42,26 @@ export function translationActive(doc: Document): boolean {
 // Transforms too: text declined as transformed mid-transition composes once it ends.
 const metric = /^(?:font|letter-spacing|word-spacing|line-height|text-transform|text-indent|tab-size|transform$|scale$|rotate$|zoom$)/u;
 
+/** A <style> element or a stylesheet <link>; with `holding`, also an
+ * element added or removed with one inside. */
+function sheetNode(node: Node | null, holding = false): boolean {
+  if (node?.nodeType !== 1) return false;
+  const el = node as Element;
+  return el.localName === 'style' || (el.localName === 'link' && /(?:^|\s)stylesheet(?:\s|$)/iu.test(el.getAttribute('rel') || ''))
+    || (holding && !!el.querySelector?.('style, link[rel~="stylesheet" i]'));
+}
+/** Whether a mutation in <head> can change how text is laid out: a
+ * stylesheet added, removed, edited or switched. A ticking <title>, an
+ * injected <script> or <meta>, a preconnect or a favicon badge's href moves
+ * nothing, and rechecking every block for each cost continuous main-thread
+ * time. The registry's own MutationObserver uses the same test. */
+export function styleMutation(record: MutationRecord): boolean {
+  if (record.type === 'characterData') return record.target.parentElement?.localName === 'style';
+  if (record.type === 'childList') return sheetNode(record.target) || [...record.addedNodes, ...record.removedNodes].some(node => sheetNode(node, true));
+  // media, disabled, href or rel on a stylesheet, or rel switched away from one.
+  return sheetNode(record.target) || (record.attributeName === 'rel' && /(?:^|\s)stylesheet(?:\s|$)/iu.test(record.oldValue || ''));
+}
+
 function notify(hub: Hub, call: (client: LifecycleClient) => void): void {
   for (const client of [...hub.clients]) call(client);
 }
@@ -171,7 +191,7 @@ function start(doc: Document): Hub {
     let styles = false, rootClass = false;
     for (const record of records) {
       if (record.target === doc.documentElement && record.type === 'attributes') rootClass = true;
-      else styles = true;
+      else if (styleMutation(record)) styles = true;
     }
     if (rootClass) {
       const classed = translatedClass(doc);
@@ -184,7 +204,7 @@ function start(doc: Document): Hub {
     if (styles) { notify(hub, client => client.styles?.()); armFonts(doc); }
   });
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class'] });
-  if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
+  if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
   const faces = doc.fonts as FontFaceSet | undefined;
   faces?.addEventListener?.('loadingdone', fonts);
   faces?.addEventListener?.('loading', loading);
