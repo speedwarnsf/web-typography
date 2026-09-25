@@ -2,14 +2,16 @@
 // Renders docs/BENCHMARKS.md from a bench-v4.mjs result, so the published
 // numbers are always the output of the benchmark rather than prose.
 //
-//   node scripts/v4/bench-report.mjs <bench.json> [--out docs/BENCHMARKS.md] [--baseline <bench.json>]
+//   node scripts/v4/bench-report.mjs <bench.json> [--out docs/BENCHMARKS.md] [--baseline <bench.json>] [--sizes <sizes.json>]
 //
 // --baseline adds a table comparing the headline numbers with an earlier run
-// (for example 4.2.0, measured back to back on the same machine).
+// (for example 4.2.0, measured back to back on the same machine). --sizes
+// takes the size table from a later bench-sizes.mjs measurement, {label,
+// sizes}, when the code has changed since the timed run.
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' }, baseline: { type: 'string' } } });
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' }, baseline: { type: 'string' }, sizes: { type: 'string' } } });
 if (!positionals[0]) throw new Error('Usage: bench-report.mjs <bench.json> [--out file] [--baseline <bench.json>]');
 const bench = JSON.parse(await readFile(positionals[0], 'utf8'));
 const baseline = values.baseline ? JSON.parse(await readFile(values.baseline, 'utf8')) : null;
@@ -60,7 +62,7 @@ const reading = [];
   const plain = get('chromium@1x', 'react-plain-38'), text = get('chromium@1x', 'react-typeset-38'), text4 = get('chromium@4x', 'react-typeset-38'), plain4 = get('chromium@4x', 'react-plain-38');
   if (plain && text && !text.error) reading.push(text.counts.resizeObservers > 1
     ? `One \`mount()\` creates one observer of each kind however many paragraphs it owns. Each React block creates its own controller: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObservers and ${text.counts.windowListeners} window listeners, and commit in ${ms(text.commitMs)} against ${ms(plain.commitMs)} for plain React${text4 && plain4 ? ` (${ms(text4.commitMs)} against ${ms(plain4.commitMs)} at 4x)` : ''}, although ${text.outcomes?.['native:fits'] ?? 0} of the 38 end as native:fits.`
-    : `One \`mount()\` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers (the registry's and the document lifecycle hub's) with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObserver and ${text.counts.windowListeners} window listener, and commit in ${ms(text.commitMs)} against ${ms(plain.commitMs)} for plain React${text4 && plain4 ? ` (${ms(text4.commitMs)} against ${ms(plain4.commitMs)} at 4x)` : ''}; blocks on screen compose before the first paint and the rest in idle time.`);
+    : `One \`mount()\` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create ${text.counts.mutationObservers} MutationObservers (the registry's and the document lifecycle hub's) with ${n(text.counts.mutationObserve)} observe calls, ${text.counts.resizeObservers} ResizeObserver and ${text.counts.windowListeners} window listener. Their screen reaches its first paint in ${ms(text.inpProxyMs)} against ${ms(plain.inpProxyMs)} for plain React${text4 && plain4 ? ` (${ms(text4.inpProxyMs)} against ${ms(plain4.inpProxyMs)} at 4x, with a ${ms(text4.longestTaskMs)} task before that paint)` : ''}: the commit (${ms(text.commitMs)}) holds only what fits a 6 ms budget, and blocks on screen compose in the next frame, before it paints, the rest in idle time.`);
   const wkFont = get('webkit@1x', 'late-font');
   if (wkFont && !wkFont.error) reading.push(wkFont.staleAfterFont ? `WebKit does not recompose after a web font that CSS applies late: ${wkFont.staleAfterFont} of ${wkFont.composed} composed paragraphs were left with breaks measured for the old font.` : 'After a late web font, every composed paragraph was recomposed in each engine.');
   const storm = get('chromium@1x', 'storm');
@@ -102,7 +104,9 @@ if (baseline) {
     row(lane, 'late-font', r => `${r.staleAfterFont} of ${r.composed}`, 'Late web font: paragraphs left stale', String);
   }
 }
-const sizes = bench.sizes ? Object.entries(bench.sizes).map(([name, s]) => [name, n(/** @type {any} */ (s).min), n(/** @type {any} */ (s).gzip), n(/** @type {any} */ (s).brotli)]) : [];
+const later = values.sizes ? JSON.parse(await readFile(values.sizes, 'utf8')) : null;
+const sizeSource = later?.sizes ?? bench.sizes;
+const sizes = sizeSource ? Object.entries(sizeSource).map(([name, s]) => [name, n(/** @type {any} */ (s).min), n(/** @type {any} */ (s).gzip), n(/** @type {any} */ (s).brotli)]) : [];
 const env = bench.environment ?? {};
 const text = `# Benchmarks
 
@@ -147,9 +151,12 @@ ${table(['Lane', 'Paragraphs', 'Visible', 'Ready', 'Idle passes', 'Long tasks / 
 
 A trusted click renders a screen of blocks under 15 wrapper elements: short
 labels, with one block in four a paragraph (a link in TypesetRichText).
-*Commit* runs from the click handler to the screen's layout effect, which
-includes the adapters' synchronous composition; *INP proxy* is the largest
-Event Timing duration of the click (Chromium only).
+*Commit* runs from the click handler to the screen's layout effect. It
+includes only the composition that fits the adapters' 6 ms commit budget
+(4.2.0 composed every block there); the rest of the on-screen work runs in
+the next animation frame, before it paints, so compare builds by the *INP
+proxy*, the largest Event Timing duration of the click (Chromium only),
+which includes it.
 
 ${table(['Lane', 'Blocks', 'Commit', 'INP proxy', 'Long tasks / TBT', 'Longest task', 'Observers (MO / RO / IO)', 'MO observe calls', 'Window / font listeners', 'Outcomes'], react)}
 
@@ -160,7 +167,8 @@ ${table(['Lane', 'Scenario', 'Work', 'Time to settle', 'Long tasks / TBT', 'DOM 
 ## Bundle size
 
 esbuild bundles (minified, tree-shaken) importing one entry point from the
-package, React external, and the shipped browser files. Bytes.
+package, React external, and the shipped browser files; *no-tree-shaking* is
+what a bundler that does not tree-shake (Metro) ships. Bytes${later ? `, measured on ${later.label} (the timings above predate it)` : ''}.
 
 ${table(['What a consumer imports', 'Minified', 'gzip', 'brotli'], sizes)}
 

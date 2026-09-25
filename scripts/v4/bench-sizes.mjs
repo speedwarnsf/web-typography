@@ -9,9 +9,9 @@ import { join, resolve } from 'node:path';
 /** @param {Uint8Array} bytes */
 const sizes = bytes => ({ min: bytes.length, gzip: gzipSync(bytes, { level: 9 }).length, brotli: brotliCompressSync(bytes).length });
 
-/** @param {string} contents @param {string[]} [external] */
-async function bundleSize(contents, external = []) {
-  const result = await build({ stdin: { contents, resolveDir: process.cwd(), loader: 'js' }, bundle: true, minify: true, write: false, format: 'esm', target: 'es2022', external, treeShaking: true, logLevel: 'silent' });
+/** @param {string} contents @param {string[]} [external] @param {boolean} [treeShaking] */
+async function bundleSize(contents, external = [], treeShaking = true) {
+  const result = await build({ stdin: { contents, resolveDir: process.cwd(), loader: 'js' }, bundle: true, minify: true, write: false, format: 'esm', target: 'es2022', external, treeShaking, logLevel: 'silent' });
   return sizes(result.outputFiles[0].contents);
 }
 
@@ -24,6 +24,9 @@ export async function measureSizes(dir) {
     'TypesetRichText-only': await bundleSize(`import { TypesetRichText } from ${react}; globalThis.x = TypesetRichText;`, ['react', 'react-dom']),
     'smartQuotes-only': await bundleSize(`import { smartQuotes } from ${esm}; globalThis.x = smartQuotes;`),
     'react.js+shared': await bundleSize(`export * from ${react};`, ['react', 'react-dom']),
+    // What a bundler that does not tree-shake ships for TypesetText (Metro,
+    // the Expo and React Native Web default): all of react.js and its chunk.
+    'TypesetText-no-tree-shaking': await bundleSize(`import { TypesetText } from ${react}; globalThis.x = TypesetText;`, ['react', 'react-dom'], false),
     'go.js': sizes(await readFile(join(dir, 'go.js'))),
     'typeset.global.js': sizes(await readFile(join(dir, 'typeset.global.js'))),
   };

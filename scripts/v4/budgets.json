@@ -3,13 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 47311,
-      "TypesetText-only": 46833,
-      "TypesetRichText-only": 42795,
+      "mount-only": 48661,
+      "TypesetText-only": 48496,
+      "TypesetRichText-only": 44492,
       "smartQuotes-only": 1349,
-      "react.js+shared": 49898,
-      "go.js": 53453,
-      "typeset.global.js": 53116
+      "react.js+shared": 51812,
+      "TypesetText-no-tree-shaking": 60505,
+      "go.js": 54853,
+      "typeset.global.js": 54516
     },
     "raised": [
       {
@@ -89,6 +90,28 @@
           "react.js+shared": 49898,
           "go.js": 53453,
           "typeset.global.js": 53116
+        }
+      },
+      {
+        "by": "4.3 review fixes, round 2",
+        "reason": "Measured per commit with the release recipe on typeset.global.js (react.js+shared in parentheses): releasing offscreen stale text +77 B (+1), moving word spaces in the translation release +76 B (+66), merging split nodes and straightening quotes when a translation ends +257 B (+237), live regions through shadow roots +86 B (+96), stable FontFace keys +12 B (+18), keeping compositions under transforms and awaiting their animations +229 B (+322), putting the lifecycle sheet back +102 B (+72), nearness per scroll container +186 B (+190), comment-held lines left untracked +64 B (+68), sentence ends after etc., a.m., p.m. and No. +268 B (+280), capital letters bound to their noun +22 B (+36), elisions in the audit +10 B; React-only: TypesetText and TypesetRichText hidden-subtree keys (+45), the registry's translation and fade filter (+222), continuous metric settling (+99) and the component-child development warning (+162). smartQuotes-only is unchanged. TypesetText-no-tree-shaking is new: what a bundler without tree shaking (Metro, the Expo and React Native Web default) ships for TypesetText; 4.2.0: 43,196 B.",
+        "before": {
+          "mount-only": 47311,
+          "TypesetText-only": 46833,
+          "TypesetRichText-only": 42795,
+          "smartQuotes-only": 1349,
+          "react.js+shared": 49898,
+          "go.js": 53453,
+          "typeset.global.js": 53116
+        },
+        "after": {
+          "mount-only": 48661,
+          "TypesetText-only": 48496,
+          "TypesetRichText-only": 44492,
+          "smartQuotes-only": 1349,
+          "react.js+shared": 51812,
+          "go.js": 54853,
+          "typeset.global.js": 54516
         }
       }
     ]
@@ -226,7 +249,7 @@
   "calibrated": {
     "size": {
       "date": "2026-09-25",
-      "dist": "output/candidate/dist"
+      "dist": "output/fx2/dist (the round 2 candidate)"
     },
     "runtime": {
       "date": "2026-09-25",
@@ -547,6 +570,55 @@
           "from": 51726,
           "to": 53116,
           "reason": "as mount-only"
+        }
+      ],
+      "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 review fixes, round 2",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 47311,
+          "to": 48661,
+          "reason": "stale release, translation release and settle, shadow-root live regions, transforms, the lifecycle sheet, scroll-container nearness, comment-held lines, C13 sentence ends (see size.raised, round 2)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 46833,
+          "to": 48496,
+          "reason": "as mount-only, plus the adapter's hidden-subtree and transform-only keys, the registry's fade filter and continuous metric settling"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 42795,
+          "to": 44492,
+          "reason": "as TypesetText-only, plus the component-child development warning"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 49898,
+          "to": 51812,
+          "reason": "as TypesetText-only and TypesetRichText-only together"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 53453,
+          "to": 54853,
+          "reason": "as mount-only"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 53116,
+          "to": 54516,
+          "reason": "as mount-only"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": null,
+          "to": 60505,
+          "reason": "new: TypesetText as a bundler without tree shaking ships it (4.2.0: 43,196 B)"
         }
       ],
       "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"

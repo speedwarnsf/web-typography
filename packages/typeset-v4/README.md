@@ -202,12 +202,19 @@ Composition runs in the browser, on the main thread.
 - `mount()` composes what is on screen first: the first viewport of a
   200-paragraph article was done in about 55 ms (230 ms at 4x), with the
   rest finished in the background in batches that yield to the page.
-- React: one registry per document serves every block, and a screen of 38
-  `TypesetText` blocks commits in about 20 ms at 4x CPU. Re-renders that
+- React: one registry per document serves every block. Pushing a screen of
+  38 `TypesetText` blocks at 4x CPU takes about 150 ms from the click to
+  its first paint (Event Timing; 4.2.0: 230 ms, plain React: 55 ms), most
+  of it one task of about 120 ms before that paint: the commit itself stays
+  near 20 ms because only about 6 ms of composition runs inside it, and
+  the rest of the on-screen work runs in the next frame. Re-renders that
   change nothing write nothing.
-- Download, gzip: 53.5 KB for `go@4.3.0.js` or `auto.js`, 47.3 KB for a
-  bundle that imports only `mount`, 46.8 KB for `TypesetText`. No runtime
-  dependencies.
+- Download, gzip: 54.9 KB for `go@4.3.0.js` or `auto.js`; with esbuild,
+  Rollup, webpack or Vite, which tree-shake, 48.7 KB for a bundle that
+  imports only `mount` and 48.5 KB for `TypesetText`. A bundler that does
+  not tree-shake, such as Metro (Expo, React Native Web), ships all of
+  `typeset.us/react`: 60.5 KB for `TypesetText` (4.2.0: 43.2 KB). No
+  runtime dependencies.
 
 These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the
 same machine. Full tables, the method and the comparison:

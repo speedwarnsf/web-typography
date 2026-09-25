@@ -45,7 +45,7 @@ leave — the first two hours of answering comments decide the thread.
 > What it doesn't do: hyphenation, justification, right-to-left or non-Latin
 > scripts. Languages: English, French, German, Spanish. Cost: about 5 ms
 > per paragraph on an M2 laptop, about 21 ms with the CPU slowed 4x; the
-> first screen of a 200-paragraph article is done in about 55 ms. 53 KB
+> first screen of a 200-paragraph article is done in about 55 ms. 55 KB
 > gzipped for the script tag, no dependencies, no telemetry. MIT.
 >
 > Try it on your own site at https://typeset.us/fix. If it breaks a line

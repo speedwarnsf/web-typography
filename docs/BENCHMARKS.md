@@ -134,9 +134,12 @@ MutationObserver / ResizeObserver / IntersectionObserver instances created.
 
 A trusted click renders a screen of blocks under 15 wrapper elements: short
 labels, with one block in four a paragraph (a link in TypesetRichText).
-*Commit* runs from the click handler to the screen's layout effect, which
-includes the adapters' synchronous composition; *INP proxy* is the largest
-Event Timing duration of the click (Chromium only).
+*Commit* runs from the click handler to the screen's layout effect. It
+includes only the composition that fits the adapters' 6 ms commit budget
+(4.2.0 composed every block there); the rest of the on-screen work runs in
+the next animation frame, before it paints, so compare builds by the *INP
+proxy*, the largest Event Timing duration of the click (Chromium only),
+which includes it.
 
 | Lane | Blocks | Commit | INP proxy | Long tasks / TBT | Longest task | Observers (MO / RO / IO) | MO observe calls | Window / font listeners | Outcomes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -170,23 +173,24 @@ Event Timing duration of the click (Chromium only).
 ## Bundle size
 
 esbuild bundles (minified, tree-shaken) importing one entry point from the
-package, React external, and the shipped browser files. Bytes, measured
-after the first round of review fixes (the timings above predate them).
+package, React external, and the shipped browser files; *no-tree-shaking* is
+what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the candidate after the second round of review fixes (the timings above predate it).
 
 | What a consumer imports | Minified | gzip | brotli |
 |---|---|---|---|
-| mount-only | 119,973 | 47,311 | 41,831 |
-| TypesetText-only | 118,913 | 46,833 | 41,321 |
-| TypesetRichText-only | 104,688 | 42,795 | 38,003 |
+| mount-only | 123,936 | 48,661 | 42,965 |
+| TypesetText-only | 123,849 | 48,496 | 42,722 |
+| TypesetRichText-only | 109,352 | 44,492 | 39,434 |
 | smartQuotes-only | 2,450 | 1,349 | 1,244 |
-| react.js+shared | 129,267 | 49,898 | 44,164 |
-| go.js | 136,227 | 53,453 | 46,589 |
-| typeset.global.js | 135,319 | 53,116 | 46,422 |
+| react.js+shared | 134,765 | 51,812 | 45,706 |
+| TypesetText-no-tree-shaking | 159,002 | 60,505 | 52,662 |
+| go.js | 140,223 | 54,853 | 47,935 |
+| typeset.global.js | 139,315 | 54,516 | 47,578 |
 
 ## Reading the numbers
 
 - Composition runs on the main thread. `mount()` composes the first viewport first and yields after about 8 ms of work, but a single paragraph can exceed a frame: at 4x CPU its long tasks reach 133 ms, and a 200-paragraph page accumulates 396 ms of blocking time (3,501 ms for 1,000 paragraphs, which take 47,132 ms to finish).
-- One `mount()` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create 2 MutationObservers (the registry's and the document lifecycle hub's) with 41 observe calls, 1 ResizeObserver and 1 window listener, and commit in 7 ms against 1 ms for plain React (19 ms against 4 ms at 4x); blocks on screen compose before the first paint and the rest in idle time.
+- One `mount()` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create 2 MutationObservers (the registry's and the document lifecycle hub's) with 41 observe calls, 1 ResizeObserver and 1 window listener. Their screen reaches its first paint in 64 ms against 40 ms for plain React (152 ms against 56 ms at 4x, with a 123 ms task before that paint): the commit (7 ms) holds only what fits a 6 ms budget, and blocks on screen compose in the next frame, before it paints, the rest in idle time.
 - After a late web font, every composed paragraph was recomposed in each engine.
 - Toggling a class on an ancestor 30 times re-ran composition 0 times over 200 paragraphs whose layout the class does not change.
 - Budgets in `scripts/v4/budgets.json` hold the size, count and time values last calibrated, with the reason for every raise (sizes on every change; time, observer and write counts nightly and at release cut).

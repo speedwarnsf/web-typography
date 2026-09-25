@@ -469,9 +469,15 @@ table.
   rechecked at all: 120 frames of an ancestor translation over 1,000
   paragraphs at 4x CPU in Chromium average 8.3 ms with none over 20 ms (the
   first 4.3 candidate: 22.8 ms, 84 of 118 over 20 ms).
-- React screens (P4, P5): pushing 38 `TypesetText` blocks commits in 19 ms
-  at 4x CPU (4.2.0: 160 ms) and 7 ms at 1x (40 ms); 1,000 blocks commit in
-  19 ms (1,446 ms) with an INP proxy of 80 ms (1,584 ms). 38
+- React screens (P4, P5): pushing 38 `TypesetText` blocks takes 152 ms from
+  the click to its first paint at 4x CPU (INP proxy; 4.2.0: 232 ms, plain
+  React: 56 ms), with one pre-paint task of 123 ms, and 64 ms at 1x (72
+  ms). The commit alone falls from 160 to 19 ms at 4x (40 to 7 ms at 1x),
+  but that is mostly work moved, not removed: 4.2.0 composed every block
+  inside the commit, while 4.3.0 composes there only what fits a 6 ms
+  budget and the rest of the on-screen blocks in the next frame, before it
+  paints. 1,000 blocks commit in 19 ms (1,446 ms) with an INP proxy of 80
+  ms (1,584 ms). 38
   `TypesetRichText` blocks commit in 23 ms at 4x (78 ms) with 941 DOM
   mutation records (3,893), and 1,000 in 38 ms (279 ms) with 0 ms of
   blocking time (5,658 ms). Every adapter in a document shares one registry:
@@ -511,12 +517,17 @@ table.
   (stylesheets and the translation class), three document listeners
   (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
   one more font listener, shared by every controller and adapter.
-- Download, gzip (esbuild bundles importing one entry point): `mount` only
-  37.7 to 47.3 KB, `TypesetText` only 38.0 to 46.8 KB, `TypesetRichText`
-  only 33.4 to 42.8 KB, `smartQuotes` only 11.7 to 1.3 KB (the line-break
-  tables now tree-shake away), `go.js` 42.3 to 53.5 KB and
-  `typeset.global.js` 42.1 to 53.1 KB. The growth is the code the fixes
-  above need, measured per group and recorded in scripts/v4/budgets.json.
+- Download, gzip (esbuild bundles importing one entry point, tree-shaken):
+  `mount` only 37.7 to 48.7 KB, `TypesetText` only 38.0 to 48.5 KB,
+  `TypesetRichText` only 33.4 to 44.5 KB, `smartQuotes` only 11.7 to 1.3 KB
+  (the line-break tables now tree-shake away), `go.js` 42.3 to 54.9 KB and
+  `typeset.global.js` 42.1 to 54.5 KB. A bundler that does not tree-shake
+  (Metro, the Expo and React Native Web default) ships all of
+  `typeset.us/react`, `dist/react.js` and its shared chunk: `TypesetText`
+  43.2 to 60.5 KB, a larger increase than any tree-shaken figure (an Expo
+  web export of one app grew by 14.3 KB gzip with the first candidate).
+  The growth is the code the fixes above need, measured per group and
+  recorded in scripts/v4/budgets.json.
 
 ### Packaging, loaders and CDN
 
