@@ -11,9 +11,14 @@ are not certification for every device, browser, font, or sentence.
   acceptance requires a real packed consumer build with the version recorded.
 - Chromium, WebKit and Firefox through Playwright. Reports record versions;
   no untested historical minimum is inferred.
-- Intl.Segmenter, ResizeObserver, MutationObserver, document.fonts and CSS
-  text-wrap required. Node 22+ for CLI/tooling.
-- ESM/CommonJS core; ESM-only client React entry; optional browser global.
+- Intl.Segmenter, ResizeObserver, MutationObserver and a layout engine are
+  required to compose. Where one is missing (jsdom and happy-dom under Jest or
+  Vitest, older engines), every entry still imports, text stays native and
+  the outcome is `native:environment`; nothing throws. document.fonts is
+  optional. Node 22+ for CLI/tooling.
+- ESM and CommonJS for both the core and the React entry (`react.cjs` for
+  `require()` and Jest); script-tag builds with typed globals (`./global`,
+  `./go`).
 
 Prefer the React adapters for text React renders. From 4.3, mount() and the
 website loader also keep framework-updated text correct: when a framework

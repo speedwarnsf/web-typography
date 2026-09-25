@@ -42,6 +42,65 @@ Hashes for every published version live in
   changed after it was composed. 4.2.0 left such blocks double-wrapped and
   its audit passed them.
 
+### React adapters
+
+- `TypesetText` and `TypesetRichText` recompose only on real changes. An
+  inline `keep={[...]}` array, fresh JSX children, inline style objects and
+  callbacks are compared by value, so a parent re-render that changes nothing
+  writes nothing: 100 such re-renders of 6 + 6 blocks went from 119,736 DOM
+  node writes to 0. `TypesetRichText` checks a computed layout key (text,
+  widths, fonts, and the computed type of the host and its descendants)
+  before replanning, so ancestor transforms and no-op class toggles cost no
+  composition, and it carries an unchanged plan's spacing, tracking and
+  hanging forward after re-verifying them instead of rebuilding them through
+  four commits.
+- During continuous resizing `TypesetRichText` shows native wrapping wherever
+  its composed lines no longer fit (host attribute `data-ts-stale`), and
+  recomposes once the size has held for 100 ms instead of on every frame.
+- The React entry imports `flushSync` from `react-dom` (external, like `react`).
+- One adapter registry per document replaces a controller per block: one
+  MutationObserver, ResizeObserver and IntersectionObserver and one set of
+  font and window listeners for every `TypesetText` and `TypesetRichText`
+  (a 38-block screen created 38 of each). A block on screen composes before
+  its first paint: in the commit while a 6 ms budget (from a learned cost per
+  character) allows, then in the next animation frame; offscreen blocks
+  compose in idle time, nearest first. A prop change of an on-screen block
+  recomposes in its commit. Unmounting no longer restores the discarded host.
+  New prop `priority?: 'auto' | 'sync'`; `'sync'` composes every block in the
+  commit, as 4.2 did. Measured on the V4 benchmark (Chromium, 38-block push):
+  commit 164 to 17 ms, INP proxy 232 to 144 ms and total blocking time 138 to
+  68 ms at 4x CPU; 1,000 blocks at 1x commit in 18 ms instead of 1,463 ms.
+- `ref` on `TypesetText` and `TypesetRichText` resolves to the host element
+  (both are `forwardRef` components; a ref was dropped before, and
+  `TypesetRichText`'s gave its class instance). `as` also accepts `div`, `li`,
+  `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
+  `legend` and `summary`, with `cite`, `colSpan`, `rowSpan`, `headers`,
+  `scope`, `htmlFor` and `value` attributes. New `onResult(result)` reports
+  each composition as a `Result`. New exported types `TypesetTag`,
+  `TypesetAdapterProps` and `Priority`.
+- Nothing throws in test runners or older engines. Under jsdom and happy-dom
+  (Jest, Vitest), and where `Intl.Segmenter`, `ResizeObserver` or
+  `MutationObserver` is missing, `typeset()` and `planRichText()` return and
+  both adapters report the new outcome `native:environment`, `mount()`
+  returns an inert controller, and `document.fonts` is optional. Importing
+  no longer constructs an `Intl.Segmenter` or inflates the Unicode line-break
+  trie (the vendored module now initializes on first use; all 19,338
+  LineBreakTest cases give identical breaks), so a missing API can no longer
+  blank an application at import, and a bundle that imports only
+  `smartQuotes` drops from 11.7 KB to 0.9 KB gzip. The script-tag builds do
+  nothing where there is no `window`.
+- Packaging: a CommonJS React entry (`dist/react.cjs`) for `require()` and
+  Jest; `.` and `./react` give `import` and `require` their own types
+  (`.d.ts` and `.d.cts`), so CommonJS consumers are no longer told the
+  package is ESM-only (attw FalseESM); `./react` has a `default` condition;
+  `./global` and `./go` ship `global.d.ts` and `go.d.ts` declaring
+  `window.Typeset` and `window.TypesetReady`. The build recipe adds these
+  files only when the package's exports name them, so a dry run at v4.2.0
+  still reproduces its tarball. The 4.3.0 tarball grows from 48 to 83 files
+  (2.57 to 3.42 MB unpacked), mostly `react.cjs` and its source map.
+- Single-line blocks skip Unicode break analysis, and a first composition no
+  longer computes an unused signature; outcomes are unchanged.
+
 ### Rendering changes
 
 Each default-output change in 4.3 is a defect fix, listed here with its
@@ -145,6 +204,15 @@ fourth with a link and emphasis) at 320, 440 and 600 px:
   composed from forced layout (4.2.0 composed it in Chromium and Firefox and
   cached `native:verification` in WebKit). `mount()` composes it when it comes
   into range. The corpus golden diff has no hidden text: 0 blocks change.
+- `TypesetRichText` plans once from the native text and no longer re-plans
+  after `document.fonts.ready` when nothing changed. 4.2.0 re-planned over
+  its own composed markup, so its final breaks could depend on that history.
+  Golden diff against 4.2.0 (60 corpus paragraphs, `TypesetText` and
+  `TypesetRichText` with and without options, 320, 390 and 560 px, three
+  engines; 2,160 settled blocks): 2 differ, both in WebKit at 320 px. In one,
+  4.3 now gives the same breaks as `typeset()` for the same markup, where
+  4.2.0's re-plan did not; the other is a block on which 4.2.0 differs from
+  itself between runs. Chromium and Firefox: 0.
 
 ### Fixed
 

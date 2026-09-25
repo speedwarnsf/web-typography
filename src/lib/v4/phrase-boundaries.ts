@@ -9,6 +9,8 @@ const nameHeads = new Set(['street', 'avenue', 'boulevard', 'road', 'lane', 'dri
 const capitalized = (text: string) => /^[('"\u2018\u201c]*\p{Lu}[\p{L}'\u2019-]*[.,;:!?!)"'\u201d\u2019]*$/u.test(text);
 const word = (text: string) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, '');
 const ends = (text: string) => /[.,;:!?)]["'”’]*$/u.test(text);
+// Created on first use: a module-level Intl.Segmenter throws at import
+// where the API is missing, taking the host application down with it.
 let sentenceSegmenter: Intl.Segmenter | undefined;
 /** English sentence boundaries. Created on first use and shared. */
 export const sentences = (): Intl.Segmenter => sentenceSegmenter ??= new Intl.Segmenter('en', { granularity: 'sentence' });

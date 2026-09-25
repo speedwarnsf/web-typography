@@ -82,7 +82,8 @@ function run(suite) {
     child.stdout.on('data', chunk => take('out', chunk));
     child.stderr.on('data', chunk => take('err', chunk));
     let timedOut = false;
-    const watchdog = setTimeout(() => { timedOut = true; try { process.kill(-(/** @type {number} */ (child.pid)), 'SIGKILL'); } catch {} }, timeoutMs);
+    // A suite may declare a longer minimum; --timeout still raises every suite.
+    const watchdog = setTimeout(() => { timedOut = true; try { process.kill(-(/** @type {number} */ (child.pid)), 'SIGKILL'); } catch {} }, Math.max(timeoutMs, (suite.timeout ?? 0) * 1000));
     child.on('exit', code => {
       clearTimeout(watchdog);
       for (const rest of [partial.out, partial.err]) if (rest) lines.push(rest);
@@ -126,7 +127,7 @@ for (const suite of selected) {
   console.log(`${status.padEnd(7)} ${suite.name.padEnd(28)} ${seconds}  ${counts}${status === 'XFAIL' ? ` (known, awaiting ${result.awaiting.join(', ')})` : ''}`);
   if (status === 'XPASS') console.log(`        Checks listed in scripts/v4/known-failures.json now pass (${fixed.map(e => e.awaiting).join(', ')}); remove those entries.`);
   if (status === 'FAIL' || status === 'TIMEOUT') {
-    if (status === 'TIMEOUT') console.log(`        ${result.file} was killed after ${values.timeout} s.`);
+    if (status === 'TIMEOUT') console.log(`        ${result.file} was killed after ${Math.max(Number(values.timeout), suite.timeout ?? 0)} s.`);
     for (const c of unexpected.slice(0, 25)) console.log(`        ${(c.browser ?? '-').padEnd(9)} ${c.label}${c.detail === undefined ? '' : '  ' + brief(c.detail)}`);
     if (unexpected.length > 25) console.log(`        ... ${unexpected.length - 25} more in ${suite.report}`);
     for (const e of errors.slice(0, 5)) console.log(`        error     ${brief(e)}`);

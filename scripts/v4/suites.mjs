@@ -1,6 +1,6 @@
 // @ts-check
 // The suites test:v4 runs, in order, and where each writes its report.
-/** @typedef {{ name: string, report?: string, note?: string }} Suite */
+/** @typedef {{ name: string, report?: string, note?: string, timeout?: number }} Suite */
 /** @type {Suite[]} */
 export const SUITES = [
   { name: 'verify-ledger', report: 'output/ledger-verification.json', note: 'published artifacts unchanged' },
@@ -35,6 +35,8 @@ export const SUITES = [
   { name: 'verify-scheduler', report: 'output/scheduler.json', note: 'busy pages, visible-first work, deferred offscreen resizes (P2)' },
   { name: 'verify-translation', report: 'output/translation.json', note: 'composition steps aside for machine translation (C10)' },
   { name: 'verify-options', report: 'output/options.json', note: 'clear errors and development option warnings (K11)' },
+  { name: 'verify-react', report: 'output/react.json', note: 'React 18 and 19 adapters in three engines: recomposition, scheduling, lifecycle, API', timeout: 360 },
+  { name: 'verify-react-node', report: 'output/react-node.json', note: 'React adapters outside a browser: TypeScript contracts' },
   { name: 'verify-tracking-clipping', report: 'output/tracking-clipping.json' },
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },

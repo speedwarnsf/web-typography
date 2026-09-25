@@ -66,7 +66,8 @@ use exhaustive search within the declared budget.
 
 ## React
 
-React is optional. The ESM-only entry includes its client-component directive:
+React is optional. The entry (ESM, and CommonJS for `require()` and Jest)
+includes its client-component directive:
 
 ```tsx
 import { TypesetRichText, TypesetText } from 'typeset.us/react';
@@ -80,6 +81,42 @@ import { TypesetRichText, TypesetText } from 'typeset.us/react';
 Use ordinary inline host markup. Independently stateful custom children retain
 native rendering. Keep one owner per subtree. Framework-updated prose must not
 also be targeted by a script loader or imperative mount. See [support](SUPPORT.md).
+
+Both adapters take the core options as props (`mode`, `keep`, `maxLines`,
+`density`, `lineBreaks`, `smartQuotes`, `opticalHanging`, `spacing`,
+`tracking`, `contour`) plus:
+
+- `as`: the host element, one of `p` (default), `h1`-`h6`, `span`, `div`, `li`,
+  `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
+  `legend` or `summary`. The engine still decides at run time: an inline host,
+  such as a `label` in running text, reports `native:inline`.
+- `ref`: resolves to the host element (object or callback refs, React 18 and 19).
+- `onResult(result)`: called after each composition with the same `Result`
+  that `typeset()` returns (outcome, lines measured before and after, feature
+  statuses), so an app can log or assert what happened without a second pass.
+- `priority`: `'auto'` (default) or `'sync'`, below.
+
+```tsx
+<ul>
+  <TypesetText as="li" text={item.text} onResult={r => log(r.outcome)} />
+</ul>
+```
+
+Component tests work as they are: under jsdom or happy-dom (Jest, Vitest)
+nothing can be measured, so both adapters render the text unchanged with
+`data-ts-outcome="native:environment"` and never throw. The same holds for
+`typeset()`, `mount()` and `auditJSON()`, and for browsers without
+`Intl.Segmenter` or `ResizeObserver`.
+
+All adapters in a document share one registry: one MutationObserver,
+ResizeObserver and IntersectionObserver, however many blocks render. A block on
+screen is composed before its first paint; offscreen blocks compose in idle
+time, nearest first. `priority="sync"` composes in the React commit, as 4.2
+did, for hero text. Re-renders that change nothing (an inline `keep` array,
+fresh JSX children, inline styles or callbacks) write nothing. While a
+container is being resized, blocks whose composed lines no longer fit show
+native wrapping (marked `data-ts-stale`) and recompose once the size has held
+for 100 ms.
 
 ## New in 4.2
 

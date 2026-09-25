@@ -14,6 +14,7 @@ import { spacingMarkerStyle } from './spacing-finish';
 import { inlineBoxInsets } from './inline-box';
 import { preservesAdvances } from './geometry';
 import type { SpaceAdjustment } from './spacing-finish';
+import { canCompose, ENVIRONMENT_OUTCOME } from './environment';
 
 export const BREAK_ATTRIBUTE = 'data-ts-break';
 const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE', 'CODE']);
@@ -168,6 +169,9 @@ function unsupported(element: HTMLElement): string | null {
 /** Read the real styled DOM. No clone can reproduce contextual selectors reliably. */
 export function planRichText(element: HTMLElement, options: Options = {}, nativeLayout?: RichPlan['before'], spaceWidths?: Map<string, number>): RichPlan {
   const source = element.textContent || '';
+  if (!canCompose(element.ownerDocument)) {
+    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: '' };
+  }
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));
   const tracking = Array.from(element.querySelectorAll<HTMLElement>('[data-ts-track]'));
@@ -180,7 +184,10 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const lang = element.closest('[lang]')?.getAttribute('lang');
     if (source.length > 12000) return result('native:budget');
     const unicode = options.lineBreaks === 'unicode';
-    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens }) : null;
+    // A block that already fits on one line ends at 'native:fits' below, or
+    // at an earlier decline; it needs the analysis outcome, not its units.
+    const fits = before.lines.length === 1 && before.overflow <= .5;
+    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits }) : null;
     if (analysis && analysis.outcome !== 'supported') return result(analysis.outcome);
     if (!unicode && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return result('native:language');
     if (unicode) for (const el of [element, ...element.querySelectorAll<HTMLElement>('*')]) {

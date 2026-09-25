@@ -59,6 +59,9 @@ jobs:
       - name: Fresh packed npm consumer and TypeScript contracts
         run: node scripts/v4/verify-package.mjs
 
+      - name: Candidate package in Vitest (jsdom, happy-dom), Jest 30, attw and publint
+        run: node scripts/v4/verify-test-runners.mjs
+
       - name: Packed React consumer in three browsers
         run: node scripts/v4/verify-consumer-browser.mjs
 

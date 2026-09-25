@@ -17,6 +17,9 @@ import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
+// Controllers share composition state, so only one may write a given target.
+import { mountOwners, mountWaiters } from './ownership';
+import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -114,9 +117,6 @@ function releaseOutput(element: HTMLElement, state: State, written: ReadonlySet<
 // The last options.text written to an element: a translator's rewrite of that
 // text is not a new value to write back.
 const authorTexts = new WeakMap<HTMLElement, string>();
-// Controllers share composition state, so only one may write a given target.
-const mountOwners = new WeakMap<HTMLElement, symbol>();
-const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
 const measurements = new WeakMap<Document, Map<string, Map<string, number>>>();
 const fontVersions = new WeakMap<Document, { epoch: number }>();
 const fontIds = new WeakMap<FontFace, number>();
@@ -127,12 +127,12 @@ function fontVersion(doc: Document): string {
     version = { epoch: 0 };
     fontVersions.set(doc, version);
     const current = version;
-    doc.fonts.addEventListener('loadingdone', () => { current.epoch++; });
+    doc.fonts?.addEventListener?.('loadingdone', () => { current.epoch++; });
   }
   // FontFace objects can be added already loaded, or replaced while the set
   // remains "loaded". Those changes need not fire a loadingdone event.
   const faces: string[] = [];
-  doc.fonts.forEach(face => {
+  doc.fonts?.forEach(face => {
     if (!fontIds.has(face)) fontIds.set(face, ++nextFontId);
     faces.push([fontIds.get(face), face.family, face.status, face.weight, face.style, face.stretch].join(':'));
   });
@@ -162,7 +162,7 @@ function layoutKey(el: HTMLElement): string {
   const scale = layout > 0 ? Math.round(box.width / layout * 1000) / 1000 : 1;
   const zoom = (el as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
   return JSON.stringify([
-    fontVersion(el.ownerDocument), el.ownerDocument.fonts.status,
+    fontVersion(el.ownerDocument), el.ownerDocument.fonts?.status,
     Math.max(0, box.width - inset), scale, zoom, cs.font, cs.fontFamily, cs.fontSize,
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
@@ -254,7 +254,7 @@ function yieldToTranslation(element: HTMLElement): void {
 function makeMeasurer(element: HTMLElement): { prepare: (texts: string[]) => void; measure: (text: string) => number; dispose: () => void } {
   const cs = getComputedStyle(element);
   const styleKey = JSON.stringify([
-    fontVersion(element.ownerDocument), element.ownerDocument.fonts.status,
+    fontVersion(element.ownerDocument), element.ownerDocument.fonts?.status,
     cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle, cs.fontStretch,
     cs.fontVariant, cs.fontFeatureSettings, cs.fontVariationSettings,
     cs.fontOpticalSizing, cs.fontKerning, cs.fontSizeAdjust, cs.letterSpacing,
@@ -352,6 +352,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
+  // No layout engine (jsdom, happy-dom) or no Intl.Segmenter: leave the text
+  // as authored and say why, rather than throw.
+  if (!canCompose(element.ownerDocument)) {
+    element.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    return { outcome: ENVIRONMENT_OUTCOME, mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
+  }
   if (translationActive(element.ownerDocument)) {
     if (states.has(element) || element.querySelector('[data-ts-break], [data-ts-track]')) yieldToTranslation(element);
     if (options.text !== undefined && authorTexts.get(element) !== options.text) { element.textContent = options.text; authorTexts.set(element, options.text); }
@@ -374,8 +380,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   // block is shown at the same width it paints composed, with no re-break.
   const visible = rendered(element);
   if (prior && !visible && prior.options === optionsKey(options) && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
-  const sig = signature(element, options);
-  if (prior?.signature === sig && ownsOutput(element, prior)) {
+  // Only a prior composition can be current; a first one needs no signature yet.
+  if (prior && prior.signature === signature(element, options) && ownsOutput(element, prior)) {
     // Back at the geometry it was composed for (a resize that returned).
     element.removeAttribute('data-ts-stale');
     return { ...prior.result, changed: false, durationMs: performance.now() - started };
@@ -729,7 +735,9 @@ export function auditJSON(selector = defaults) {
     const path: string[] = [];
     const doc = element.ownerDocument;
     for (let el: HTMLElement | null = element; el; el = el.parentElement) {
-      if (el.id && doc.querySelectorAll('#' + CSS.escape(el.id)).length === 1) { path.unshift('#' + CSS.escape(el.id)); break; }
+      // CSS.escape is missing in jsdom.
+      const id = el.id && (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(el.id) : el.id.replace(/[^\w-]/gu, c => '\\' + c));
+      if (id && doc.querySelectorAll('#' + id).length === 1) { path.unshift('#' + id); break; }
       if (el === doc.documentElement) { path.unshift(':root'); break; }
       if (el === doc.body) { path.unshift('body'); break; }
       path.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + (Array.from(el.parentElement?.children || []).filter(sibling => sibling.tagName === el!.tagName).indexOf(el) + 1) + ')');
@@ -777,6 +785,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // nodes fail instanceof checks against this window's constructors.
   const doc = (root as Node).nodeType === 9 ? root as Document : (root as Node).ownerDocument!;
   const view = doc.defaultView;
+  // Without observers or layout (jsdom, happy-dom, older engines) nothing can
+  // be kept correct: mark the scope native and return an inert controller.
+  if (!canMaintain(doc)) {
+    const scope = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    if (isElement(root) && root.matches(selector)) scope.unshift(root);
+    for (const el of scope) if (!el.closest(excluded)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    return { ready: Promise.resolve(), refresh() {}, disconnect() {}, stats: { passes: 0, compositions: 0, maxBatchMs: 0, overlappingTargets: 0 } };
+  }
   const identity = Symbol('typeset-mount');
   const claimed = new Set<HTMLElement>();
   const blocked = new Map<HTMLElement, () => void>();
@@ -1165,7 +1181,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // While fonts load, text may be about to change metrics again: recheck
     // what is near the screen now and leave the rest to the fonts' arrival,
     // which rechecks everything.
-    const fontsLoading = doc.fonts.status === 'loading';
+    const fontsLoading = doc.fonts?.status === 'loading';
     if (fontsLoading) armFonts(doc);
     function* work() {
       for (const el of nearby) if (pending.has(el)) yield el;
@@ -1249,7 +1265,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     for (const el of ownedWithin(target)) recheck(el, KEY);
     schedule();
   };
-  doc.fonts.ready.then(() => {
+  (doc.fonts?.ready ?? Promise.resolve()).then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
     discover();

@@ -76,11 +76,14 @@ export function armFonts(doc: Document): void {
   const hub = hubs.get(doc);
   if (!hub) return;
   const settled = () => { if (hubs.get(doc) === hub) notify(hub, client => client.fonts?.()); };
-  if (doc.fonts.status === 'loading' && !hub.ready) {
+  // document.fonts is missing in DOM emulations and some older engines.
+  const fonts = doc.fonts as FontFaceSet | undefined;
+  if (!fonts) return;
+  if (fonts.status === 'loading' && !hub.ready) {
     hub.ready = true;
-    doc.fonts.ready.then(() => { hub.ready = false; settled(); });
+    fonts.ready.then(() => { hub.ready = false; settled(); });
   }
-  doc.fonts.forEach(face => {
+  fonts.forEach(face => {
     if (face.status !== 'loading' || hub.faces.has(face)) return;
     hub.faces.add(face);
     face.loaded.then(settled, settled);
@@ -122,8 +125,9 @@ function start(doc: Document): Hub {
   });
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class'] });
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
-  doc.fonts.addEventListener('loadingdone', fonts);
-  doc.fonts.addEventListener('loading', loading);
+  const faces = doc.fonts as FontFaceSet | undefined;
+  faces?.addEventListener?.('loadingdone', fonts);
+  faces?.addEventListener?.('loading', loading);
   doc.addEventListener('transitionend', ended, true);
   doc.addEventListener('animationend', ended, true);
   doc.addEventListener('contentvisibilityautostatechange', visibility, true);
@@ -135,8 +139,8 @@ function start(doc: Document): Hub {
     view?.removeEventListener('resize', resize);
     print?.removeEventListener?.('change', printed);
     observer.disconnect();
-    doc.fonts.removeEventListener('loadingdone', fonts);
-    doc.fonts.removeEventListener('loading', loading);
+    faces?.removeEventListener?.('loadingdone', fonts);
+    faces?.removeEventListener?.('loading', loading);
     doc.removeEventListener('transitionend', ended, true);
     doc.removeEventListener('animationend', ended, true);
     doc.removeEventListener('contentvisibilityautostatechange', visibility, true);
