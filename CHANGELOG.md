@@ -76,8 +76,11 @@ Outside the changes below, 0 of these differ in any engine.
   and hover backgrounds painted a sliver there, a padded link's padding sat
   at that line's end, and WebKit link names began with a newline (16 to 19
   of 79 corpus links at 300 px). The break now goes before the outermost
-  element that starts the line, in the DOM renderer and `TypesetRichText`;
-  the framework text an element holds is not split for it. Lines and
+  element that starts the line, in the DOM renderer and `TypesetRichText`
+  (there also when the text before it ends inside another element or a
+  fragment, as in `<strong>Note: </strong><a>`, where the first 4.3
+  candidates still broke inside the link); the framework text an element
+  holds is not split for it. Lines and
   characters are unchanged, and so are widths unless the element has
   horizontal padding, border or margin, which now starts its line as the
   compositor planned. Where the element that starts the line has other font

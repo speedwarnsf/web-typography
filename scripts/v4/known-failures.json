@@ -12,7 +12,7 @@
     },
     {
       "script": "verify-break-semantics",
-      "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$|: a line that starts at a link breaks before the link: never first inside it, no empty stub on the line before$",
+      "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$|: a line that starts at a link breaks before the link: never first inside it, no empty stub on the line before$|: TypesetRichText: a line that starts at a link right after another element or a fragment breaks before the link, with no stub$",
       "modes": [
         "release"
       ],

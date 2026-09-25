@@ -103,17 +103,28 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
   const educated = educate ? smartQuotes(source) : null;
   const optical = new Map(hangs.map(hang => [hang.offset, hang.px]));
   const spacing = new Map(spaces.map(space => [space.offset, space.px]));
-  // A line that starts where an element starts breaks at the end of the text
-  // before that element, not first inside it (see renderRichText).
-  const before = new Set<number>();
+  // A line that starts where an element starts breaks before the outermost
+  // element starting there, not first inside it (see renderRichText): at the
+  // end of the text just before it, or, where that text ends inside another
+  // element or a fragment ("<strong>Note: </strong><a>"), as a sibling. Such
+  // an element is always rendered as a keyed pair (break or nothing, then the
+  // element), so a line starting there or not never remounts it.
+  const moved = new Set<number>(), atTextEnd = new Set<number>();
+  const paired = new Set<number>();
   {
-    let at = 0;
+    let at = 0, index = 0;
+    const starts = new Set<number>();
     const scan = (nodes: ReactNode) => {
       let afterText = false;
       Children.forEach(nodes, child => {
         if (typeof child === 'string' || typeof child === 'number') { at += String(child).length; afterText = String(child).length > 0; return; }
         if (isValidElement<{ children?: ReactNode }>(child)) {
-          if (afterText && breaks.has(at) && quoteSource(child.props.children)) before.add(at);
+          const element = index++;
+          if (at > 0 && !starts.has(at) && quoteSource(child.props.children)) {
+            starts.add(at);
+            if (!afterText) paired.add(element);
+            if (breaks.has(at)) { moved.add(at); if (afterText) atTextEnd.add(at); }
+          }
           scan(child.props.children);
         }
         afterText = false;
@@ -121,13 +132,14 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
     };
     scan(children);
   }
+  let elements = 0;
   const visit = (nodes: ReactNode): ReactNode => Children.map(nodes, child => {
     if (typeof child === 'string' || typeof child === 'number') {
       const raw = String(child);
       const text = educated === null ? raw : educated.slice(offset, offset + raw.length);
       const start = offset; offset += text.length;
       const stops = [...new Set([...breaks, ...optical.keys(), ...spacing.keys(), ...tracks.flatMap(run => [run.start, run.end])])].filter(at => at >= start && at < offset);
-      if (before.has(offset) && offset > start) stops.push(offset);
+      if (atTextEnd.has(offset) && offset > start) stops.push(offset);
       stops.sort((a, b) => a - b);
       let cursor = 0;
       const pieces: ReactNode[] = [];
@@ -148,7 +160,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
         const local = stop - start;
         append(text.slice(cursor, local), start + cursor);
         // Exposed where it stands in for the collapsed space; see renderRichText.
-        if (breaks.has(stop) && (stop === offset || !before.has(stop))) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true, style: breakStyle }), stop, true);
+        if (breaks.has(stop) && (stop === offset || !moved.has(stop))) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true, style: breakStyle }), stop, true);
         if (stop === offset) { cursor = local; continue; }
         if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
         if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
@@ -158,7 +170,11 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       return pieces;
     }
     if (!isValidElement<{ children?: ReactNode }>(child)) return child;
-    return cloneElement(child, undefined, visit(child.props.children));
+    const element = elements++, at = offset;
+    const rendered = cloneElement(child, undefined, visit(child.props.children));
+    if (!paired.has(element)) return rendered;
+    return [breaks.has(at) ? createElement('br', { key: 'break', [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, at) ? undefined : true, style: breakStyle }) : null,
+      cloneElement(rendered, { key: 'element' })];
   });
   return visit(children);
 }

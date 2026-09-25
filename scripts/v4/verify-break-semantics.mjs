@@ -30,9 +30,13 @@ const bundle = await readFile(artifacts.bundle, 'utf8');
 const LINKS = ['First, ', 'read the notes at the front desk', '. ', 'Then ask the volunteers for a map', '. ', 'Visit the garden behind the clinic', ', and ', 'bring water for the long walk home', '. ', 'Rest on the benches by the river', ' before ', 'the evening bus', ' leaves.'];
 const LINK_WIDTHS = [300, 260, 340, 220];
 const linked = LINKS.map((part, i) => i % 2 ? `<a href="#${i}">${part}</a>` : part).join('');
+// TypesetRichText with the text before each link ending inside another
+// element or a fragment ("<strong>Note: </strong><a>"): the break goes before
+// the link as its sibling, as in the DOM renderer, not first inside it.
+const ADJACENT_WIDTHS = [360, 350, 340, 330, 320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210];
 const react = (await build({
   stdin: { contents: `
-import { createElement as h } from 'react';
+import { createElement as h, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
 createRoot(document.getElementById('react')).render(h('div', null,
@@ -41,6 +45,15 @@ createRoot(document.getElementById('react')).render(h('div', null,
 ));
 createRoot(document.getElementById('react-links')).render(h('div', null, ${JSON.stringify(LINK_WIDTHS)}.map(width =>
   h(TypesetRichText, { key: width, id: 'r' + width, lang: 'en', style: { width } }, ${JSON.stringify(LINKS)}.map((part, i) => i % 2 ? h('a', { key: i, href: '#' + i }, part) : part)))));
+// Two orders, so that at these widths lines start at links after a <strong>,
+// an <em>, an <em><b> and a fragment.
+const adjacent = (id, width, wrap) => h(TypesetRichText, { key: id + width, id: id + width, lang: 'en', style: { width } },
+  h('strong', null, 'Note: '), h('a', { href: '#n1' }, 'read the notes at the front desk'), h('em', null, ', then '), h('a', { href: '#n2' }, 'ask the volunteers for a map'),
+  wrap[0]('. Visit '), h('a', { href: '#n3' }, 'the garden behind the clinic'), h('em', null, ' and ', h('b', null, 'then ')), h('a', { href: '#n4' }, 'bring water for the long walk home'),
+  wrap[1]('. Rest '), h('a', { href: '#n5' }, 'on the benches by the river'), h('em', null, ' before '), h('a', { href: '#n6' }, 'the evening bus'), ' leaves.');
+const strong = text => h('strong', null, text), fragment = text => h(Fragment, null, text);
+createRoot(document.getElementById('react-adjacent')).render(h('div', null, ${JSON.stringify(ADJACENT_WIDTHS)}.flatMap(width =>
+  [adjacent('e', width, [fragment, strong]), adjacent('f', width, [strong, fragment])])));
 `, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
 
@@ -52,7 +65,7 @@ body{margin:16px;background:#fff;color:#111;font:18px/1.5 Georgia}main,#react{wi
 <p id="p2">Read the <em>careful</em> notes in <a href="#guide">the neighborhood gallery guide</a> before you plan a visit, because the opening hours change with the seasons and the weather.</p>
 <p id="p3">The public-health team kept a quarter-century archive of eighty-seven campaigns in a well-lit room, and the county's long-term plan keeps it open to anyone who asks.</p>
 <p id="p4">"Parenthetical openings and <a href="#caps">Capital letters</a> can hang into the margin when optical alignment is on," the designer said, "which the website loader enables."</p>
-</main><div id="react"></div><section id="links">${LINK_WIDTHS.map(width => `<p id="l${width}" style="width:${width}px">${linked}</p><p id="lp${width}" class="pad" style="width:${width}px">${linked}</p>`).join('')}</section><div id="react-links"></div><script src="/typeset.js"></script><script src="/react.js"></script></body></html>`;
+</main><div id="react"></div><section id="links">${LINK_WIDTHS.map(width => `<p id="l${width}" style="width:${width}px">${linked}</p><p id="lp${width}" class="pad" style="width:${width}px">${linked}</p>`).join('')}</section><div id="react-links"></div><div id="react-adjacent"></div><script src="/typeset.js"></script><script src="/react.js"></script></body></html>`;
 
 // Trusted Types with no policy rejects every HTML sink, as a strict site would.
 const LEGACY = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:20px/1.3 Georgia}h2{width:260px;font-size:24px}</style></head>
@@ -106,7 +119,9 @@ for (const config of browsers) {
     for (const [configName, options] of /** @type {const} */ ([['defaults', {}], ['website-go', { smartQuotes: 'en', opticalHanging: true }]])) {
       await page.goto('http://breaks.test/page');
       await page.evaluate(async options => { const c = window.Typeset.mount(document, 'main p, main h2, #links p', options); await c.ready; }, options);
-      await page.waitForFunction(() => ['r1', 'r2', 'r300', 'r220'].every(id => document.getElementById(id)?.dataset.tsOutcome) && document.getElementById('r1')?.dataset.tsTracking !== 'native:tracking-uncomposed');
+      // Polled on a timer: rAF polling keeps a frame pending, and offscreen
+      // React blocks compose only in idle periods with none pending.
+      await page.waitForFunction(() => [...document.querySelectorAll('#react p, #react-links p, #react-adjacent p')].every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome) && document.getElementById('r1')?.dataset.tsTracking !== 'native:tracking-uncomposed', undefined, { polling: 100 });
       await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       const facts = await page.evaluate(() => {
         const blocks = [...document.querySelectorAll('main p, main h2, #react p')].map(el => {
@@ -140,19 +155,23 @@ for (const config of browsers) {
       check(`${where} exposing breaks and inline markers paints identically (DOM, DPR 2)`, now.main.equals(before.main));
       check(`${where} exposing breaks and inline markers paints identically (React, DPR 2)`, now.react.equals(before.react));
       check(`${where} exposing breaks and inline markers keeps every line box`, JSON.stringify(now.lines) === JSON.stringify(before.lines));
-      const links = await page.evaluate(() => [...document.querySelectorAll('main p a, #links p a, #react-links p a')].map(a => {
+      const links = await page.evaluate(() => [...document.querySelectorAll('main p a, #links p a, #react-links p a, #react-adjacent p a')].map(a => {
         const rects = [...a.getClientRects()];
         let previous = a.previousSibling, first = a.firstChild;
         while (previous && (previous.nodeType === 8 || (previous.nodeType === 3 && !(/** @type {Text} */ (previous)).length))) previous = previous.previousSibling;
         while (first && (first.nodeType === 8 || (first.nodeType === 3 && !(/** @type {Text} */ (first)).length))) first = first.nextSibling;
         const block = /** @type {HTMLElement} */ (a.closest('p'));
-        return { block: block.id, react: !!block.closest('#react-links'), outcome: block.dataset.tsOutcome, text: a.textContent,
+        return { block: block.id, react: !!block.closest('#react-links, #react-adjacent'), adjacent: !!block.closest('#react-adjacent'), outcome: block.dataset.tsOutcome, text: a.textContent,
           startsLine: previous?.nodeName === 'BR' && /** @type {Element} */ (previous).hasAttribute('data-ts-break'),
           breakFirst: first?.nodeName === 'BR' && /** @type {Element} */ (first).hasAttribute('data-ts-break'), stub: rects.length > 1 && rects[0].width < .5 };
       }));
       check(`${where} a line that starts at a link breaks before the link: never first inside it, no empty stub on the line before`,
         links.filter(l => l.startsLine && !l.react).length >= 2 && links.some(l => l.startsLine && l.react) && links.every(l => !l.breakFirst && !l.stub && (l.outcome === 'composed:rich' || !/^[lr]\d/.test(l.block))),
         { starting: links.filter(l => l.startsLine).map(l => l.block + ':' + l.text), wrong: links.filter(l => l.breakFirst || l.stub).slice(0, 4), outcomes: [...new Set(links.map(l => l.block + ':' + l.outcome))] });
+      const adjacent = links.filter(l => l.adjacent);
+      check(`${where} TypesetRichText: a line that starts at a link right after another element or a fragment breaks before the link, with no stub`,
+        adjacent.filter(l => l.startsLine).length >= 3 && adjacent.every(l => !l.breakFirst && !l.stub && l.outcome === 'composed:rich'),
+        { starting: adjacent.filter(l => l.startsLine).map(l => l.block + ':' + l.text), wrong: adjacent.filter(l => l.breakFirst || l.stub).slice(0, 4), outcomes: [...new Set(adjacent.map(l => l.block + ':' + l.outcome))] });
     }
     // The v3 renderer export: no role, no HTML sink.
     for (const path of ['legacy-tt', 'legacy']) {
