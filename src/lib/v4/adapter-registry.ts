@@ -121,6 +121,13 @@ function createRegistry(doc: Document): Registry {
   const frame = (fn: () => void): void => { if (win?.requestAnimationFrame) win.requestAnimationFrame(fn); else later(fn, 16); };
   let commitStart = 0;
   let costPerChar = 0;
+  // Whether a composition in this document has laid out lines. The first
+  // to do so pays one-time setup (segmenters, the line search's compiled
+  // code, measurement caches): 80-90 ms at 4x CPU for a paragraph that then
+  // costs about 13 ms. Learned, and counted against the visible budget, it
+  // turned away half of a cold screen's on-screen blocks, which painted
+  // native lines and were rewrapped a frame later. It is neither.
+  let warm = false;
   let frameQueued = false, idleQueued = false, staleQueued = false;
   // When idle work was first requested and has not run since.
   let idleSince = 0;
@@ -141,15 +148,19 @@ function createRegistry(doc: Document): Registry {
   };
   const observeDocument = () => mutations?.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: OBSERVED });
 
-  function run(entry: AdapterEntry, reason: Reason, inCommit: boolean): void {
+  /** Compose one host; returns the time spent on one-time setup, if this
+   * was the document's first composition to lay out lines, else 0. */
+  function run(entry: AdapterEntry, reason: Reason, inCommit: boolean): number {
     pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element);
-    if (!entries.has(entry.element)) return;
+    if (!entries.has(entry.element)) return 0;
     const begun = performance.now(), length = entry.element.textContent?.length || 1;
     writing(() => entry.compose(reason, inCommit));
+    const took = performance.now() - begun;
+    let setup = 0;
+    if (!warm && entry.element.dataset.tsOutcome?.startsWith('composed')) { warm = true; setup = took; }
     // Learn this device's cost per character of composed text, so a budget
     // can decline a composition that would overrun it before starting it.
-    const perChar = (performance.now() - begun) / length;
-    costPerChar = costPerChar ? costPerChar * .8 + perChar * .2 : perChar;
+    else costPerChar = costPerChar ? costPerChar * .8 + took / length * .2 : took / length;
     // Our own write may change the host's height; that is no reason to check
     // it again. (In a commit the update renders after this returns.)
     const size = sizes.get(entry.element);
@@ -158,6 +169,7 @@ function createRegistry(doc: Document): Registry {
     // a scale-in, a drawer closing): compose again once it ends, since neither
     // a CSS transition nor a Web Animation ends with a mutation.
     if (entry.element.dataset.tsOutcome === 'native:transformed') awaitTransforms(entry);
+    return setup;
   }
   /** Hosts declined under each running animation, composed again when it ends. */
   const animating = new WeakMap<Animation, Set<AdapterEntry>>();
@@ -208,15 +220,15 @@ function createRegistry(doc: Document): Registry {
     if (win && typeof win.requestIdleCallback === 'function') win.requestIdleCallback(flushIdle, { timeout: Math.max(1, IDLE_TIMEOUT_MS - (performance.now() - idleSince)) });
     else later(() => flushIdle(), 50);
   }
-  /** Compose (or check) one pending host. */
-  function process(entry: AdapterEntry, reason: Reason, fonts: string): void {
+  /** Compose (or check) one pending host; returns run()'s setup time. */
+  function process(entry: AdapterEntry, reason: Reason, fonts: string): number {
     const drop = () => { pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element); };
     if (reason === 'check') {
       // A host being resized, or whose metrics keep changing, is checked once
       // they settle, not per frame; a change meanwhile moves the settle on.
-      if (resizing.has(entry)) { if (continuous.has(entry)) settleLater(); drop(); return; }
+      if (resizing.has(entry)) { if (continuous.has(entry)) settleLater(); drop(); return 0; }
       // A hidden host keeps its composition; it is checked when shown.
-      if (!rendered(entry.element) || !entry.changed(fonts)) { drop(); return; }
+      if (!rendered(entry.element) || !entry.changed(fonts)) { drop(); return 0; }
       // Changed again soon after a check composed it: a font-size or spacing
       // transition, a text-size slider, an animation. Native lines until the
       // metrics hold for RESIZE_SETTLE_MS, then one composition, instead of a
@@ -229,11 +241,12 @@ function createRegistry(doc: Document): Registry {
         resizing.add(entry); continuous.add(entry);
         settleLater();
         drop();
-        return;
+        return 0;
       }
     }
-    run(entry, reason, false);
+    const setup = run(entry, reason, false);
     if (reason === 'check') checked.set(entry, { at: performance.now(), fonts }); else checked.delete(entry);
+    return setup;
   }
   function settleLater(): void {
     clearTimeout(settle);
@@ -241,13 +254,13 @@ function createRegistry(doc: Document): Registry {
   }
   /** On-screen work, before this frame paints, top to bottom, then nearby
    * hosts within FRAME_BUDGET_MS. Only visible work beyond VISIBLE_BUDGET_MS
-   * continues in the next frame. */
+   * (the document's one-time setup not counted) continues in the next frame. */
   function flushFrame(): void {
     frameQueued = false;
     // Print shows native wrapping; the work waits until printing ends.
     if (!pending.size || printing(doc)) return;
     ensureLifecycleStyles(doc);
-    const start = performance.now();
+    let start = performance.now();
     const fonts = fontKey(doc);
     // All reads first: one layout, then the compositions.
     const queued = [...pending.keys()].map(entry => ({ entry, rect: entry.element.getBoundingClientRect() }));
@@ -260,7 +273,7 @@ function createRegistry(doc: Document): Registry {
       // At least one per frame, so a slow device still makes progress.
       if (composed && !fits(entry, start, onScreen.includes(entry) ? VISIBLE_BUDGET_MS : FRAME_BUDGET_MS)) { frameQueued = true; frame(flushFrame); break; }
       const reason = pending.get(entry);
-      if (reason) { process(entry, reason, fonts); composed++; }
+      if (reason) { start += process(entry, reason, fonts); composed++; }
     }
     // A composition can start a font load (a face first used by this text).
     if (composed) armFonts(doc);

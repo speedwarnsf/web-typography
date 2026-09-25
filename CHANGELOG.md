@@ -516,14 +516,18 @@ table.
   rechecked at all: 120 frames of an ancestor translation over 1,000
   paragraphs at 4x CPU in Chromium average 8.3 ms with none over 20 ms (the
   first 4.3 candidate: 22.8 ms, 84 of 118 over 20 ms).
-- React screens (P4, P5): pushing 38 `TypesetText` blocks takes 152 ms from
+- React screens (P4, P5): pushing 38 `TypesetText` blocks takes 192 ms from
   the click to its first paint at 4x CPU (INP proxy; 4.2.0: 232 ms, plain
-  React: 56 ms), with one pre-paint task of 123 ms, and 64 ms at 1x (72
-  ms). The commit alone falls from 160 to 19 ms at 4x (40 to 7 ms at 1x),
-  but that is mostly work moved, not removed: 4.2.0 composed every block
-  inside the commit, while 4.3.0 composes there only what fits a 6 ms
-  budget and the rest of the on-screen blocks in the next frame, before it
-  paints. 1,000 blocks commit in 19 ms (1,446 ms) with an INP proxy of 80
+  React: 56 ms), with one pre-paint task of 160 ms, and 64 ms at 1x (72
+  ms), with every on-screen block composed in that paint. The commit alone
+  falls from 157 to 21 ms at 4x (39 to 8 ms at 1x), but that is mostly
+  work moved, not removed: 4.2.0 composed every block inside the commit,
+  while 4.3.0 composes there only what fits a 6 ms budget and the rest of
+  the on-screen blocks in the next frame, before it paints. Earlier 4.3
+  candidates counted the page's one-time setup (80 to 90 ms at 4x) against
+  that frame's 120 ms safety limit, so a cold first screen at 4x painted
+  half its on-screen blocks natively and rewrapped them a frame later;
+  their 152 ms was measured to that partial paint. 1,000 blocks commit in 19 ms (1,446 ms) with an INP proxy of 80
   ms (1,584 ms). 38
   `TypesetRichText` blocks commit in 23 ms at 4x (78 ms) with 941 DOM
   mutation records (3,893), and 1,000 in 38 ms (279 ms) with 0 ms of

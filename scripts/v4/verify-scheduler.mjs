@@ -69,6 +69,34 @@ window.mountCarousels = () => { const root = createRoot(document.getElementById(
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
+// The benchmark's screen push (bench-v4.mjs react-K-38): 38 blocks, one in
+// four a paragraph, under 15 wrappers, pushed from a click.
+const pushFixture = (await build({
+  stdin: { contents: `
+import { createElement as h, useState, useLayoutEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { TypesetText, TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
+const labels = ['Daily tip', 'Breathe', 'Sleep better tonight', 'Your streak', 'Hydration', 'Move for five minutes', 'Check in', 'Journal', 'Gratitude', 'Mindful minute'];
+const para = 'Small habits compound: a short walk after lunch, a glass of water before coffee, and two minutes of slow breathing before bed.';
+function block(kind, i) {
+  const long = i % 4 === 3, text = long ? para : labels[i % labels.length], style = { display: 'block', width: '300px' };
+  if (kind === 'typeset') return h(TypesetText, { key: i, text, as: long ? 'p' : 'span', style });
+  return h(TypesetRichText, { key: i, as: long ? 'p' : 'span', style }, long ? h('span', null, 'Small habits compound: ', h('a', { href: '#walk' }, 'a short walk after lunch'), ', a glass of water before coffee, and two minutes of slow breathing before bed.') : text);
+}
+function Screen({ kind }) {
+  useLayoutEffect(() => { window.committed = true; }, []);
+  let tree = h('div', null, Array.from({ length: 38 }, (_, i) => block(kind, i)));
+  for (let d = 0; d < 15; d++) tree = h('div', { className: 'view' }, tree);
+  return tree;
+}
+function App() {
+  const [kind, setKind] = useState(null);
+  return h('div', null, h('button', { id: 'push', onClick: () => setKind(window.pushKind) }, 'Push screen'), kind && h(Screen, { kind }));
+}
+createRoot(document.getElementById('app')).render(h(App));
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
 // Idle callbacks, observed before React loads: how much idle time each was
 // given, and whether an adapter composed during it.
 const idleProbe = () => {
@@ -201,6 +229,42 @@ for (const { name, engine, executablePath } of browsers) {
       await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       check('React adapters: every offscreen block composes after the animation', result.composed === result.hosts, result);
       if (result.idleCallbacks) check('React adapters: no composition in an idle period shorter than 20 ms (the rest of an animation frame)', result.shortIdleCompositions === 0, result);
+      await page.close();
+    }
+    // A cold screen push at 4x CPU (a mid-range phone): the document's first
+    // composition pays one-time setup, which must not push on-screen blocks
+    // past the visible budget into the next frame. Every on-screen block is
+    // composed in the first frame that paints the new screen. (The RC painted
+    // 8 of 15 on-screen hosts native and rewrapped them a frame later.)
+    if (name === 'chromium') for (const kind of ['typeset', 'rich']) {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 844 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><body style="margin:16px;font:17px/1.45 Georgia"><div id="app"></div></body></html>');
+      await page.addScriptTag({ content: pushFixture });
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await page.evaluate(async kind => {
+        const w = /** @type {any} */ (window);
+        await document.fonts.ready;
+        w.pushKind = kind; w.firstFrame = null; w.frames = 0;
+        // Each frame, after layout and before paint: the hosts on screen and
+        // whether each has an outcome yet.
+        const tick = document.createElement('div');
+        tick.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:1px;visibility:hidden';
+        document.body.append(tick);
+        new ResizeObserver(() => {
+          if (!w.committed || w.firstFrame) return;
+          const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-typeset-react], [data-typeset-react-rich]')]).filter(el => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top < innerHeight && r.bottom > 0; });
+          w.firstFrame = { onScreen: hosts.length, uncomposed: hosts.filter(el => !el.dataset.tsOutcome).length };
+        }).observe(tick);
+        const loop = () => { w.frames++; tick.style.width = (w.frames % 2 ? 2 : 1) + 'px'; if (w.frames < 600 && !w.firstFrame) requestAnimationFrame(loop); };
+        requestAnimationFrame(loop);
+      }, kind);
+      await page.click('#push');
+      await page.waitForFunction(() => /** @type {any} */ (window).firstFrame, null, { timeout: 20000 });
+      const result = await page.evaluate(() => /** @type {any} */ (window).firstFrame);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      check(`${kind === 'typeset' ? 'TypesetText' : 'TypesetRichText'} at 4x CPU: a cold screen push paints every on-screen block composed in its first frame`, result.onScreen >= 12 && result.uncomposed === 0, result);
       await page.close();
     }
     // Offscreen text in a wrapper that does not scroll vertically: an app
