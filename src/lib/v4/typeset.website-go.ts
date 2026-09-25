@@ -7,7 +7,9 @@ import * as api from './typeset.release';
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const script = document.currentScript as HTMLScriptElement | null;
   const requested = script?.dataset.typesetSelector || 'p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6, td, th, dd, dt';
-  const selector = ':is(' + requested + '):not([data-typeset-react], [data-typeset-react] *, [data-typeset-react-rich], [data-typeset-react-rich] *, .demo, .demo *, [data-no-smooth], [data-no-smooth] *)';
+  // Only the React adapters' own hosts are left out; authors exclude content
+  // with data-no-typeset.
+  const selector = ':is(' + requested + '):not([data-typeset-react], [data-typeset-react] *, [data-typeset-react-rich], [data-typeset-react-rich] *)';
   const options = {
     smartQuotes: script?.dataset.typesetSmartQuotes === 'false' ? false as const : 'en' as const,
     opticalHanging: script?.dataset.typesetOpticalHanging !== 'false',

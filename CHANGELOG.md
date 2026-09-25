@@ -78,6 +78,17 @@ Outside the changes below, 0 of these differ in any engine.
   horizontal padding, border or margin, which now starts its line as the
   compositor planned. Golden diff: 173 of 680 rich cells per engine, markup
   only (the break's position); 0 of the rest.
+- **The automatic loader composes `.demo` and `[data-no-smooth]` content.**
+  The website loader (go@4.2.0.js, and 4.3's `typeset.us/auto`) always
+  skipped elements with the class `demo` or the attribute
+  `data-no-smooth`, and everything inside them, even under an explicit
+  `data-typeset-selector`; these were typeset.us-internal exclusions that
+  no document mentioned, and a page whose prose sat in a `.demo` container
+  got nothing composed and a console note that nothing matched. From
+  go@4.3.0.js they compose like any other prose; `data-no-typeset` remains
+  the way to exclude content. Loader fixture: 2 of 2 such paragraphs now
+  compose (0 under go@4.2.0.js); no typeset.us page that loads go.js uses
+  either. The npm `typeset.us/go` never had these exclusions.
 - **Justified text is left as the author set it** (`native:justify`, C3). A
   generated break ends its line, so every composed line took the last-line
   alignment: `text-align: justify` became ragged right, and a

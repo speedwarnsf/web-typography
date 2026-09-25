@@ -95,6 +95,12 @@ for (const config of browsers) {
       const full = await load(browser, PROSE, auto);
       check('auto.js with matching prose logs nothing', full.info.length === 0, full.info);
       await full.page.close();
+      // go@4.2.0.js also skipped .demo and [data-no-smooth], typeset.us-internal
+      // classes an adopter could not see or override (4.3 rendering change).
+      const LONG = 'Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned.';
+      const demo = await load(browser, `<html lang="en"><style>body{width:340px;font:19px/1.5 Georgia}</style><main class="demo"><p>${LONG}</p></main><p data-no-smooth>${LONG}</p></html>`, auto);
+      check('auto.js composes prose inside .demo and [data-no-smooth]', demo.state.filter(el => el.tag === 'P' && el.outcome === 'composed:rich').length === 2 && demo.info.length === 0, { state: demo.state.filter(el => el.tag === 'P'), info: demo.info });
+      await demo.page.close();
     }
     const unmarked = await load(browser, PROSE, packageGo);
     check('package go.js without [data-typeset] targets logs one console.info that names [data-typeset] and auto.js', unmarked.info.length === 1 && /no element matches \[data-typeset\]/.test(unmarked.info[0]) && /auto/.test(unmarked.info[0]), unmarked.info);
