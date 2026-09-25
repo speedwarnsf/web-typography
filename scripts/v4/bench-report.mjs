@@ -3,18 +3,31 @@
 // numbers are always the output of the benchmark rather than prose.
 //
 //   node scripts/v4/bench-report.mjs <bench.json> [--out docs/BENCHMARKS.md] [--baseline <bench.json>] [--sizes <sizes.json>]
+//     [--react <bench.json> --react-baseline <bench.json>]
 //
 // --baseline adds a table comparing the headline numbers with an earlier run
 // (for example 4.2.0, measured back to back on the same machine). --sizes
 // takes the size table from a later bench-sizes.mjs measurement, {label,
-// sizes}, when the code has changed since the timed run.
+// sizes}, when the code has changed since the timed run. --react and
+// --react-baseline take the React screen-push rows from a later
+// `bench-v4.mjs --only react` pair (the build and 4.2.0 back to back), and
+// say so above the React table.
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' }, baseline: { type: 'string' }, sizes: { type: 'string' } } });
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { out: { type: 'string', default: 'docs/BENCHMARKS.md' }, baseline: { type: 'string' }, sizes: { type: 'string' }, react: { type: 'string' }, 'react-baseline': { type: 'string' } } });
 if (!positionals[0]) throw new Error('Usage: bench-report.mjs <bench.json> [--out file] [--baseline <bench.json>]');
 const bench = JSON.parse(await readFile(positionals[0], 'utf8'));
 const baseline = values.baseline ? JSON.parse(await readFile(values.baseline, 'utf8')) : null;
+// React rows from a later paired run, when given.
+const reactRun = values.react ? JSON.parse(await readFile(values.react, 'utf8')) : null;
+const reactBaseline = values['react-baseline'] ? JSON.parse(await readFile(values['react-baseline'], 'utf8')) : null;
+for (const [target, source] of /** @type {const} */ ([[bench, reactRun], [baseline, reactBaseline]])) {
+  if (!target || !source) continue;
+  for (const [lane, results] of Object.entries(source.results)) for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (results))) {
+    if (key.startsWith('react-') && target.results[lane]) target.results[lane][key] = value;
+  }
+}
 const lanes = Object.keys(bench.results);
 /** @param {unknown} v */
 const n = v => typeof v === 'number' ? v.toLocaleString('en-US') : v === null || v === undefined ? '-' : String(v);
@@ -156,7 +169,13 @@ includes only the composition that fits the adapters' 6 ms commit budget
 (4.2.0 composed every block there); the rest of the on-screen work runs in
 the next animation frame, before it paints, so compare builds by the *INP
 proxy*, the largest Event Timing duration of the click (Chromium only),
-which includes it.
+which includes it.${reactRun ? `
+These rows were measured later than the other tables (${reactRun.label}${reactBaseline ? ` and ${reactBaseline.label} back to back` : ''}, load average
+${reactRun.environment?.loadAverageAtStart?.[0] ?? '?'} at start); the "Against" table uses them too.` : ''}${lanes.some(lane => Object.entries(bench.results[lane] ?? {}).some(([key, r]) => key.startsWith('react-') && /** @type {any} */ (r)?.outcomes?.none)) ? `
+Outcomes are read 1.5 s after the click. The benchmark's frame probe keeps a
+frame pending throughout, so offscreen blocks, which compose only in idle
+periods of 20 ms or more or one a second after waiting, are mostly still
+*none* then.` : ''}
 
 ${table(['Lane', 'Blocks', 'Commit', 'INP proxy', 'Long tasks / TBT', 'Longest task', 'Observers (MO / RO / IO)', 'MO observe calls', 'Window / font listeners', 'Outcomes'], react)}
 

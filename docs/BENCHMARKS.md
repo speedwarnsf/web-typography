@@ -26,21 +26,21 @@ Wall times move with machine load by several percent; counts do not.
 | chromium@1x | mount-200: total blocking time | 0 ms | 0 ms |
 | chromium@1x | mount-1000: all composed | 12,651 ms | 10,241 ms |
 | chromium@1x | mount-1000: total blocking time | 0 ms | 0 ms |
-| chromium@1x | 38 TypesetText: commit | 40 ms | 7 ms |
+| chromium@1x | 38 TypesetText: commit | 42 ms | 7 ms |
 | chromium@1x | 38 TypesetText: INP proxy | 72 ms | 64 ms |
-| chromium@1x | 38 TypesetText: total blocking time | 0 ms | 3 ms |
+| chromium@1x | 38 TypesetText: total blocking time | 0 ms | 1 ms |
 | chromium@1x | 38 TypesetText: MutationObservers | 38 | 2 |
-| chromium@1x | 1000 TypesetText: commit | 1,446 ms | 19 ms |
-| chromium@1x | 1000 TypesetText: INP proxy | 1,584 ms | 80 ms |
-| chromium@1x | 1000 TypesetText: total blocking time | 1,503 ms | 8 ms |
+| chromium@1x | 1000 TypesetText: commit | 1,517 ms | 22 ms |
+| chromium@1x | 1000 TypesetText: INP proxy | 1,656 ms | 88 ms |
+| chromium@1x | 1000 TypesetText: total blocking time | 1,578 ms | 9 ms |
 | chromium@1x | 1000 TypesetText: MutationObservers | 1,000 | 2 |
-| chromium@1x | 38 TypesetRichText: commit | 20 ms | 22 ms |
-| chromium@1x | 38 TypesetRichText: INP proxy | 96 ms | 72 ms |
+| chromium@1x | 38 TypesetRichText: commit | 21 ms | 21 ms |
+| chromium@1x | 38 TypesetRichText: INP proxy | 88 ms | 64 ms |
 | chromium@1x | 38 TypesetRichText: total blocking time | 0 ms | 0 ms |
 | chromium@1x | 38 TypesetRichText: MutationObservers | 38 | 2 |
-| chromium@1x | 1000 TypesetRichText: commit | 279 ms | 38 ms |
-| chromium@1x | 1000 TypesetRichText: INP proxy | 2,392 ms | 96 ms |
-| chromium@1x | 1000 TypesetRichText: total blocking time | 5,658 ms | 0 ms |
+| chromium@1x | 1000 TypesetRichText: commit | 272 ms | 44 ms |
+| chromium@1x | 1000 TypesetRichText: INP proxy | 2,456 ms | 96 ms |
+| chromium@1x | 1000 TypesetRichText: total blocking time | 5,742 ms | 3 ms |
 | chromium@1x | 1000 TypesetRichText: MutationObservers | 1,000 | 2 |
 | chromium@1x | Ancestor class storm: recompositions | 26 | 0 |
 | chromium@1x | Ancestor class storm: DOM mutation records | 9,984 | 30 |
@@ -56,13 +56,13 @@ Wall times move with machine load by several percent; counts do not.
 | chromium@4x | mount-200: total blocking time | 1,100 ms | 396 ms |
 | chromium@4x | mount-1000: all composed | 57,487 ms | 47,132 ms |
 | chromium@4x | mount-1000: total blocking time | 8,293 ms | 3,501 ms |
-| chromium@4x | 38 TypesetText: commit | 160 ms | 19 ms |
-| chromium@4x | 38 TypesetText: INP proxy | 232 ms | 152 ms |
-| chromium@4x | 38 TypesetText: total blocking time | 135 ms | 73 ms |
+| chromium@4x | 38 TypesetText: commit | 160 ms | 23 ms |
+| chromium@4x | 38 TypesetText: INP proxy | 232 ms | 192 ms |
+| chromium@4x | 38 TypesetText: total blocking time | 134 ms | 111 ms |
 | chromium@4x | 38 TypesetText: MutationObservers | 38 | 2 |
-| chromium@4x | 38 TypesetRichText: commit | 78 ms | 23 ms |
-| chromium@4x | 38 TypesetRichText: INP proxy | 312 ms | 192 ms |
-| chromium@4x | 38 TypesetRichText: total blocking time | 282 ms | 109 ms |
+| chromium@4x | 38 TypesetRichText: commit | 76 ms | 28 ms |
+| chromium@4x | 38 TypesetRichText: INP proxy | 288 ms | 208 ms |
+| chromium@4x | 38 TypesetRichText: total blocking time | 247 ms | 111 ms |
 | chromium@4x | 38 TypesetRichText: MutationObservers | 38 | 2 |
 | chromium@4x | Ancestor class storm: recompositions | 4 | 0 |
 | chromium@4x | Ancestor class storm: DOM mutation records | 2,486 | 30 |
@@ -78,12 +78,12 @@ Wall times move with machine load by several percent; counts do not.
 | webkit@1x | mount-200: total blocking time | 0 ms | 0 ms |
 | webkit@1x | mount-1000: all composed | 54,105 ms | 45,313 ms |
 | webkit@1x | mount-1000: total blocking time | 0 ms | 0 ms |
-| webkit@1x | 38 TypesetText: commit | 79 ms | 9 ms |
-| webkit@1x | 38 TypesetText: INP proxy | 96 ms | 56 ms |
+| webkit@1x | 38 TypesetText: commit | 82 ms | 10 ms |
+| webkit@1x | 38 TypesetText: INP proxy | 96 ms | 64 ms |
 | webkit@1x | 38 TypesetText: total blocking time | 0 ms | 0 ms |
 | webkit@1x | 38 TypesetText: MutationObservers | 38 | 2 |
-| webkit@1x | 38 TypesetRichText: commit | 37 ms | 23 ms |
-| webkit@1x | 38 TypesetRichText: INP proxy | 136 ms | 64 ms |
+| webkit@1x | 38 TypesetRichText: commit | 38 ms | 24 ms |
+| webkit@1x | 38 TypesetRichText: INP proxy | 128 ms | 64 ms |
 | webkit@1x | 38 TypesetRichText: total blocking time | 0 ms | 0 ms |
 | webkit@1x | 38 TypesetRichText: MutationObservers | 38 | 2 |
 | webkit@1x | Ancestor class storm: recompositions | 16 | 0 |
@@ -140,21 +140,27 @@ includes only the composition that fits the adapters' 6 ms commit budget
 the next animation frame, before it paints, so compare builds by the *INP
 proxy*, the largest Event Timing duration of the click (Chromium only),
 which includes it.
+These rows were measured later than the other tables (4.3.0 candidate and 4.2.0 back to back, load average
+6.05 at start); the "Against" table uses them too.
+Outcomes are read 1.5 s after the click. The benchmark's frame probe keeps a
+frame pending throughout, so offscreen blocks, which compose only in idle
+periods of 20 ms or more or one a second after waiting, are mostly still
+*none* then.
 
 | Lane | Blocks | Commit | INP proxy | Long tasks / TBT | Longest task | Observers (MO / RO / IO) | MO observe calls | Window / font listeners | Outcomes |
 |---|---|---|---|---|---|---|---|---|---|
-| chromium@1x | 38 plain React | 1 ms | 40 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
-| chromium@1x | 1000 plain React | 5 ms | 48 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
-| chromium@1x | 38 TypesetText | 7 ms | 64 ms | 1 / 3 ms | 53 ms | 2 / 1 / 1 | 41 | 1 / 3 | 29 native:fits, 9 composed:rich |
-| chromium@1x | 1000 TypesetText | 19 ms | 80 ms | 1 / 8 ms | 58 ms | 2 / 1 / 1 | 1,003 | 1 / 3 | 750 native:fits, 250 composed:rich |
-| chromium@1x | 38 TypesetRichText | 22 ms | 72 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 41 | 1 / 2 | 29 native:fits, 9 composed:rich |
-| chromium@1x | 1000 TypesetRichText | 38 ms | 96 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 1,003 | 1 / 2 | 750 native:fits, 250 composed:rich |
+| chromium@1x | 38 plain React | 1 ms | 32 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
+| chromium@1x | 1000 plain React | 4 ms | 40 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
+| chromium@1x | 38 TypesetText | 7 ms | 64 ms | 1 / 1 ms | 51 ms | 2 / 1 / 1 | 36 | 1 / 3 | 25 native:fits, 8 composed:rich, 5 none |
+| chromium@1x | 1000 TypesetText | 22 ms | 88 ms | 1 / 9 ms | 59 ms | 2 / 1 / 1 | 36 | 1 / 3 | 967 none, 25 native:fits, 8 composed:rich |
+| chromium@1x | 38 TypesetRichText | 21 ms | 64 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 36 | 1 / 2 | 25 native:fits, 8 composed:rich, 5 none |
+| chromium@1x | 1000 TypesetRichText | 44 ms | 96 ms | 1 / 3 ms | 53 ms | 2 / 1 / 1 | 36 | 1 / 2 | 967 none, 25 native:fits, 8 composed:rich |
 | chromium@4x | 38 plain React | 4 ms | 56 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
-| chromium@4x | 38 TypesetText | 19 ms | 152 ms | 1 / 73 ms | 123 ms | 2 / 1 / 1 | 41 | 1 / 3 | 29 native:fits, 9 composed:rich |
-| chromium@4x | 38 TypesetRichText | 23 ms | 192 ms | 1 / 109 ms | 159 ms | 2 / 1 / 1 | 41 | 1 / 2 | 29 native:fits, 9 composed:rich |
+| chromium@4x | 38 TypesetText | 23 ms | 192 ms | 1 / 111 ms | 161 ms | 2 / 1 / 1 | 36 | 1 / 3 | 25 native:fits, 8 composed:rich, 5 none |
+| chromium@4x | 38 TypesetRichText | 28 ms | 208 ms | 1 / 111 ms | 161 ms | 2 / 1 / 1 | 36 | 1 / 2 | 25 native:fits, 8 composed:rich, 5 none |
 | webkit@1x | 38 plain React | 1 ms | 16 ms | 0 / 0 ms | 0 ms | 0 / 0 / 0 | 0 | 0 / 0 |  |
-| webkit@1x | 38 TypesetText | 9 ms | 56 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 41 | 1 / 3 | 29 native:fits, 9 composed:rich |
-| webkit@1x | 38 TypesetRichText | 23 ms | 64 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 41 | 1 / 2 | 29 native:fits, 9 composed:rich |
+| webkit@1x | 38 TypesetText | 10 ms | 64 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 41 | 1 / 3 | 29 native:fits, 9 composed:rich |
+| webkit@1x | 38 TypesetRichText | 24 ms | 64 ms | 0 / 0 ms | 0 ms | 2 / 1 / 1 | 41 | 1 / 2 | 29 native:fits, 9 composed:rich |
 
 ## Lifecycle
 
@@ -174,23 +180,23 @@ which includes it.
 
 esbuild bundles (minified, tree-shaken) importing one entry point from the
 package, React external, and the shipped browser files; *no-tree-shaking* is
-what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the candidate after the second round of review fixes (the timings above predate it).
+what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the candidate after the third round of review fixes (the timings above predate it).
 
 | What a consumer imports | Minified | gzip | brotli |
 |---|---|---|---|
-| mount-only | 124,016 | 48,692 | 43,009 |
-| TypesetText-only | 123,929 | 48,531 | 42,781 |
-| TypesetRichText-only | 109,432 | 44,521 | 39,464 |
-| smartQuotes-only | 2,450 | 1,349 | 1,244 |
-| react.js+shared | 134,845 | 51,848 | 45,761 |
-| TypesetText-no-tree-shaking | 159,088 | 60,528 | 52,793 |
-| go.js | 140,303 | 54,889 | 47,866 |
-| typeset.global.js | 139,395 | 54,553 | 47,751 |
+| mount-only | 125,721 | 49,408 | 43,546 |
+| TypesetText-only | 125,744 | 49,292 | 43,521 |
+| TypesetRichText-only | 111,521 | 45,416 | 40,166 |
+| smartQuotes-only | 2,704 | 1,478 | 1,354 |
+| react.js+shared | 136,914 | 52,723 | 46,487 |
+| TypesetText-no-tree-shaking | 161,354 | 61,447 | 53,464 |
+| go.js | 142,074 | 55,580 | 48,496 |
+| typeset.global.js | 141,166 | 55,224 | 48,167 |
 
 ## Reading the numbers
 
 - Composition runs on the main thread. `mount()` composes the first viewport first and yields after about 8 ms of work, but a single paragraph can exceed a frame: at 4x CPU its long tasks reach 133 ms, and a 200-paragraph page accumulates 396 ms of blocking time (3,501 ms for 1,000 paragraphs, which take 47,132 ms to finish).
-- One `mount()` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create 2 MutationObservers (the registry's and the document lifecycle hub's) with 41 observe calls, 1 ResizeObserver and 1 window listener. Their screen reaches its first paint in 64 ms against 40 ms for plain React (152 ms against 56 ms at 4x, with a 123 ms task before that paint): the commit (7 ms) holds only what fits a 6 ms budget, and blocks on screen compose in the next frame, before it paints, the rest in idle time.
+- One `mount()` creates one observer of each kind however many paragraphs it owns (with one more MutationObserver per document, the lifecycle hub's), and every React block in a document shares one registry: 38 TypesetText blocks create 2 MutationObservers (the registry's and the document lifecycle hub's) with 36 observe calls, 1 ResizeObserver and 1 window listener. Their screen reaches its first paint in 64 ms against 32 ms for plain React (192 ms against 56 ms at 4x, with a 161 ms task before that paint): the commit (7 ms) holds only what fits a 6 ms budget, and blocks on screen compose in the next frame, before it paints, the rest in idle time.
 - After a late web font, every composed paragraph was recomposed in each engine.
 - Toggling a class on an ancestor 30 times re-ran composition 0 times over 200 paragraphs whose layout the class does not change.
 - Budgets in `scripts/v4/budgets.json` hold the size, count and time values last calibrated, with the reason for every raise (sizes on every change; time, observer and write counts nightly and at release cut).

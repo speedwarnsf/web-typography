@@ -578,20 +578,21 @@ table.
   first 4.3 candidate: 22.8 ms, 84 of 118 over 20 ms).
 - React screens (P4, P5): pushing 38 `TypesetText` blocks takes 192 ms from
   the click to its first paint at 4x CPU (INP proxy; 4.2.0: 232 ms, plain
-  React: 56 ms), with one pre-paint task of 160 ms, and 64 ms at 1x (72
+  React: 56 ms), with one pre-paint task of 161 ms, and 64 ms at 1x (72
   ms), with every on-screen block composed in that paint. The commit alone
-  falls from 157 to 21 ms at 4x (39 to 8 ms at 1x), but that is mostly
+  falls from 160 to 23 ms at 4x (42 to 7 ms at 1x), but that is mostly
   work moved, not removed: 4.2.0 composed every block inside the commit,
   while 4.3.0 composes there only what fits a 6 ms budget and the rest of
   the on-screen blocks in the next frame, before it paints. Earlier 4.3
   candidates counted the page's one-time setup (80 to 90 ms at 4x) against
   that frame's 120 ms safety limit, so a cold first screen at 4x painted
   half its on-screen blocks natively and rewrapped them a frame later;
-  their 152 ms was measured to that partial paint. 1,000 blocks commit in 19 ms (1,446 ms) with an INP proxy of 80
-  ms (1,584 ms). 38
-  `TypesetRichText` blocks commit in 23 ms at 4x (78 ms) with 941 DOM
-  mutation records (3,893), and 1,000 in 38 ms (279 ms) with 0 ms of
-  blocking time (5,658 ms). Every adapter in a document shares one registry:
+  their 152 ms was measured to that partial paint. 1,000 blocks commit in
+  22 ms (1,517 ms) with an INP proxy of 88 ms (1,656 ms). 38
+  `TypesetRichText` blocks commit in 28 ms at 4x (76 ms) with an INP proxy
+  of 208 ms (288 ms) and 835 DOM mutation records (3,893), and 1,000 in 44
+  ms (272 ms) with 3 ms of blocking time (5,742 ms). Every adapter in a
+  document shares one registry:
   2 MutationObservers, 1 ResizeObserver and 1 IntersectionObserver however
   many blocks render (4.2.0: one of each per block), parent re-renders that
   change nothing (an inline `keep` array, fresh JSX, inline styles or
