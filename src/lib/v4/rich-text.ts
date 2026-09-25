@@ -86,26 +86,34 @@ export function selectionBookmark(element: HTMLElement): () => void {
   };
 }
 
-/** Snapshot every inline longhand with its priority. */
-function inlineStyle(element: HTMLElement): Map<string, [string, string]> {
-  const style = element.style, saved = new Map<string, [string, string]>();
-  for (let i = 0; i < style.length; i++) saved.set(style[i], [style.getPropertyValue(style[i]), style.getPropertyPriority(style[i])]);
-  return saved;
+interface InlineStyle { hadAttribute: boolean; cssText: string; longhands: Map<string, [string, string]> | null }
+
+/** Snapshot an inline style. Blink and WebKit reparse cssText with !important
+ * declarations last, so a mixed style also keeps its longhands to restore in
+ * place and keep the authored order. */
+function inlineStyle(element: HTMLElement): InlineStyle {
+  const style = element.style, names = Array.from({ length: style.length }, (_, i) => style[i]);
+  const mixed = new Set(names.map(name => style.getPropertyPriority(name))).size > 1;
+  return { hadAttribute: element.hasAttribute('style'), cssText: style.cssText,
+    longhands: mixed ? new Map(names.map(name => [name, [style.getPropertyValue(name), style.getPropertyPriority(name)]])) : null };
 }
 
-/** Put an inline snapshot back through the CSSOM only. Writing the style
+/** Put an inline style back through the CSSOM only. Writing the style
  * attribute is inline-style injection: a style-src policy without
- * 'unsafe-inline' blocks it, which left nowrap behind in Chromium and WebKit
- * and erased author CSSOM styles in Firefox. Removing the attribute is allowed. */
-function restoreInlineStyle(element: HTMLElement, saved: Map<string, [string, string]>, hadAttribute: boolean): void {
+ * 'unsafe-inline' refuses it, which left nowrap behind in Chromium and WebKit
+ * and erased author CSSOM styles in Firefox. The CSSOM (cssText included) and
+ * removing the attribute are allowed. One write unless a mixed-priority style
+ * needs its longhands put back one by one. */
+function restoreInlineStyle(element: HTMLElement, saved: InlineStyle): void {
   const style = element.style;
-  // No attribute before: removing ours restores everything in one write.
-  if (!hadAttribute) { removeStyleAttribute(element); return; }
-  for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.has(name)) style.removeProperty(name);
-  for (const [name, [value, priority]] of saved) {
-    if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
+  if (!saved.hadAttribute) removeStyleAttribute(element);
+  else if (!saved.longhands) { if (style.cssText !== saved.cssText) style.cssText = saved.cssText; }
+  else {
+    for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.longhands.has(name)) style.removeProperty(name);
+    for (const [name, [value, priority]] of saved.longhands) {
+      if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
+    }
   }
-  if (!hadAttribute && !style.length) removeStyleAttribute(element);
 }
 
 /** Resolve the live Attr first: Chromium serializes CSSOM changes into the
@@ -116,12 +124,12 @@ function removeStyleAttribute(element: HTMLElement): void {
   if (attribute) element.removeAttributeNode(attribute);
 }
 
-/** Temporarily modify only named properties, then restore every longhand
+/** Temporarily modify only named properties, then restore every declaration
  * they touched (shorthands such as white-space and text-wrap) exactly. */
 function override(element: HTMLElement, properties: Record<string, string>): () => void {
-  const hadAttribute = element.hasAttribute('style'), saved = inlineStyle(element);
+  const saved = inlineStyle(element);
   for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, 'important');
-  return () => restoreInlineStyle(element, saved, hadAttribute);
+  return () => restoreInlineStyle(element, saved);
 }
 
 function unsupported(element: HTMLElement): string | null {
