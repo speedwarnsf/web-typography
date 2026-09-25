@@ -27,44 +27,26 @@ function pairWordBefore(text: string, index: number): boolean {
   }
   return start < end && end - start <= nPairLongest && nPairs.has(text.slice(start, end).toLowerCase());
 }
-/** The code point of `text` that starts at `index`, or the one that ends
- * just before it. */
-function pointAt(text: string, index: number): string {
-  const code = text.charCodeAt(index);
-  return code >= 0xd800 && code <= 0xdbff && index + 1 < text.length && (text.charCodeAt(index + 1) & 0xfc00) === 0xdc00 ? text.slice(index, index + 2) : text[index];
-}
-function pointBefore(text: string, index: number): string {
-  const code = text.charCodeAt(index - 1);
-  return (code & 0xfc00) === 0xdc00 && index > 1 && (text.charCodeAt(index - 2) & 0xfc00) === 0xd800 ? text.slice(index - 2, index) : text[index - 1];
-}
+/** A sentence end, and a closing single quote after a word. */
+const sentenceEnd = /[.!?](?:\s|$)/gu;
+const closer = /[\p{L}\p{N}.,!?]['\u2019](?![\p{L}\p{N}])/gu;
 /**
  * Whether a closing single quote ends a later word of the same sentence:
- * for the quote at `index`, whether /[\p{L}\p{N}.,!?]['\u2019](?![\p{L}\p{N}])/u
- * matches the text after it up to the first /[.!?](?:\s|$)/u. Searching the
- * rest of the text for each 'round, 'bout or 'nuff cost the square of a text
- * with no sentence end, so each call resumes where the last left off: the
- * quotes are educated left to right, and neither the next sentence end nor
- * the next closing quote from a later start can come before the last ones.
+ * for the quote at `index`, whether `closer` matches the text after it up to
+ * the first sentence end. Searching the rest of the text for each 'round,
+ * 'bout or 'nuff cost the square of a text with no sentence end, so each
+ * call resumes where the last left off: quotes are educated left to right,
+ * and neither the next sentence end nor the next closing quote from a later
+ * start can come before the last ones.
  */
 function laterCloser(text: string): (index: number) => boolean {
-  let end = -1, close = -1, closeFrom = -1;
-  const sentenceEnd = (at: number) => /[.!?]/u.test(text[at]) && (at + 1 === text.length || /\s/u.test(text[at + 1]));
+  let end = -1, close = -1, quote = 0;
   return index => {
-    const from = index + 1;
-    // The first sentence end at or after `from`, or text.length.
-    if (end < from) for (end = from; end < text.length && !sentenceEnd(end); end++);
-    // The first quote that closes a word starting at or after `from`, or text.length.
-    if (closeFrom < from) {
-      for (close = Math.max(close + 1, from + 1), closeFrom = Infinity; close < text.length; close++) {
-        if (text[close] !== "'" && text[close] !== '\u2019') continue;
-        const before = pointBefore(text, close);
-        if (close - before.length < from || !/[\p{L}\p{N}.,!?]/u.test(before)) continue;
-        if (close + 1 < text.length && /[\p{L}\p{N}]/u.test(pointAt(text, close + 1))) continue;
-        closeFrom = close - before.length;
-        break;
-      }
-    }
-    return close < end;
+    if (end <= index) { sentenceEnd.lastIndex = index + 1; end = sentenceEnd.exec(text)?.index ?? text.length; }
+    // After a match, lastIndex is its end, so the quote is just before it;
+    // with none, it is 0 and nothing closes.
+    if (close <= index) { closer.lastIndex = index + 1; close = closer.exec(text)?.index ?? text.length; quote = closer.lastIndex ? closer.lastIndex - 1 : close; }
+    return quote < end;
   };
 }
 
@@ -80,7 +62,7 @@ export function smartQuotes(text: string): string {
   // here, not read back from the growing output, which flattened it for
   // every quote.
   let before = '';
-  let closesLater: ((index: number) => boolean) | undefined;
+  const closesLater = laterCloser(text);
   const put = (char: string) => { out += char; before = char; };
   for (let index = 0; index < text.length; index++) {
     const quote = text[index];
@@ -99,7 +81,7 @@ export function smartQuotes(text: string): string {
     }
     const rest = text.slice(index + 1);
     if (/\p{L}/u.test(before) && /\p{L}/u.test(after)) put('\u2019');
-    else if (opening && (elision.test(rest) || (loose.test(rest) && !(closesLater ??= laterCloser(text))(index))
+    else if (opening && (elision.test(rest) || (loose.test(rest) && !closesLater(index))
       || (/^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && pairWordBefore(text, index)))) put('\u2019');
     else if (opening && after && !/\s/u.test(after)) { singleOpen = true; put('\u2018'); }
     else if (/\d/u.test(before) && !singleOpen) put(quote);
