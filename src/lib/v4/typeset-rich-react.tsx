@@ -115,6 +115,13 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
   return visit(children);
 }
 
+let warnedQuotesLang = false;
+/** Development builds only: bundlers replace process.env.NODE_ENV; without a
+ * bundler `process` is undefined and nothing is logged. */
+function development(): boolean {
+  try { return process.env.NODE_ENV !== 'production'; } catch { return false; }
+}
+
 function supportedTree(children: ReactNode): boolean {
   let supported = true;
   Children.forEach(children, child => {
@@ -242,6 +249,11 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;
     const plan = this.state.plan;
     const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);
+    if (quotes === 'en' && !this.props.lang && !warnedQuotesLang && development()) {
+      warnedQuotesLang = true;
+      // Education happens during render, where an ancestor's lang is invisible.
+      console.warn('TypesetRichText: smartQuotes="en" needs lang="en" (or en-*) on the component itself; quotes are left as written.');
+    }
     return createElement(as, { ...attributes, ref: this.host, 'data-typeset-react-rich': '', 'data-typeset-done': plan ? '1' : undefined,
       'data-ts-outcome': plan?.outcome, 'data-ts-quotes': quotes ? educate ? 'enabled' : 'native:quotes-scope' : undefined,
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,

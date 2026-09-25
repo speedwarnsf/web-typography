@@ -55,6 +55,17 @@ line boxes, outcomes, feature statuses, copy text and markup).
   change from composed to native (5 of 8 on the live-region fixture, per
   loader and engine); 0 of 316 blocks change in the golden A/B, which has no
   live regions.
+- **Smart quote corrections (C15).** A single quote right after a curled
+  opening double quote now opens too: `"'Quoted' inside,"` gives
+  “‘Quoted’ inside,” (4.2 gave “’Quoted’). Rock ’n’ roll,
+  ’bout, ’round and ’nuff are elisions (4.2 gave ‘n’ and ‘bout).
+  Glyph substitutions only, length-preserving; ’90s, ’Tis, ’em, primes
+  such as 5'10" and possessives are unchanged, and single quotes never become
+  double. Golden diff: 0 of 173 corpus texts (14 with straight quotes) change;
+  the changes are exactly the patterns above. `TypesetText` also curls quotes
+  during render, so its server HTML has them (a Next production build: 8
+  curled, 0 straight, no hydration messages in three engines; 4.2 had 2 of 10
+  curled before hydration).
 - The legacy `renderFrozenLines()` export no longer sets the non-ARIA
   `role="text"`, which emptied a composed heading's accessible name in WebKit,
   and clears the element with `replaceChildren()` instead of `innerHTML`, so it
@@ -96,6 +107,10 @@ line boxes, outcomes, feature statuses, copy text and markup).
   opening space. No rendering change: 0 pixel, line box, outcome or feature
   differences on the framework fixtures (48 paragraphs per engine) or in the
   golden A/B against 4.2.0.
+
+- `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
+  once in development builds; it leaves quotes as written, as before (C15).
+  The package build leaves `process.env.NODE_ENV` to the application's bundler.
 
 ### Development
 

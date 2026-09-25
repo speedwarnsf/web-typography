@@ -68,7 +68,12 @@ and nonnegative sliced padding/borders/margins is measured with its surrounding
 text. Unsupported box decoration remains native. Identity and pure 2D translation
 transforms are supported; scale, rotation, perspective and nonzero Z are not.
 
-Smart quotes are explicit English, quotes-only. Optical hanging applies to
+Smart quotes are explicit English, quotes-only. Each quote keeps its kind:
+single quotes are never turned into double quotes, or the reverse. From 4.3
+TypesetText curls them during render, so server HTML already has them;
+TypesetRichText does so only with lang="en" (or en-*) on the component itself,
+since render cannot see an ancestor's lang, and warns in development builds
+when it is missing. Optical hanging applies to
 eligible left-aligned leading glyphs, not indented/centered or justified contexts.
 Clipped containers are supported only when the full glyph's measured geometry
 fits the available clip, padding and scrollport. Rounded clips are conservative;
