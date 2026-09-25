@@ -68,10 +68,17 @@ try {
   check('Dependabot leaves the pinned esbuild alone (reproducible builds)', /dependency-name: esbuild/.test(dependabot));
 
   // The release process names what the workflows assume: the npm that
-  // packs the tarball (release-check rebuilds it with this one).
+  // packs the tarball (release-check rebuilds it with this one), and master
+  // holding the files the published docs link at blob/master.
   const releasing = await readFile('docs/RELEASING.md', 'utf8');
   const pinnedNpm = [...new Set([...release.matchAll(/npm install -g (npm@\S+)/g)].map(m => m[1]))];
   check('RELEASING.md says to cut with the npm the release workflow rebuilds with', pinnedNpm.length === 1 && releasing.includes(pinnedNpm[0]), { pinnedNpm });
+  const linked = /** @type {string[]} */ ([]);
+  for (const file of ['packages/typeset-v4/README.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/SECURITY.md', 'SECURITY.md', 'docs/security/advisories.json']) {
+    for (const [, path] of (await readFile(file, 'utf8')).matchAll(/github\.com\/speedwarnsf\/web-typography\/blob\/master\/([\w./-]+?)\.?(?=[\s")\]]|$)/gm)) linked.push(path);
+  }
+  check('RELEASING.md says master must hold what the published docs link at blob/master before tagging', new Set(linked).size >= 5 && /Merge the release branch into `master` and push `master` before you tag/.test(releasing)
+    && [...new Set(linked)].every(path => releasing.includes(path.replace(/^docs\/security\/advisory-.*$/, 'advisory'))), { linked: [...new Set(linked)] });
   const security = await readFile('SECURITY.md', 'utf8');
   check('SECURITY.md names supported versions, private reporting and response targets', /\| 4\.3\.x \|/.test(security) && /\| 4\.2\.x \| Security fixes only \|/.test(security) && /security\/advisories\/new/.test(security) && /3 business days/.test(security));
   const packaged = await readFile('packages/typeset-v4/SECURITY.md', 'utf8').catch(() => '');

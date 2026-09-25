@@ -39,6 +39,16 @@ Review the diff, commit it, push, and wait for CI.
 
 ## 3. Tag and publish
 
+Merge the release branch into `master` and push `master` before you tag.
+The published docs link to the repository at `blob/master`: the package
+README and MIGRATION.md to SECURITY.md, STABILITY.md, CHANGELOG.md and
+docs/BENCHMARKS.md, both SECURITY.md files to the 3.x advisory, and
+`docs/security/advisories.json`, whose `details` link the cut copies into
+`public/release.json` and `public/sri.json`, to the advisory too. A file
+that is only on the release branch (for 4.3.0: SECURITY.md, STABILITY.md,
+the advisory and advisories.json) is a 404 on npm, on the website and in
+the GitHub Release until `master` has it.
+
 ```sh
 git tag -s vx.y.z -m "typeset.us x.y.z"   # on the cut commit
 git push origin vx.y.z
