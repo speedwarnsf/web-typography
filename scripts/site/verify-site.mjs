@@ -254,6 +254,9 @@ try {
     // `export let` is a build error.
     const plain = frameworks.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/<!-- -->/g, '');
     check('content', '/install/frameworks: the SvelteKit recipe uses $props(), which runes mode requires', plain.includes('let { html } = $props();') && !/^\s*export let html;/m.test(plain));
+    // The TypeScript scaffolds (create-vite vue-ts, create-vue --ts) run
+    // vue-tsc before building: an untyped ref(null) and controller fail it.
+    check('content', '/install/frameworks: the Vue recipe type-checks as TypeScript (typed ref and controller)', plain.includes('<script setup lang="ts">') && plain.includes('ref<HTMLElement | null>(null)') && plain.includes('let controller: ReturnType<typeof mount> | undefined;'));
     for (const config of browsers) {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {

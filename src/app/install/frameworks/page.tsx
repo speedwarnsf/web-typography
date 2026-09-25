@@ -85,14 +85,15 @@ const SVELTE = `<!-- SvelteKit (Svelte 5, runes): content Svelte renders once, s
 
 <article bind:this={article}>{@html html}</article>`;
 
-const VUE = `<!-- Vue or Nuxt: content Vue renders once, such as v-html Markdown. -->
-<script setup>
+const VUE = `<!-- Vue or Nuxt: content Vue renders once, such as v-html Markdown.
+     Without TypeScript, drop lang="ts" and the type annotations. -->
+<script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue';
 import { mount } from 'typeset.us';
-defineProps({ html: String });
-const article = ref(null);
-let controller;
-onMounted(() => { controller = mount(article.value, 'p, h2, li'); });
+defineProps<{ html: string }>();
+const article = ref<HTMLElement | null>(null);
+let controller: ReturnType<typeof mount> | undefined;
+onMounted(() => { if (article.value) controller = mount(article.value, 'p, h2, li'); });
 onBeforeUnmount(() => controller?.disconnect());
 </script>
 
