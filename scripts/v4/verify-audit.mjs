@@ -10,7 +10,8 @@
 //    label/number and letter-designator splits (also a capital letter cut
 //    off from the noun it modifies, "B | students"), line-initial dashes and
 //    closing punctuation, split ellipses, and a sentence opener stranded
-//    after "a.m." or "No." ending a sentence.
+//    after "a.m." or "No." ending a sentence. A line starting with an elided
+//    word (’n’, ’90s) is not line-initial punctuation.
 //  - The JSON shape and schemaVersion stay those of 4.2.0.
 // (regressed-vs-native is checked against every golden cell by verify-golden.)
 import { readFile, writeFile } from 'node:fs/promises';
@@ -39,6 +40,12 @@ const quiet = [
   ['The shop sold size S shirts and type A<br>batteries for decades.', 'letter designator'],
 ];
 const untagged = ['We walked all the way to the<br>store and back again.', 'untagged text'];
+// Quiet too, with no 4.2.0 control (4.2.0 had no line-initial-punctuation
+// review): a line may start with an elided word.
+const elided = [
+  ['They talked about rock<br>’n’ roll until midnight.', 'an elision starting a line (’n’)'],
+  ['We moved away in the ’80s and the<br>’90s and never came back.', 'an elision starting a line (’90s)'],
+];
 const loud = [
   ['The trail climbs 1,200<br>m over 14 km of ridge.', 'bound-split'],
   ['Your first visit is with Dr.<br>Jones, who will see you.', 'bound-split'],
@@ -90,14 +97,14 @@ for (const { name, engine, executablePath } of browsers) {
 
     // False positives and real defects, judged by this build and by 4.2.0.
     const fixture = (/** @type {string[][]} */ rows, /** @type {string} */ prefix) => rows.map(([html], i) => `<p id="${prefix}${i}">${html}</p>`).join('');
-    await tab.setContent(page(fixture(quiet, 'q') + `<p id="u0" lang="">${untagged[0]}</p>` + fixture(loud, 'l')));
+    await tab.setContent(page(fixture(quiet, 'q') + `<p id="u0" lang="">${untagged[0]}</p>` + fixture(loud, 'l') + fixture(elided, 'e')));
     await tab.addScriptTag({ content: baseline });
     await tab.evaluate(() => { window.Baseline = window.Typeset; });
     await tab.addScriptTag({ content: subject });
     const judged = await tab.evaluate(ids => Object.fromEntries(ids.map(id => {
       const types = (/** @type {any} */ api) => api.audit('#' + id).map((/** @type {any} */ issue) => issue.type).filter((/** @type {string} */ type) => type !== 'unprocessed');
       return [id, { subject: types(window.Typeset), baseline: types(window.Baseline), lines: window.Typeset.measureLayout(document.getElementById(id)).lines.length }];
-    })), [...quiet.map((_, i) => 'q' + i), 'u0', ...loud.map((_, i) => 'l' + i)]);
+    })), [...quiet.map((_, i) => 'q' + i), 'u0', ...loud.map((_, i) => 'l' + i), ...elided.map((_, i) => 'e' + i)]);
     for (const [i, [, what]] of quiet.entries()) {
       const row = judged['q' + i];
       check(`no false positive: ${what}`, row.lines >= 2 && !row.subject.length, row);
@@ -105,6 +112,10 @@ for (const { name, engine, executablePath } of browsers) {
     }
     check('no false positive: untagged text', judged.u0.lines >= 2 && !judged.u0.subject.length, judged.u0);
     check('4.2.0 flagged it: untagged text', judged.u0.baseline.length > 0, judged.u0);
+    for (const [i, [, what]] of elided.entries()) {
+      const row = judged['e' + i];
+      check(`no false positive: ${what}`, row.lines >= 2 && !row.subject.includes('line-initial-punctuation'), row);
+    }
     for (const [i, [html, type]] of loud.entries()) {
       const row = judged['l' + i];
       check(`reviewed as ${type}: ${html.replace(/<br>/, ' / ')}`, row.subject.includes(type), row);

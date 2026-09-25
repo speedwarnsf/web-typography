@@ -1,5 +1,5 @@
 {
-  "note": "Health and public-information copy built around the constructions the 4.2 compositor split: abbreviations read as sentence ends, honorifics and names, numbers and units, labels and numbers, letter designators, initialisms and compounds, plus control paragraphs for the article 'a' and the pronoun 'I' (also after a capitalized word, which is not a letter designator) and abbreviations that end a sentence. Used by verify-golden (C13, C16). Round 2 of the 4.3 review added sentence ends after 'etc.', 'a.m.', 'p.m.', 'No.' and a letter designator, and capital letters before the noun they modify.",
+  "note": "Health and public-information copy built around the constructions the 4.2 compositor split: abbreviations read as sentence ends, honorifics and names, numbers and units, labels and numbers, letter designators, initialisms and compounds, plus control paragraphs for the article 'a' and the pronoun 'I' (also after a capitalized word, which is not a letter designator) and abbreviations that end a sentence. Used by verify-golden (C13, C16). Round 2 of the 4.3 review added sentence ends after 'etc.', 'a.m.', 'p.m.', 'No.' and a letter designator, capital letters before the noun they modify, and elided words that open with an apostrophe.",
   "paragraphs": [
     { "id": "clinic", "text": "Your first visit is with Dr. Alvarez, who will review your labs and answer questions. Bring a list of medicines and arrive by 8 a.m. so Dr. Chen can see you before the clinic gets busy." },
     { "id": "academic", "text": "As shown in Fig. 4 and discussed on p. 17, the U.S. sample was smaller than the U.K. sample, but the effect held in both groups after adjustment for age and income." },
@@ -28,6 +28,7 @@
     { "id": "no-answer", "text": "Did the new schedule help? No. Staff on the night shift could not use it, and the clinic went back to the old one within a month of the change." },
     { "id": "closing-times", "text": "Doors close at 5 p.m. Nurses stay until the last patient is seen, and we accept Aetna, Cigna, Kaiser, etc. Coverage details are printed on the back of the form." },
     { "id": "grade-letters", "text": "A study found that A students and B students differ less than people think, and that a grade of C often says more about sleep than about effort." },
-    { "id": "prenominal-letters", "text": "The test looks for the X chromosome in each sample, while the B cells make the antibodies, and a patient with an F grade on the screening gets a second visit." }
+    { "id": "prenominal-letters", "text": "The test looks for the X chromosome in each sample, while the B cells make the antibodies, and a patient with an F grade on the screening gets a second visit." },
+    { "id": "elisions", "text": "They talked about rock ’n’ roll until ’round midnight, about the ’90s and the ’80s, and about how ’tis the season, and they had ’nuff of it by the time the last bus came." }
   ]
 }

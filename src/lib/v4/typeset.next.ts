@@ -737,7 +737,9 @@ function lineReview(layout: LayoutMetrics, language: string, english: boolean): 
     const pair = english ? boundPair(word, first, previous) : null;
     if (pair) add('bound-split', at + ' separates "' + word + '" from "' + first + '" (' + { unit: 'number and unit', honorific: 'honorific and name', label: 'label and number', designator: 'word and letter designator' }[pair] + ')');
     if (/^\./u.test(first)) add('split-ellipsis', 'Line ' + (index + 2) + ' begins with the rest of a split ellipsis');
-    else if (/^[\u2013\u2014,;:!?)\]}\u201D\u2019\u00BB]/u.test(first)) add('line-initial-punctuation', 'Line ' + (index + 2) + ' begins with "' + first[0] + '"');
+    // An apostrophe that opens an elided word (’n’, ’round, ’90s, ’tis) is
+    // not closing punctuation; the word may start a line.
+    else if (/^[\u2013\u2014,;:!?)\]}\u201D\u2019\u00BB]/u.test(first) && !/^\u2019[\p{L}\p{N}]/u.test(first)) add('line-initial-punctuation', 'Line ' + (index + 2) + ' begins with "' + first[0] + '"');
   }
   return review;
 }
