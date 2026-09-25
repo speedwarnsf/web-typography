@@ -8,6 +8,25 @@ const loose = /^(?:bout|round|nuff)\b/iu;
  * quoted key letter ("Type 'n' to cancel") opens a quotation. */
 const nPairs = new Set(['rock', 'rhythm', 'fish', 'salt', 'pick', 'shake', 'surf', 'drag', 'grab', 'meet', 'stop', 'park', 'cash', 'wash',
   'rip', 'plug', 'spick', 'bump', 'nip', 'scratch', 'peel', 'lock', 'snack', 'bread', 'mix']);
+const nPairLongest = Math.max(...[...nPairs].map(word => word.length));
+/** Whether the run of letters before `index`, across any whitespace, is a
+ * pair word: what /(\p{L}+)\s*$/u finds in text.slice(0, index), read
+ * backwards and no further than a pair word reaches. That pattern searched
+ * the whole text before each quote, from every start, so a long run of
+ * letters before many 'n tokens took seconds to educate. */
+function pairWordBefore(text: string, index: number): boolean {
+  let end = index;
+  while (end > 0 && /\s/u.test(text[end - 1])) end--;
+  let start = end;
+  while (start > 0 && end - start <= nPairLongest) {
+    const low = text.charCodeAt(start - 1);
+    // A letter outside the BMP is a surrogate pair; no pair word has one.
+    if (low >= 0xdc00 && low <= 0xdfff && start > 1 && /^\p{L}$/u.test(text.slice(start - 2, start))) start -= 2;
+    else if (/\p{L}/u.test(text[start - 1])) start--;
+    else break;
+  }
+  return start < end && end - start <= nPairLongest && nPairs.has(text.slice(start, end).toLowerCase());
+}
 /** Whether a closing single quote ends a later word of the same sentence. */
 function closesLater(text: string, index: number): boolean {
   const rest = text.slice(index + 1);
@@ -43,7 +62,7 @@ export function smartQuotes(text: string): string {
     const rest = text.slice(index + 1);
     if (/\p{L}/u.test(before) && /\p{L}/u.test(after)) out += '\u2019';
     else if (opening && (elision.test(rest) || (loose.test(rest) && !closesLater(text, index))
-      || (/^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && nPairs.has(/(\p{L}+)\s*$/u.exec(text.slice(0, index))?.[1].toLowerCase() ?? '')))) out += '\u2019';
+      || (/^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && pairWordBefore(text, index)))) out += '\u2019';
     else if (opening && after && !/\s/u.test(after)) { singleOpen = true; out += '\u2018'; }
     else if (/\d/u.test(before) && !singleOpen) out += quote;
     else { singleOpen = false; out += '\u2019'; }

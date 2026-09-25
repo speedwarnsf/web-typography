@@ -67,6 +67,26 @@ for (const [input, expected] of TABLE) {
   check(`education: ${input}`, output === expected && output.length === input.length && smartQuotes(output) === output, { output, expected });
 }
 {
+  // Education stays linear in the text. The 'n pair look-back searched all
+  // the text before each quote from every start: 1.6 KB of letters and 'n
+  // tokens took about 0.7 s, 3.5 KB about 7 s, and CJK prose with one
+  // "rock 'n' roll" 1 s (4.2.0 and now: under 1 ms). Server rendering and
+  // the auto loader educate before the size budget applies.
+  const inputs = {
+    'letters then many \'n': 'a'.repeat(1000) + '.' + " 'n".repeat(200),
+    'CJK then one pair': '\u4e00'.repeat(8000) + " rock 'n' roll",
+    "6,000 characters of 'round": " 'round".repeat(857),
+    'spaces before many \'n': 'rock' + ' '.repeat(6000) + " 'n".repeat(2000),
+  };
+  for (const [name, input] of Object.entries(inputs)) {
+    smartQuotes(input.slice(0, 50));
+    const began = performance.now();
+    smartQuotes(input);
+    const ms = performance.now() - began;
+    check(`education time: ${name} (${input.length} characters) under 100 ms`, ms < 100, { ms: Math.round(ms * 10) / 10 });
+  }
+}
+{
   // No change on real prose against the published 4.2.0 function.
   const { smartQuotes: published } = await import(pathToFileURL(resolve('public/releases/4.2.0/index.js')).href);
   /** @type {string[]} */
