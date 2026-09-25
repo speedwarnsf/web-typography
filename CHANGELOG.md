@@ -754,6 +754,10 @@ table.
   justification; right-to-left text; the browser floor; framework-owned
   text. MIGRATION.md covers 4.2 to 4.3 and links each older guide in its
   archive.
+- The README, the agent contract and `typeset-audit --help` say that any
+  uncaught error or unhandled rejection on the audited page fails the run
+  (exit 1, listed under `errors`) even when every audit passes, as it has
+  since 4.0; they described exit 1 only as a failed audit.
 - Stale 3.x claims are gone from current docs and the site ("audit() returns
   []", 1.4 to 1.6 ms per paragraph, 20 KB, English only, cloned links). The
   Show HN kit, the essay, SKILL.md's frontmatter, the agent contract and

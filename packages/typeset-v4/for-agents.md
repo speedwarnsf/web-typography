@@ -144,9 +144,12 @@ typeset-audit --help, or:
 Read-only by default: it waits for the page's own composition to finish
 (window.TypesetReady, or an outcome on every element in scope) for up to
 --timeout seconds (30) per width. --apply composes only an isolated preview, never the
-deployed site. Exit 0 is the documented safety/coverage gate; 1 fails it;
-2 is invocation/runtime failure. stdout is JSON; errors go to stderr. Reports
-stay local. Do not upload page text, project identity or results without consent.
+deployed site. Exit 0 is the documented safety/coverage gate; 1 fails it,
+either because an audit failed or because the page threw an uncaught error
+or an unhandled rejection at any width (a failing analytics script counts),
+listed in the JSON's top-level "errors" with each report still passing on
+its own; 2 is invocation/runtime failure. stdout is JSON; usage and runtime
+errors go to stderr. Reports stay local. Do not upload page text, project identity or results without consent.
 
 ## Upgrade and rollback
 
