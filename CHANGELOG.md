@@ -394,7 +394,12 @@ table.
   many blocks render (4.2.0: one of each per block), parent re-renders that
   change nothing (an inline `keep` array, fresh JSX, inline styles or
   callbacks) write nothing, and unmounting no longer restores the host React
-  discards.
+  discards. Offscreen blocks compose only in idle periods of 20 ms or more
+  (no frame pending), or one at a time after waiting 1 s, never in what is
+  left of an animation frame, so a screen push drops no frames for them: 4.2
+  dropped about 8 frames per slide at 4x CPU in Chrome, and the first 4.3
+  candidate still composed in 41 of a 900 ms slide's short idle periods
+  (Firefox 17). Engines without idle callbacks (WebKit) keep a 50 ms timer.
 - Revealed hidden text: 10 compositions instead of 196 and 83 ms of blocking
   time at 4x instead of 1,075 ms. The first viewport of never-composed
   revealed text finishes later (428 ms at 4x against 249 ms), because

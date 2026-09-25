@@ -8,7 +8,12 @@
 //   1000 paragraphs, container resized: only blocks within about a viewport
 //   are recomposed; offscreen blocks keep native wrapping or their old
 //   composition until scrolled near; no visible frame is double-wrapped.
+//   React adapters during an animation (a screen push): offscreen blocks
+//   compose in idle callbacks, but never in the short idle periods left in
+//   animation frames, where a composition on a slow device drops frames.
 import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { build } from 'esbuild';
 import { browsers } from './browsers.mjs';
 import { artifacts } from './candidate.mjs';
 
@@ -19,6 +24,34 @@ const busyPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><st
 <body><article>${Array.from({ length: 60 }, (_, i) => `<p>${escape(corpus[i % corpus.length])}</p>`).join('')}</article></body></html>`;
 // Short paragraphs keep 1000 compositions affordable in every engine.
 const short = (/** @type {number} */ i) => escape(corpus[i % corpus.length].split(' ').slice(0, 26 + (i % 9)).join(' '));
+const reactFixture = (await build({
+  stdin: { contents: `
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { TypesetText } from ${JSON.stringify(resolve(artifacts.react))};
+const texts = ${JSON.stringify(corpus.slice(0, 48))};
+window.mountReact = () => { const root = createRoot(document.getElementById('app')); flushSync(() => root.render(h('div', null,
+  texts.slice(0, 4).map((text, i) => h(TypesetText, { key: 'v' + i, text, className: 'r' })),
+  h('div', { style: { height: '4000px' } }),
+  texts.slice(4).map((text, i) => h(TypesetText, { key: 'o' + i, text, className: 'r' }))))); };
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
+// Idle callbacks, observed before React loads: how much idle time each was
+// given, and whether an adapter composed during it.
+const idleProbe = () => {
+  const w = /** @type {any} */ (window);
+  w.idleLog = [];
+  const request = window.requestIdleCallback;
+  if (typeof request !== 'function') return;
+  window.requestIdleCallback = (callback, options) => request.call(window, deadline => {
+    const count = () => document.querySelectorAll('.r[data-ts-outcome]').length;
+    const remaining = deadline.timeRemaining(), before = count();
+    callback(deadline);
+    w.idleLog.push({ remaining, timedOut: deadline.didTimeout, composed: count() - before, animating: !!w.animating });
+  }, options);
+};
 const manyPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:16px/1.4 Georgia,serif}article{width:420px;padding:0 12px}p{margin:0 0 8px}</style></head>
 <body><article id="doc">${Array.from({ length: 1000 }, (_, i) => `<p>${short(i)}</p>`).join('')}</article></body></html>`;
 
@@ -107,6 +140,36 @@ for (const { name, engine, executablePath } of browsers) {
       check('resize: no visible frame is double-wrapped', result.samples === 0, result);
       check('resize: only blocks near the screen are recomposed', result.afterResize > 0 && result.afterResize < 200 && result.visibleComposed, result);
       check('resize: offscreen blocks are composed once scrolled near', result.scrolledCompositions > 0 && result.scrolledComposed && result.farStale > 0, result);
+      await page.close();
+    }
+    // React adapters during an animation.
+    {
+      const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}#app{width:420px;padding:0 12px}#slide{position:fixed;top:0;left:0;width:40px;height:40px;background:#ccc}</style></head><body><div id="slide"></div><div id="app"></div></body></html>');
+      await page.evaluate(idleProbe);
+      await page.addScriptTag({ content: reactFixture });
+      const cdp = name === 'chromium' ? await page.context().newCDPSession(page) : null;
+      await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        await document.fonts.ready;
+        // A 900 ms slide, one inline style write per frame, as a screen push animates.
+        w.animating = true;
+        const slide = /** @type {HTMLElement} */ (document.getElementById('slide'));
+        const t0 = performance.now();
+        const animate = () => { const t = performance.now() - t0; slide.style.transform = `translateX(${Math.min(1, t / 900) * 600}px)`; if (t < 900) requestAnimationFrame(animate); else w.animating = false; };
+        requestAnimationFrame(animate);
+        w.mountReact();
+        const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
+        while (performance.now() - t0 < 15000 && !hosts.every(el => el.dataset.tsOutcome)) await new Promise(r => setTimeout(r, 50));
+        const during = w.idleLog.filter((/** @type {any} */ e) => e.animating && e.composed);
+        return { hosts: hosts.length, composed: hosts.filter(el => el.dataset.tsOutcome).length, idleCallbacks: w.idleLog.length,
+          shortIdleCompositions: w.idleLog.filter((/** @type {any} */ e) => e.composed && !e.timedOut && e.remaining < 20).length, during: during.length, sample: w.idleLog.filter((/** @type {any} */ e) => e.composed).slice(0, 6) };
+      });
+      await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      check('React adapters: every offscreen block composes after the animation', result.composed === result.hosts, result);
+      if (result.idleCallbacks) check('React adapters: no composition in an idle period shorter than 20 ms (the rest of an animation frame)', result.shortIdleCompositions === 0, result);
       await page.close();
     }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }

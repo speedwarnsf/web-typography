@@ -14,11 +14,12 @@
  * native and then rewrapped (only visible work beyond VISIBLE_BUDGET_MS, on a
  * very slow device, continues in the following frame). Hosts within a
  * viewport of the screen follow within a small frame budget, and the rest
- * compose in idle time. Triggers (ancestor class or style changes, fonts, window
- * resizes, a host's height changing at the same width, and the document
- * lifecycle hub's stylesheet, metric-transition and content-visibility
- * signals) first compare each host's computed layout key
- * and do nothing when it is unchanged. During a continuous resize a host whose
+ * compose in long idle periods, not in what is left of an animation frame.
+ * Triggers (ancestor class or style changes, fonts, window resizes, a host's
+ * height changing at the same width, and the document lifecycle hub's
+ * stylesheet, metric-transition and content-visibility signals) first
+ * compare each host's computed layout key and do nothing when it is
+ * unchanged. During a continuous resize a host whose
  * composed lines no longer fit shows native lines (stale) and recomposes once
  * the size has held for RESIZE_SETTLE_MS. Hidden hosts keep their composition
  * and are checked when shown; nothing composes while the page prints; and
@@ -60,6 +61,12 @@ const FRAME_BUDGET_MS = 12;
  * alone would exceed this, on a very slow device. */
 const VISIBLE_BUDGET_MS = 120;
 const IDLE_SLICE_MS = 8;
+/** Idle work waits at most this long for a long idle period. */
+const IDLE_TIMEOUT_MS = 1000;
+/** An idle period at least this long has no frame pending. Shorter ones are
+ * what is left of an animation frame (a screen push, a transition, a
+ * scroll), which one composition on a slow device can overrun. */
+const LONG_IDLE_MS = 20;
 const RESIZE_SETTLE_MS = 100;
 // Edge's translator tags the nodes it rewrites with the _mst attributes; the
 // hidden and open attributes reveal text, which then composes before the
@@ -106,6 +113,8 @@ function createRegistry(doc: Document): Registry {
   let commitStart = 0;
   let costPerChar = 0;
   let frameQueued = false, idleQueued = false, staleQueued = false;
+  // When idle work was first requested and has not run since.
+  let idleSince = 0;
   let settle: ReturnType<typeof setTimeout> | undefined;
   let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
   let writingDepth = 0;
@@ -158,11 +167,14 @@ function createRegistry(doc: Document): Registry {
   function schedule(): void {
     if (!pending.size) return;
     if (!frameQueued) { frameQueued = true; frame(flushFrame); }
-    if (!idleQueued) {
-      idleQueued = true;
-      if (win && typeof win.requestIdleCallback === 'function') win.requestIdleCallback(flushIdle, { timeout: 1000 });
-      else later(() => flushIdle(), 50);
-    }
+    requestIdle();
+  }
+  function requestIdle(): void {
+    if (idleQueued) return;
+    idleQueued = true;
+    if (!idleSince) idleSince = performance.now();
+    if (win && typeof win.requestIdleCallback === 'function') win.requestIdleCallback(flushIdle, { timeout: Math.max(1, IDLE_TIMEOUT_MS - (performance.now() - idleSince)) });
+    else later(() => flushIdle(), 50);
   }
   /** Compose (or check) one pending host. */
   function process(entry: AdapterEntry, reason: Reason, fonts: string): void {
@@ -196,17 +208,23 @@ function createRegistry(doc: Document): Registry {
     // A composition can start a font load (a face first used by this text).
     if (composed) armFonts(doc);
   }
-  /** Everything else, in slices, nearest first. */
+  /** Everything else, in slices, nearest first, in a long idle period: a
+   * short one is the rest of an animation frame, which a composition on a
+   * slow device can overrun, dropping frames of a screen push or a scroll.
+   * Waited for up to IDLE_TIMEOUT_MS; a callback that fires on its timeout
+   * composes one block. (Engines without idle callbacks use a timer.) */
   function flushIdle(deadline?: IdleDeadline): void {
     idleQueued = false;
-    if (!pending.size || printing(doc)) return;
+    if (!pending.size || printing(doc)) { idleSince = 0; return; }
+    if (deadline && !deadline.didTimeout && deadline.timeRemaining() < LONG_IDLE_MS) { requestIdle(); return; }
+    idleSince = 0;
     const start = performance.now();
     const fonts = fontKey(doc);
     const order = [...pending.keys()].sort((a, b) => Number(near.has(b)) - Number(near.has(a)));
     for (const entry of order) {
       const reason = pending.get(entry);
       if (reason) process(entry, reason, fonts);
-      if (performance.now() - start >= IDLE_SLICE_MS || (deadline && !deadline.didTimeout && deadline.timeRemaining() <= 1)) break;
+      if (deadline?.didTimeout || performance.now() - start >= IDLE_SLICE_MS || (deadline && deadline.timeRemaining() <= 1)) break;
     }
     armFonts(doc);
     schedule();
@@ -380,7 +398,7 @@ function createRegistry(doc: Document): Registry {
     mutations = observer = viewport = null;
     unsubscribe?.(); unsubscribe = undefined;
     clearTimeout(settle); settle = undefined;
-    pending.clear(); near.clear(); resizing.clear();
+    pending.clear(); near.clear(); resizing.clear(); idleSince = 0;
   }
 
   return {
