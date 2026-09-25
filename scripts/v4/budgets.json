@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 49408,
-      "TypesetText-only": 49292,
-      "TypesetRichText-only": 45416,
-      "smartQuotes-only": 1478,
-      "react.js+shared": 52723,
-      "TypesetText-no-tree-shaking": 61447,
-      "go.js": 55580,
-      "typeset.global.js": 55224
+      "mount-only": 49987,
+      "TypesetText-only": 49897,
+      "TypesetRichText-only": 46026,
+      "smartQuotes-only": 1544,
+      "react.js+shared": 53303,
+      "TypesetText-no-tree-shaking": 62036,
+      "go.js": 56146,
+      "typeset.global.js": 55806
     },
     "raised": [
       {
@@ -136,6 +136,30 @@
           "TypesetText-no-tree-shaking": 61447,
           "go.js": 55580,
           "typeset.global.js": 55224
+        }
+      },
+      {
+        "by": "4.3 gate 3 fixes",
+        "reason": "Measured per fix with the release recipe on typeset.global.js (react.js+shared in parentheses): keep phrases matched down a trie of the phrases instead of by rescanning the joined units (cubic on dash runs) +284 B (+303), smart-quote education linear (the last character kept, the closing-quote search resumed; quadratic at 120 KB) +72 B (+81; smartQuotes-only +66 B, 4.5%), and text placed again when a pane it waits on starts to overflow (P5) +226 B (+196). Only smartQuotes-only passed its 2% tolerance.",
+        "before": {
+          "mount-only": 49408,
+          "TypesetText-only": 49292,
+          "TypesetRichText-only": 45416,
+          "smartQuotes-only": 1478,
+          "react.js+shared": 52723,
+          "TypesetText-no-tree-shaking": 61447,
+          "go.js": 55580,
+          "typeset.global.js": 55224
+        },
+        "after": {
+          "mount-only": 49987,
+          "TypesetText-only": 49897,
+          "TypesetRichText-only": 46026,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 53303,
+          "TypesetText-no-tree-shaking": 62036,
+          "go.js": 56146,
+          "typeset.global.js": 55806
         }
       }
     ]
@@ -273,7 +297,7 @@
   "calibrated": {
     "size": {
       "date": "2026-09-25",
-      "dist": "output/candidate/dist (the round 3 candidate, 15bf0bb)"
+      "dist": "output/candidate/dist (the gate 3 fixes candidate, c3e5dea)"
     },
     "runtime": {
       "date": "2026-09-25",
@@ -701,6 +725,61 @@
         }
       ],
       "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 gate 3 fixes",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 49408,
+          "to": 49987,
+          "reason": "keep phrases matched down a trie (+327 B), linear smart-quote education (+72 B), text placed again when a pane it waits on overflows (+180 B) (see size.raised, gate 3)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 49292,
+          "to": 49897,
+          "reason": "as mount-only (+322, +79, +204 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 45416,
+          "to": 46026,
+          "reason": "as mount-only (+350, +64, +196 B)"
+        },
+        {
+          "budget": "size.gzip.smartQuotes-only",
+          "from": 1478,
+          "to": 1544,
+          "reason": "education in linear time: the character before a quote kept as it is written instead of read back from the growing output, and the search for a later closing quote resumed from the last one instead of rescanning the rest of the text (quadratic: 0.3 to 0.8 s at 120 KB)"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 52723,
+          "to": 53303,
+          "reason": "as TypesetText-only and TypesetRichText-only together (+303, +81, +196 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": 61447,
+          "to": 62036,
+          "reason": "as react.js+shared (+288, +74, +227 B)"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 55580,
+          "to": 56146,
+          "reason": "as mount-only (+271, +67, +228 B)"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 55224,
+          "to": 55806,
+          "reason": "as mount-only (+284, +72, +226 B)"
+        }
+      ],
+      "measured": "scripts/v4/bench-sizes.mjs on a candidate built after each fix (release recipe, Node 24 zlib)"
     }
   ]
 }

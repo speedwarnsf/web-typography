@@ -645,13 +645,13 @@ table.
   (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
   one more font listener, shared by every controller and adapter.
 - Download, gzip (esbuild bundles importing one entry point, tree-shaken):
-  `mount` only 37.7 to 49.4 KB, `TypesetText` only 38.0 to 49.3 KB,
-  `TypesetRichText` only 33.4 to 45.4 KB, `smartQuotes` only 11.7 to 1.5 KB
-  (the line-break tables now tree-shake away), `go.js` 42.3 to 55.6 KB and
-  `typeset.global.js` 42.1 to 55.2 KB. A bundler that does not tree-shake
+  `mount` only 37.7 to 50.0 KB, `TypesetText` only 38.0 to 49.9 KB,
+  `TypesetRichText` only 33.4 to 46.0 KB, `smartQuotes` only 11.7 to 1.5 KB
+  (the line-break tables now tree-shake away), `go.js` 42.3 to 56.1 KB and
+  `typeset.global.js` 42.1 to 55.8 KB. A bundler that does not tree-shake
   (Metro, the Expo and React Native Web default) ships all of
   `typeset.us/react`, `dist/react.js` and its shared chunk: `TypesetText`
-  43.2 to 61.4 KB, a larger increase than any tree-shaken figure (an Expo
+  43.2 to 62.0 KB, a larger increase than any tree-shaken figure (an Expo
   web export of one app grew by 17.0 KB gzip, 434,777 to 451,735 bytes,
   with a 4.3.0 release candidate).
   The growth is the code the fixes above need, measured per group and
