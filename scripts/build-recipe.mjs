@@ -16,12 +16,16 @@ export const sri = bytes => 'sha384-' + createHash('sha384').update(bytes).diges
 /** @param {Uint8Array} bytes */
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
+const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true };
 // The bind-weight research hook (typeset.ts bindWeights) is compiled out of
-// every artifact. process.env.NODE_ENV is left for the consumer's bundler
-// (esbuild would otherwise bake in "development" or "production"), so the
-// React adapter's development warnings follow the application's build. A
-// source that mentions neither name builds unchanged.
-const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true, define: { __TYPESET_BIND_OVERRIDE__: 'undefined', 'process.env.NODE_ENV': 'process.env.NODE_ENV' } };
+// every artifact; bind-harness.mjs builds its own research loader. Development
+// checks (src/lib/v4/validate.ts) and the React adapter's development warnings
+// run when process.env.NODE_ENV is not "production". The module builds leave
+// the expression for the consumer's bundler (esbuild would otherwise bake in
+// its own default); the script-tag builds, which no bundler sees, keep the
+// checks. A source that mentions none of these names builds unchanged.
+const moduleEnv = { __TYPESET_BIND_OVERRIDE__: 'undefined', 'process.env.NODE_ENV': 'process.env.NODE_ENV' };
+const scriptEnv = { __TYPESET_BIND_OVERRIDE__: 'undefined', 'process.env.NODE_ENV': '"development"' };
 
 /**
  * The npm package's dist/: ESM with a shared chunk, CJS, and the two IIFEs.
@@ -31,10 +35,10 @@ const common = { bundle: true, target: 'es2022', minify: false, sourcemap: true,
  */
 export async function buildPackageDist({ root, distDir, plugins = [] }) {
   const base = { ...common, absWorkingDir: root, plugins, logLevel: /** @type {const} */ ('warning') };
-  await build({ ...base, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react'], outdir: distDir, chunkNames: 'shared-[hash]' });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], format: 'iife', minify: true, outfile: `${distDir}/typeset.global.js` });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.go.ts'], format: 'iife', minify: true, outfile: `${distDir}/go.js` });
+  await build({ ...base, define: moduleEnv, entryPoints: { index: 'src/lib/v4/typeset.release.ts', react: 'src/lib/v4/typeset.release.react.tsx' }, format: 'esm', splitting: true, external: ['react'], outdir: distDir, chunkNames: 'shared-[hash]' });
+  await build({ ...base, define: moduleEnv, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'cjs', outfile: `${distDir}/index.cjs` });
+  await build({ ...base, define: scriptEnv, entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], format: 'iife', minify: true, outfile: `${distDir}/typeset.global.js` });
+  await build({ ...base, define: scriptEnv, entryPoints: ['src/lib/v4/typeset.go.ts'], format: 'iife', minify: true, outfile: `${distDir}/go.js` });
   await copyFile(join(root, 'src/lib/v4/typeset-lists.css'), join(root, distDir, 'styles.css'));
 }
 
@@ -78,10 +82,10 @@ export async function writeManifest({ root, distDir, version, extra = {} }) {
 export async function buildSite({ root, distDir, siteDir, version, plugins = [] }) {
   const base = { ...common, absWorkingDir: root, plugins, sourcemap: false, logLevel: /** @type {const} */ ('warning') };
   await mkdir(join(root, siteDir), { recursive: true });
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.website-go.ts'], format: 'iife', minify: true, outfile: `${siteDir}/go.js`, banner: { js: `/* typeset.us ${version}; automatic website loader. MIT. https://typeset.us */` } });
+  await build({ ...base, define: scriptEnv, entryPoints: ['src/lib/v4/typeset.website-go.ts'], format: 'iife', minify: true, outfile: `${siteDir}/go.js`, banner: { js: `/* typeset.us ${version}; automatic website loader. MIT. https://typeset.us */` } });
   await copyFile(join(root, distDir, 'typeset.global.js'), join(root, siteDir, 'typeset.min.js'));
   await copyFile(join(root, distDir, 'typeset.global.js.map'), join(root, siteDir, 'typeset.global.js.map'));
-  await build({ ...base, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'esm', minify: true, outfile: `${siteDir}/typeset.esm.js` });
+  await build({ ...base, define: scriptEnv, entryPoints: ['src/lib/v4/typeset.release.ts'], format: 'esm', minify: true, outfile: `${siteDir}/typeset.esm.js` });
   await copyFile(join(root, distDir, 'styles.css'), join(root, siteDir, 'typeset.css'));
 }
 

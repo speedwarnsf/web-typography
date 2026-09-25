@@ -3,7 +3,7 @@
 import { Children, Component, Fragment, cloneElement, createElement, createRef, isValidElement } from 'react';
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
 import { BREAK_ATTRIBUTE, breakReplacesSpace, inLiveRegion, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
-import { measureLayout } from './layout-metrics';
+import { contentWidth, measureLayout } from './layout-metrics';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
 import { smartQuotes } from './smart-quotes';
@@ -15,6 +15,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
+import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
 
 export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 'dangerouslySetInnerHTML'> {
   children: ReactNode;
@@ -101,7 +102,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
         const local = stop - start;
         append(text.slice(cursor, local), start + cursor);
         // Exposed where it stands in for the collapsed space; see renderRichText.
-        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true }), stop, true);
+        if (breaks.has(stop)) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true, style: breakStyle }), stop, true);
         if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
         if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
         cursor = local;
@@ -122,6 +123,9 @@ function development(): boolean {
   try { return process.env.NODE_ENV !== 'production'; } catch { return false; }
 }
 
+// The same switch as the DOM renderer's break: print and stale mode set it to none.
+const breakStyle = { display: 'var(--ts-break-display, inline)' };
+
 function supportedTree(children: ReactNode): boolean {
   let supported = true;
   Children.forEach(children, child => {
@@ -140,8 +144,14 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   private observer?: MutationObserver;
   private resize?: ResizeObserver;
   private releaseCopy?: () => void;
+  private unsubscribe?: () => void;
   private frame = 0;
+  private staleFrame = 0;
+  private settle?: ReturnType<typeof setTimeout>;
+  private widths = new WeakMap<Element, number>();
   private mounted = false;
+  /** Machine translation is rewriting this subtree: no replans, no observers. */
+  private frozen = false;
 
   static getDerivedStateFromProps(props: TypesetRichTextProps, state: State): Partial<State> | null {
     return props.children !== state.input ? { input: props.children, plan: null } : null;
@@ -149,11 +159,14 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   componentDidMount(): void {
     this.mounted = true;
     const el = this.host.current!;
-    this.observer = new MutationObserver(this.schedule);
-    this.resize = new ResizeObserver(this.schedule);
+    this.observer = new MutationObserver(this.mutated);
+    this.frozen = translationActive(el.ownerDocument);
+    this.resize = new ResizeObserver(this.resized);
+    installLifecycleStyles(el.ownerDocument);
     this.bindHost();
-    el.ownerDocument.fonts.addEventListener('loadingdone', this.schedule);
-    el.ownerDocument.defaultView?.addEventListener('resize', this.schedule);
+    // Fonts a stylesheet loads late, including in WebKit, which fires no
+    // loadingdone event for them.
+    this.unsubscribe = subscribe(el.ownerDocument, { fonts: this.schedule, metrics: this.metricsEnded, styles: this.stylesChanged, resize: this.schedule, translation: this.translationChanged });
     el.ownerDocument.fonts.ready.then(this.schedule);
     this.recompose();
   }
@@ -163,6 +176,9 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   }
   componentDidUpdate(previous: TypesetRichTextProps, _state: State, restoreSelection: (() => void) | null): void {
     restoreSelection?.();
+    if (this.frozen) return;
+    // A new plan renders for the current width: show it.
+    if (this.settle === undefined) this.host.current?.removeAttribute('data-ts-stale');
     if (previous.as !== this.props.as) this.bindHost();
     if (previous !== this.props) this.recompose();
     else {
@@ -210,14 +226,15 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   }
   componentWillUnmount(): void {
     this.mounted = false;
-    cancelAnimationFrame(this.frame);
+    cancelAnimationFrame(this.frame); cancelAnimationFrame(this.staleFrame);
+    if (this.settle !== undefined) clearTimeout(this.settle);
     this.observer?.disconnect(); this.resize?.disconnect();
-    this.host.current?.ownerDocument.fonts.removeEventListener('loadingdone', this.schedule);
-    this.host.current?.ownerDocument.defaultView?.removeEventListener('resize', this.schedule);
+    this.unsubscribe?.();
     this.releaseCopy?.();
   }
   private observe = () => {
-    if (this.host.current) this.observer?.observe(this.host.current, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class', 'lang'] });
+    if (this.frozen) return;
+    if (this.host.current) this.observer?.observe(this.host.current, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class', 'lang', '_msttexthash', '_msthash'] });
     for (let ancestor = this.host.current?.parentElement; ancestor; ancestor = ancestor.parentElement) {
       this.observer?.observe(ancestor, { attributes: true, attributeFilter: ['style', 'class', 'lang'] });
     }
@@ -230,12 +247,62 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.resize?.observe(el);
     if (el.parentElement) this.resize?.observe(el.parentElement);
   };
+  private metricsEnded = (target: Element) => {
+    const el = this.host.current;
+    if (el && (target.contains(el) || el.contains(target))) this.schedule();
+  };
+  private stylesChanged = () => {
+    const el = this.host.current, plan = this.state.plan;
+    if (el && (!plan?.styleSignature || richFingerprint(el) !== plan.styleSignature)) this.schedule();
+  };
+  /** Width changes (a sidebar drag, a rotation) replan once the size has held
+   * for 100 ms, not every frame. Meanwhile, if the host is narrower than its
+   * widest composed line, it shows native wrapping ([data-ts-stale]); that is
+   * written in the next animation frame, since a ResizeObserver callback must
+   * not change sizes. Other size changes (fonts, reveals) replan next frame. */
+  private resized = (entries: ResizeObserverEntry[]) => {
+    let width = false;
+    for (const entry of entries) {
+      const previous = this.widths.get(entry.target), next = entry.contentRect.width;
+      this.widths.set(entry.target, next);
+      if (previous && next && Math.abs(previous - next) > .01) width = true;
+    }
+    if (!width || !this.state.plan?.breaks.length) { this.schedule(); return; }
+    if (this.settle !== undefined) clearTimeout(this.settle);
+    this.settle = setTimeout(() => { this.settle = undefined; this.recompose(); }, 100);
+    if (!this.staleFrame) this.staleFrame = requestAnimationFrame(() => {
+      this.staleFrame = 0;
+      const el = this.host.current, plan = this.state.plan;
+      if (el && plan?.widths.length && contentWidth(el) < Math.max(...plan.widths) - .01) el.setAttribute('data-ts-stale', '');
+    });
+  };
+  private mutated = (records: MutationRecord[]) => {
+    const el = this.host.current;
+    // A translator wrapping this text in <font> or tagging it (Edge).
+    if (el && records.some(record => record.attributeName?.startsWith('_mst') || [...record.addedNodes].some(node => node.nodeName === 'FONT'))) markTranslated(el.ownerDocument);
+    else this.schedule();
+  };
+  /** Freeze while a translator rewrites the page: React output stays as it is,
+   * since a re-render would write into Text nodes the translator is filling.
+   * Unlike mount(), the adapter cannot remove the breaks it rendered. */
+  private translationChanged = (active: boolean) => {
+    this.frozen = active;
+    if (active) {
+      this.observer?.disconnect(); this.resize?.disconnect();
+      cancelAnimationFrame(this.frame); this.frame = 0;
+      cancelAnimationFrame(this.staleFrame); this.staleFrame = 0;
+      if (this.settle !== undefined) { clearTimeout(this.settle); this.settle = undefined; }
+    } else { this.bindHost(); this.observe(); this.schedule(); }
+  };
   private schedule = () => {
-    if (!this.mounted || this.frame) return;
+    if (!this.mounted || this.frame || this.frozen) return;
     this.frame = requestAnimationFrame(() => { this.frame = 0; this.recompose(); });
   };
   private recompose = () => {
-    if (!this.mounted || !this.host.current) return;
+    if (!this.mounted || !this.host.current || this.frozen) return;
+    // Hidden: keep the current plan. Shown again at the same width, the text
+    // paints composed instead of native first and re-broken a frame later.
+    if (this.state.plan && (!rendered(this.host.current) || printing(this.host.current.ownerDocument))) return;
     this.observer?.disconnect();
     // A live region announces every change: never measure or break it.
     const plan: RenderPlan = inLiveRegion(this.host.current)
@@ -243,7 +310,8 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
       : planRichText(this.host.current, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     if (JSON.stringify(plan) !== JSON.stringify(this.state.plan)) this.setState({ plan });
-    else this.observe();
+    else { this.host.current.removeAttribute('data-ts-stale'); this.observe(); }
+    armFonts(this.host.current.ownerDocument);
   };
   render(): ReactElement {
     const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;

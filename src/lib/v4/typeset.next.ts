@@ -15,6 +15,8 @@ import { boundPair, proseBoundary, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
+import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { describe } from './validate';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -61,6 +63,13 @@ interface State {
   styles: { textWrap: string; inlineSize: string; maxInlineSize: string };
   appliedStyles: { textWrap: string; inlineSize: string; maxInlineSize: string };
   signature: string;
+  /** layoutKey() of the composed element, for cheap rechecks. */
+  layout: string;
+  /** optionsKey() of the options it was composed with. */
+  options: string;
+  /** Right edge of the widest composed line from the content box's left edge;
+   * 0 when nothing is composed. Narrower than this, the forced breaks wrap twice. */
+  widest: number;
   result: Result;
   rich?: RichOutput;
   hadStyle: boolean;
@@ -102,6 +111,9 @@ function releaseOutput(element: HTMLElement, state: State, written: ReadonlySet<
   state.signature = '';
   restoreSelection();
 }
+// The last options.text written to an element: a translator's rewrite of that
+// text is not a new value to write back.
+const authorTexts = new WeakMap<HTMLElement, string>();
 // Controllers share composition state, so only one may write a given target.
 const mountOwners = new WeakMap<HTMLElement, symbol>();
 const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
@@ -136,25 +148,50 @@ function modeOf(el: HTMLElement, options: Options): Mode {
   return el.closest('h1,h2,h3,h4,h5,h6') ? 'title' : 'body';
 }
 
-function signature(el: HTMLElement, options: Options): string {
+/** Everything that decides line layout, read from computed values rather than
+ * from attribute strings: an ancestor's class or style counts only through
+ * what it computes to. Cheap enough to recheck on every ancestor mutation. */
+function layoutKey(el: HTMLElement): string {
   const cs = getComputedStyle(el);
-  const context: (string | null)[] = [];
-  for (let ancestor: HTMLElement | null = el; ancestor; ancestor = ancestor.parentElement) {
-    context.push(ancestor.id, ancestor.getAttribute('class'), ancestor.getAttribute('style'));
-  }
+  const box = el.getBoundingClientRect();
+  const inset = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0') + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.borderRightWidth || '0');
+  // Transforms, zoom and scale on any ancestor change glyph advances without
+  // changing a computed style here; their ratio to the layout width does.
+  const used = parseFloat(cs.width);
+  const layout = cs.boxSizing === 'border-box' ? used : used + inset;
+  const scale = layout > 0 ? Math.round(box.width / layout * 1000) / 1000 : 1;
+  const zoom = (el as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
   return JSON.stringify([
-    el.innerHTML, fontVersion(el.ownerDocument), el.ownerDocument.fonts.status,
-    contentWidth(el), el.parentElement && contentWidth(el.parentElement), cs.font, cs.fontFamily, cs.fontSize,
+    fontVersion(el.ownerDocument), el.ownerDocument.fonts.status,
+    Math.max(0, box.width - inset), scale, zoom, cs.font, cs.fontFamily, cs.fontSize,
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
     cs.fontSizeAdjust, cs.fontSynthesis, cs.textRendering, cs.letterSpacing, cs.wordSpacing,
     cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.textAlignLast, cs.direction,
     cs.writingMode, cs.display, cs.textWrap, cs.hyphens, cs.wordBreak, cs.lineBreak, cs.overflowWrap, cs.getPropertyValue('-webkit-line-clamp'),
+    cs.overflow, cs.textOverflow, cs.textIndent, cs.boxSizing, cs.maxInlineSize,
+    // A shrink-to-fit block is pinned to its composed width; its parent's width decides.
+    cs.display === 'inline-block' && el.parentElement ? contentWidth(el.parentElement) : null,
     el.closest('[lang]')?.getAttribute('lang'), el.dataset.typesetMode,
-    options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour,
-    context, getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content,
+    getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content,
     el.querySelector(':not([data-ts-break]):not(.ts-line)') ? richFingerprint(el) : '',
   ]);
+}
+function optionsKey(options: Options): string {
+  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
+}
+function signature(el: HTMLElement, options: Options, layout = layoutKey(el)): string {
+  return el.innerHTML + '\u0000' + layout + '\u0000' + optionsKey(options);
+}
+
+/** A composition still renders as composed: one line per generated line, no
+ * native wraps added by a font, spacing or size change since it was verified. */
+function layoutIntact(el: HTMLElement): boolean {
+  const outcome = el.dataset.tsOutcome;
+  if (outcome !== 'composed:rich' && outcome !== 'composed') return true;
+  const lines = measureLayout(el).lines.length;
+  return outcome === 'composed' ? lines === el.querySelectorAll(':scope > .ts-line').length
+    : lines === el.querySelectorAll('br[data-ts-break]').length + 1;
 }
 
 function resetStyles(el: HTMLElement, state: State): void {
@@ -192,6 +229,25 @@ export function restore(element: HTMLElement): void {
   delete element.dataset.tsHanging;
   delete element.dataset.tsSpacing;
   delete element.dataset.tsTracking;
+  element.removeAttribute('data-ts-stale');
+}
+
+/** Release to a translator. Engine markers are removed and wrappers unwrapped
+ * by moving their existing Text nodes; no Text node is split, merged, edited
+ * or removed, since the translator holds and fills them. Quote substitutions
+ * stay as they are for the same reason. */
+function yieldToTranslation(element: HTMLElement): void {
+  const state = states.get(element);
+  for (const marker of element.querySelectorAll('[data-ts-break]')) marker.remove();
+  for (const wrapper of element.querySelectorAll('[data-ts-track], .ts-line[data-ts-generated]')) wrapper.replaceWith(...wrapper.childNodes);
+  if (state) {
+    resetStyles(element, state);
+    if (element.style.getPropertyPriority('text-wrap-style') === 'important' && element.style.getPropertyValue('text-wrap-style') === 'auto') element.style.removeProperty('text-wrap-style');
+    if (!state.hadStyle && !element.style.length) element.removeAttribute('style');
+  }
+  states.delete(element);
+  for (const name of ['typesetDone', 'tsQuotes', 'tsHanging', 'tsSpacing', 'tsTracking']) delete element.dataset[name];
+  element.removeAttribute('data-ts-stale');
 }
 
 /** Exact DOM measurements inherit font features, axes, tracking and transforms. */
@@ -287,22 +343,44 @@ function render(element: HTMLElement, source: string, lines: FrozenLine[]): void
 
 /** Compose supported text while preserving source content and live elements. */
 export function typeset(element: HTMLElement, options: Options = {}): Result {
+  if ((element as Node | null)?.nodeType !== 1) {
+    throw new TypeError('[typeset] typeset() expects an HTMLElement (received ' + describe(element) + (typeof element === 'string' ? '; typesetAll() and mount() take selectors' : '') + ')');
+  }
   const started = performance.now();
   const mode = modeOf(element, options);
   if (element.closest('[data-typeset-react-rich]')) return { outcome: 'skipped:framework', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   if (element.closest(excluded) || element.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line')) {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
+  if (translationActive(element.ownerDocument)) {
+    if (states.has(element) || element.querySelector('[data-ts-break], [data-ts-track]')) yieldToTranslation(element);
+    if (options.text !== undefined && authorTexts.get(element) !== options.text) { element.textContent = options.text; authorTexts.set(element, options.text); }
+    element.dataset.tsOutcome = 'native:translated';
+    return { outcome: 'native:translated', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
+  }
   if (inLiveRegion(element)) {
     // Release any earlier composition and apply adapter text, then leave the
     // region alone: no measurement overrides, no markers, no attributes.
     if (states.has(element)) restore(element);
-    if (options.text !== undefined && element.textContent !== options.text) element.textContent = options.text;
+    if (options.text !== undefined) {
+      if (element.textContent !== options.text) element.textContent = options.text;
+      authorTexts.set(element, options.text);
+    }
     return { outcome: 'native:live-region', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   }
   const prior = states.get(element);
+  // Hidden (display:none, a closed dialog, a skipped content-visibility
+  // subtree): nothing can be measured, so keep the composition. When the
+  // block is shown at the same width it paints composed, with no re-break.
+  const visible = rendered(element);
+  if (prior && !visible && prior.options === optionsKey(options) && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
   const sig = signature(element, options);
-  if (prior?.signature === sig && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
+  if (prior?.signature === sig && ownsOutput(element, prior)) {
+    // Back at the geometry it was composed for (a resize that returned).
+    element.removeAttribute('data-ts-stale');
+    return { ...prior.result, changed: false, durationMs: performance.now() - started };
+  }
+  element.removeAttribute('data-ts-stale');
   if (prior) {
     const restoreSelection = selectionBookmark(element);
     const unchanged = ownsOutput(element, prior);
@@ -316,15 +394,18 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       // An external edit inside a generated line is new author text, never
       // permission to resurrect our cached source.
       for (const node of prior.outputNodes) {
-        if (node instanceof HTMLElement && node.parentNode === element && node.hasAttribute('data-ts-generated')) {
-          node.replaceWith(...node.childNodes);
+        if (node.nodeType === 1 && node.parentNode === element && (node as Element).hasAttribute('data-ts-generated')) {
+          (node as Element).replaceWith(...node.childNodes);
         }
       }
     }
     prior.quotes?.restore();
     restoreSelection();
   }
-  if (options.text !== undefined && element.textContent !== options.text) element.textContent = options.text;
+  if (options.text !== undefined) {
+    if (element.textContent !== options.text) element.textContent = options.text;
+    authorTexts.set(element, options.text);
+  }
   const rawMarkup = element.innerHTML;
   const restoreQuoteSelection = selectionBookmark(element);
   const quotes = options.smartQuotes === 'en' ? applySmartQuotes(element) : undefined;
@@ -334,7 +415,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const nodes = Array.from(element.childNodes);
   const hadStyle = element.hasAttribute('style');
   const styles = { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize };
-  const before = measureLayout(element);
+  const before = visible ? measureLayout(element) : emptyMetrics();
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
   // The composition's style fingerprint as the last verification confirmed
@@ -391,19 +472,29 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
         }
       }
     }
+    const after = visible ? measureLayout(element) : emptyMetrics();
+    let widest = 0;
+    if (outcome.startsWith('composed') && after.lines.length) {
+      const style = getComputedStyle(element), box = element.getBoundingClientRect();
+      const left = box.left + parseFloat(style.borderLeftWidth || '0') + parseFloat(style.paddingLeft || '0');
+      widest = Math.max(...after.lines.map(line => line.right - left));
+      installLifecycleStyles(element.ownerDocument);
+    }
     element.dataset.tsOutcome = outcome;
     element.dataset.typesetDone = '1';
     element.dataset.tsQuotes = features.quotes;
     element.dataset.tsHanging = features.hanging;
     element.dataset.tsSpacing = features.spacing;
     element.dataset.tsTracking = features.tracking;
-    const result: Result = { outcome, mode, before, after: measureLayout(element), changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
+    const result: Result = { outcome, mode, before, after, changed: element.innerHTML !== rawMarkup, durationMs: performance.now() - started, ...(constraint && { constraint }), ...(search && { search }), features };
+    const layout = layoutKey(element);
     const heads = new Map<Text, string>();
     for (const output of [rich, spacing, tracking, optical]) for (const head of output?.heads || []) heads.set(head, head.data);
     states.set(element, {
       nodes, outputNodes: Array.from(element.childNodes), source, output: element.textContent || '', markup: element.innerHTML, styles,
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
-      signature: signature(element, options), result,
+      // Never cache a decision made without measurement: the next call decides again.
+      signature: outcome === 'unmeasurable' ? '' : signature(element, options, layout), layout, options: optionsKey(options), widest, result,
       rich, hadStyle, quotes, optical, spacing, tracking, heads,
       english: options.lineBreaks !== 'unicode' || languageOf(element.closest('[lang]')?.getAttribute('lang')) === 'en',
     });
@@ -413,7 +504,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const cs = getComputedStyle(element);
   const lang = element.closest('[lang]')?.getAttribute('lang');
   if (options.lineBreaks !== 'unicode' && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return finish('native:language');
-  if (!before.width || !before.lines.length) return finish('unmeasurable');
+  if (!visible || !before.width || !before.lines.length) return finish('unmeasurable');
   if (cs.writingMode !== 'horizontal-tb' || cs.direction !== 'ltr') return finish('native:direction');
   for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
@@ -508,6 +599,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   return finish('composed');
 }
 
+const isElement = (node: unknown): node is HTMLElement => (node as Node | null)?.nodeType === 1;
+
 export function typesetAll(selector = defaults, options: Options = {}): Result[] {
   return Array.from(document.querySelectorAll<HTMLElement>(selector), el => typeset(el, options));
 }
@@ -592,6 +685,12 @@ export function auditReport(selector = defaults): AuditReport {
       for (const sibling of [marker.previousSibling, marker.nextSibling]) if (sibling?.nodeType === 3 && /^\s+$/.test((sibling as Text).data)) isolatedSpaces++;
     }
     if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
+    // A composition renders one line per generated line. A font, spacing or
+    // size change since then adds native wraps: alternating long and short lines.
+    if ((outcome === 'composed:rich' || outcome === 'composed') && !element.hasAttribute('data-ts-stale')) {
+      const expected = outcome === 'composed' ? element.querySelectorAll(':scope > .ts-line').length : element.querySelectorAll('br[data-ts-break]').length + 1;
+      if (layout.lines.length !== expected) add('stale-layout', 'error', layout.lines.length + ' rendered lines where the composition has ' + expected + '; text metrics changed after it was composed');
+    }
     const state = states.get(element);
     const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
     const english = language === 'en' || (language === 'und' && !!state?.english);
@@ -655,14 +754,45 @@ export interface Controller {
   stats: { passes: number; compositions: number; maxBatchMs: number; readonly overlappingTargets: number };
 }
 
-/** One lifecycle owner per mount. Observers are disconnected during our writes. */
-export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
+// Controller jobs. CONTENT recomposes through typeset()'s full signature;
+// KEY rechecks the computed layout key and composes only if it changed;
+// VERIFY also checks that the rendered lines still match the composition.
+const CONTENT = 1, KEY = 2, VERIFY = 4;
+const RESIZE_SETTLE_MS = 100;
+const REVEAL_BUDGET_MS = 24;
+
+/** One lifecycle owner per mount. Observers are disconnected during our writes.
+ * mount('article p', options) is mount(document, 'article p', options). */
+export function mount(selector: string, options?: Options): Controller;
+export function mount(root?: ParentNode, selector?: string, options?: Options): Controller;
+export function mount(target: ParentNode | string = document, selectorOrOptions?: string | Options, maybeOptions: Options = {}): Controller {
+  const byString = typeof target === 'string';
+  const root: ParentNode = byString ? document : target as ParentNode;
+  const selector = byString ? target as string : typeof selectorOrOptions === 'string' ? selectorOrOptions : defaults;
+  const options: Options = (byString && selectorOrOptions && typeof selectorOrOptions === 'object' ? selectorOrOptions : maybeOptions) || {};
+  if (![1, 9, 11].includes((root as Node | null)?.nodeType as number)) {
+    throw new TypeError('[typeset] mount() expects a Document, an Element or a selector string (received ' + describe(root) + ')');
+  }
+  // Realm-safe: a parent page may mount into a same-origin iframe, whose
+  // nodes fail instanceof checks against this window's constructors.
+  const doc = (root as Node).nodeType === 9 ? root as Document : (root as Node).ownerDocument!;
+  const view = doc.defaultView;
   const identity = Symbol('typeset-mount');
   const claimed = new Set<HTMLElement>();
   const blocked = new Map<HTMLElement, () => void>();
   const owned = new Set<HTMLElement>();
-  const pending = new Set<HTMLElement>();
+  const pending = new Map<HTMLElement, number>();
   const nearby = new Set<HTMLElement>();
+  // Owned blocks last seen without boxes. Their compositions are kept.
+  const hidden = new Set<HTMLElement>();
+  // Owned blocks whose width is changing. They are recomposed once, after the
+  // size has held for RESIZE_SETTLE_MS; meanwhile any that would wrap twice
+  // show their native wrapping ([data-ts-stale]).
+  const resizing = new Set<HTMLElement>();
+  // Offscreen blocks a resize left for later: composed when they come within a viewport.
+  const deferred = new Set<HTMLElement>();
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  let guardFrame = 0;
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -670,7 +800,8 @@ export function mount(root: ParentNode = document, selector = defaults, options:
   const stats = { passes: 0, compositions: 0, maxBatchMs: 0, get overlappingTargets() { return blocked.size; } };
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
-  const eligible = (el: HTMLElement) => (el === root || root.contains(el)) && el.matches(selector) && !el.closest(excluded) && !inLiveRegion(el);
+  const within = (el: Node) => el === root || root.contains(el);
+  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !inLiveRegion(el);
   const stopWaiting = (el: HTMLElement) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -707,58 +838,209 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     mountWaiters.delete(el);
     for (const wake of waiters || []) wake();
   };
-  const select = (within: ParentNode = root) => {
-    const scope = root instanceof HTMLElement && within instanceof Node && within.contains(root) ? root : within;
+  const select = (scope: ParentNode = root) => {
+    if (isElement(root) && (scope as Node).contains(root as Node)) scope = root;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
-    if (scope instanceof HTMLElement && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter(el => (el === root || root.contains(el)) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !inLiveRegion(el));
+    if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
+    return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !inLiveRegion(el));
   };
   const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+    let near = false;
     for (const entry of entries) {
       const el = entry.target as HTMLElement;
       if (entry.isIntersecting) nearby.add(el); else nearby.delete(el);
+      if (deferred.has(el)) {
+        // Deferred work is watched until the block comes within a viewport.
+        if (!entry.isIntersecting) continue;
+        deferred.delete(el);
+        enqueue(el, KEY, true);
+      }
       // One viewport snapshot per queued job. Watching thousands of finished
       // elements through every reflow costs more than the scheduling saves.
       viewport?.unobserve(el);
+      if (entry.isIntersecting && pending.has(el)) near = true;
     }
-  }, { rootMargin: '400px' });
-  const enqueue = (el: HTMLElement) => {
+    // Visible work waits for no idle period.
+    if (near) schedule();
+  }, { rootMargin: '100% 0px' });
+  /** Queue a job. New or changed text takes one intersection snapshot to
+   * learn whether it is near the screen; rechecks come from callers that
+   * already read layout, and say so with `near`. */
+  const enqueue = (el: HTMLElement, job = CONTENT, near = false) => {
     if (!claim(el)) return;
-    if (!pending.has(el)) viewport?.observe(el);
-    pending.add(el);
+    const queued = pending.get(el);
+    if (near) nearby.add(el);
+    else if (queued === undefined && job & CONTENT && !nearby.has(el)) viewport?.observe(el);
+    if (job & CONTENT) deferred.delete(el);
+    pending.set(el, (queued || 0) | job);
   };
-  const discover = (within: ParentNode = root) => {
-    for (const el of select(within)) enqueue(el);
+  /** A recheck: near the screen means the next task, elsewhere idle time. */
+  const recheck = (el: HTMLElement, job: number) => enqueue(el, job, onScreen(el));
+  /** Shown again: within a viewport of the screen, check it in the next task;
+   * further away, wait until it comes near, as offscreen resize work does. */
+  const revealed = (el: HTMLElement, job: number) => {
+    hidden.delete(el);
+    const box = el.getBoundingClientRect(), height = view?.innerHeight ?? 0;
+    if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, job, true);
+    else { deferred.add(el); viewport.observe(el); }
   };
+  /** Queue matching elements this controller does not own yet. */
+  const discover = (scope: ParentNode = root) => {
+    for (const el of select(scope)) if (!owned.has(el)) enqueue(el);
+  };
+  /** Owned elements inside (or equal to) a mutated node. */
+  const ownedWithin = (node: Node) => {
+    const found: HTMLElement[] = [];
+    for (const el of owned) if (node === el || node.contains(el)) found.push(el);
+    return found;
+  };
+  const drop = (el: HTMLElement) => {
+    owned.delete(el); pending.delete(el); nearby.delete(el); hidden.delete(el); deferred.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
+  };
+  const onScreen = (el: HTMLElement) => {
+    const box = el.getBoundingClientRect();
+    return box.bottom > 0 && box.top < (view?.innerHeight ?? 0) && box.right > 0 && box.left < (view?.innerWidth ?? 0);
+  };
+  /** Compose now, before this frame paints: for text an attribute change just
+   * revealed. Called from the MutationObserver callback, never from a
+   * ResizeObserver callback, where a size change would report a loop error. */
+  const composeNow = (elements: HTMLElement[]) => {
+    const start = performance.now(), later: HTMLElement[] = [];
+    observer.disconnect();
+    for (const el of elements) {
+      // A reveal is often a click: keep the frame short. The rest show
+      // native wrapping (or their retained composition) and compose next.
+      if (performance.now() - start > REVEAL_BUDGET_MS) { later.push(el); continue; }
+      pending.delete(el); process(el, KEY);
+    }
+    guard(later);
+    for (const el of later) enqueue(el, KEY, true);
+    observe();
+  };
+  /** Before a frame's layout only (a mutation callback, the window's resize
+   * event, an animation frame): blocks now narrower than their widest composed
+   * line would paint alternating long and short lines, so they show native
+   * wrapping until they are recomposed. All reads come before any write. */
+  const guard = (elements: Iterable<HTMLElement>) => {
+    if (printing(doc)) return;
+    const stale: HTMLElement[] = [];
+    for (const el of elements) {
+      const widest = states.get(el)?.widest;
+      if (!widest || el.hasAttribute('data-ts-stale')) continue;
+      const width = boxOf(el).w;
+      if (width > 0 && width < widest - .01) stale.push(el);
+    }
+    for (const el of stale) el.setAttribute('data-ts-stale', '');
+  };
+  /** The size has held: recompose what is on or near the screen now, and
+   * leave offscreen blocks (stale or not) until they come near. */
+  const settle = () => {
+    settleTimer = undefined;
+    if (stopped) return;
+    const height = view?.innerHeight ?? 0;
+    for (const el of resizing) {
+      if (!owned.has(el)) continue;
+      const box = el.getBoundingClientRect();
+      if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, KEY, true);
+      else { deferred.add(el); viewport.observe(el); }
+    }
+    resizing.clear();
+    schedule();
+  };
+  /** A block's width is changing: recompose once it settles, not every frame. */
+  const resizeStarted = (el: HTMLElement) => {
+    resizing.add(el);
+    if (deferred.delete(el)) viewport?.unobserve(el);
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+    settleTimer = setTimeout(settle, RESIZE_SETTLE_MS);
+    // Widths the observers cannot see change ahead of layout (a stylesheet
+    // rule, a sibling outside the root): check them before each frame.
+    if (!guardFrame && view) guardFrame = view.requestAnimationFrame(function frame() {
+      guardFrame = 0;
+      if (stopped || !resizing.size) return;
+      guard(resizing);
+      guardFrame = view.requestAnimationFrame(frame);
+    });
+  };
+  /** Owned blocks whose content width differs from the last one observed.
+   * A block last seen hidden (width 0) is being revealed, not resized. */
+  const widthChanged = (elements: Iterable<HTMLElement>) => {
+    const changed: HTMLElement[] = [];
+    for (const el of elements) {
+      const last = sizes.get(el), width = boxOf(el).w;
+      if (last?.w && width && Math.abs(last.w - width) > .01) changed.push(el);
+    }
+    return changed;
+  };
+  /** Work near the viewport runs in the next task; idle callbacks are only for
+   * offscreen work, since a busy page may leave no idle time at all. */
   const schedule = () => {
-    if (stopped || !fontsReady || timer !== undefined || idle !== undefined || !pending.size) return;
-    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(flush, { timeout: 200 });
+    if (stopped || !fontsReady || !pending.size) return;
+    let near = false;
+    for (const el of nearby) if (pending.has(el)) { near = true; break; }
+    if (near) {
+      if (timer !== undefined) return;
+      if (idle !== undefined) { cancelIdleCallback(idle); idle = undefined; }
+      timer = setTimeout(() => flush(), 0);
+      return;
+    }
+    if (timer !== undefined || idle !== undefined) return;
+    if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(flush, { timeout: 200 });
     else timer = setTimeout(() => flush(), 16);
   };
+  /** Class, style and visibility attributes restyle a subtree. Owned text in it
+   * gets a layout-key recheck instead of a recomposition: most changes (a menu
+   * class, a transform, a scroll-linked variable) leave every line unchanged. */
+  const attributesChanged = (target: HTMLElement) => {
+    const affected = ownedWithin(target);
+    // A width this change sets (a sidebar drag, a container animation):
+    // guard the frame about to paint, and recompose once it settles.
+    const resized = fontsReady && affected.length ? widthChanged(affected) : [];
+    if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
+    // A tab, dialog or card this change just showed: on-screen text that could
+    // not be composed while hidden, or was hidden at another width, composes
+    // before the reveal paints. A retained composition needs nothing.
+    const shown: HTMLElement[] = [];
+    const revealing = fontsReady && hidden.size > 0 && !printing(doc);
+    for (const el of affected) {
+      if (resizing.has(el)) continue;
+      if (revealing && hidden.has(el) && rendered(el)) { if (onScreen(el)) shown.push(el); else revealed(el, KEY); }
+      else recheck(el, KEY);
+    }
+    if (shown.length) composeNow(shown);
+    // An attribute on an author element inside owned text is new markup.
+    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
+    discover(target);
+  };
   const observer = new MutationObserver(records => {
+    const restyled = new Set<HTMLElement>();
     const stale = new Set<HTMLElement>(), written = new Set<Node>();
     for (const record of records) {
-      const target = record.target instanceof HTMLElement ? record.target : record.target.parentElement;
-      for (let el = target; el && (el === root || root.contains(el)); el = el.parentElement) {
+      const target = isElement(record.target) ? record.target : record.target.parentElement;
+      if (!target) continue;
+      if (record.type === 'attributes' && record.attributeName?.startsWith('_mst')) { markTranslated(doc); continue; }
+      if (record.type === 'childList' && !translationActive(doc) && [...record.addedNodes].some(node => node.nodeName === 'FONT')) {
+        for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) if (owned.has(el)) { markTranslated(doc); break; }
+      }
+      // Restyles (including a region turning live, or an exclusion) are
+      // handled per node in attributesChanged, whose recheck releases what is
+      // no longer eligible.
+      if (record.type === 'attributes') { restyled.add(target); continue; }
+      for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) {
         if (!owned.has(el)) continue;
-        pending.add(el);
+        enqueue(el, CONTENT);
         const state = states.get(el);
         if (state?.heads.size && staleSplit(el, state, record, written)) stale.add(el);
       }
-      if (record.type === 'attributes' && target) {
-        // An ancestor's styles can affect its entire subtree, but a clock tick
-        // or an unrelated inserted node must not rescan the whole document.
-        discover(target);
-        if (target.closest(excluded) || inLiveRegion(target)) for (const el of owned) if (target.contains(el)) pending.add(el);
-      }
       if (record.type === 'childList') {
-        for (const node of record.addedNodes) if (node instanceof HTMLElement) discover(node);
-        if (target && !owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
-        for (const node of record.removedNodes) if (node instanceof Element && !root.contains(node)) {
-          for (const el of claimed) if (node.contains(el) && !root.contains(el)) {
-            owned.delete(el); pending.delete(el); nearby.delete(el); viewport?.unobserve(el); unwatch(el); release(el);
-          }
-          for (const el of blocked.keys()) if (node.contains(el) && !root.contains(el)) stopWaiting(el);
+        for (const node of record.addedNodes) if (isElement(node)) discover(node);
+        if (!owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
+        for (const node of record.removedNodes) {
+          if (!isElement(node) || within(node)) continue;
+          // Walk the removed subtree once, not every claimed element per node.
+          if (claimed.has(node)) drop(node);
+          if (node.firstElementChild) for (const el of node.getElementsByTagName('*')) if (claimed.has(el as HTMLElement)) drop(el as HTMLElement);
+          if (blocked.size) for (const el of blocked.keys()) if (node.contains(el) && !within(el)) stopWaiting(el);
         }
       }
     }
@@ -769,16 +1051,53 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       for (const el of stale) { const state = states.get(el); if (state) releaseOutput(el, state, written); }
       observe();
     }
+    // Each restyled node once per delivery, however many records it produced.
+    for (const target of restyled) attributesChanged(target);
     schedule();
   });
-  const observedWidths = new WeakMap<Element, number>();
+  // Content-box sizes as last seen by the ResizeObserver or left by our writes.
+  const sizes = new WeakMap<Element, { w: number; h: number }>();
+  // Layout sizes, like the ResizeObserver's: a transform (a scale animation)
+  // changes a box's rectangle but not the width its lines were composed for.
+  const boxOf = (el: Element) => {
+    const cs = getComputedStyle(el);
+    let w = parseFloat(cs.width), h = parseFloat(cs.height);
+    if (Number.isNaN(w) || Number.isNaN(h)) {
+      const rect = el.getBoundingClientRect();
+      w = rect.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0');
+      h = rect.height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0') - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0');
+    } else if (cs.boxSizing === 'border-box') {
+      w -= parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0') + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.borderRightWidth || '0');
+      h -= parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0') + parseFloat(cs.borderTopWidth || '0') + parseFloat(cs.borderBottomWidth || '0');
+    }
+    return { w: Math.max(0, w), h: Math.max(0, h) };
+  };
   const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
+    // Reads only. A write here that changed any observed size would make every
+    // engine report "ResizeObserver loop completed with undelivered notifications".
     for (const entry of entries) {
-      const previous = observedWidths.get(entry.target);
-      observedWidths.set(entry.target, entry.contentRect.width);
-      if (previous !== undefined && Math.abs(previous - entry.contentRect.width) <= .01) continue;
-      for (const el of watched.get(entry.target) || []) pending.add(el);
+      const { width, height } = entry.contentRect;
+      const previous = sizes.get(entry.target);
+      sizes.set(entry.target, { w: width, h: height });
+      if (!previous) continue;
+      if (!width) {
+        // Hidden. Keep the composition: shown again at this width, it paints composed.
+        if (owned.has(entry.target as HTMLElement)) hidden.add(entry.target as HTMLElement);
+        continue;
+      }
+      if (Math.abs(previous.w - width) > .01) {
+        for (const el of watched.get(entry.target) || []) {
+          // Revealed: a retained composition is already painting; verify it.
+          if (!previous.w || hidden.has(el)) revealed(el, VERIFY);
+          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
+        }
+      } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
+        // Same width, new height: a font, a text-spacing override, a browser
+        // font-size setting or text-only zoom can add native wraps to composed
+        // lines without any mutation. Verify the rendered lines.
+        recheck(entry.target as HTMLElement, VERIFY);
+      }
     }
     if (pending.size) schedule();
   });
@@ -790,7 +1109,7 @@ export function mount(root: ParentNode = document, selector = defaults, options:
       let dependents = watched.get(target);
       if (!dependents) {
         dependents = new Set(); watched.set(target, dependents);
-        observedWidths.set(target, contentWidth(target)); resize?.observe(target);
+        sizes.set(target, boxOf(target)); resize?.observe(target);
       }
       dependents.add(el);
     }
@@ -806,55 +1125,131 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     parents.delete(el);
   };
   function observe() {
-    observer.observe(root, { subtree: true, childList: true, characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', 'aria-live', 'role'] });
-    if (root instanceof HTMLElement) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang', 'aria-live', 'role'] });
+    observer.observe(root, { subtree: true, childList: true, characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', 'aria-live', 'role', '_msttexthash', '_msthash'] });
+    if (isElement(root)) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'aria-live', 'role'] });
     }
   }
+  /** One job. Rechecks are a computed-style read; only a changed key, changed
+   * content or a composition that no longer renders as composed is recomposed. */
+  const process = (el: HTMLElement, job: number) => {
+    if (!within(el)) { drop(el); return; }
+    if (!eligible(el)) { restore(el); drop(el); return; }
+    if (owned.has(el) && parents.get(el) !== el.parentElement) { unwatch(el); watch(el); }
+    const state = states.get(el);
+    if (!(job & CONTENT) && state && owned.has(el) && !rendered(el)) { hidden.add(el); return; }
+    hidden.delete(el);
+    if (!(job & CONTENT) && state?.signature && owned.has(el) && layoutKey(el) === state.layout) {
+      // Back at the width it was composed for: show the composition again.
+      if (el.hasAttribute('data-ts-stale')) { el.removeAttribute('data-ts-stale'); job |= VERIFY; }
+      // Nothing that decides layout changed. The rendered lines are the safety
+      // net for anything the key cannot see.
+      if (!(job & VERIFY) || layoutIntact(el)) return;
+      state.signature = '';
+    }
+    const result = typeset(el, options);
+    if (result.changed) stats.compositions++;
+    if (result.outcome === 'unmeasurable') hidden.add(el);
+    if (!owned.has(el)) { owned.add(el); watch(el); }
+    // Our own write may change the block's height; that is not a reason to verify.
+    else if (result.changed) { const box = boxOf(el); sizes.set(el, { w: sizes.get(el)?.w ?? box.w, h: box.h }); }
+  };
   function flush(deadline?: IdleDeadline) {
     timer = undefined;
     idle = undefined;
-    if (stopped) return;
+    // Print shows native wrapping; the work waits until printing ends.
+    if (stopped || printing(doc)) return;
     observer.disconnect();
     const start = performance.now();
     stats.passes++;
+    // While fonts load, text may be about to change metrics again: recheck
+    // what is near the screen now and leave the rest to the fonts' arrival,
+    // which rechecks everything.
+    const fontsLoading = doc.fonts.status === 'loading';
+    if (fontsLoading) armFonts(doc);
     function* work() {
       for (const el of nearby) if (pending.has(el)) yield el;
-      yield* pending;
+      yield* pending.keys();
     }
     for (const el of work()) {
+      const job = pending.get(el);
+      if (job === undefined) continue;
       pending.delete(el);
+      // Superseded: a width still changing is recomposed once it settles, and
+      // offscreen text a resize deferred is recomposed when it comes near.
+      if ((resizing.has(el) || deferred.has(el) || (fontsLoading && !nearby.has(el))) && !(job & CONTENT)) continue;
       nearby.delete(el); viewport?.unobserve(el);
-      if (!(root === el || root.contains(el))) { owned.delete(el); unwatch(el); release(el); continue; }
-      if (!eligible(el)) { restore(el); owned.delete(el); unwatch(el); release(el); continue; }
-      if (owned.has(el) && parents.get(el) !== el.parentElement) { unwatch(el); watch(el); }
-      const result = typeset(el, options);
-      if (result.changed) stats.compositions++;
-      if (!owned.has(el)) { owned.add(el); watch(el); }
-      if (performance.now() - start >= 8 || (deadline && deadline.timeRemaining() <= 1)) break;
+      process(el, job);
+      // An idle callback that fired on its timeout reports no time remaining;
+      // it still gets the 8 ms budget, or a busy page composes one block per 200 ms.
+      if (performance.now() - start >= 8 || (deadline && !deadline.didTimeout && deadline.timeRemaining() <= 1)) break;
     }
     stats.maxBatchMs = Math.max(stats.maxBatchMs, performance.now() - start);
     observe();
+    // A composition can start a font load (a face first used by this text).
+    armFonts(doc);
     if (pending.size) schedule();
     else resolveReady();
   }
   const refresh = () => {
     if (stopped) return;
     discover();
+    for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
   };
+  // The window's resize event runs before the frame's layout: guard what is
+  // on screen, and let the settle recompose what changed width. A viewport
+  // resize can also change vw/vh sizes without resizing a box; those blocks
+  // get a key recheck, which composes nothing unless it changed.
   const resized = () => {
-    for (const el of owned) pending.add(el);
+    if (stopped || !fontsReady) return;
+    const visible: HTMLElement[] = [];
+    for (const el of owned) if (states.get(el)?.widest && onScreen(el)) visible.push(el);
+    const changed = widthChanged(visible);
+    guard(changed);
+    for (const el of changed) resizeStarted(el);
+    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY, visible.includes(el));
     schedule();
   };
   const fontsChanged = () => {
-    for (const el of owned) {
-      const state = states.get(el);
-      if (state) state.signature = '';
-    }
-    refresh();
+    if (stopped) return;
+    discover();
+    for (const el of owned) recheck(el, KEY | VERIFY);
+    schedule();
   };
-  document.fonts.ready.then(() => {
+  // Owned text a transition or animation ended on, inside or around. The key
+  // holds the final computed metrics; a composition made mid-transition holds
+  // intermediate ones, so a recheck is enough (an animation on <body> must not
+  // measure every block).
+  const metricsChanged = (target: Element) => {
+    if (stopped) return;
+    for (const el of ownedWithin(target)) recheck(el, KEY);
+    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) recheck(el, KEY);
+    schedule();
+  };
+  const stylesChanged = () => {
+    if (stopped) return;
+    for (const el of owned) recheck(el, KEY);
+    schedule();
+  };
+  // Translation started: step aside at once, before the translator fills the
+  // Text nodes it holds. Ended ("show original"): compose the current DOM.
+  const translationChanged = (active: boolean) => {
+    if (stopped) return;
+    if (active) {
+      observer.disconnect();
+      for (const el of owned) typeset(el, options);
+      observe();
+    } else for (const el of owned) enqueue(el, CONTENT);
+    schedule();
+  };
+  // A content-visibility:auto section scrolled into range: its text can be measured now.
+  const visibilityChanged = (target: Element) => {
+    if (stopped) return;
+    for (const el of ownedWithin(target)) recheck(el, KEY);
+    schedule();
+  };
+  doc.fonts.ready.then(() => {
     if (stopped) { resolveReady(); return; }
     fontsReady = true;
     discover();
@@ -862,19 +1257,19 @@ export function mount(root: ParentNode = document, selector = defaults, options:
     if (!pending.size) resolveReady();
   });
   observe();
-  document.fonts.addEventListener('loadingdone', fontsChanged);
-  window.addEventListener('resize', resized);
+  const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized, translation: translationChanged });
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
       stopped = true;
       if (timer !== undefined) clearTimeout(timer);
-      if (idle !== undefined) window.cancelIdleCallback(idle);
+      if (idle !== undefined) cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
-      document.fonts.removeEventListener('loadingdone', fontsChanged);
-      window.removeEventListener('resize', resized);
+      unsubscribe();
+      if (settleTimer !== undefined) clearTimeout(settleTimer);
+      if (guardFrame) view?.cancelAnimationFrame(guardFrame);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear(); nearby.clear();
+      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear(); deferred.clear();
       watched.clear(); parents.clear();
       for (const el of blocked.keys()) stopWaiting(el);
       for (const el of claimed) release(el);

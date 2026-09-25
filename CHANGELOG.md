@@ -37,6 +37,10 @@ Hashes for every published version live in
   composed corpus cells at 4 widths in Chromium under 4.3). New error:
   `alignment-lost` (see Rendering changes). Field shapes and `schemaVersion`
   are unchanged.
+- A third new error, `stale-layout`: a composed block whose rendered line count
+  differs from its composed lines (breaks + 1), because a font, spacing or size
+  changed after it was composed. 4.2.0 left such blocks double-wrapped and
+  its audit passed them.
 
 ### Rendering changes
 
@@ -123,6 +127,25 @@ whose outcome, finish features or markup differ from 4.2.0.
   own layout; weak line ends stay at 46 (WebKit 46 to 48); lines added
   over native fall from 5 to 2. No orphan, overflow or source change.
 
+Lifecycle entries were measured on the V4 corpus (85 paragraphs, every
+fourth with a link and emphasis) at 320, 440 and 600 px:
+
+- Generated `<br>` elements are written `display: var(--ts-break-display,
+  inline) !important` instead of `display: inline !important`, and the
+  `TypesetRichText` break carries `display: var(--ts-break-display, inline)`.
+  On screen nothing moves: 251, 249 and 251 of 255 blocks change markup in
+  Chromium, WebKit and Firefox, 0 differ once the break style is normalized,
+  and 0 change outcome or rendered lines. In print, breaks are now `none` and
+  text wraps natively at the paper's width, where 4.2.0 printed the screen
+  breaks and alternated long and short lines.
+- `typeset()` does not measure or compose text that is not rendered: in a
+  `display:none` subtree it keeps an existing composition (4.2.0 restored
+  native text and recorded `unmeasurable`), and text in a skipped
+  `content-visibility:auto` section records `unmeasurable` instead of being
+  composed from forced layout (4.2.0 composed it in Chromium and Firefox and
+  cached `native:verification` in WebKit). `mount()` composes it when it comes
+  into range. The corpus golden diff has no hidden text: 0 blocks change.
+
 ### Fixed
 
 - **Strict Content Security Policy and Trusted Types (C5).** Measurement and
@@ -172,6 +195,74 @@ whose outcome, finish features or markup differ from 4.2.0.
   retention is kept unless the native layout splits a kept phrase. Output with
   `keep` omitted is unchanged (golden diff 0).
 
+### Lifecycle
+
+- `mount()` works when a parent page mounts into a same-origin iframe
+  document: inserted paragraphs, text edits, resizes and fonts inside the
+  iframe are picked up (nodes from another realm failed `instanceof` checks).
+- Ancestor class and style changes no longer recompose owned text. The
+  controller rechecks a layout key built from computed values (fonts, metrics,
+  width, effective scale and zoom) and composes only when it changed: 60
+  frames of an ancestor transform animation, a body class with no styles or a
+  scroll-linked custom property on `<html>` now cause 0 compositions (4.2.0:
+  92 to 174 over 40 paragraphs). Removing nodes walks the removed subtree
+  instead of every claimed element.
+- Composed text follows text metrics, not only width: fonts that finish
+  loading (including CSS-requested fonts in WebKit, which fires no loading
+  events), the text-spacing overrides of WCAG 1.4.12, a browser font-size
+  setting, rules changed through the CSSOM, and transitions or animations of
+  font weight, size or spacing. A same-width height change makes the
+  controller verify rendered lines against the composition. One set of font,
+  stylesheet and transition listeners serves every controller and
+  `TypesetRichText` in a document.
+- Hidden text keeps its composition. A tab, dialog, accordion or stack card
+  hidden with `display:none`, the `hidden` attribute or `content-visibility`
+  and shown again at the same width paints its composed lines in the first
+  frame, instead of native lines re-broken a moment later (field report b),
+  with `mount()`, `TypesetText` and `TypesetRichText`. Text an attribute
+  change reveals at a new width is composed before that frame paints. Text
+  in a skipped `content-visibility:auto` section composes when it comes into
+  range; WebKit had cached a failed measurement there.
+- No double-wrapped frames during resizes or in print. A block whose width
+  changes is recomposed once the size has held for 100 ms, not every frame;
+  meanwhile, if it is narrower than its widest composed line, it shows native
+  wrapping (`data-ts-stale`). The switch is written before the frame's layout
+  (in the mutation callback for a script-driven width, in the window's resize
+  event, or in the next animation frame for changes no observer sees). Print
+  shows native wrapping and pauses composition. `--ts-break-display` and
+  `data-ts-stale` are supported hooks; see SUPPORT.md.
+- The scheduler no longer starves on a busy page. An idle callback that fires
+  on its 200 ms timeout gets the full 8 ms budget instead of one block, and
+  text near the viewport is composed in the next task rather than waiting for
+  idle time: with 12 ms of script per frame, visible paragraphs compose in
+  about 125 ms and 60 paragraphs in about 3 s (4.2.0: about 2 s and 13 s).
+  After a resize, blocks on or within a viewport of the screen are
+  recomposed; offscreen blocks wait until they come near.
+- Machine translation no longer garbles or loses text. When the page is
+  translated (the `translated-ltr`/`translated-rtl` class Google Translate and
+  Chrome set on `<html>`, a `<font>` wrapper inside composed text, or Edge's
+  `_msttexthash`), `mount()` and `typeset()` remove their markers and unwrap
+  their wrappers by moving the existing Text nodes, never splitting, merging,
+  editing or removing one, record `native:translated`, and compose nothing
+  until the translation ends; then the current DOM is composed again.
+  `TypesetRichText` freezes instead: it stops observing and replanning, but
+  the breaks React rendered stay. 4.2.0 merged and edited the Text nodes the
+  translator was filling, which lost sentences.
+
+### API
+
+- `mount('article p', options)` is `mount(document, 'article p', options)`;
+  a string first argument used to throw.
+- `typeset()` throws `TypeError: [typeset] typeset() expects an HTMLElement
+  (received ...)` for a non-element, and `mount()` a `TypeError` naming what
+  it received, instead of raw TypeErrors from inside the engine.
+- Invalid options print one `console.warn` each in development (the ESM and
+  CommonJS entries unless `process.env.NODE_ENV` is `production`; always in
+  `typeset.global.js` and `go.js`), for example `[typeset] smartQuotes must
+  be "en" or false (received true)`. Values keep their 4.2 behaviour, and
+  production bundles contain none of these checks. SUPPORT.md lists the
+  messages.
+
 ### Development
 
 - `npm run build:dist` (also `build:candidate`) builds the engine into
@@ -193,6 +284,10 @@ whose outcome, finish features or markup differ from 4.2.0.
   committed Svelte, Vue, Solid and Lit fixture bundles in `tests/frameworks/`),
   `verify-live-regions` (C4) and `verify-smart-quotes` (C15). Each fails on
   the published 4.2.0 build.
+- Lifecycle suites in `test:v4`, each in Chromium, WebKit and Firefox:
+  `verify-iframe-mount`, `verify-recompose-storms`, `verify-reflow-triggers`,
+  `verify-visibility`, `verify-print-resize`, `verify-scheduler`,
+  `verify-translation` and `verify-options`.
 
 ## 4.1.0 - 2026-09-17
 

@@ -111,14 +111,63 @@ every change there. Its outcome is `native:live-region`.
 
 Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
 for styles and no 'unsafe-eval'. It writes and restores styles through the
-CSSOM only, never the style attribute, injects no <style> element and uses no
-HTML sink, so it also runs under require-trusted-types-for 'script' with
-trusted-types 'none'. Allow the origin that serves the script. 4.2 restored
-its measurement styles through the style attribute, which such a policy
-refuses: paragraphs kept white-space:nowrap in Chromium and WebKit, and
-Firefox erased author CSSOM styles. `scripts/v4/verify-strict-csp.mjs` runs
-typeset, recomposition, restore, copy, go.js and both React adapters under
-that policy in three engines.
+CSSOM only, never the style attribute, injects no <style> element (its print
+and resize rules are a constructable stylesheet) and uses no HTML sink, so it
+also runs under require-trusted-types-for 'script' with trusted-types 'none'.
+Allow the origin that serves the script. 4.2 restored its measurement styles
+through the style attribute, which such a policy refuses: paragraphs kept
+white-space:nowrap in Chromium and WebKit, and Firefox erased author CSSOM
+styles. `scripts/v4/verify-strict-csp.mjs` runs typeset, recomposition,
+restore, copy, go.js and both React adapters under that policy in three
+engines.
+
+Generated line breaks are displayed through the custom property
+`--ts-break-display` (default `inline`). In print it is `none`, so printed text
+wraps natively at the paper's width; set `--ts-break-display: inline` on a
+composed element in print CSS to keep its composition. While a block's width is
+changing and it is narrower than its widest composed line, the engine marks it
+`data-ts-stale` and shows native wrapping until the size has held for 100 ms
+and it is recomposed. Both hooks are supported; the engine installs their rules
+as a constructable stylesheet, and `dist/styles.css` carries them for engines
+without one. Hidden text (display:none, the hidden attribute, a closed dialog,
+content-visibility) keeps its composition and is not measured until shown.
+
+Machine translation: when a page is translated (Google Translate and Chrome set
+`translated-ltr`/`translated-rtl` on `<html>`; translators wrap text in `<font>`;
+Edge adds `_msttexthash`), `mount()` and `typeset()` step aside with outcome
+`native:translated`, moving but never splitting, merging or removing the Text
+nodes the translator fills, and compose the current DOM again when the
+translation ends. `TypesetRichText` only freezes: the breaks React rendered
+remain, so a translation of that text is read per line. `TypesetText` steps
+aside like `mount()`.
+
+Errors and warnings. For anything that is not an element, `typeset()` throws:
+`TypeError: [typeset] typeset() expects an HTMLElement (received ...)`.
+For a root that is not a document, element or selector, `mount()` throws:
+`[typeset] mount() expects a Document, an Element or a selector string (received ...)`.
+`mount('article p', options)` is
+`mount(document, 'article p', options)`. In development builds (the ESM and
+CommonJS entries when `process.env.NODE_ENV` is not `production`, and always in
+`typeset.global.js` and `go.js`) invalid options print one `console.warn` each
+and otherwise behave as before, for example:
+
+- `smartQuotes must be "en" or false (received true)`
+- `smartQuotes must be "en" or false (received "EN")`
+- `spacing must be true or false (received "false")`
+- `tracking must be true or false (received 1)`
+- `opticalHanging must be true or false (received "yes")`
+- `lineBreaks must be "unicode" or "legacy" (received "auto")`
+- `contour must be "finished" or "natural" (received "smooth")`
+- `mode must be "body", "heading", "title" or "ui" (received "para")`
+- `density must be "compact" or "editorial" (received "loose")`
+- `maxLines must be a positive integer (received 0)`
+- `keep must be an array of strings (received "Oak Street")`
+- `text must be a string (received 5)`
+- `typeset() has no option "spcing"; it is ignored`
+- `typeset() options must be an object (received "p")`
+- `mount() selector must be a string (received an object)`
+
+Production bundles drop these checks.
 
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device

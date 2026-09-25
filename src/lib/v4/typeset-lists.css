@@ -12,3 +12,18 @@
   color: var(--ts-bullet-color, currentColor);
   font-size: var(--ts-bullet-size, 1.25em);
 }
+
+/* Generated line breaks. The engine installs these rules itself as a
+   constructable stylesheet; they are here for engines without one.
+   --ts-break-display switches every generated break; set it to inline on a
+   composed element to keep its composition in print. */
+[data-ts-stale] { --ts-break-display: none; }
+[data-ts-stale] :is([data-ts-space], [data-ts-hang])[data-ts-break] { margin-left: 0 !important; }
+[data-ts-stale] [data-ts-track] { letter-spacing: inherit !important; word-spacing: inherit !important; }
+[data-ts-stale] > .ts-line[data-ts-generated] { display: inline !important; word-spacing: inherit !important; }
+@media print {
+  :root { --ts-break-display: none; }
+  :is([data-ts-space], [data-ts-hang])[data-ts-break] { margin-left: 0 !important; }
+  [data-ts-track] { letter-spacing: inherit !important; word-spacing: inherit !important; }
+  .ts-line[data-ts-generated] { display: inline !important; word-spacing: inherit !important; }
+}

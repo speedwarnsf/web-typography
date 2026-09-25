@@ -555,7 +555,9 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     } else if (px) {
       marker.dataset.tsHang = String(offset);
       Object.assign(marker.style, opticalMarkerStyle(px));
-    } else marker.style.setProperty('display', 'inline', 'important');
+    // !important beats author br{display:none}; the variable lets print CSS,
+    // stale mode and authors switch every generated break off at once.
+    } else marker.style.setProperty('display', 'var(--ts-break-display, inline)', 'important');
     if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
     else {
       const tail = head.splitText(point.offset);

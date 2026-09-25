@@ -3,13 +3,13 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 41158,
-      "TypesetText-only": 41477,
-      "TypesetRichText-only": 35880,
+      "mount-only": 44637,
+      "TypesetText-only": 44911,
+      "TypesetRichText-only": 37573,
       "smartQuotes-only": 11712,
-      "react.js+shared": 43420,
-      "go.js": 46395,
-      "typeset.global.js": 46185
+      "react.js+shared": 47276,
+      "go.js": 50419,
+      "typeset.global.js": 50206
     },
     "raised": [
       {
@@ -61,30 +61,30 @@
         "readyMs": 7817,
         "tbtMs": 1041,
         "longestTaskMs": 124,
-        "mutationObservers": 1,
-        "mutationObserve": 195,
+        "mutationObservers": 2,
+        "mutationObserve": 197,
         "resizeObservers": 1,
         "resizeObserve": 201,
         "intersectionObservers": 1,
         "intersectionObserve": 200,
         "windowListeners": 1,
-        "documentListeners": 1,
-        "fontListeners": 2,
+        "documentListeners": 4,
+        "fontListeners": 3,
         "nodeWrites": 53621
       },
       "mount-1000": {
         "visibleMs": 258,
         "tbtMs": 8152,
         "longestTaskMs": 168,
-        "mutationObservers": 1,
-        "mutationObserve": 996,
+        "mutationObservers": 2,
+        "mutationObserve": 1001,
         "resizeObservers": 1,
         "resizeObserve": 1001,
         "intersectionObservers": 1,
         "intersectionObserve": 1000,
         "windowListeners": 1,
-        "documentListeners": 1,
-        "fontListeners": 2,
+        "documentListeners": 4,
+        "fontListeners": 3,
         "nodeWrites": 268476
       },
       "react-plain-38": {
@@ -105,73 +105,73 @@
         "commitMs": 161,
         "tbtMs": 136,
         "longestTaskMs": 186,
-        "mutationObservers": 38,
-        "mutationObserve": 1596,
+        "mutationObservers": 39,
+        "mutationObserve": 1598,
         "resizeObservers": 38,
         "resizeObserve": 76,
         "intersectionObservers": 38,
         "intersectionObserve": 38,
-        "windowListeners": 38,
-        "documentListeners": 1,
-        "fontListeners": 39,
+        "windowListeners": 1,
+        "documentListeners": 4,
+        "fontListeners": 3,
         "nodeWrites": 1210
       },
       "react-rich-38": {
         "commitMs": 78,
         "tbtMs": 271,
         "longestTaskMs": 151,
-        "mutationObservers": 38,
-        "mutationObserve": 2394,
+        "mutationObservers": 39,
+        "mutationObserve": 2396,
         "resizeObservers": 38,
         "resizeObserve": 76,
         "intersectionObservers": 0,
         "intersectionObserve": 0,
-        "windowListeners": 38,
-        "documentListeners": 1,
-        "fontListeners": 38,
+        "windowListeners": 1,
+        "documentListeners": 4,
+        "fontListeners": 2,
         "nodeWrites": 3893
       },
       "storm": {
         "elapsedMs": 1357,
         "tbtMs": 10,
         "longestTaskMs": 56,
-        "passes": 41,
+        "passes": 33,
         "mutationObservers": 0,
-        "mutationObserve": 41,
+        "mutationObserve": 33,
         "resizeObservers": 0,
         "resizeObserve": 0,
         "intersectionObservers": 0,
-        "intersectionObserve": 207,
+        "intersectionObserve": 0,
         "windowListeners": 0,
         "documentListeners": 0,
         "fontListeners": 0,
-        "nodeWrites": 2708
+        "nodeWrites": 30
       },
       "hidden": {
-        "visibleMs": 241,
-        "tbtMs": 1045,
+        "visibleMs": 489,
+        "tbtMs": 99,
         "longestTaskMs": 122,
         "mutationObservers": 0,
-        "mutationObserve": 193,
+        "mutationObserve": 11,
         "resizeObservers": 0,
         "resizeObserve": 0,
         "intersectionObservers": 0,
-        "intersectionObserve": 200,
+        "intersectionObserve": 570,
         "windowListeners": 0,
         "documentListeners": 1,
         "fontListeners": 0,
-        "nodeWrites": 53622
+        "nodeWrites": 2371
       },
       "late-font": {
         "settledMs": 12565,
         "tbtMs": 1809,
         "longestTaskMs": 148,
         "mutationObservers": 0,
-        "mutationObserve": 196,
+        "mutationObserve": 205,
         "resizeObservers": 0,
         "resizeObserve": 0,
         "intersectionObservers": 0,
-        "intersectionObserve": 200,
+        "intersectionObserve": 0,
         "windowListeners": 0,
         "documentListeners": 0,
         "fontListeners": 0,
@@ -190,5 +190,23 @@
       "repeat": 3,
       "platform": "darwin-arm64"
     }
-  }
+  },
+  "changes": [
+    {
+      "date": "2026-09-24",
+      "by": "4.3 lifecycle (C7-C10, C12, P2, P3, K11)",
+      "raised": [
+        "size: mount-only +3479, TypesetText-only +3434, TypesetRichText-only +1693, react.js+shared +3856, go.js +4024, typeset.global.js +4021 gzip bytes: the lifecycle hub, metric and font triggers, hidden-text retention, stale mode and print CSS, visible-first scheduling, translation handling and clear errors; the script-tag builds also carry the development option checks",
+        "counts: one MutationObserver and three document listeners (transitionend, animationend, contentvisibilityautostatechange) and one more FontFaceSet listener (loading) per document, shared by every controller and TypesetRichText",
+        "hidden.intersectionObserve 200 -> 570 and hidden.visibleMs 241 -> 489: revealed offscreen text is observed until it comes near instead of being composed at once, and on-screen reveals compose for at most 24 ms before the frame"
+      ],
+      "lowered": [
+        "react-*-38: windowListeners 38 -> 1 and fontListeners 39/38 -> 3/2 (one hub per document instead of listeners per block)",
+        "storm: nodeWrites 2708 -> 30, intersectionObserve 207 -> 0, passes 41 -> 33 (ancestor class toggles recheck a computed layout key and compose nothing)",
+        "hidden: nodeWrites 53622 -> 2371, tbtMs 1045 -> 99 (compositions kept and offscreen work deferred)",
+        "late-font: intersectionObserve 200 -> 0"
+      ],
+      "measured": "scripts/v4/bench-v4.mjs, one run, chromium@4x, darwin-arm64, load 7-9; time budgets other than hidden are unchanged"
+    }
+  ]
 }
