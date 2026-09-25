@@ -298,8 +298,14 @@ changes only an isolated preview, never a deployed site.
   `native:translated`, and compose the current DOM again when the page
   returns to its original language. `TypesetRichText` only freezes: the
   breaks React rendered stay, so its translated text still breaks at the
-  composed positions. No network smoke test against a live translator runs
-  yet; the offline suite simulates each translator's marks.
+  composed positions. Because the Text nodes are moved and never merged, the
+  translator receives a composed paragraph as many Text nodes, and Google
+  Translate sometimes joins those segments with a stray space before
+  punctuation ("dijo ,"): 3 of 9 test paragraphs in a live English to
+  Spanish check, in all three engines, where the uncomposed page had none.
+  No text is lost, and showing the original restores the source exactly.
+  No network smoke test against a live translator runs in the suite; the
+  offline suite simulates each translator's marks.
 - **Content Security Policy and Trusted Types.** The 4.x composition path
   (`mount`, `typeset`, the loaders and the React adapters) assigns no HTML
   strings, uses no `eval`, injects no `<style>` elements and writes styles

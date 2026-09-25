@@ -295,7 +295,9 @@ paper's width (generated breaks are hidden in print; set
 Translate, Chrome or Edge translates the page, Typeset removes its breaks
 without touching the text the translator fills, reports
 `native:translated`, and composes again when the page is shown in the
-original language. `TypesetRichText` only pauses. See SUPPORT.md.
+original language. `TypesetRichText` only pauses. A translation can show a
+stray space before punctuation where composition split a paragraph into
+many Text nodes; no text is lost. See SUPPORT.md.
 
 **Without JavaScript?** Readers get your CSS, including the
 `text-wrap: pretty` above.

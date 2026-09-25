@@ -271,7 +271,10 @@ Outside the changes below, 0 of these differ in any engine.
   frozen when its container narrows during the translation (a re-render
   there would make React remove Text nodes the translator had replaced and
   unmount the whole root). 4.2.0 merged and edited the Text nodes the
-  translator was filling, which lost sentences.
+  translator was filling, which lost sentences. The Text nodes a
+  composition split stay split, so a translation can show a stray space
+  before punctuation ("dijo ,", 3 of 9 paragraphs in a live Google
+  Translate check); no text is lost (SUPPORT.md).
 - **`mount()` works in same-origin iframes (C12).** Inserted paragraphs,
   text edits, resizes and fonts inside a parent-mounted iframe document are
   picked up, and copied links keep absolute URLs there (nodes from another
