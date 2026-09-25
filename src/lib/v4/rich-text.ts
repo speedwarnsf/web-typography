@@ -668,19 +668,21 @@ export function preserveRichCopy(element: HTMLElement): () => void {
     const registered = roots;
     doc.addEventListener('copy', event => {
       if (event.defaultPrevented || !event.clipboardData) return;
-      if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
+      // Node types, not instanceof: a same-origin iframe's nodes come from another realm.
+      const target = event.target as Node | null;
+      if (target?.nodeType === Node.ELEMENT_NODE && (target as Element).closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
       const selection = doc.getSelection();
       if (!selection?.rangeCount || selection.isCollapsed) return;
       const ranges = Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i));
       const containingRoot = (range: Range) => {
-        let root = range.startContainer instanceof HTMLElement ? range.startContainer : range.startContainer.parentElement;
+        let root = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer as HTMLElement : range.startContainer.parentElement;
         while (root && !(registered.has(root) && root.contains(range.endContainer))) root = root.parentElement;
         return root;
       };
       const affected = ranges.some(range => {
         if (containingRoot(range)) return true;
         const common = range.commonAncestorContainer;
-        const parent = common instanceof Element ? common : common.parentElement;
+        const parent = common.nodeType === Node.ELEMENT_NODE ? common as Element : common.parentElement;
         return Array.from(parent?.querySelectorAll<HTMLElement>('*') || []).some(el => registered.has(el) && range.intersectsNode(el));
       });
       if (!affected) return;
@@ -692,8 +694,8 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         for (const el of fragment.querySelectorAll('*')) {
           for (const attribute of ['data-ts-outcome', 'data-typeset-done', 'data-ts-quotes', 'data-ts-hanging', 'data-ts-spacing', 'data-ts-tracking']) el.removeAttribute(attribute);
           // Relative links must still point to the source document after paste.
-          if (el instanceof HTMLAnchorElement && el.hasAttribute('href')) {
-            try { el.href = new URL(el.getAttribute('href')!, doc.baseURI).href; } catch { /* Preserve invalid author URLs as authored. */ }
+          if (el.localName === 'a' && el.namespaceURI === 'http://www.w3.org/1999/xhtml' && el.hasAttribute('href')) {
+            try { el.setAttribute('href', new URL(el.getAttribute('href')!, doc.baseURI).href); } catch { /* Preserve invalid author URLs as authored. */ }
           }
         }
         const container = doc.createElement('div'); container.append(fragment);
