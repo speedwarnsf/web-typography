@@ -41,7 +41,11 @@ position, and React's, stay in place (emptied, with their text wrapped next to
 them) instead of moving into tracking wrappers; nothing goes between a comment
 and the Text node after it (Lit starts each item of an array, map() or
 repeat(), and a top-level render(), with an empty comment and writes to the
-node after it), and such a node keeps its text, unwrapped.
+node after it), and such a node keeps its text, unwrapped. So the line that
+holds such text is not letter-spaced (the paragraph's other lines are; with
+none left, tracking reports `native:tracking-comment`); this also applies to
+static HTML with React's server-rendering separators (`<!-- -->`) or
+WordPress's `<!--more-->`, while hydrated React text is tracked.
 `verify-framework-text.mjs` runs a hand-rolled renderer, React 19, Svelte 5,
 Vue 3.5, Solid 1.9 and Lit 3 (template parts, and iterables with a top-level
 render()) through twenty updates each in three engines. Limits: direct
