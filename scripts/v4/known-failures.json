@@ -99,7 +99,7 @@
     },
     {
       "script": "verify-package-contents",
-      "label": "^(React adapters declare ReactElement|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.2 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
+      "label": "^(React adapters declare their public React types|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.75 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
       "modes": [
         "release"
       ],
