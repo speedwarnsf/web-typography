@@ -28,7 +28,9 @@ const { values } = parseArgs({ options: {
   out: { type: 'string', default: 'output/golden.json' },
   baseline: { type: 'string', default: 'public/releases/4.2.0/typeset.global.js' },
   dump: { type: 'string' },
-  // Sweep bind weights without a rebuild (typeset.ts bindWeights), e.g. '{"pair":1.5}'.
+  // Sweep bind weights (typeset.ts bindWeights), e.g. '{"pair":1.5}'. Release
+  // builds compile the override out, so the subject is then a research build
+  // of src/ that reads globalThis.__TYPESET_BIND__, as bind-harness.mjs does.
   bind: { type: 'string' },
 } });
 const started = performance.now();
@@ -39,7 +41,10 @@ const corpus = JSON.parse(await readFile('tests/v4-corpus.json', 'utf8')).paragr
 /** @type {{ id: string, text: string }[]} */
 const adversarial = JSON.parse(await readFile('tests/v4-corpus-adversarial.json', 'utf8')).paragraphs;
 const baseline = await readFile(values.baseline, 'utf8');
-const subject = await readFile(process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js', 'utf8');
+const subject = values.bind
+  ? (await (await import('esbuild')).build({ entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], bundle: true, format: 'iife', target: 'es2022', write: false, logLevel: 'silent',
+    define: { __TYPESET_BIND_OVERRIDE__: 'globalThis.__TYPESET_BIND__', 'process.env.NODE_ENV': '"development"' } })).outputFiles[0].text
+  : await readFile(process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js', 'utf8');
 const stride = Math.max(1, Number(values.stride) || 1);
 const report = { ...await releaseIdentity(), baseline: values.baseline, stride, checks: /** @type {any[]} */ ([]), errors: /** @type {any[]} */ ([]), browsers: /** @type {Record<string, string>} */ ({}), counts: /** @type {Record<string, any>} */ ({}), changed: /** @type {any[]} */ ([]) };
 
