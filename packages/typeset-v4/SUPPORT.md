@@ -143,10 +143,18 @@ region keeps the quotes it curled while rendering. Regions count through open
 shadow roots as assistive technology sees them: text slotted into a
 component's live wrapper (a design system's toast or alert that puts
 `role="status"` around a `<slot>`), a paragraph containing a component whose
-slot is live, and text inside a shadow root under a live region. A role or
-`aria-live` a component sets through `ElementInternals`, or inside a closed
-shadow root, cannot be read from outside the component: mark such text
-`data-no-typeset`.
+slot is live, and text inside a shadow root under a live region, as these
+are when the text is composed. No mutation reaches the page when a shadow
+tree changes later: a component defined after the text composed (a lazily
+loaded toast whose shadow root wraps the slot in `role="status"`), or a role
+set inside a shadow root afterwards, is seen at the next resize, font load
+or pass, which releases the text inside the now-live region with one extra
+update (a light-DOM change is released with the change itself). Mark such
+text `data-no-typeset`, or keep undefined components hidden with
+`:not(:defined) { visibility: hidden }`, which leaves them uncomposed. A
+role or `aria-live` a component sets through `ElementInternals`, or inside a
+closed shadow root, cannot be read from outside the component: mark such
+text `data-no-typeset`.
 
 Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
 for styles and no 'unsafe-eval'. It writes and restores styles through the

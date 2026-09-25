@@ -203,9 +203,14 @@ Outside the changes below, 0 of these differ in any engine.
   roots as assistive technology sees them: text slotted into a component's
   live wrapper (a toast or alert with `role="status"` around a `<slot>`), a
   paragraph containing a component whose slot is live, and text in a shadow
-  root under a live region. Roles set through `ElementInternals` or inside a
-  closed shadow root cannot be read from outside; SUPPORT.md gives
-  `data-no-typeset` as the workaround. Golden diff: 9 of 13 paragraphs
+  root under a live region, as they are when the text is composed. A shadow
+  tree that turns live later sends no mutation (a component defined after
+  the text composed, a role set inside its shadow root): the text is
+  released at the next resize or font load, with one update inside the
+  region (98 mutation records for a paragraph in three engines). Roles set
+  through `ElementInternals` or inside a closed shadow root cannot be read
+  from outside; SUPPORT.md gives `data-no-typeset` as the workaround for
+  these and for lazily defined components. Golden diff: 9 of 13 paragraphs
   on the live-region fixture, per loader and engine (a paragraph that
   contains an `<output>` now reports `native:live-region`, not
   `native:rich-element`); 0 in the golden sets, which have no live regions.

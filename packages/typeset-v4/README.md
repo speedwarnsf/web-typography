@@ -243,9 +243,10 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   `alert`, `log`, `marquee` or `timer` role, or text that contains one, such
   as a paragraph with an inline result count (`native:live-region`): a
   screen reader would announce its every change. Regions in open shadow
-  roots count (a toast that wraps a `<slot>` in `role="status"`); one set
-  through `ElementInternals` or in a closed shadow root cannot be seen, so
-  mark that text `data-no-typeset`.
+  roots count (a toast that wraps a `<slot>` in `role="status"`) as they
+  are when the text is composed; one set through `ElementInternals`, in a
+  closed shadow root, or by a component defined after the text composed
+  is not seen in time, so mark that text `data-no-typeset`.
 
 ## Browsers
 
