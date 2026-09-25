@@ -58,7 +58,7 @@ Left as the browser set it, because the content or its CSS is outside what Types
 | `native:rich-element` | The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code), such as an image, button or nested block. | Yes | None, or compose the text blocks inside it separately. |
 | `native:rich-excluded` | The block contains hidden, aria-hidden, editable or data-no-typeset content. | Yes | None. |
 | `native:rich-direction` | An inline element changes direction, bidi or writing mode, or is not visible. | Yes | None. |
-| `native:rich-whitespace` | Inline markup preserves whitespace, is indented, or changes text advances (a transform). | Yes | None. |
+| `native:rich-whitespace` | The block or its inline markup is indented (any text-indent, including a first-line indent such as p + p { text-indent: 1.5em } and a hanging indent), preserves whitespace, or changes text advances (a transform). | Yes | None; indented paragraphs keep the browser's layout. |
 | `native:rich-layout` | An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). | Yes | None. |
 | `native:rich-box` | An inline element has negative padding, borders or margins, or box-decoration-break: clone. | Yes | None. |
 | `native:rich-decorated` | An inline element has ::before or ::after content. | Yes | None. |

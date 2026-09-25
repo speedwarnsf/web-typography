@@ -236,6 +236,10 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   `text-align: justify` (or a `text-align-last` that differs from
   `text-align`) keeps the browser's layout and reports `native:justify`.
   For justified text use CSS `text-align: justify` with `hyphens: auto`.
+- **Indented paragraphs.** Any `text-indent`, including the book-style
+  first-line indent (`p + p { text-indent: 1.5em }`) and a hanging indent,
+  keeps the browser's layout (`native:rich-whitespace`), so on a page set
+  that way every indented paragraph stays native.
 - **Right-to-left, vertical, and non-Latin scripts.** Arabic, Hebrew, CJK
   and other scripts keep the browser's layout (`native:script`,
   `native:direction`).
