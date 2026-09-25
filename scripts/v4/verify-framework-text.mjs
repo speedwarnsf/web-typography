@@ -148,6 +148,18 @@ function direct() {
   return results;
 }
 
+/** WebKit's accessible name for the linked paragraph's link, through its inspector protocol. @param {import('playwright').Page} page */
+async function webkitLinkName(page) {
+  const anyPage = /** @type {any} */ (page);
+  const impl = anyPage._connection?.toImpl?.(page);
+  const session = impl?.delegate?._session ?? impl?._delegate?._session;
+  if (!session) return null;
+  const { root } = await session.send('DOM.getDocument');
+  const { nodeId } = await session.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#linked a' });
+  const { properties } = await session.send('DOM.getAccessibilityPropertiesForNode', { nodeId });
+  return { name: String(properties?.label ?? '').replace(/\s+/g, ' ').trim(), text: await page.evaluate(() => (document.querySelector('#linked a')?.textContent || '').replace(/\s+/g, ' ').trim()) };
+}
+
 /** @type {{ browser: string, label: string, pass: boolean, detail?: unknown }[]} */
 const checks = [];
 /** @type {{ browser: string, error: string }[]} */
@@ -176,6 +188,7 @@ await Promise.all(browsers.map(async config => {
         const initial = await tab.evaluate(compose, loader);
         check(`${where}: composes with generated breaks and tracking`, initial.composed.length >= 3 && initial.breaks > 3 && initial.tracked > 0, initial);
         if (config.name === 'chromium') check(`${where}: Chromium's accessibility tree reads every word as composed`, (await axWords(tab)).length === 0, await axWords(tab));
+        if (config.name === 'webkit') { const link = await webkitLinkName(tab); if (link) check(`${where}: WebKit names the link with its words`, link.name === link.text && link.text.length > 3, link); }
         const out = await tab.evaluate(exercise);
         check(`${where}: no frame shows stale text across 20 updates`, out.stale.length === 0 && out.frames > 20, { frames: out.frames, stale: out.stale });
         check(`${where}: the text equals the framework's value after every update`, out.late.length === 0 && out.finalMatches, out.late.slice(0, 2));
