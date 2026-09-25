@@ -3,7 +3,9 @@
 // from a package directory whose dist/ is the artifact under test. By default
 // the package is staged under output/ from TYPESET_DIST (the candidate in
 // test:v4) with the repository's Playwright; --consumer instead runs the CLI
-// installed in the packed consumer that verify-package.mjs created.
+// installed in the packed consumer that verify-package.mjs created. Pages
+// under the strict Content Security Policy the engine supports are audited
+// in all three engines.
 import http from 'node:http';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -42,11 +44,19 @@ if (consumerMode) {
   if (peer.code !== 0) throw new Error(peer.stderr);
 }
 const goJS = await readFile(consumerMode ? `${cwd}/node_modules/typeset.us/dist/go.js` : `${cwd}/dist/go.js`);
-const plain = '<!doctype html><html lang="en"><head><style>body{padding:30px}p{font:20px/1.4 Georgia;width:240px}</style></head><body><p data-typeset>"Read <strong>the notes</strong> at <a href="#collection">the neighborhood gallery</a>," she said.</p>';
+const css = 'body{padding:30px}p{font:20px/1.4 Georgia;width:240px}';
+const body = '<body><p data-typeset>"Read <strong>the notes</strong> at <a href="#collection">the neighborhood gallery</a>," she said.</p>';
+const plain = `<!doctype html><html lang="en"><head><style>${css}</style></head>${body}`;
+// The policy SUPPORT.md says the engine runs under; styles come from a file.
+const STRICT = "style-src 'self'; script-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'";
+const strict = `<!doctype html><html lang="en"><head><link rel="stylesheet" href="/style.css"></head>${body}`;
 const server = http.createServer((req, res) => {
   if (req.url === '/go.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(goJS); return; }
+  if (req.url === '/style.css') { res.writeHead(200, { 'content-type': 'text/css' }); res.end(css); return; }
+  const managed = req.url?.endsWith('managed') ? '<script src="/go.js" data-typeset-smart-quotes="en" data-typeset-optical-hanging="true" defer></script>' : '';
+  if (req.url?.startsWith('/strict')) { res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': STRICT }); res.end(strict + managed + '</body></html>'); return; }
   res.writeHead(200, { 'content-type': 'text/html' });
-  res.end(plain + (req.url === '/managed' ? '<script src="/go.js" data-typeset-smart-quotes="en" data-typeset-optical-hanging="true" defer></script>' : '') + '</body></html>');
+  res.end(plain + managed + '</body></html>');
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(undefined)));
 const address = server.address();
@@ -56,13 +66,22 @@ const checks = [];
 /** @type {{ error: string }[]} */
 const errors = [];
 try {
-  const invoke = (/** @type {string[]} */ args) => run('node', [cli, ...args], { TYPESET_BROWSER_PATH: browsers[0].executablePath || '' });
+  const invoke = (/** @type {string[]} */ args) => {
+    const engine = browsers.find(b => b.name === args[args.indexOf('--browser') + 1]) ?? browsers[0];
+    return run('node', [cli, ...args], { TYPESET_BROWSER_PATH: engine.executablePath || '' });
+  };
   for (const [label, args, expected] of /** @type {[string, string[], number][]} */ ([
     ['unprocessed scope fails', ['--url', `${base}/plain`, '--widths', '320'], 1],
     ['preview composes explicit scope', ['--url', `${base}/plain`, '--widths', '320,390', '--apply', '--smart-quotes', '--optical-hanging'], 0],
     ['existing loader is inspected without replacement', ['--url', `${base}/managed`, '--widths', '320,390'], 0],
     ['empty scope fails', ['--url', `${base}/plain`, '--selector', '#absent', '--widths', '320', '--apply'], 1],
     ['invalid width fails before navigation', ['--url', `${base}/plain`, '--widths', '0'], 2],
+    // A site under the strict policy (script-src 'self', Trusted Types): the
+    // inspector is not an inline script the page could refuse (4.2's exit 2).
+    ...browsers.flatMap(({ name }) => /** @type {[string, string[], number][]} */ ([
+      [`strict CSP (${name}): existing loader is inspected`, ['--url', `${base}/strict-managed`, '--widths', '320,390', '--browser', name], 0],
+      [`strict CSP (${name}): preview composes explicit scope`, ['--url', `${base}/strict`, '--widths', '320,390', '--apply', '--browser', name], 0],
+    ])),
   ])) {
     const result = await invoke(args);
     let output = null;
@@ -73,7 +92,8 @@ try {
       // What the CLI did, and separately whether the page it inspected passes.
       const reports = output?.reports ?? [];
       const composed = reports.length === 2 && reports.every((/** @type {{ outcomes: Record<string, number> }} */ r) => Object.keys(r.outcomes).some(o => o.startsWith('composed')));
-      const did = composed && (output?.errors ?? []).length === 0 && (label !== 'preview composes explicit scope' || reports[0]?.features?.quotes?.applied === 1);
+      const did = composed && (output?.errors ?? []).length === 0 && (label !== 'preview composes explicit scope' || reports[0]?.features?.quotes?.applied === 1)
+        && (!label.endsWith('existing loader is inspected') || reports[0]?.features?.quotes?.applied === 1);
       checks.push({ label, pass: did, exitCode: result.code, ...(did ? {} : { detail }) });
       const passes = result.code === 0 && output?.pass === true;
       checks.push({ label: label + ': audit passes', pass: passes, exitCode: result.code, ...(passes ? {} : { detail }) });

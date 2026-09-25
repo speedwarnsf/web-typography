@@ -311,6 +311,16 @@ Outside the changes below, 0 of these differ in any engine.
   cases give identical breaks), so a missing API cannot blank an application
   at import. The script-tag builds, including `typeset.us/auto`, do nothing
   where there is no `window`.
+- **`typeset-audit` works on pages under a strict Content Security
+  Policy.** The CLI injected its inspector as an inline `<script>`, which
+  `script-src 'self'` (helmet's default) and Trusted Types refuse, so the
+  documented CI command exited 2 with a runtime error on exactly the sites
+  that follow SUPPORT.md's CSP guidance (4.2.0's CLI did the same). It now
+  runs the inspector through the browser automation protocol; the page's
+  policy still governs everything the engine does there, so a site whose
+  own composition breaks under its policy still fails the audit. Tested
+  under `style-src 'self'; script-src 'self'; require-trusted-types-for
+  'script'; trusted-types 'none'` in Chromium, WebKit and Firefox.
 - **Clear errors (K11).** `typeset()` throws `TypeError: [typeset] typeset()
   expects an HTMLElement (received ...)` for a non-element, and `mount()` a
   `TypeError` naming what it received, instead of raw TypeErrors from inside

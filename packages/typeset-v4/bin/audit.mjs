@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 try {
@@ -24,6 +25,11 @@ try {
     try { runner = await import('playwright'); } catch { throw new Error('Install the optional runner: npm install -D playwright; npx playwright install ' + values.browser); }
     const browser = await runner[values.browser].launch({ executablePath: process.env.TYPESET_BROWSER_PATH || undefined });
     const reports = [], errors = [];
+    // Run as the automation protocol's own script rather than a <script>
+    // element, so a page's Content Security Policy (script-src 'self',
+    // Trusted Types) does not refuse the inspector. The page's policy still
+    // applies to everything the engine does there.
+    const inspectorSource = await readFile(fileURLToPath(new URL('../dist/typeset.global.js', import.meta.url)), 'utf8');
     try {
       for (const width of widths) {
         const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -32,7 +38,7 @@ try {
         await page.evaluate(() => document.fonts.ready);
         // Keep a site's installed global intact. Inspection is not an upgrade.
         await page.evaluate(() => { window.__typesetAuditPrevious = window.Typeset; });
-        await page.addScriptTag({ path: fileURLToPath(new URL('../dist/typeset.global.js', import.meta.url)) });
+        await page.evaluate(inspectorSource + '\n;undefined');
         const report = await page.evaluate(async options => {
           const inspector = window.Typeset;
           window.Typeset = window.__typesetAuditPrevious;
