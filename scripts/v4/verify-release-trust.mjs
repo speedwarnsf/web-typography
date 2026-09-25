@@ -55,6 +55,9 @@ try {
   check('release.yml verifies the rebuild and runs test:release before publishing', /release-check\.mjs --version/.test(verify) && /npm run test:release/.test(verify) && /needs: verify/.test(publish));
   check('release.yml verify job cannot write or mint tokens', !/write/.test(verify.split('steps:')[0]));
   check('release.yml publishes only on a tag push, from the npm environment', /if: github\.event_name == 'push'/.test(publish) && /environment: npm/.test(publish));
+  check('release.yml publishes the commit the verify job checked, and stops if the tag has moved since', /sha=\$\(git rev-parse "\$TAG\^\{commit\}"\)/.test(verify) && /sha: \$\{\{ steps\.version\.outputs\.sha \}\}/.test(release)
+    && /ref: \$\{\{ needs\.verify\.outputs\.sha \}\}/.test(publish) && !/ref: \$\{\{ env\.TAG \}\}/.test(publish)
+    && /git fetch --force --no-tags origin "refs\/tags\/\$TAG:refs\/tags\/\$TAG"/.test(publish) && /"\$NOW" != "\$VERIFIED"/.test(publish) && publish.indexOf('The tag still names the verified commit') < publish.indexOf('npm publish'));
   check('release.yml publish job may mint an OIDC token (trusted publishing)', /id-token: write/.test(publish));
   check('release.yml publishes exactly the committed tarball with provenance', /npm publish "public\/releases\/\$VERSION\/typeset\.us-\$VERSION\.tgz" --provenance/.test(publish) && !/npm publish(?! "public\/releases)/.test(publish.replace(/--dry-run/g, '')));
   check('release.yml confirms registry integrity and an attestation after publishing', /verify-ledger\.mjs --network/.test(publish) && /dist\.attestations/.test(publish));

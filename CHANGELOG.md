@@ -645,7 +645,9 @@ table.
 - Releases are published by `.github/workflows/release.yml` from a `v*` tag,
   only after CI passed on that commit, `scripts/v4/release-check.mjs` rebuilt
   the ledger-recorded tarball from the tag byte for byte, and every suite
-  passed against the committed dist. It publishes exactly
+  passed against the committed dist; the publish job checks out that
+  verified commit, not the tag by name, and stops if the tag was moved
+  during the approval wait. It publishes exactly
   `public/releases/<v>/typeset.us-<v>.tgz` with npm trusted publishing and
   provenance, checks the registry's integrity and attestation, and creates a
   GitHub Release from the CHANGELOG section with the evidence attached.

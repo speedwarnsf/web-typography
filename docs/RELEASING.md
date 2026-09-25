@@ -46,7 +46,9 @@ git push origin vx.y.z
    are unchanged, and `release-cut --dry-run` on the tag rebuilds the npm
    tarball, every archived file and the pinned loader byte for byte;
 3. runs `npm run test:release` against the committed dist;
-4. waits for approval in the `npm` environment;
+4. waits for approval in the `npm` environment, then checks out the commit
+   steps 1 to 3 verified (not the tag by name) and stops if the tag no
+   longer names it;
 5. publishes exactly `public/releases/x.y.z/typeset.us-x.y.z.tgz` with npm
    trusted publishing and `--provenance`, checks that the registry's
    integrity equals the ledger and that an attestation exists;

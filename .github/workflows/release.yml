@@ -44,6 +44,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      sha: ${{ steps.version.outputs.sha }}
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
@@ -59,6 +60,8 @@ jobs:
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           case "$VERSION" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+          # The commit every later step verifies; publish uses this commit, not the tag name.
+          echo "sha=$(git rev-parse "$TAG^{commit}")" >> "$GITHUB_OUTPUT"
 
       - name: CI passed on the tagged commit
         env:
@@ -122,12 +125,22 @@ jobs:
     env:
       VERSION: ${{ needs.verify.outputs.version }}
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      VERIFIED: ${{ needs.verify.outputs.sha }}
     steps:
+      # The commit the verify job checked, not whatever the tag names after
+      # the approval wait: a tag moved meanwhile would publish an unverified
+      # tarball whose provenance names the verified commit.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.verify.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: The tag still names the verified commit
+        run: |
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          NOW="$(git rev-parse "$TAG^{commit}")"
+          if [ "$NOW" != "$VERIFIED" ] || [ "$VERIFIED" != "$GITHUB_SHA" ]; then echo "$TAG names $NOW; the verified commit was $VERIFIED (run for $GITHUB_SHA). Not publishing."; exit 1; fi
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
