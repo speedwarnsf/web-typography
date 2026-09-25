@@ -293,11 +293,20 @@ export function restore(element: HTMLElement): void {
 /** Release to a translator. Engine markers are removed and wrappers unwrapped
  * by moving their existing Text nodes; no Text node is split, merged, edited
  * or removed, since the translator holds and fills them. Quote substitutions
- * stay as they are for the same reason. */
+ * stay as they are for the same reason. A word space beside a removed break
+ * or wrapper is moved in place too: Chromium left it out of its accessibility
+ * tree while it collapsed at a line end and does not add it back as it comes
+ * to sit mid-line, which would join the words around every former break for
+ * a screen reader already running. */
 function yieldToTranslation(element: HTMLElement): void {
   const state = states.get(element);
-  for (const marker of element.querySelectorAll('[data-ts-break]')) marker.remove();
-  for (const wrapper of element.querySelectorAll('[data-ts-track], .ts-line[data-ts-generated]')) wrapper.replaceWith(...wrapper.childNodes);
+  const spaces = new Set<Text>();
+  const beside = (node: Node) => {
+    for (const sibling of [node.previousSibling, node.nextSibling]) if (sibling?.nodeType === Node.TEXT_NODE && (sibling as Text).length && !/\S/u.test((sibling as Text).data)) spaces.add(sibling as Text);
+  };
+  for (const marker of element.querySelectorAll('[data-ts-break]')) { beside(marker); marker.remove(); }
+  for (const wrapper of element.querySelectorAll('[data-ts-track], .ts-line[data-ts-generated]')) { beside(wrapper); wrapper.replaceWith(...wrapper.childNodes); }
+  for (const space of spaces) if (space.parentNode && element.contains(space)) space.parentNode.insertBefore(space, space.nextSibling);
   if (state) {
     resetStyles(element, state);
     if (element.style.getPropertyPriority('text-wrap-style') === 'important' && element.style.getPropertyValue('text-wrap-style') === 'auto') element.style.removeProperty('text-wrap-style');

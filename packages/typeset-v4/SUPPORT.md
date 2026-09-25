@@ -308,6 +308,13 @@ changes only an isolated preview, never a deployed site.
   punctuation ("dijo ,"): 3 of 9 test paragraphs in a live English to
   Spanish check, in all three engines, where the uncomposed page had none.
   No text is lost, and showing the original restores the source exactly.
+  A word space beside a removed break is moved in place as well, so a
+  Chromium accessibility tree that was live before the release (a screen
+  reader running) reads it; `scripts/v4/verify-native-ax.mjs` checks that
+  lane in Chromium and Firefox. WebKit's accessible names join the words at
+  any soft wrap that falls between two Text nodes (plain DOM does the same),
+  so while text is released a link or heading name there can read two words
+  as one where a line wraps at a former break.
   No network smoke test against a live translator runs in the suite; the
   offline suite simulates each translator's marks.
 - **Content Security Policy and Trusted Types.** The 4.x composition path

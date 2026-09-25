@@ -15,8 +15,14 @@
 //             run in the nightly lane.
 // Fixtures: the acceptance page, the promise corpus with links, emphasis and
 // headings, and TypesetText/TypesetRichText blocks, at 320, 375 and 768 px.
-// One more lane on the corpus: composed at 768 px and narrowed to 320 px, so
-// blocks far offscreen wait, stale, to be recomposed.
+// Two more lanes on the corpus: composed at 768 px and narrowed to 320 px
+// (blocks far offscreen wait, stale, to be recomposed), and composed with an
+// accessibility tree already live, as with a screen reader running, then
+// released to a translator (Chromium never re-adds a word space it left out
+// while it collapsed at a line end, so a fresh tree cannot see that defect).
+// That lane skips WebKit, whose names join words at any soft wrap between two
+// Text nodes (plain DOM does it too); released text keeps its Text nodes
+// split at the former breaks until the translation ends.
 //
 // Negative control: the same oracle runs against the published 4.2.0 build
 // (public/releases/4.2.0) and must find its joined words; a run that cannot
@@ -96,13 +102,14 @@ const SUBJECTS = [
 ];
 for (const subject of SUBJECTS) Object.assign(subject, { bundleText: await readFile(subject.bundle, 'utf8'), reactText: await reactBundle(subject.react) });
 
-/** @typedef {{ name: string, html: () => string, compose: string | null, blocks: string, widths?: number[], narrowTo?: number }} Fixture */
+/** @typedef {{ name: string, html: () => string, compose: string | null, blocks: string, widths?: number[], narrowTo?: number, live?: boolean, translate?: boolean, engines?: string[] }} Fixture */
 /** @type {Fixture[]} */
 const FIXTURES = [
   { name: 'acceptance', html: () => acceptanceHTML, compose: 'compose', blocks: '[data-compose]' },
   { name: 'corpus', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2' },
   { name: 'react', html: () => '<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia}h2{font:600 24px/1.25 Georgia}p{margin:0 0 14px}</style></head><body><div id="root"></div><script src="/react-fixture.js"></script></body></html>', compose: null, blocks: '#root p, #root h2' },
   { name: 'corpus-narrowed', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2', widths: [768], narrowTo: 320 },
+  { name: 'corpus-translated-live', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2', widths: [320, 768], live: true, translate: true, engines: ['chromium', 'firefox'] },
 ];
 
 const identity = await releaseIdentity();
@@ -152,10 +159,10 @@ async function domFacts(page, selector) {
   }, selector);
 }
 
-/** @param {import('playwright').Page} page @param {string[]} ids */
-async function chromiumAX(page, ids) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Accessibility.enable');
+/** @param {import('playwright').Page} page @param {string[]} ids @param {import('playwright').CDPSession} [live] a session whose tree has been live since before composition */
+async function chromiumAX(page, ids, live) {
+  const cdp = live ?? await page.context().newCDPSession(page);
+  if (!live) await cdp.send('Accessibility.enable');
   const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
   /** @type {Map<string, number>} */
   const backend = new Map();
@@ -186,7 +193,7 @@ async function chromiumAX(page, ids) {
     walk(start);
     out[id] = { text: parts.join(''), name: start.name?.value ?? '' };
   }
-  await cdp.detach();
+  if (!live) await cdp.detach();
   return out;
 }
 
@@ -221,7 +228,7 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
     if (firefox) { await browser.newPage(); gecko = await marionette(MARIONETTE_PORT); }
     for (const subject of SUBJECTS) {
       const tally = tallies[`${subject.key}:${config.name}`] = { unmatchedWords: 0, blocks: 0, linkMismatches: 0, headingMismatches: 0, links: 0, headings: 0, samples: [] };
-      for (const fixture of FIXTURES) {
+      for (const fixture of FIXTURES.filter(f => !f.engines || f.engines.includes(config.name))) {
         for (const width of fixture.widths ?? WIDTHS) {
           const where = `${config.name} ${fixture.name} ${width}px${fixture.narrowTo ? ' to ' + fixture.narrowTo + 'px' : ''}`;
           const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -240,6 +247,13 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
             });
             await page.route('**/*', route => route.request().url().startsWith('http://ax.test/') ? route.fallback() : route.abort());
             await page.goto(url);
+            /** @type {import('playwright').CDPSession | undefined} */
+            let live;
+            if (fixture.live && config.name === 'chromium') {
+              live = await page.context().newCDPSession(page);
+              await live.send('Accessibility.enable');
+              await live.send('Accessibility.getFullAXTree');
+            }
             if (fixture.compose) await page.evaluate(name => /** @type {any} */ (window)[name](), fixture.compose);
             else await page.waitForFunction(selector => { const els = [...document.querySelectorAll(selector)]; return els.length >= 7 && els.every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome); }, fixture.blocks);
             await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -252,8 +266,13 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
               await page.setViewportSize({ width: fixture.narrowTo, height: 900 });
               await page.waitForTimeout(1500);
             }
-            const facts = fixture.narrowTo ? await domFacts(page, fixture.blocks) : before;
-            const composed = facts.blocks.filter(b => b.outcome?.startsWith('composed'));
+            if (fixture.translate) {
+              await page.evaluate(() => document.documentElement.classList.add('translated-ltr'));
+              await page.waitForTimeout(600);
+            }
+            const facts = fixture.narrowTo || fixture.translate ? await domFacts(page, fixture.blocks) : before;
+            // Every block once the engine has stepped aside; otherwise the composed ones.
+            const composed = fixture.translate ? facts.blocks : facts.blocks.filter(b => b.outcome?.startsWith('composed'));
             if (fixture.narrowTo && subject.key === 'candidate') {
               const stale = await page.evaluate(() => document.querySelectorAll('[data-ts-stale]').length);
               checks.push({ browser: config.name, label: `candidate: ${where} leaves offscreen blocks waiting`, pass: stale > 0, detail: { stale } });
@@ -261,7 +280,7 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
             /** @type {Record<string, { text?: string, name: string }>} */
             let ax = {};
             const ids = [...facts.blocks.map(b => b.id), ...facts.links.map(l => l.id)];
-            if (config.name === 'chromium') ax = await chromiumAX(page, ids);
+            if (config.name === 'chromium') ax = await chromiumAX(page, ids, live);
             else if (config.name === 'webkit') ax = await webkitNames(page, [...facts.links.map(l => l.id), ...facts.headings.map(h => h.id)]);
             else if (gecko) {
               await page.waitForTimeout(800);
