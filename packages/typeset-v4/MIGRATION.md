@@ -38,7 +38,8 @@ in the CHANGELOG with the number of test paragraphs it changed.
    - Print wraps natively. To print a composition, set
      `--ts-break-display: inline` in print CSS.
    - A block that is being resized shows native wrapping (`data-ts-stale`)
-     until its size holds for 100 ms. Hidden text keeps its composition.
+     until its size holds for 100 ms, or, far offscreen, until it comes
+     near the screen. Hidden text keeps its composition.
    - While a page is machine-translated, composition steps aside
      (`native:translated`).
    - English abbreviations, units, honorifics, labels and letter designators

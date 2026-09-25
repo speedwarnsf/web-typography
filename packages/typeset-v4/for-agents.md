@@ -81,7 +81,8 @@ discovers changed subtrees, composes visible text first, and yields between
 batches while recomposing actual source, font, metric and width changes. Ancestor
 class/style changes recheck computed values and compose only if they changed.
 Hidden text keeps its composition; a resizing block shows native wrapping
-(data-ts-stale) until its size settles; print wraps natively (the
+(data-ts-stale) until its size settles (far offscreen text, until it comes
+near); print wraps natively (the
 --ts-break-display custom property; set it to inline to print a composition);
 a translated page gets native:translated. mount() also accepts a selector
 alone, mount('article p', options), and works in same-origin iframes.

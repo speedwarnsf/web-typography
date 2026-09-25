@@ -187,7 +187,9 @@ Outside the changes below, 0 of these differ in any engine.
   `innerHTML`, so it runs under Trusted Types.
 - Transient states with no static golden effect: while a block's width is
   changing and its composed lines no longer fit, it shows native wrapping
-  (`data-ts-stale`) until 100 ms after the size holds; while a page is
+  (`data-ts-stale`) until 100 ms after the size holds, or, when it is more
+  than a viewport height offscreen, until it comes that near (released to
+  native in idle time meanwhile); while a page is
   machine-translated, owned text is released to native (`native:translated`);
   where nothing can be measured (jsdom, happy-dom, engines without the
   required APIs) text stays native (`native:environment`) where 4.2 threw.
@@ -260,8 +262,14 @@ Outside the changes below, 0 of these differ in any engine.
   observer callback).
 - **No double-wrapped frames during resizes or in print (C9).** A block
   whose width changes is recomposed once the size has held for 100 ms, not
-  every frame; meanwhile, if it is narrower than its widest composed line,
-  it shows native wrapping. The switch is written before the frame's layout.
+  every frame (with `mount()` and the loaders, a block more than a viewport
+  height offscreen once it comes that near); meanwhile, if it is narrower
+  than its widest composed line, it shows native wrapping. The switch is
+  written before the frame's layout. Offscreen text left waiting is released
+  to native in idle time, so assistive technology never reads it with its
+  breaks hidden: Chromium drops the word space beside a hidden break and
+  WebKit joins words at the engine's markers, which after a narrowing
+  resize read 14 joined pairs in 9 offscreen blocks of a 48-block page.
   Print shows native wrapping and pauses composition. A width only layout
   can show (a stylesheet rule, a composed block moved into a narrower
   container) can still paint its first frame double-wrapped.

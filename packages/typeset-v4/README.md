@@ -124,7 +124,8 @@ Two CSS hooks are supported. Every generated break is displayed through
 printed text wraps natively at the paper's width; set it back to `inline`
 to print a composition. While a block's width is changing and its composed
 lines no longer fit, it carries `data-ts-stale` and shows native wrapping
-until it is recomposed. `dist/styles.css` has the rules; the engine also
+until it is recomposed (text far offscreen, once it comes near the screen).
+`dist/styles.css` has the rules; the engine also
 installs them itself.
 
 | Script attribute | Default | What it does |

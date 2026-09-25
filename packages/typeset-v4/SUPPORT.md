@@ -151,8 +151,12 @@ Generated line breaks are displayed through the custom property
 wraps natively at the paper's width; set `--ts-break-display: inline` on a
 composed element in print CSS to keep its composition. While a block's width is
 changing and it is narrower than its widest composed line, the engine marks it
-`data-ts-stale` and shows native wrapping until the size has held for 100 ms
-and it is recomposed. Both hooks are supported; the engine installs their rules
+`data-ts-stale` and shows native wrapping until it is recomposed: 100 ms after
+the size holds for text within about a viewport height of the screen, and for
+text further away (with `mount()` and the loaders) once it comes that near. That
+offscreen text is released to native in idle time meanwhile, so no engine
+marker is left beside a hidden break for assistive technology to join words
+at; its outcome is kept. Both hooks are supported; the engine installs their rules
 as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. Hidden text (display:none, the hidden attribute, a closed dialog,
 content-visibility) keeps its composition and is not measured until shown.

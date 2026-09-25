@@ -15,6 +15,8 @@
 //             run in the nightly lane.
 // Fixtures: the acceptance page, the promise corpus with links, emphasis and
 // headings, and TypesetText/TypesetRichText blocks, at 320, 375 and 768 px.
+// One more lane on the corpus: composed at 768 px and narrowed to 320 px, so
+// blocks far offscreen wait, stale, to be recomposed.
 //
 // Negative control: the same oracle runs against the published 4.2.0 build
 // (public/releases/4.2.0) and must find its joined words; a run that cannot
@@ -94,10 +96,13 @@ const SUBJECTS = [
 ];
 for (const subject of SUBJECTS) Object.assign(subject, { bundleText: await readFile(subject.bundle, 'utf8'), reactText: await reactBundle(subject.react) });
 
+/** @typedef {{ name: string, html: () => string, compose: string | null, blocks: string, widths?: number[], narrowTo?: number }} Fixture */
+/** @type {Fixture[]} */
 const FIXTURES = [
   { name: 'acceptance', html: () => acceptanceHTML, compose: 'compose', blocks: '[data-compose]' },
   { name: 'corpus', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2' },
   { name: 'react', html: () => '<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia}h2{font:600 24px/1.25 Georgia}p{margin:0 0 14px}</style></head><body><div id="root"></div><script src="/react-fixture.js"></script></body></html>', compose: null, blocks: '#root p, #root h2' },
+  { name: 'corpus-narrowed', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2', widths: [768], narrowTo: 320 },
 ];
 
 const identity = await releaseIdentity();
@@ -217,8 +222,8 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
     for (const subject of SUBJECTS) {
       const tally = tallies[`${subject.key}:${config.name}`] = { unmatchedWords: 0, blocks: 0, linkMismatches: 0, headingMismatches: 0, links: 0, headings: 0, samples: [] };
       for (const fixture of FIXTURES) {
-        for (const width of WIDTHS) {
-          const where = `${config.name} ${fixture.name} ${width}px`;
+        for (const width of fixture.widths ?? WIDTHS) {
+          const where = `${config.name} ${fixture.name} ${width}px${fixture.narrowTo ? ' to ' + fixture.narrowTo + 'px' : ''}`;
           const page = await browser.newPage({ viewport: { width, height: 900 } });
           page.setDefaultTimeout(20000);
           page.on('pageerror', error => errors.push({ browser: config.name, error: `${subject.key} ${where}: ${error.message}` }));
@@ -238,10 +243,21 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
             if (fixture.compose) await page.evaluate(name => /** @type {any} */ (window)[name](), fixture.compose);
             else await page.waitForFunction(selector => { const els = [...document.querySelectorAll(selector)]; return els.length >= 7 && els.every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome); }, fixture.blocks);
             await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-            const facts = await domFacts(page, fixture.blocks);
+            const before = await domFacts(page, fixture.blocks);
+            const composedBefore = before.blocks.filter(b => b.outcome?.startsWith('composed'));
+            const withBreaks = composedBefore.filter(b => b.breaks > 0);
+            if (subject.key === 'candidate') checks.push({ browser: config.name, label: `candidate: ${where} composes with generated breaks`, pass: withBreaks.length > 0, detail: { blocks: before.blocks.length, composed: composedBefore.length, withBreaks: withBreaks.length } });
+            if (fixture.narrowTo) {
+              // Past the resize settle and the idle work it leaves offscreen.
+              await page.setViewportSize({ width: fixture.narrowTo, height: 900 });
+              await page.waitForTimeout(1500);
+            }
+            const facts = fixture.narrowTo ? await domFacts(page, fixture.blocks) : before;
             const composed = facts.blocks.filter(b => b.outcome?.startsWith('composed'));
-            const withBreaks = composed.filter(b => b.breaks > 0);
-            if (subject.key === 'candidate') checks.push({ browser: config.name, label: `candidate: ${where} composes with generated breaks`, pass: withBreaks.length > 0, detail: { blocks: facts.blocks.length, composed: composed.length, withBreaks: withBreaks.length } });
+            if (fixture.narrowTo && subject.key === 'candidate') {
+              const stale = await page.evaluate(() => document.querySelectorAll('[data-ts-stale]').length);
+              checks.push({ browser: config.name, label: `candidate: ${where} leaves offscreen blocks waiting`, pass: stale > 0, detail: { stale } });
+            }
             /** @type {Record<string, { text?: string, name: string }>} */
             let ax = {};
             const ids = [...facts.blocks.map(b => b.id), ...facts.links.map(l => l.id)];

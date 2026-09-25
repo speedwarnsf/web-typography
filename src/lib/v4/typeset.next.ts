@@ -826,8 +826,9 @@ export interface Controller {
 
 // Controller jobs. CONTENT recomposes through typeset()'s full signature;
 // KEY rechecks the computed layout key and composes only if it changed;
-// VERIFY also checks that the rendered lines still match the composition.
-const CONTENT = 1, KEY = 2, VERIFY = 4;
+// VERIFY also checks that the rendered lines still match the composition;
+// RELEASE removes the markup of stale text left waiting (see settle).
+const CONTENT = 1, KEY = 2, VERIFY = 4, RELEASE = 8;
 const RESIZE_SETTLE_MS = 100;
 const REVEAL_BUDGET_MS = 24;
 
@@ -1015,7 +1016,10 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     for (const el of stale) el.setAttribute('data-ts-stale', '');
   };
   /** The size has held: recompose what is on or near the screen now, and
-   * leave offscreen blocks (stale or not) until they come near. */
+   * leave offscreen blocks until they come near. A stale one is released to
+   * native in idle time meanwhile: with its breaks hidden, the word spaces
+   * beside them drop out of Chromium's accessibility tree and WebKit joins
+   * words at its markers, so it keeps no engine markup while it waits. */
   const settle = () => {
     settleTimer = undefined;
     if (stopped) return;
@@ -1024,10 +1028,18 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       if (!owned.has(el)) continue;
       const box = el.getBoundingClientRect();
       if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, KEY, true);
-      else { deferred.add(el); viewport.observe(el); }
+      else { deferred.add(el); viewport.observe(el); if (el.hasAttribute('data-ts-stale')) enqueue(el, RELEASE); }
     }
     resizing.clear();
     schedule();
+  };
+  /** Release the markup of stale text still waiting to be recomposed: far
+   * offscreen, or hidden (a skipped content-visibility:auto section is in the
+   * accessibility tree). Its outcome stays; it is composed when it is near or
+   * shown, as before. */
+  const releaseWaiting = (el: HTMLElement) => {
+    const state = states.get(el);
+    if (state?.signature && el.hasAttribute('data-ts-stale') && !resizing.has(el) && (deferred.has(el) || hidden.has(el))) releaseOutput(el, state, new Set());
   };
   /** A block's width is changing: recompose once it settles, not every frame. */
   const resizeStarted = (el: HTMLElement) => {
@@ -1285,11 +1297,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       const job = pending.get(el);
       if (job === undefined) continue;
       pending.delete(el);
+      if (job & RELEASE) releaseWaiting(el);
       // Superseded: a width still changing is recomposed once it settles, and
       // offscreen text a resize deferred is recomposed when it comes near.
       if ((resizing.has(el) || deferred.has(el) || (fontsLoading && !nearby.has(el))) && !(job & CONTENT)) continue;
-      nearby.delete(el); viewport?.unobserve(el);
-      process(el, job);
+      if (job & (CONTENT | KEY | VERIFY)) {
+        nearby.delete(el); viewport?.unobserve(el);
+        process(el, job);
+      }
       // An idle callback that fired on its timeout reports no time remaining;
       // it still gets the 8 ms budget, or a busy page composes one block per 200 ms.
       if (performance.now() - start >= 8 || (deadline && !deadline.didTimeout && deadline.timeRemaining() <= 1)) break;
@@ -1322,7 +1337,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const width = view?.innerWidth ?? 0;
     if (width !== windowWidth) {
       windowWidth = width;
-      for (const el of hidden) if (states.get(el)?.widest && !rendered(el)) el.setAttribute('data-ts-stale', '');
+      for (const el of hidden) if (states.get(el)?.widest && !rendered(el)) { el.setAttribute('data-ts-stale', ''); enqueue(el, RELEASE); }
     }
     const visible: HTMLElement[] = [];
     for (const el of owned) if (states.get(el)?.widest && onScreen(el)) visible.push(el);
