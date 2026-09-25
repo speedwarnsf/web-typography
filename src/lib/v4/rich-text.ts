@@ -367,15 +367,18 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   } finally { restoreMarkers.reverse().forEach(restore => restore()); }
 }
 
-const liveRegions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
-/** Whether this element is inside a live region: aria-live other than off on
- * the nearest region, or a status, alert, log, marquee or timer role, or
- * <output>. Assistive technology announces every change there, and composing
- * rewrites the text on each resize, font load and idle pass, so screen
- * readers repeated status messages whose words had not changed. */
+const liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+/** Whether this element is inside a live region: the nearest region says
+ * aria-live polite or assertive, or has a status, alert, log, marquee or timer
+ * role, or is <output>, and does not say aria-live off. Assistive technology
+ * announces every change there, and composing rewrites the text on each
+ * resize, font load and idle pass, so screen readers repeated status messages
+ * whose words had not changed. */
 export function inLiveRegion(element: Element): boolean {
-  const region = element.closest(liveRegions);
-  return !!region && (region.getAttribute('aria-live') ?? 'polite').trim().toLowerCase() !== 'off';
+  const region = element.closest('[aria-live], ' + liveRoles);
+  if (!region) return false;
+  const live = region.getAttribute('aria-live')?.trim().toLowerCase();
+  return live === 'polite' || live === 'assertive' || (live !== 'off' && region.matches(liveRoles));
 }
 
 /** Whether a generated break at `offset` stands in for a collapsed space. */
