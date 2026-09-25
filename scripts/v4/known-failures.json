@@ -3,12 +3,12 @@
   "entries": [
     {
       "script": "verify-native-ax",
-      "label": "^candidate: .* (composed block words|link names|heading names) equal source$",
+      "label": "^candidate: .* ((composed block words|link names|heading names) equal source|leaves offscreen blocks waiting)$",
       "modes": [
         "release"
       ],
       "awaiting": "the 4.3.0 release cut",
-      "reason": "test:release runs the committed packages/typeset-v4/dist, which is the published 4.2.0 build with the joined-word defect until 4.3.0 is cut."
+      "reason": "test:release runs the committed packages/typeset-v4/dist, which is the published 4.2.0 build with the joined-word defect until 4.3.0 is cut, and with no stale mode to leave offscreen blocks waiting after a narrowing resize."
     },
     {
       "script": "verify-break-semantics",
@@ -57,12 +57,12 @@
     },
     {
       "script": "verify-smart-quotes",
-      "label": "^education: |^server HTML: TypesetText with (smartQuotes and no lang|lang=\"en\") has curled quotes$|: TypesetRichText without lang warns once$",
+      "label": "^education: |^server HTML: TypesetText with (smartQuotes and no lang|lang=\"en\") has curled quotes$|: TypesetRichText without lang warns once$|: TypesetRichText with a component child stays native and warns once$",
       "modes": [
         "release"
       ],
       "awaiting": "the 4.3.0 release cut",
-      "reason": "test:release runs the committed 4.2.0 dist, with the quote misfires and client-only TypesetText education (C15)."
+      "reason": "test:release runs the committed 4.2.0 dist, with the quote misfires and client-only TypesetText education (C15), and no development warnings for TypesetRichText."
     },
     {
       "script": "verify-react",
@@ -99,7 +99,7 @@
     },
     {
       "script": "verify-package-contents",
-      "label": "^(React adapters declare their public React types|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.8 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
+      "label": "^(React adapters declare their public React types|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.85 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
       "modes": [
         "release"
       ],
