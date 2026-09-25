@@ -402,7 +402,12 @@ Outside the changes below, 0 of these differ in any engine.
   that is no longer correct: `stale-layout` (a font, spacing or size change
   after composition left a block double-wrapped, which 4.2.0 passed) and
   `alignment-lost`. 4.2.0's own output carried the `hidden-break` and
-  `isolated-space` errors (C2); 4.3.0's carries neither.
+  `isolated-space` errors (C2); 4.3.0's carries neither. A hanging indent
+  (`padding-left` with a negative `text-indent`, as in a bibliography) is no
+  longer reported as `overflow`: 4.2.0 failed the CI gate with a hard error
+  for the first line of every such element in scope, native or excluded,
+  so a correct page with a reference list could not pass. Overflow is
+  still an error on any element, composed or not.
 - **Installs beside any React 18.2+ or 19, and any Playwright (K3).** The
   React peer was `^19.2.3` and Playwright was a peer: npm failed with
   ERESOLVE beside React 18, React 19.0 or 19.1 and older Playwright, and

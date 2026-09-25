@@ -36,12 +36,24 @@ export function contentWidth(element: HTMLElement): number {
 
 /** Read real line boxes, including native and fallback text. No DOM writes. */
 export function measureLayout(element: HTMLElement): LayoutMetrics {
+  return measure(element, false);
+}
+/** measureLayout for the audit: a first line that starts left of the content
+ * box by the author's negative text-indent (a hanging indent, as in a
+ * bibliography) is the author's layout, not overflow. Composition keeps
+ * measureLayout, so no decision it makes changes. */
+export function measureForAudit(element: HTMLElement): LayoutMetrics {
+  return measure(element, true);
+}
+function measure(element: HTMLElement, authorIndent: boolean): LayoutMetrics {
   const cs = getComputedStyle(element);
   const box = element.getBoundingClientRect();
   const width = Math.max(0, box.width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
     - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0'));
   const left = box.left + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.paddingLeft || '0');
   const right = left + width;
+  // How far left of the content box the first line may start (<= 0).
+  const indent = authorIndent && cs.direction !== 'rtl' ? Math.min(0, cs.textIndent.endsWith('%') ? parseFloat(cs.textIndent) / 100 * width : parseFloat(cs.textIndent) || 0) : 0;
   const lines: MeasuredLine[] = [];
   if (cs.display !== 'contents' && !element.getClientRects().length) {
     return { lines, width, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 };
@@ -62,7 +74,7 @@ export function measureLayout(element: HTMLElement): LayoutMetrics {
       const rect = rects[0], text = source.slice(start, end).replace(/\s+/gu, ' ');
       return { width, lines: [{ text, sourceStart: start, sourceEnd: end, words: text.split(' ').length,
         width: rect.width, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }],
-        overflow: Math.max(0, rect.right - right, left - rect.left), firstSingleton: false, lastSingleton: false, rag: 0 };
+        overflow: Math.max(0, rect.right - right, left + indent - rect.left), firstSingleton: false, lastSingleton: false, rag: 0 };
     }
   }
   let node: Node | null;
@@ -154,7 +166,7 @@ export function measureLayout(element: HTMLElement): LayoutMetrics {
     lines, width,
     // Old Typeset intentionally hangs punctuation/capitals into the margin.
     // Do not mislabel its documented optical indent as an A/B overflow win.
-    overflow: Math.max(0, ...lines.flatMap((l, i) => [l.right - right, left + (hangs[i] || optical.get(l.sourceStart) || 0) - l.left])),
+    overflow: Math.max(0, ...lines.flatMap((l, i) => [l.right - right, left + (hangs[i] || optical.get(l.sourceStart) || 0) + (i ? 0 : indent) - l.left])),
     firstSingleton: lines.length > 1 && lines[0].words === 1,
     lastSingleton: lines.length > 1 && lines[lines.length - 1].words === 1,
     rag: fills.reduce((sum, f) => sum + (f - mean) ** 2, 0) / Math.max(1, fills.length),

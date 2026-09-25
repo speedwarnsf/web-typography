@@ -120,6 +120,19 @@ for (const { name, engine, executablePath } of browsers) {
       const row = judged['l' + i];
       check(`reviewed as ${type}: ${html.replace(/<br>/, ' / ')}`, row.subject.includes(type), row);
     }
+
+    // A hanging indent (padding-left with a negative text-indent, as in a
+    // bibliography) is the author's layout, not overflow: the gate failed
+    // correct pages on it, native or excluded. Real overflow still fails.
+    await tab.setContent(page(`<div style="padding-left:2em;text-indent:-2em"><p id="h0">${corpus[12]}</p><p id="h1" data-no-typeset>${corpus[13]}</p><p id="h2">A short hanging line.</p></div>`
+      + `<p id="o0" style="width:120px">Supercalifragilisticexpialidocious overflows its measure.</p>`));
+    await tab.addScriptTag({ content: subject });
+    const hanging = await tab.evaluate(() => {
+      const overflow = (/** @type {string} */ selector) => window.Typeset.auditJSON(selector).issues.filter((/** @type {any} */ issue) => issue.type === 'overflow').map((/** @type {any} */ issue) => issue.detail);
+      return { hanging: overflow('#h0, #h1, #h2'), real: overflow('#o0'), lines: ['h0', 'h1'].map(id => window.Typeset.measureLayout(/** @type {HTMLElement} */ (document.getElementById(id))).lines.length) };
+    });
+    check('no overflow error for a hanging indent (native, excluded, single-line)', hanging.hanging.length === 0 && hanging.lines.every(n => n >= 2), hanging);
+    check('real overflow is still an error', hanging.real.length === 1, hanging);
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack) }); }
   finally { await browser.close(); }
 }

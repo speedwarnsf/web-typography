@@ -179,7 +179,10 @@ https://typeset.us/releases/4.3.0/OUTCOMES.md. In TypeScript they are the
 `auditJSON(selector)` returns errors, items to review, and outcome counts.
 It passes when the scope is not empty, there are no hard errors (overflow,
 stale output, word spaces hidden from assistive technology) and no element
-was left unprocessed. It is not a verdict on how the text looks.
+was left unprocessed. It is not a verdict on how the text looks. Overflow
+is checked on every element in scope, composed or not, including native
+and `data-no-typeset` text; a hanging indent (a negative `text-indent`) is
+not overflow.
 
 ```sh
 npm i -D playwright && npx playwright install chromium

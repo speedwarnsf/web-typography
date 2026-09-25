@@ -1,7 +1,7 @@
 import { composeParagraph, tokenize, shapeExactLines, finalValidate, isWeakEnding } from './typeset';
 import type { FrozenLine } from './typeset';
 import { composeTitle } from './title-layout';
-import { contentWidth, measureLayout } from './layout-metrics';
+import { contentWidth, measureForAudit, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import { inLiveRegion, liveText, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
 import { applySmartQuotes, smartQuotes } from './smart-quotes';
@@ -755,7 +755,7 @@ export function auditReport(selector = defaults): AuditReport {
       const status = value || 'off';
       report.features[feature][status] = (report.features[feature][status] || 0) + 1;
     }
-    const layout = measureLayout(element);
+    const layout = measureForAudit(element);
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
     if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
