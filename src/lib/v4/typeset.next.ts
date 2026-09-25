@@ -4,7 +4,7 @@ import { composeTitle } from './title-layout';
 import { contentWidth, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import { inLiveRegion, liveText, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
-import { applySmartQuotes } from './smart-quotes';
+import { applySmartQuotes, smartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
 import type { RichOutput, RichPlan } from './rich-text';
@@ -409,7 +409,11 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     // region alone: no measurement overrides, no markers, no attributes.
     if (states.has(element)) restore(element);
     if (options.text !== undefined) {
-      if (element.textContent !== options.text) element.textContent = options.text;
+      // TypesetText curls quotes as it renders: that text is current, and a
+      // new value is written educated as it would be outside a region.
+      const curled = options.smartQuotes === 'en' ? smartQuotes(options.text) : options.text;
+      const lang = element.closest('[lang]')?.getAttribute('lang');
+      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = !lang || /^en(?:-|$)/i.test(lang) ? curled : options.text;
       authorTexts.set(element, options.text);
     }
     return { outcome: 'native:live-region', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };

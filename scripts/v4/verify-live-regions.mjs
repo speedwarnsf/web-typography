@@ -20,6 +20,7 @@
 // app's own, while the control paragraph composes. A region that turns live
 // later is released; one that stops being live is composed; a composed
 // paragraph moved into a live toast is released with the move itself.
+// TypesetText in a region keeps the quotes it curled while rendering.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -30,8 +31,8 @@ import { fixtureFont } from './font-fixture.mjs';
 const watchdog = setTimeout(() => { console.error('verify-live-regions: watchdog'); process.exit(3); }, 170_000);
 watchdog.unref();
 
-const TEXT = 'Your appointment is confirmed for Tuesday morning at the county clinic, and a reminder with directions will arrive by text message the day before your visit.';
-const UPDATE = 'Your appointment is moved to Thursday morning at the county clinic, and a reminder with directions will arrive by text message the day before your visit.';
+const TEXT = 'It\'s confirmed: your appointment is on Tuesday morning at the county clinic, and a "reminder" with directions will arrive by text message the day before your visit.';
+const UPDATE = 'It\'s moved: your appointment is on Thursday morning at the county clinic, and a "reminder" with directions will arrive by text message the day before your visit.';
 const COUNT = 'for clinics near you that offer walk-in appointments on weekday evenings and weekends, with interpreters for every visit.';
 const scripts = {
   '/typeset.js': await readFile(artifacts.bundle, 'utf8'),
@@ -127,7 +128,7 @@ await Promise.all(browsers.map(async config => {
           const textRecords = records.filter(r => !r.startsWith('attributes'));
           check(`${where}: no text or node mutation inside live regions across mount, resize, font load and idle`, textRecords.length === 0, textRecords.slice(0, 5));
           check(`${where}: TypesetRichText reports native:live-region inside a region and around one, and still composes outside`, /** @type {any} */ (facts.react).rr === 'native:live-region' && /** @type {any} */ (facts.react).ri === 'native:live-region' && /** @type {any} */ (facts.react).rc === 'composed:rich', facts.react);
-          check(`${where}: TypesetText in a live region is left alone`, !/** @type {any} */ (facts.react).rt && !facts.breaksInRegions, facts.react);
+          check(`${where}: TypesetText in a live region is left alone, with the quotes it curled`, !/** @type {any} */ (facts.react).rt && !facts.breaksInRegions && typeof facts.rtText === 'string' && !/["']/.test(facts.rtText) && facts.rtText.length === TEXT.length, { ...facts.react, rtText: facts.rtText });
           const rt = await page.evaluate(() => /** @type {any} */ (window).Typeset.typeset(document.getElementById('rt')).outcome);
           check(`${where}: typeset() reports native:live-region`, rt === 'native:live-region', rt);
           // An app update: new TypesetText text, a new count in the inline region.
@@ -140,7 +141,7 @@ await Promise.all(browsers.map(async config => {
             const records = /** @type {string[]} */ (w.records).filter(r => !r.startsWith('attributes'));
             return { records, rt: document.getElementById('rt')?.textContent, ri: /** @type {HTMLElement} */ (document.getElementById('ri')).dataset.tsOutcome, riMarkers: document.querySelectorAll('#ri [data-ts-break]').length };
           }, { value: UPDATE });
-          check(`${where}: an app update writes the regions once each, and nothing else`, updated.records.length <= 2 && updated.rt === UPDATE && updated.ri === 'native:live-region' && updated.riMarkers === 0, updated);
+          check(`${where}: an app update writes the regions once each, curled, and nothing else`, updated.records.length <= 2 && typeof updated.rt === 'string' && !/["']/.test(updated.rt) && updated.rt.length === UPDATE.length && updated.ri === 'native:live-region' && updated.riMarkers === 0, updated);
         } else {
           check(`${where}: no mutation inside live regions across mount, resize, font load and idle`, records.length === 0 && first === 0, records.slice(0, 5));
           check(`${where}: live-region paragraphs report native:live-region and the control composes`, /** @type {any} */ (facts.audit)['native:live-region'] === 9 && facts.control === 'composed:rich' && facts.off === 'composed:rich', { audit: facts.audit, control: facts.control, off: facts.off });

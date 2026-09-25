@@ -127,7 +127,8 @@ live, as Chromium treats it), role status, alert, log, marquee or timer, or
 result count or "saved" status), is never composed, measured or rewritten,
 because assistive technology announces every change there. Its outcome is
 `native:live-region`. Composed text moved into a live region, or given one,
-is released in the same mutation callback as that change.
+is released in the same mutation callback as that change. `TypesetText` in a
+region keeps the quotes it curled while rendering.
 
 Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
 for styles and no 'unsafe-eval'. It writes and restores styles through the
