@@ -68,11 +68,14 @@ const ASTRO = `---
   mount(document, 'article p, article h1, article li');
 </script>`;
 
-const SVELTE = `<!-- SvelteKit: content Svelte renders once, such as {@html} Markdown. -->
+const SVELTE = `<!-- SvelteKit (Svelte 5, runes): content Svelte renders once, such as
+     {@html} Markdown. In Svelte 4 or legacy mode, write export let html; -->
 <script>
   import { onMount } from 'svelte';
   import { mount } from 'typeset.us';
-  export let html;
+  /** @type {{ html: string }} */
+  let { html } = $props();
+  /** @type {HTMLElement} */
   let article;
   onMount(() => {
     const controller = mount(article, 'p, h2, li');

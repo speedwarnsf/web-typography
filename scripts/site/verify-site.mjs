@@ -250,6 +250,10 @@ try {
     check('content', 'homepage states a measured loader size, not "38 KB", and no "--" dash', !/38(&nbsp;|\s)KB/.test(developer) && !developer.includes('doing -- visible') && /\d+\.\d(&nbsp;|\s)KB gzipped/.test(developer));
     const frameworks = await (await fetch(base + '/install/frameworks')).text();
     check('content', '/install/frameworks has Next.js, Vite, Astro, SvelteKit and Vue recipes', ['Next.js (App Router)', 'Vite + React', 'Astro', 'SvelteKit', 'Vue and Nuxt'].every(t => frameworks.includes(t)));
+    // New SvelteKit projects compile every file in runes mode, where
+    // `export let` is a build error.
+    const plain = frameworks.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/<!-- -->/g, '');
+    check('content', '/install/frameworks: the SvelteKit recipe uses $props(), which runes mode requires', plain.includes('let { html } = $props();') && !/^\s*export let html;/m.test(plain));
     for (const config of browsers) {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
