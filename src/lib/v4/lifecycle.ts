@@ -56,8 +56,10 @@ export function markTranslated(doc: Document): void {
 
 /** Printing (or print emulation) lays text out at the paper's width, where
  * print CSS shows native wrapping; composing for it is wasted work. */
+const prints = new WeakMap<Document, MediaQueryList | undefined>();
 export function printing(doc: Document): boolean {
-  return !!doc.defaultView?.matchMedia?.('print').matches;
+  if (!prints.has(doc)) prints.set(doc, doc.defaultView?.matchMedia?.('print'));
+  return !!prints.get(doc)?.matches;
 }
 
 /** Whether an element's text is laid out now: it has boxes and is not in a

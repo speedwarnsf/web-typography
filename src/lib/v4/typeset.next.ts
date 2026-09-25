@@ -659,6 +659,7 @@ export interface Controller {
 // VERIFY also checks that the rendered lines still match the composition.
 const CONTENT = 1, KEY = 2, VERIFY = 4;
 const RESIZE_SETTLE_MS = 100;
+const REVEAL_BUDGET_MS = 24;
 
 /** One lifecycle owner per mount. Observers are disconnected during our writes.
  * mount('article p', options) is mount(document, 'article p', options). */
@@ -752,7 +753,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
         // Deferred work is watched until the block comes within a viewport.
         if (!entry.isIntersecting) continue;
         deferred.delete(el);
-        enqueue(el, KEY);
+        enqueue(el, KEY, true);
       }
       // One viewport snapshot per queued job. Watching thousands of finished
       // elements through every reflow costs more than the scheduling saves.
@@ -762,13 +763,19 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Visible work waits for no idle period.
     if (near) schedule();
   }, { rootMargin: '100% 0px' });
-  const enqueue = (el: HTMLElement, job = CONTENT) => {
+  /** Queue a job. New or changed text takes one intersection snapshot to
+   * learn whether it is near the screen; rechecks come from callers that
+   * already read layout, and say so with `near`. */
+  const enqueue = (el: HTMLElement, job = CONTENT, near = false) => {
     if (!claim(el)) return;
     const queued = pending.get(el);
-    if (queued === undefined && !nearby.has(el)) viewport?.observe(el);
+    if (near) nearby.add(el);
+    else if (queued === undefined && job & CONTENT && !nearby.has(el)) viewport?.observe(el);
     if (job & CONTENT) deferred.delete(el);
     pending.set(el, (queued || 0) | job);
   };
+  /** A recheck: near the screen means the next task, elsewhere idle time. */
+  const recheck = (el: HTMLElement, job: number) => enqueue(el, job, onScreen(el));
   /** Queue matching elements this controller does not own yet. */
   const discover = (scope: ParentNode = root) => {
     for (const el of select(scope)) if (!owned.has(el)) enqueue(el);
@@ -790,8 +797,16 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
    * revealed. Called from the MutationObserver callback, never from a
    * ResizeObserver callback, where a size change would report a loop error. */
   const composeNow = (elements: HTMLElement[]) => {
+    const start = performance.now(), later: HTMLElement[] = [];
     observer.disconnect();
-    for (const el of elements) { pending.delete(el); process(el, KEY); }
+    for (const el of elements) {
+      // A reveal is often a click: keep the frame short. The rest show
+      // native wrapping (or their retained composition) and compose next.
+      if (performance.now() - start > REVEAL_BUDGET_MS) { later.push(el); continue; }
+      pending.delete(el); process(el, KEY);
+    }
+    guard(later);
+    for (const el of later) enqueue(el, KEY, true);
     observe();
   };
   /** Before a frame's layout only (a mutation callback, the window's resize
@@ -818,7 +833,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     for (const el of resizing) {
       if (!owned.has(el)) continue;
       const box = el.getBoundingClientRect();
-      if (!viewport || (box.bottom > -height && box.top < 2 * height)) { nearby.add(el); enqueue(el, KEY); }
+      if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, KEY, true);
       else { deferred.add(el); viewport.observe(el); }
     }
     resizing.clear();
@@ -873,7 +888,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // guard the frame about to paint, and recompose once it settles.
     const resized = fontsReady && affected.length ? widthChanged(affected) : [];
     if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
-    for (const el of affected) if (!resizing.has(el)) enqueue(el, KEY);
+    for (const el of affected) if (!resizing.has(el)) recheck(el, KEY);
     // A tab, dialog or card this change just showed: text that could not be
     // composed while hidden, or was hidden at another width, composes before
     // the reveal paints. A retained composition needs nothing.
@@ -948,14 +963,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       if (Math.abs(previous.w - width) > .01) {
         for (const el of watched.get(entry.target) || []) {
           // Revealed: a retained composition is already painting; verify it.
-          if (!previous.w || hidden.has(el)) { hidden.delete(el); enqueue(el, VERIFY); }
+          if (!previous.w || hidden.has(el)) { hidden.delete(el); recheck(el, VERIFY); }
           else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
         // Same width, new height: a font, a text-spacing override, a browser
         // font-size setting or text-only zoom can add native wraps to composed
         // lines without any mutation. Verify the rendered lines.
-        enqueue(entry.target as HTMLElement, VERIFY);
+        recheck(entry.target as HTMLElement, VERIFY);
       }
     }
     if (pending.size) schedule();
@@ -1021,6 +1036,11 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     observer.disconnect();
     const start = performance.now();
     stats.passes++;
+    // While fonts load, text may be about to change metrics again: recheck
+    // what is near the screen now and leave the rest to the fonts' arrival,
+    // which rechecks everything.
+    const fontsLoading = doc.fonts.status === 'loading';
+    if (fontsLoading) armFonts(doc);
     function* work() {
       for (const el of nearby) if (pending.has(el)) yield el;
       yield* pending.keys();
@@ -1031,7 +1051,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       pending.delete(el);
       // Superseded: a width still changing is recomposed once it settles, and
       // offscreen text a resize deferred is recomposed when it comes near.
-      if ((resizing.has(el) || deferred.has(el)) && !(job & CONTENT)) continue;
+      if ((resizing.has(el) || deferred.has(el) || (fontsLoading && !nearby.has(el))) && !(job & CONTENT)) continue;
       nearby.delete(el); viewport?.unobserve(el);
       process(el, job);
       // An idle callback that fired on its timeout reports no time remaining;
@@ -1048,7 +1068,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   const refresh = () => {
     if (stopped) return;
     discover();
-    for (const el of owned) enqueue(el, KEY | VERIFY);
+    for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
   };
   // The window's resize event runs before the frame's layout: guard what is
@@ -1062,25 +1082,28 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const changed = widthChanged(visible);
     guard(changed);
     for (const el of changed) resizeStarted(el);
-    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY);
+    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY, visible.includes(el));
     schedule();
   };
   const fontsChanged = () => {
     if (stopped) return;
     discover();
-    for (const el of owned) enqueue(el, KEY | VERIFY);
+    for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
   };
-  // Owned text a transition or animation ended on, inside or around.
+  // Owned text a transition or animation ended on, inside or around. The key
+  // holds the final computed metrics; a composition made mid-transition holds
+  // intermediate ones, so a recheck is enough (an animation on <body> must not
+  // measure every block).
   const metricsChanged = (target: Element) => {
     if (stopped) return;
-    for (const el of ownedWithin(target)) enqueue(el, VERIFY);
-    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, VERIFY);
+    for (const el of ownedWithin(target)) recheck(el, KEY);
+    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) recheck(el, KEY);
     schedule();
   };
   const stylesChanged = () => {
     if (stopped) return;
-    for (const el of owned) enqueue(el, KEY);
+    for (const el of owned) recheck(el, KEY);
     schedule();
   };
   // Translation started: step aside at once, before the translator fills the
@@ -1097,7 +1120,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // A content-visibility:auto section scrolled into range: its text can be measured now.
   const visibilityChanged = (target: Element) => {
     if (stopped) return;
-    for (const el of ownedWithin(target)) enqueue(el, KEY);
+    for (const el of ownedWithin(target)) recheck(el, KEY);
     schedule();
   };
   doc.fonts.ready.then(() => {
