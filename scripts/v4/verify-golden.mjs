@@ -224,6 +224,11 @@ const tradeOffs = {
   // tight-line trade, to be retuned in 4.4). Unbinding "10 g" at a line end
   // made that layout eligible here.
   'recipe@320/TypesetFixture': 'weak line end chosen over a 97% line (tight-line trade, 4.4)',
+  // C13 reads "U.S." before a capitalized noun ("the U.S. Health officials")
+  // as mid-sentence, so ending a line on the next sentence's first word costs
+  // nothing: the layout strands "Health" and ends another line on "than"
+  // (recorded in the CHANGELOG with the sweep's counts; to be revisited in 4.4).
+  'initialism-end@320/TypesetFixture': 'opener stranded after a sentence-final initialism (C13, recorded, 4.4)',
 };
 
 /** @param {{ name: string, engine: any, executablePath?: string }} config */

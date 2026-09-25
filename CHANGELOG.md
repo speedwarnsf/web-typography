@@ -22,11 +22,11 @@ changes only where 4.2.0 had a verified defect; each change is listed under
 Every count compares the published 4.2.0 build with the 4.3.0 candidate, in
 the same pages, in Chromium, WebKit and Firefox:
 
-- `scripts/v4/verify-golden.mjs`: 3,868 cells per engine (85 corpus
+- `scripts/v4/verify-golden.mjs`: 3,932 cells per engine (85 corpus
   paragraphs at 240, 320, 400 and 560 px in Georgia and the bundled Fraunces,
   plain, with a link and emphasis, with React's server-rendering comment
   separators, through the legacy renderer, with quotes and hanging, as
-  titles and justified, plus a 29-paragraph adversarial set).
+  titles and justified, plus a 33-paragraph adversarial set).
   A cell changes when its outcome, finishing features, breaks or characters
   differ.
 - A golden A/B of 316 blocks per engine (audit fixture, 40 corpus
@@ -165,22 +165,38 @@ Outside the changes below, 0 of these differ in any engine.
   head that takes a roman numeral ("World War I", "Phase I", "Title I") or a
   name after a regnal title ("King Henry I"), never after any other
   capitalized word ("In March I", "At Kaiser I"). Golden diff: 0 of 2,724
-  corpus cells per engine (the corpus has none of these constructions); 53
-  (Chromium, Firefox) or 55 (WebKit) of 232 cells of the new adversarial set
-  (`tests/v4-corpus-adversarial.json`, 29 paragraphs), and 50 of 232 through
+  corpus cells per engine (the corpus has none of these constructions); 63
+  (Chromium, Firefox) or 64 (WebKit) of 264 cells of the new adversarial set
+  (`tests/v4-corpus-adversarial.json`, 33 paragraphs), and 55 of 264 through
   the legacy renderer. On that set, line-end review items (the C16 audit)
-  fall from 137 under 4.2.0 to 92 (WebKit 135 to 92), against 426 in the
+  fall from 152 under 4.2.0 to 110 (WebKit 151 to 110), against 485 in the
   browser's own layout; pairs split at line ends fall from 60 to 21 (WebKit
   58 to 19). Openers stranded after "St." or an initial ("Main St. Doors",
   "vitamin K. Parents") are not charged, since those abbreviations often
   continue a sentence: 8 such line ends in the adversarial set where 4.2.0,
-  which read every period as a sentence end, had none. The binding is a trade, not a free win: across 105 widths (240
-  to 760 px) of the first 20 of those paragraphs, split pairs fall by about
-  86% (797 to 113 in Chromium) while weak line ends rise by about 7% (554 to
-  591), because a split pair costs what a weak line end costs. One recorded
-  trade-off at the golden widths: at 320 px in Fraunces the recipe paragraph
-  ends a line on "the", which neither the browser nor 4.2.0 does (the
-  tight-line ranking, to be retuned in 4.4). Dropping 4.2.0's false sentence
+  which read every period as a sentence end, had none. The same holds after
+  a dotted initialism, a company suffix or "Jr." that ends a sentence before
+  a capitalized noun ("across the U.S. Health officials", "Novagen Inc.
+  Shares", "King Jr. Organizers"), which reads as mid-sentence, and there
+  4.3 strands the opener more often than 4.2.0 and than the browser: in a
+  sweep of seven such sentences at 131 widths (280 to 800 px) in Georgia,
+  Fraunces and Arial, the next sentence's first word ends a line in 483 of
+  2,751 cells in Chromium (WebKit 478, Firefox 483), against 302 (300 in
+  Firefox) in the browser's own layout and 51 (WebKit 50) under 4.2.0, 332
+  (WebKit 339) of them where neither does. The C16 audit does not report
+  these line ends. The four adversarial paragraphs added for them have 12
+  (WebKit 11) such line ends (native 5, 4.2.0 2), and at 320 px in Fraunces
+  "…across the U.S. Health" also adds a weak line end (a recorded
+  trade-off). Telling the two readings apart needs a continuation list
+  ("U.S. Army" against "U.S. Health"), left for 4.4. The binding is a
+  trade, not a free win: across 105 widths (240 to 760 px) of the first 20
+  of those paragraphs, split pairs fall by about 86% (797 to 113 in
+  Chromium) while weak line ends rise by about 7% (554 to 591), because a
+  split pair costs what a weak line end costs. Two recorded trade-offs at
+  the golden widths: that "U.S. Health" paragraph, and at 320 px in
+  Fraunces the recipe paragraph, which ends a line on "the" where neither
+  the browser nor 4.2.0 does (the tight-line ranking, to be retuned in
+  4.4). Dropping 4.2.0's false sentence
   ends also moves breaks where no pair is involved, since their penalties had
   steered some layouts: at the phone widths of 288 and 343 px, the review
   found 16 (Chromium), 21 (WebKit) and 18 (Firefox) changed cells without a
