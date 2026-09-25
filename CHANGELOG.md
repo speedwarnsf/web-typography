@@ -380,10 +380,16 @@ table.
   starves on a busy page: text near the viewport composes in the next task,
   an idle callback that fires on its timeout still gets its 8 ms budget, and
   offscreen blocks wait until they come near after a resize (P2).
-- Ancestor class and style changes cost nothing when layout is unchanged: 30
-  class toggles on an ancestor of 200 paragraphs recomposed 26 times with
-  9,984 DOM mutation records in 4.2.0, and 0 times with 30 records in 4.3.0
-  (P3).
+- Ancestor class and style changes recompose nothing when layout is
+  unchanged: 30 class toggles on an ancestor of 200 paragraphs recomposed 26
+  times with 9,984 DOM mutation records in 4.2.0, and 0 times with 30
+  records in 4.3.0 (P3). Each such change still rechecks a layout key for
+  every block inside it (about 15 to 23 ms for 1,000 paragraphs at 4x CPU).
+  A translation or fade (only `transform: translate(...)`, `translate` or
+  `opacity` changed), which JavaScript animations write every frame, is not
+  rechecked at all: 120 frames of an ancestor translation over 1,000
+  paragraphs at 4x CPU in Chromium average 8.3 ms with none over 20 ms (the
+  first 4.3 candidate: 22.8 ms, 84 of 118 over 20 ms).
 - React screens (P4, P5): pushing 38 `TypesetText` blocks commits in 19 ms
   at 4x CPU (4.2.0: 160 ms) and 7 ms at 1x (40 ms); 1,000 blocks commit in
   19 ms (1,446 ms) with an INP proxy of 80 ms (1,584 ms). 38

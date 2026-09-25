@@ -190,7 +190,9 @@ function modeOf(el: HTMLElement, options: Options): Mode {
 
 /** Everything that decides line layout, read from computed values rather than
  * from attribute strings: an ancestor's class or style counts only through
- * what it computes to. Cheap enough to recheck on every ancestor mutation. */
+ * what it computes to. Cheap per block, but an ancestor change rechecks every
+ * block inside it (about 15 ms for 1,000 blocks at 4x CPU), so a translation
+ * or fade, written every frame by an animation, is not rechecked (movedOnly). */
 function layoutKey(el: HTMLElement): string {
   const cs = getComputedStyle(el);
   const box = el.getBoundingClientRect();
@@ -214,8 +216,24 @@ function layoutKey(el: HTMLElement): string {
     cs.display === 'inline-block' && el.parentElement ? contentWidth(el.parentElement) : null,
     el.closest('[lang]')?.getAttribute('lang'), el.dataset.typesetMode,
     getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content,
-    el.querySelector(':not([data-ts-break]):not(.ts-line)') ? richFingerprint(el) : '',
+    // Author descendants only: the engine's own tracking spans need no fingerprint.
+    el.querySelector(':not([data-ts-break]):not(.ts-line):not([data-ts-track])') ? richFingerprint(el) : '',
   ]);
+}
+/** Whether a style attribute changed only by a translation (the transform or
+ * translate property) or opacity: a JavaScript animation (a screen push,
+ * parallax, a smooth-scroll wrapper) writes one every frame, and none of them
+ * moves a line. A scale, rotation or any other declaration is a real change. */
+function movedOnly(before: string | null, after: string | null): boolean {
+  const declarations = (text: string | null) => new Map((text || '').split(';').map(part => part.trim()).filter(Boolean)
+    .map(part => { const at = part.indexOf(':'); return at < 0 ? [part, ''] : [part.slice(0, at).trim().toLowerCase(), part.slice(at + 1).trim()]; }));
+  const a = declarations(before), b = declarations(after);
+  for (const name of new Set([...a.keys(), ...b.keys()])) {
+    if (a.get(name) === b.get(name) || name === 'opacity' || name === 'translate') continue;
+    if (name === 'transform' && [a.get(name), b.get(name)].every(value => value === undefined || /^(?:none|(?:translate(?:3d|x|y|z)?\([^()]*\)\s*)+)$/iu.test(value))) continue;
+    return false;
+  }
+  return true;
 }
 function optionsKey(options: Options): string {
   return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
@@ -1055,7 +1073,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   /** Class, style and visibility attributes restyle a subtree. Owned text in it
    * gets a layout-key recheck instead of a recomposition: most changes (a menu
    * class, a transform, a scroll-linked variable) leave every line unchanged. */
-  const attributesChanged = (target: HTMLElement) => {
+  const attributesChanged = (target: HTMLElement, newMatches: boolean) => {
     const affected = ownedWithin(target);
     // A width this change sets (a sidebar drag, a container animation):
     // guard the frame about to paint, and recompose once it settles.
@@ -1074,10 +1092,11 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (shown.length) composeNow(shown);
     // An attribute on an author element inside owned text is new markup.
     for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
-    discover(target);
+    // Only an attribute other than style can make new elements match.
+    if (newMatches) discover(target);
   };
   const observer = new MutationObserver(records => {
-    const restyled = new Set<HTMLElement>();
+    const restyled = new Set<HTMLElement>(), matching = new Set<HTMLElement>();
     const stale = new Set<HTMLElement>(), written = new Set<Node>();
     // Owned text that may now be in a live region: moved into one (a toast),
     // given one, or under a region that turned live.
@@ -1093,7 +1112,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       // handled per node in attributesChanged, whose recheck releases what is
       // no longer eligible.
       if (record.type === 'attributes') {
+        if (record.attributeName === 'style' && movedOnly(record.oldValue, target.getAttribute('style'))) continue;
         restyled.add(target);
+        if (record.attributeName !== 'style') matching.add(target);
         if (record.attributeName === 'aria-live' || record.attributeName === 'role') for (const el of ownedWithin(target)) live.add(el);
         continue;
       }
@@ -1132,7 +1153,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       observe();
     }
     // Each restyled node once per delivery, however many records it produced.
-    for (const target of restyled) attributesChanged(target);
+    for (const target of restyled) attributesChanged(target, matching.has(target));
     schedule();
   });
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
@@ -1214,9 +1235,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     parents.delete(el);
   };
   function observe() {
-    observer.observe(root, { subtree: true, childList: true, characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', 'aria-live', 'role', '_msttexthash', '_msthash'] });
+    observer.observe(root, { subtree: true, childList: true, characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'data-no-typeset', 'data-typeset', 'data-typeset-mode', 'aria-live', 'role', '_msttexthash', '_msthash'] });
     if (isElement(root)) for (let ancestor = root.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      observer.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'aria-live', 'role'] });
+      observer.observe(ancestor, { attributes: true, attributeOldValue: true, attributeFilter: ['class', 'style', 'lang', 'hidden', 'open', 'aria-live', 'role'] });
     }
   }
   /** One job. Rechecks are a computed-style read; only a changed key, changed

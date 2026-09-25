@@ -1,7 +1,8 @@
 // @ts-check
 // P3: ancestor mutations that leave every line unchanged (a transform
-// animation, a class with no styles, a scroll-linked custom property) must not
-// recompose anything; ancestor changes that do change text metrics (a theme
+// animation, a class with no styles, a scroll-linked custom property, a fade)
+// must not recompose anything, and a translation or fade must not even
+// trigger a recheck pass; ancestor changes that do change text metrics (a theme
 // font, a vw font size under a window resize, scale, zoom) must recompose, with
 // rendered lines equal to generated breaks + 1. Removing unrelated nodes must
 // not scan every claimed element.
@@ -75,18 +76,21 @@ for (const { name, engine, executablePath } of browsers) {
       ['60 frames of an ancestor transform animation', `frames(60, i => { document.getElementById('wrap').style.transform = 'translate(' + (i % 12) + 'px, ' + (i % 5) + 'px)'; })`],
       ['30 toggles of a body class with no styles', `frames(30, () => document.body.classList.toggle('menu-open'))`],
       ['60 frames of a scroll-linked custom property on html', `frames(60, i => document.documentElement.style.setProperty('--scroll', String(i / 60)))`],
+      ['60 frames of an ancestor fade and slide', `frames(60, i => { const s = document.getElementById('shell').style; s.opacity = String(1 - i / 120); s.translate = (i % 7) + 'px 0'; })`],
     ])) {
       const result = await tab.evaluate(async run => {
         const w = /** @type {any} */ (window);
-        const before = w.controller.stats.compositions;
+        const before = w.controller.stats.compositions, passes = w.controller.stats.passes;
         const html = [...document.querySelectorAll('article p')].map(p => p.innerHTML).join('');
         await (0, eval)(run);
         await w.quiet();
-        return { compositions: w.controller.stats.compositions - before, unchanged: html === [...document.querySelectorAll('article p')].map(p => p.innerHTML).join(''), stale: w.stale() };
+        return { compositions: w.controller.stats.compositions - before, passes: w.controller.stats.passes - passes, unchanged: html === [...document.querySelectorAll('article p')].map(p => p.innerHTML).join(''), stale: w.stale() };
       }, run);
       check(`${label}: 0 compositions`, result.compositions === 0 && result.unchanged && result.stale === 0, result);
+      // A translation or fade moves no line: not even a layout-key recheck.
+      if (/transform|fade/.test(label)) check(`${label}: no recheck pass at all`, result.passes === 0, result);
     }
-    await tab.evaluate(() => { const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap')); wrap.style.transform = ''; document.documentElement.style.removeProperty('--scroll'); });
+    await tab.evaluate(() => { const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap')); wrap.style.transform = ''; document.documentElement.style.removeProperty('--scroll'); const shell = /** @type {HTMLElement} */ (document.getElementById('shell')); shell.style.opacity = ''; shell.style.translate = ''; });
 
     // Changes that alter text metrics through an ancestor.
     const theme = await tab.evaluate(async () => {
