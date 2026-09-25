@@ -12,12 +12,12 @@
     },
     {
       "script": "verify-break-semantics",
-      "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$",
+      "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$|: a line that starts at a link breaks before the link: never first inside it, no empty stub on the line before$",
       "modes": [
         "release"
       ],
       "awaiting": "the 4.3.0 release cut",
-      "reason": "test:release runs the committed 4.2.0 dist, which hides generated breaks, uses inline-block markers and sets role=text in renderFrozenLines (C2)."
+      "reason": "test:release runs the committed 4.2.0 dist, which hides generated breaks, uses inline-block markers and sets role=text in renderFrozenLines (C2), and puts a break that starts a line at a link first inside the link."
     },
     {
       "script": "verify-strict-csp",
@@ -30,12 +30,12 @@
     },
     {
       "script": "verify-copy-privacy",
-      "label": ": nothing hidden reaches the clipboard that native copy leaves out$",
+      "label": ": nothing hidden reaches the clipboard that native copy leaves out$|: no engine markers, data-ts or adapter attributes, or wrap override in the HTML$|^select all: the author's inline styles survive, including a text-wrap-style the engine overrode$",
       "modes": [
         "release"
       ],
       "awaiting": "the 4.3.0 release cut",
-      "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11)."
+      "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11), and copies its text-wrap-style override and data-ts-stale with each host."
     },
     {
       "script": "verify-framework-text",
@@ -99,7 +99,7 @@
     },
     {
       "script": "verify-package-contents",
-      "label": "^(React adapters declare their public React types|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.75 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
+      "label": "^(React adapters declare their public React types|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.8 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
       "modes": [
         "release"
       ],
