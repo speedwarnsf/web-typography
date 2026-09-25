@@ -10,8 +10,10 @@
 // options. For every cell the suite records what each build produced: the
 // outcome, the finish features and the element's markup after composition,
 // which carries every break, spacing marker and tracking run. Cells must be
-// byte-identical to 4.2.0 unless the text contains a construction a 4.3
-// rendering change (CHANGELOG, "Rendering changes") is about; those cells are
+// identical to 4.2.0, apart from the attribute-only accessibility and break
+// display changes (attributeNeutral, counted apart), unless the text contains
+// a construction a 4.3 rendering change (CHANGELOG, "Rendering changes") is
+// about; those cells are
 // counted and must still keep the paragraph's promises: no overflow, no new
 // orphan, and the same decision in every engine where 4.2.0 agreed.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -123,6 +125,23 @@ function compose({ cells, build, baseline }) {
 }
 
 /**
+ * Markup with the 4.3 changes that alter attributes only, never a break, a
+ * width or a character: C2 exposes generated breaks to assistive technology
+ * (no aria-hidden on a break; spacing and hanging markers display inline, not
+ * inline-block) and C9 routes every break's display through
+ * --ts-break-display. verify-break-semantics and verify-print-resize check
+ * those attributes; here both builds' markup is compared without them, and
+ * the cells they alone change are counted apart.
+ * @param {string} markup
+ */
+function attributeNeutral(markup) {
+  return markup
+    .replace(/<br data-ts-break="" aria-hidden="true"/g, '<br data-ts-break=""')
+    .replace(/(<br data-ts-break=""[^>]*? style=")display: (?:var\(--ts-break-display, inline\)|inline)(?: !important)?;/g, '$1display: BREAK;')
+    .replace(/(<span data-ts-break=""[^>]*? style=")display: inline-block;/g, '$1display: inline;');
+}
+
+/**
  * The 4.3 rendering changes that apply to a cell. A cell none of them applies
  * to must be byte-identical to 4.2.0.
  * @param {Cell} cell
@@ -209,9 +228,10 @@ for (const { name, base, cand } of runs) {
   const variants = [...new Set(cells.map(cell => cell.variant))];
   for (const variant of variants) {
     const pairs = cand.map((c, i) => ({ c, b: base[i], cell: /** @type {Cell} */ (byId.get(c.id)) })).filter(p => p.cell.variant === variant);
-    const differ = pairs.filter(({ c, b }) => c.outcome !== b.outcome || c.markup !== b.markup || JSON.stringify(c.features) !== JSON.stringify(b.features));
+    const differ = pairs.filter(({ c, b }) => c.outcome !== b.outcome || attributeNeutral(c.markup) !== attributeNeutral(b.markup) || JSON.stringify(c.features) !== JSON.stringify(b.features));
+    const attributesOnly = pairs.filter(({ c, b }) => c.markup !== b.markup && !differ.some(d => d.c === c)).length;
     const unexplained = differ.filter(({ cell }) => !changeReasons(cell).length);
-    report.counts[`${name} ${variant}`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length };
+    report.counts[`${name} ${variant}`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length, attributesOnly };
     for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: changeReasons(cell), baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
     check(name, `${variant}: identical to 4.2.0 unless a rendering change applies`, unexplained.length === 0,
       unexplained.length ? unexplained.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: [b.outcome, ...b.lines], subject: [c.outcome, ...c.lines] })) : { cells: pairs.length, changed: differ.length });
@@ -247,7 +267,7 @@ for (const { name, base, cand } of runs) {
   }
   // A recorded trade-off that no longer occurs must be removed from the list.
   for (const key of Object.keys(tradeOffs)) {
-    const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (c.markup !== base[i].markup || c.outcome !== base[i].outcome));
+    const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (attributeNeutral(c.markup) !== attributeNeutral(base[i].markup) || c.outcome !== base[i].outcome));
     check(name, `recorded trade-off still occurs: ${key}`, occurs);
   }
 }
@@ -274,7 +294,8 @@ if (runs.length > 1) {
 if (values.dump) await writeFile(values.dump, JSON.stringify({ cells, runs }));
 report.summary = { cells: cells.length, engines: runs.map(run => run.name), seconds: Math.round((performance.now() - started) / 1000),
   checks: report.checks.length, failed: report.checks.filter(c => !c.pass).length, errors: report.errors.length,
-  changed: Object.fromEntries(Object.entries(report.counts).map(([key, value]) => [key, value.changed])) };
+  changed: Object.fromEntries(Object.entries(report.counts).map(([key, value]) => [key, value.changed])),
+  attributesOnly: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => 'attributesOnly' in value).map(([key, value]) => [key, value.attributesOnly])) };
 await writeFile(values.out, JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ ...report.summary, failures: report.checks.filter(c => !c.pass).slice(0, 8), errors: report.errors.slice(0, 4) }, null, 2));
 if (report.summary.failed || report.summary.errors || !runs.length) process.exitCode = 1;
