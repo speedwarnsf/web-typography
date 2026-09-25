@@ -129,7 +129,7 @@ try {
   for (const file of await readdir(join(staging, distDir))) await copyFile(join(staging, distDir, file), join(archive, file));
   for (const file of recipe.archivedFiles) await copyFile(join(staging, pkgDir, file), join(archive, file));
   await copyFile(join(staging, 'pack', pack.filename), join(archive, pack.filename));
-  if (values.summary) await writeFile(join(archive, 'index.html'), archivePage(version, values.summary, stable));
+  if (values.summary) await writeFile(join(archive, 'index.html'), archivePage(version, values.summary, stable, recipe));
   await buildSite({ root: staging, distDir, siteDir: 'site', version, recipe });
   const go = await readFile(join(staging, 'site/go.js'));
 
@@ -236,10 +236,13 @@ try {
 
 
 /**
- * The archive landing page, in the form 4.1.0 and 4.2.0 shipped.
+ * The archive landing page, in the form 4.1.0 and 4.2.0 shipped. From the
+ * 4.3 recipe its install line pins the exact version (npm i -E), as every
+ * other install line does; the page is immutable once cut.
  * @param {string} v @param {string} summary @param {string[]} earlier stable releases before v, ascending
+ * @param {import('./build-recipe.mjs').Recipe} recipe
  */
-function archivePage(v, summary, earlier) {
+function archivePage(v, summary, earlier, recipe) {
   const major = Number(v.split('.')[0]);
   const links = [];
   for (const old of [...earlier].reverse()) {
@@ -251,5 +254,5 @@ function archivePage(v, summary, earlier) {
     if (last) links.push(`<a href="/releases/${last}/">V${m} archive</a>`);
   }
   links.push('<a href="/">typeset.us</a>');
-  return `<!doctype html><html lang="en"><base href="/releases/${v}/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Typeset ${v}</title><style>body{font:18px/1.6 system-ui;max-width:48rem;margin:3rem auto;padding:0 1.5rem;background:#101010;color:#eee}a{color:#a8d6b2}h1{font-size:2rem}code{overflow-wrap:anywhere}</style><main><h1>Typeset ${v}</h1><p>${summary}</p><p><code>npm install typeset.us@${v}</code></p><ul><li><a href="README.md">Installation and selector targeting</a></li><li><a href="MIGRATION.md">Migration and rollback</a></li><li><a href="SUPPORT.md">Support range and testing limits</a></li><li><a href="for-agents.md">Agent integration contract</a></li><li><a href="capabilities.json">Machine-readable capabilities</a></li><li><a href="typeset.us-${v}.tgz">npm package download</a></li><li><a href="/go@${v}.js">Automatic website loader</a></li><li><a href="index.js">ES module</a></li><li><a href="typeset.global.js">Browser global</a></li><li><a href="styles.css">Optional native list styles</a></li><li><a href="manifest.json">Package artifact integrity hashes</a></li><li><a href="/sri.json">Website loader integrity hashes</a></li></ul><p>${links.join(' / ')}</p></main></html>\n`;
+  return `<!doctype html><html lang="en"><base href="/releases/${v}/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Typeset ${v}</title><style>body{font:18px/1.6 system-ui;max-width:48rem;margin:3rem auto;padding:0 1.5rem;background:#101010;color:#eee}a{color:#a8d6b2}h1{font-size:2rem}code{overflow-wrap:anywhere}</style><main><h1>Typeset ${v}</h1><p>${summary}</p><p><code>${recipe.line === '4.2' ? 'npm install' : 'npm i -E'} typeset.us@${v}</code></p><ul><li><a href="README.md">Installation and selector targeting</a></li><li><a href="MIGRATION.md">Migration and rollback</a></li><li><a href="SUPPORT.md">Support range and testing limits</a></li><li><a href="for-agents.md">Agent integration contract</a></li><li><a href="capabilities.json">Machine-readable capabilities</a></li><li><a href="typeset.us-${v}.tgz">npm package download</a></li><li><a href="/go@${v}.js">Automatic website loader</a></li><li><a href="index.js">ES module</a></li><li><a href="typeset.global.js">Browser global</a></li><li><a href="styles.css">Optional native list styles</a></li><li><a href="manifest.json">Package artifact integrity hashes</a></li><li><a href="/sri.json">Website loader integrity hashes</a></li></ul><p>${links.join(' / ')}</p></main></html>\n`;
 }
