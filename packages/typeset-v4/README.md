@@ -28,8 +28,8 @@ On the typeset.us homepage demo, across 96 widths from 250 to 345 px, short
 words left hanging at line ends went from 215 to 38 against Chromium's
 `text-wrap: pretty`, and from 216 to 28 against Safari's. Firefox left a
 one-word last line at 30 of the 96 widths; Typeset left none, in all three.
-(Measured with 4.2.0; scripts/field/sweep-homepage.mjs reproduces it.)
-<!-- TODO(docs-sync): re-run the sweep on the 4.3.0 candidate and update these numbers. -->
+(Measured with the 4.3.0 candidate, which gives the same counts as 4.2.0;
+scripts/field/sweep-homepage.mjs reproduces it.)
 
 ## Install
 
@@ -75,11 +75,21 @@ import { TypesetText, TypesetRichText } from 'typeset.us/react';
 </TypesetRichText>
 ```
 
-`as` can be `p`, `h1` to `h6` or `span`.
-<!-- TODO(docs-sync): K5 widens `as` and adds refs and onResult; list them. -->
-Never point `mount()` or a script tag at text a framework updates; use the
-adapter for that text. For Vue, Svelte, Astro and plain HTML, see
-https://typeset.us/install/frameworks.
+`as` is the host element: `p` (default), `h1` to `h6`, `span`, `div`, `li`,
+`blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
+`legend` or `summary`. A `ref` resolves to that element. `onResult(result)`
+receives each composition's `Result`, as `typeset()` returns it.
+`priority="sync"` composes in the React commit; by default a block on screen
+composes before its first paint and offscreen blocks follow in idle time.
+Under jsdom or happy-dom (Jest, Vitest) nothing can be measured, so both
+adapters render the text unchanged, report `native:environment` and never
+throw. Both take the options below as props.
+
+Give each piece of text one owner: the adapter, `mount()` or a script tag.
+`mount()` and the loaders keep text that Svelte, Vue, Solid, Lit or React
+update in place correct (SUPPORT.md lists the limits), but text React
+renders is best set with the adapters. For Vue, Svelte, Astro and plain
+HTML, see https://typeset.us/install/frameworks.
 
 `-E` saves the exact version. A minor release changes default rendering only
 to fix a verified defect (see [Stability](#stability)).
@@ -94,7 +104,7 @@ attributes (last table).
 | `mode` | `'body'`; `'title'` inside h1 to h6 | `'title'` and `'heading'` balance short display text and never add a line. `'body'` composes paragraphs. `'ui'` never composes. Also `data-typeset-mode`. |
 | `density` | not set | Not set: body text keeps the browser's line count, or uses one more line to fix a one-word last line or a stranded sentence opener. `'compact'`: one more line only for a one-word last line. `'editorial'`: one more line for better phrasing. |
 | `maxLines` | not set | Most lines a result may use; a longer one is declined (`native:line-budget`). |
-| `keep` | not set | Phrases to keep on one line, such as `['New York']`. Titles strongly avoid breaking inside them. <!-- TODO(docs-sync): C14 extends keep to body text. --> |
+| `keep` | not set | Phrases to keep on one line, such as `['New York']`, matched ignoring case and surrounding punctuation. A phrase that fits the measure is never split; one the browser splits can earn one extra line (not with `density: 'compact'`). Titles keep phrases within their fewest lines. |
 | `lineBreaks` | `'unicode'` | Unicode 17 line-break rules with English, French, German and Spanish preferences from `lang`. `'legacy'` is the earlier English-only path, kept for comparison. |
 | `smartQuotes` | `false` | `'en'` turns straight quotes and apostrophes curly in English text. Changes the copied text. |
 | `opticalHanging` | `false` | `true` hangs opening quotes and capitals into the margin when they fit. |
@@ -103,7 +113,19 @@ attributes (last table).
 | `contour` | `'finished'` | Ranks candidates by their shape after spacing. `'natural'` is the earlier ranking. |
 | `text` | | For framework adapters: the current author text. |
 
-<!-- TODO(docs-sync): C9 adds a break display option and K11 validates options; add their rows. -->
+In development builds an invalid option value, an unknown option or a
+non-string selector logs one `console.warn` (for example `[typeset]
+smartQuotes must be "en" or false (received true)`) and otherwise behaves as
+before. Production bundles leave the checks out; SUPPORT.md lists the
+messages.
+
+Two CSS hooks are supported. Every generated break is displayed through
+`--ts-break-display` (default `inline`): print CSS sets it to `none`, so
+printed text wraps natively at the paper's width; set it back to `inline`
+to print a composition. While a block's width is changing and its composed
+lines no longer fit, it carries `data-ts-stale` and shows native wrapping
+until it is recomposed. `dist/styles.css` has the rules; the engine also
+installs them itself.
 
 | Script attribute | Default | What it does |
 | --- | --- | --- |
@@ -158,43 +180,50 @@ browser and has no Node requirement.
 
 Composition runs in the browser, on the main thread.
 
-- About 5 to 8 ms per paragraph on an Apple M2 Pro in Chromium, and about
-  25 ms with the CPU slowed 4x to approximate a mid-range phone.
+- About 5 ms per paragraph (median; 15 ms at the 95th percentile) on an
+  Apple M2 Pro in Chromium, about 21 ms with the CPU slowed 4x to
+  approximate a mid-range phone, and about 19 ms in WebKit.
 - `mount()` composes what is on screen first: the first viewport of a
-  200-paragraph article was done in about 50 ms (210 ms at 4x), with the rest
-  finished in the background in batches that yield to the page.
-- Download, gzip: 43.2 KB for `go@4.3.0.js` or `auto.js`, 37.9 KB for a
-  bundle that imports only `mount`, 38.2 KB for `TypesetText`. No runtime
+  200-paragraph article was done in about 55 ms (230 ms at 4x), with the
+  rest finished in the background in batches that yield to the page.
+- React: one registry per document serves every block, and a screen of 38
+  `TypesetText` blocks commits in about 20 ms at 4x CPU. Re-renders that
+  change nothing write nothing.
+- Download, gzip: 52.1 KB for `go@4.3.0.js` or `auto.js`, 45.8 KB for a
+  bundle that imports only `mount`, 45.5 KB for `TypesetText`. No runtime
   dependencies.
 
-The timings are 4.2.0 figures from `npm run bench`, and the sizes are this
-release's files. Full tables and the method:
+These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the
+same machine. Full tables, the method and the comparison:
 https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
-<!-- TODO(docs-sync): replace with the 4.3.0 bench after P2-P6 land. -->
 
 ## What it won't do
 
 - **Hyphenation.** Typeset never inserts hyphens, and leaves text with
   `hyphens: auto` or soft hyphens to the browser.
-- **Justified text.** Typeset sets ragged-right text.
-  <!-- TODO(docs-sync): C3 declines justified paragraphs with native:justify; confirm. -->
+- **Justified text.** Typeset sets ragged-right text. A paragraph set with
+  `text-align: justify` (or a `text-align-last` that differs from
+  `text-align`) keeps the browser's layout and reports `native:justify`.
   For justified text use CSS `text-align: justify` with `hyphens: auto`.
 - **Right-to-left, vertical, and non-Latin scripts.** Arabic, Hebrew, CJK
   and other scripts keep the browser's layout (`native:script`,
   `native:direction`).
 - **Languages other than English, French, German and Spanish.** Other
   declared languages keep the browser's layout.
-- **Editable text, or text a framework updates behind its back.** Use the
-  React adapters, or leave it native.
+- **Editable text and live regions.** Editable content keeps the browser's
+  layout, and so does text inside an `aria-live` region or a `status`,
+  `alert`, `log`, `marquee` or `timer` role (`native:live-region`), whose
+  every change a screen reader would announce.
 
 ## Browsers
 
-Needs `Intl.Segmenter`, `ResizeObserver`, `MutationObserver`,
-`document.fonts` and CSS `text-wrap`: in practice Chrome and Edge 114, Safari
-17.4 and Firefox 125, or later. Tested with Playwright's Chromium 149,
-WebKit 26.5 and Firefox 151. Physical phones and screen readers are not
+Composes where `Intl.Segmenter`, `ResizeObserver` and `MutationObserver`
+exist. The supported browsers also have CSS `text-wrap`: Chrome and Edge
+114, Safari 17.4 and Firefox 125, or later. In an older engine, or a DOM emulation such as jsdom, the text keeps
+the browser's layout with the outcome `native:environment`, and nothing
+throws, including at import. Tested with Playwright's Chromium 149, WebKit
+26.5 and Firefox 151. Physical phones and spoken screen-reader output are not
 yet part of the automated tests; SUPPORT.md lists exactly what is.
-<!-- TODO(docs-sync): K4 makes older engines keep native layout without throwing; say so. -->
 
 ## Accessibility
 
@@ -202,9 +231,17 @@ Typeset checks the accessibility tree the browser actually builds, not a
 DOM approximation. `scripts/v4/verify-native-ax.mjs` reads Chromium's tree
 (every word of every composed paragraph, and every link and heading name) and
 WebKit's link and heading names on every test run, and Firefox's tree
-nightly, and requires them to match the source text. `auditJSON()` fails if a generated break hides a word space
-from assistive technology.
-<!-- TODO(docs-sync): after C2, state what screen readers hear at generated breaks (for example that each is a line boundary in browse mode) and link the VoiceOver/NVDA note. -->
+nightly, and requires them to match the source text: in 4.3.0 every word
+of every composed paragraph, link and heading matches in all three engines
+(4.2.0 left 581 words unmatched in Chromium's tree and 381 in Firefox's,
+and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
+WebKit). A generated break that replaces a space is exposed to assistive
+technology, so a screen reader meets a line boundary there, as at any line
+end, and reads the words apart; a break after a hyphen stays hidden, so
+"public-health" is still one word. `auditJSON()` fails if a generated break
+hides a word space. Text in live regions is never composed, so status
+messages are not re-announced. Spoken VoiceOver and NVDA output has not
+been checked by a person yet (SUPPORT.md).
 
 ## Recommended CSS
 
@@ -223,9 +260,10 @@ lets go.
 
 More answers: https://typeset.us/faq
 
-**What do screen readers hear?** The same words as the source. See
-Accessibility above.
-<!-- TODO(docs-sync): true once C2 lands (4.2.0 joined words at generated breaks); confirm with verify-native-ax. -->
+**What do screen readers hear?** The same words as the source, with a line
+boundary at each generated break (engine accessibility trees are checked in
+Chromium, WebKit and Firefox). 4.2.0 hid its breaks and joined the words
+around them; see Accessibility above.
 
 **Does it cause layout shift?** Almost never. Composition keeps the
 browser's line count; body text may use one more line only to fix a
@@ -238,13 +276,17 @@ only adds line-break elements in the browser, and search engines index the
 same text.
 
 **Copy and paste?** Copying composed text gives the original text, without
-the generated line breaks, in plain text and HTML. Find-in-page and
-`innerText` see a line break at each generated break (SUPPORT.md, known
-limitations).
-<!-- TODO(docs-sync): update if a newline-free rendering ships. -->
+the generated line breaks, in plain text and HTML, and leaves out hidden
+content just as the browser's own copy does. Find-in-page and `innerText`
+see a line break at each generated break (SUPPORT.md, known limitations).
 
-**Printing, and translation tools?** See SUPPORT.md, known limitations.
-<!-- TODO(docs-sync): C9 (print) and C10 (translated pages) change these; summarise here. -->
+**Printing, and translation tools?** Printed text wraps natively at the
+paper's width (generated breaks are hidden in print; set
+`--ts-break-display: inline` to print a composition). When Google
+Translate, Chrome or Edge translates the page, Typeset removes its breaks
+without touching the text the translator fills, reports
+`native:translated`, and composes again when the page is shown in the
+original language. `TypesetRichText` only pauses. See SUPPORT.md.
 
 **Without JavaScript?** Readers get your CSS, including the
 `text-wrap: pretty` above.

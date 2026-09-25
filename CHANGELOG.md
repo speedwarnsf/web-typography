@@ -12,229 +12,377 @@ Hashes for every published version live in
 
 ## 4.3.0 - Unreleased
 
-### Audit
+4.3.0 follows 4.2.0. It is a minor release: no public API was renamed or
+removed, nothing new is required, and new API is additive. Default rendering
+changes only where 4.2.0 had a verified defect; each change is listed under
+"Rendering changes" with the number of test paragraphs whose output changed.
 
-- `auditJSON()` and `audit()` report two new errors, with `schemaVersion` still 1:
-  `hidden-break`, a generated line break hidden from assistive technology
-  where it replaces a space (the words on either side are read as one), and
-  `isolated-space`, a word space alone beside an inline-block engine marker,
-  which Chromium drops from its accessibility tree. 4.2.0's composed output
-  has both, so audits of composed pages that passed under 4.2.0 can now fail.
-- `issue.target` now resolves: every selector started `html:nth-of-type(0)`
-  and matched nothing. Targets start from a unique id, from `body`, or are
-  `:root`.
-- Line-end reviews follow the compositor's own policy, which removes false
-  positives: a word before sentence punctuation ("…what it was for.") and a
-  letter designator ("type A") are valid line ends; an abbreviation is not a
-  sentence end, so "Dr. Jones" and "8 a.m. Monday" are not stranded openers;
-  untagged text gets no English word lists, as the compositor gives it none
-  (text composed through the legacy break path still does).
-- New review items: `bound-split` (a number and its unit, an honorific and a
-  name, a label and its number, or a word and its letter designator split
-  across lines), `split-ellipsis`, `line-initial-punctuation` (a line opening
-  with a dash or closing punctuation) and `regressed-vs-native` (a composed
-  element with more line-end reviews than its native layout had; 11 of 671
-  composed corpus cells at 4 widths in Chromium under 4.3). New error:
-  `alignment-lost` (see Rendering changes). Field shapes and `schemaVersion`
-  are unchanged.
-- A third new error, `stale-layout`: a composed block whose rendered line count
-  differs from its composed lines (breaks + 1), because a font, spacing or size
-  changed after it was composed. 4.2.0 left such blocks double-wrapped and
-  its audit passed them.
+### Rendering changes
 
-### React adapters
+Every count compares the published 4.2.0 build with the 4.3.0 candidate, in
+the same pages, in Chromium, WebKit and Firefox:
 
-- `TypesetText` and `TypesetRichText` recompose only on real changes. An
-  inline `keep={[...]}` array, fresh JSX children, inline style objects and
-  callbacks are compared by value, so a parent re-render that changes nothing
-  writes nothing: 100 such re-renders of 6 + 6 blocks went from 119,736 DOM
-  node writes to 0. `TypesetRichText` checks a computed layout key (text,
-  widths, fonts, and the computed type of the host and its descendants)
-  before replanning, so ancestor transforms and no-op class toggles cost no
-  composition, and it carries an unchanged plan's spacing, tracking and
-  hanging forward after re-verifying them instead of rebuilding them through
-  four commits.
-- During continuous resizing `TypesetRichText` shows native wrapping wherever
-  its composed lines no longer fit (host attribute `data-ts-stale`), and
-  recomposes once the size has held for 100 ms instead of on every frame.
-- The React entry imports `flushSync` from `react-dom` (external, like `react`).
-- One adapter registry per document replaces a controller per block: one
-  MutationObserver, ResizeObserver and IntersectionObserver and one set of
-  font and window listeners for every `TypesetText` and `TypesetRichText`
-  (a 38-block screen created 38 of each). A block on screen composes before
-  its first paint: in the commit while a 6 ms budget (from a learned cost per
-  character) allows, then in the next animation frame; offscreen blocks
-  compose in idle time, nearest first. A prop change of an on-screen block
-  recomposes in its commit. Unmounting no longer restores the discarded host.
-  New prop `priority?: 'auto' | 'sync'`; `'sync'` composes every block in the
-  commit, as 4.2 did. Measured on the V4 benchmark (Chromium, 38-block push):
-  commit 164 to 17 ms, INP proxy 232 to 144 ms and total blocking time 138 to
-  68 ms at 4x CPU; 1,000 blocks at 1x commit in 18 ms instead of 1,463 ms.
-- `ref` on `TypesetText` and `TypesetRichText` resolves to the host element
-  (both are `forwardRef` components; a ref was dropped before, and
-  `TypesetRichText`'s gave its class instance). `as` also accepts `div`, `li`,
-  `blockquote`, `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`,
-  `legend` and `summary`, with `cite`, `colSpan`, `rowSpan`, `headers`,
-  `scope`, `htmlFor` and `value` attributes. New `onResult(result)` reports
-  each composition as a `Result`. New exported types `TypesetTag`,
-  `TypesetAdapterProps` and `Priority`.
-- Nothing throws in test runners or older engines. Under jsdom and happy-dom
-  (Jest, Vitest), and where `Intl.Segmenter`, `ResizeObserver` or
-  `MutationObserver` is missing, `typeset()` and `planRichText()` return and
-  both adapters report the new outcome `native:environment`, `mount()`
-  returns an inert controller, and `document.fonts` is optional. Importing
-  no longer constructs an `Intl.Segmenter` or inflates the Unicode line-break
-  trie (the vendored module now initializes on first use; all 19,338
-  LineBreakTest cases give identical breaks), so a missing API can no longer
-  blank an application at import, and a bundle that imports only
-  `smartQuotes` drops from 11.7 KB to 0.9 KB gzip. The script-tag builds do
-  nothing where there is no `window`.
-- Packaging: a CommonJS React entry (`dist/react.cjs`) for `require()` and
-  Jest; `.` and `./react` give `import` and `require` their own types
-  (`.d.ts` and `.d.cts`), so CommonJS consumers are no longer told the
-  package is ESM-only (attw FalseESM); `./react` has a `default` condition;
-  `./global` and `./go` ship `global.d.ts` and `go.d.ts` declaring
-  `window.Typeset` and `window.TypesetReady`. The build recipe adds these
-  files only when the package's exports name them, so a dry run at v4.2.0
-  still reproduces its tarball. The 4.3.0 tarball grows from 48 to 83 files
-  (2.57 to 3.42 MB unpacked), mostly `react.cjs` and its source map.
-- Single-line blocks skip Unicode break analysis, and a first composition no
-  longer computes an unused signature; outcomes are unchanged.
+- `scripts/v4/verify-golden.mjs`: 3,380 cells per engine (85 corpus
+  paragraphs at 240, 320, 400 and 560 px in Georgia and the bundled Fraunces,
+  plain, with a link and emphasis, through the legacy renderer, with quotes
+  and hanging, as titles and justified, plus a 20-paragraph adversarial set).
+  A cell changes when its outcome, finishing features, breaks or characters
+  differ.
+- A golden A/B of 316 blocks per engine (audit fixture, 40 corpus
+  paragraphs and React adapters at 320, 375 and 768 px, default and loader
+  options): element screenshots at DPR 2, `measureLayout` line boxes,
+  outcomes, feature statuses, copied text and HTML, and markup.
+- The React adapters: 2,160 settled `TypesetText` and `TypesetRichText`
+  blocks (60 corpus paragraphs, four configurations, 320, 390 and 560 px).
 
-### API (additive)
+Outside the changes below, 0 of these differ in any engine.
 
-- `OUTCOMES` lists every outcome code; the `Outcome`, `FeatureStatus`,
-  `QuoteStatus`, `HangingStatus`, `SpacingStatus` and `TrackingStatus` types
-  name them. `Result.outcome` and `Result.features` use these types while
-  still accepting any string, so existing code compiles unchanged.
-  OUTCOMES.md (also in the package and at docs/outcomes.md) says what each of
-  the 38 outcomes and 32 feature statuses means, whether it is expected, and
-  what to do, grouped as composed, nothing to improve, unsupported content,
-  couldn't improve safely and not processed.
-- Every option documents its default in the type declarations. The
-  `lineBreaks` comment said the default was the legacy path; the package
-  default is `'unicode'`.
+- **Generated line breaks are word separators again (accessibility, C2).** A
+  generated `<br>` that stands in for a collapsed space is no longer
+  `aria-hidden`, so engine accessibility trees stop joining the words on
+  either side of it ("galleryguide"), including inside link and heading
+  names. A break after a hyphen or dash stays hidden, so "public-health" is
+  still one word. Spacing and hanging markers are `display: inline` instead
+  of `inline-block`, which stops Chromium dropping the word space beside
+  them. The same applies to `TypesetRichText`. Assistive technology now meets
+  a line boundary at each generated break, and WebKit accessible names
+  contain a newline there. `scripts/v4/verify-native-ax.mjs` finds 0
+  unmatched words and 0 wrong link or heading names in Chromium, WebKit and
+  Firefox; 4.2.0 left 581 words unmatched in Chromium and 381 in Firefox,
+  and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
+  WebKit. Attributes only: in the golden A/B, markup changed
+  in 311 (310 in WebKit) blocks, and 1,087 of 1,103 generated breaks
+  are now exposed (16 hyphen breaks stay hidden), with 0
+  screenshots, line boxes, outcomes, feature statuses or copied texts
+  changed. In verify-golden 2,016 (WebKit 2,011) of 2,724 corpus cells per engine
+  differ only in these attributes and C9's below.
+- **Generated breaks are displayed through `--ts-break-display` (C9).** The
+  break's inline style is `display: var(--ts-break-display, inline)
+  !important` (4.2.0: `display: inline !important`), and the
+  `TypesetRichText` break carries `display: var(--ts-break-display, inline)`.
+  On screen nothing moves: the same cells as above change markup only. In
+  print the property is `none` and spacing, hanging and tracking are
+  neutralized, so printed text wraps natively at the paper's width, where
+  4.2.0 printed the screen breaks and the page re-wrapped them into
+  alternating long and short lines.
+- **Justified text is left as the author set it** (`native:justify`, C3). A
+  generated break ends its line, so every composed line took the last-line
+  alignment: `text-align: justify` became ragged right, and a
+  `text-align-last` that differs from `text-align` applied to every line,
+  while `audit()` still passed. Multi-line paragraphs whose computed
+  `text-align` is `justify` or `justify-all`, or whose `text-align-last`
+  differs from `text-align`, are now declined under every entry point
+  (`typeset()`, `mount()`, the loaders, `TypesetText`, `TypesetRichText` and
+  the legacy renderer). A single line still reports `native:fits`. Golden
+  diff: 336 of 336 justified cells per engine (42 corpus paragraphs), 0 of
+  the rest.
+- **Abbreviations, units, honorifics, labels and letter designators stay
+  with their words** (English, C13). Every word ending in a period counted
+  as a sentence end, so the compositor paid to break after "Dr.", "Fig.",
+  "a.m." and "U.S.", and the single-letter penalty pushed units and
+  designators to the next line ("1,200 / m", "hepatitis / C", "World War /
+  I"). Now an abbreviation (Mr, Mrs, Ms, Mx, Dr, Prof, Rev, St, Mt, Jr, Sr,
+  vs, etc, e.g, i.e, a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted
+  initialisms and single initials) ends no sentence; splitting a number from
+  its unit, an honorific from a name, a label from its number or a word from
+  its letter designator costs what a weak line end costs; and only the
+  article and the pronoun "I" pay the single-letter penalty. Golden diff: 0
+  of 2,724 corpus cells per engine (the corpus has none of these
+  constructions); 43 (Chromium, Firefox) or 44 (WebKit) of 160 cells of the
+  new adversarial set (`tests/v4-corpus-adversarial.json`), and 41 of 160
+  through the legacy renderer. On that set, line-end review items (the C16
+  audit) fall from 93 under 4.2.0 to 58 (WebKit 91 to 59), against 271 in the
+  browser's own layout; pairs split at line ends fall from 46 to 12. One
+  recorded trade-off: at 320 px in Fraunces the recipe paragraph ends a line
+  on "the", which neither the browser nor 4.2.0 does (the tight-line
+  ranking, to be retuned in 4.4). No orphan, overflow or text change.
+- **Live regions are no longer composed** (accessibility, C4). Text whose
+  nearest region has `aria-live="polite"` or `"assertive"`, or (without
+  `aria-live="off"`) `role="status"`, `alert`, `log`, `marquee` or `timer`,
+  or is an `<output>`, keeps native wrapping and reports
+  `native:live-region`. 4.2 composed it and rewrote it on every resize, font
+  load and idle pass (51 mutation records on mount and 180 more across two
+  resizes for one status paragraph), and Chrome announced those rewrites, so
+  screen readers repeated status messages. Golden diff: 5 of 8 paragraphs on
+  the live-region fixture, per loader and engine; 0 in the golden sets,
+  which have no live regions.
+- **Smart quote corrections (C15).** A single quote right after a curled
+  opening double quote now opens too: `"'Quoted' inside,"` gives
+  “‘Quoted’ inside,” (4.2 gave “’Quoted’). Rock ’n’ roll, ’bout, ’round and
+  ’nuff are elisions (4.2 gave ‘n’ and ‘bout). Glyph substitutions only and
+  length-preserving; ’90s, ’Tis, ’em, primes such as 5'10" and possessives
+  are unchanged, and single quotes never become double. Golden diff: 0 of
+  173 corpus texts (14 with straight quotes). `TypesetText` also curls quotes
+  during render, so its server HTML has them (a Next production build: 8
+  curled, 0 straight, no hydration messages in three engines; 4.2 had 2 of
+  10 curled before hydration).
+- **Unrendered text is not measured** (C8). `typeset()` on an element in a
+  `display: none` subtree keeps an existing composition (4.2.0 restored
+  native text and recorded `unmeasurable`), and text in a skipped
+  `content-visibility: auto` section records `unmeasurable` instead of being
+  composed from forced layout (4.2.0 composed it in Chromium and Firefox and
+  cached `native:verification` in WebKit). `mount()` and the React adapters
+  compose it when it comes into range; a direct `typeset()` caller calls
+  again. 0 golden cells change (the golden sets have no hidden text).
+- **`TypesetRichText` plans once from the native text** and no longer
+  re-plans over its own composed markup after `document.fonts.ready` when
+  nothing changed (P4, P5). 4.2.0's final breaks could depend on that
+  history. React golden diff: 2 of 2,160 blocks, both in WebKit at 320 px.
+  In one, 4.3 now gives the same breaks as `typeset()` for the same markup,
+  where 4.2.0's re-plan did not; the other is a block on which 4.2.0 differs
+  from itself between runs. Chromium and Firefox: 0. (2,040 more differ only
+  in the C2 and C9 attributes and in the order of the host's attributes.)
+- The legacy `renderFrozenLines()` export no longer sets the non-ARIA
+  `role="text"`, which emptied a composed heading's accessible name in
+  WebKit, and clears the element with `replaceChildren()` instead of
+  `innerHTML`, so it runs under Trusted Types.
+- Transient states with no static golden effect: while a block's width is
+  changing and its composed lines no longer fit, it shows native wrapping
+  (`data-ts-stale`) until 100 ms after the size holds; while a page is
+  machine-translated, owned text is released to native (`native:translated`);
+  where nothing can be measured (jsdom, happy-dom, engines without the
+  required APIs) text stays native (`native:environment`) where 4.2 threw.
 
-### Documentation
+### Fixed
 
-- The npm README is an introduction, not release notes: what Typeset does,
-  a 375 px before/after image against `text-wrap: pretty`, a "Do I need it?"
-  table (CSS `balance` and `pretty` first; Typeset for grammar-aware breaks,
-  Firefox parity, preserved markup and checkable results; not for justified
-  text), three pinned install paths, every option with its default, the
-  common outcomes, what it costs, what it won't do, browser requirements,
-  accessibility, baseline CSS for before the script runs, an FAQ, the
-  stability promise and a glossary. Every link is absolute, so it works on
-  npmjs.com. "New in" notes live here in the CHANGELOG.
-- The repository README states the positioning against `text-wrap`, and its
-  install lines are generated from the published version and sri.json at
-  each cut (it had pinned 4.1.0).
+- **Hidden content stays off the clipboard (C11).** A copy that touches a
+  composed paragraph is serialized by the engine; 4.2 built its HTML from
+  `range.cloneContents()`, which keeps what native copy leaves out, so a
+  select-all or a cross-paragraph copy pasted `display:none` notes, hidden
+  inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts
+  and styles. The clone is now walked in step with its source and those
+  nodes are dropped; if the two ever disagree, only plain text is written.
+- **Strict Content Security Policy and Trusted Types (C5).** Measurement and
+  line-wrap styles are restored through the CSSOM, never by writing the
+  style attribute. Under `style-src` without `'unsafe-inline'`, 4.2 left
+  `white-space: nowrap` on paragraphs and links in Chromium and WebKit,
+  erased the author's CSSOM styles in Firefox (a 300 px width became the
+  container width), and logged a CSP error on every pass; `TypesetRichText`
+  declined as `native:rich-whitespace`. 4.3 runs under `style-src 'self';
+  script-src 'self'; require-trusted-types-for 'script'; trusted-types
+  'none'` with no violation in three engines. Published bundles no longer
+  read the bind-weight research global `__TYPESET_BIND__`.
+- **Framework text updates never leave stale text (C6).** When Svelte, Vue,
+  Solid, Lit or React (outside the adapters) set the `.data` of a Text node
+  the engine had split, 4.2 replaced only line 1 and left the old lines 2..n
+  on screen, merged them back on `restore()`, and `disconnect()` kept them.
+  Solid and Lit updates were lost outright once a marker or tracking wrapper
+  took their node's position, and React threw (removeChild) when it removed
+  a Text node tracking had moved, unmounting the app. Now the mount observer
+  removes the stale fragments within the mutation's microtask, before any
+  frame, and recomposes; every cleanup drops the fragments of a node that
+  was written to or removed; and Text nodes Solid or Lit address by
+  position, and React's, stay in place (emptied, their text wrapped beside
+  them). Tested with a vanilla renderer, React 19, Svelte 5, Vue 3.5, Solid
+  1.9 and Lit 3 through twenty updates each in three engines.
+- **Composed text follows text metrics, not only width (C7).** Fonts that
+  finish loading (including CSS-requested fonts in WebKit, which fires no
+  loading events and left 59 of 195 paragraphs stale under 4.2.0), the
+  text-spacing overrides of WCAG 1.4.12, a browser font-size setting, CSSOM
+  rule changes, and transitions or animations of font, spacing or
+  line-height properties now recompose. A same-width height change makes
+  the controller check rendered lines against the composition.
+- **Hidden text keeps its composition (C8).** A tab, dialog, accordion or
+  stack card hidden with `display:none`, the `hidden` attribute or
+  `content-visibility`, and shown again at the same width, paints its
+  composed lines in the first frame instead of native lines re-broken a
+  moment later, with `mount()`, `TypesetText` and `TypesetRichText`. Text an
+  attribute change reveals at a new width composes before that frame paints.
+- **No double-wrapped frames during resizes or in print (C9).** A block
+  whose width changes is recomposed once the size has held for 100 ms, not
+  every frame; meanwhile, if it is narrower than its widest composed line,
+  it shows native wrapping. The switch is written before the frame's layout.
+  Print shows native wrapping and pauses composition.
+- **Machine translation no longer garbles or loses text (C10).** When the
+  page is translated (the `translated-ltr`/`translated-rtl` class Google
+  Translate and Chrome set, a `<font>` wrapper inside composed text, or
+  Edge's `_msttexthash`), `mount()`, the loaders, `typeset()` and
+  `TypesetText` remove their breaks and wrappers by moving the existing Text
+  nodes, never splitting, merging, editing or removing one, and compose
+  again when the translation ends. `TypesetRichText` freezes. 4.2.0 merged
+  and edited the Text nodes the translator was filling, which lost
+  sentences.
+- **`mount()` works in same-origin iframes (C12).** Inserted paragraphs,
+  text edits, resizes and fonts inside a parent-mounted iframe document are
+  picked up, and copied links keep absolute URLs there (nodes from another
+  realm failed `instanceof` checks).
+- **`keep` works in body text (C14).** It was typed and exposed on both
+  React adapters, but body composition never received it. A kept phrase
+  that fits the measure is now never split, a phrase the browser splits can
+  earn one extra line (not with `density: 'compact'`), and a phrase longer
+  than the measure is split as few times as possible. Matching ignores case,
+  NBSP and punctuation around the phrase, in titles too. Output with `keep`
+  omitted is unchanged (golden diff 0).
+- **The audit is accurate (C16).** `issue.target` resolves: every selector
+  started `html:nth-of-type(0)` and matched nothing; targets now start from
+  a unique id, from `body`, or are `:root`. Line-end reviews follow the
+  compositor's own policy: a word before sentence punctuation and a letter
+  designator are valid line ends, an abbreviation is not a sentence end, and
+  untagged text gets no English word lists. `audit()` fails composed output
+  that is no longer correct: `stale-layout` (a font, spacing or size change
+  after composition left a block double-wrapped, which 4.2.0 passed) and
+  `alignment-lost`. 4.2.0's own output carried the `hidden-break` and
+  `isolated-space` errors (C2); 4.3.0's carries neither.
+- **Installs beside any React 18.2+ or 19, and any Playwright (K3).** The
+  React peer was `^19.2.3` and Playwright was a peer: npm failed with
+  ERESOLVE beside React 18, React 19.0 or 19.1 and older Playwright, and
+  upgraded `react` alone in apps locked to 19.0 or 19.1, which left
+  `react-dom` behind ("Incompatible React versions"). `TypesetText` no longer
+  schedules a layout effect during server rendering, which React 18 warned
+  about. The published declarations no longer inline @types/react 19.2
+  internals, so they compile against @types/react 18.3 and 19.0.
+- **Nothing throws in test runners or older engines (K4).** Under jsdom and
+  happy-dom (Jest, Vitest), and where `Intl.Segmenter`, `ResizeObserver` or
+  `MutationObserver` is missing, `typeset()`, `planRichText()` and both
+  adapters report `native:environment`, `mount()` returns an inert
+  controller and `document.fonts` is optional. Importing no longer
+  constructs an `Intl.Segmenter` or inflates the Unicode line-break trie
+  (the vendored module initializes on first use; all 19,338 LineBreakTest
+  cases give identical breaks), so a missing API cannot blank an application
+  at import. The script-tag builds, including `typeset.us/auto`, do nothing
+  where there is no `window`.
+- **Clear errors (K11).** `typeset()` throws `TypeError: [typeset] typeset()
+  expects an HTMLElement (received ...)` for a non-element, and `mount()` a
+  `TypeError` naming what it received, instead of raw TypeErrors from inside
+  the engine. An invalid `keep` value no longer throws once `keep` reaches
+  body composition; like every invalid option it keeps its 4.2 behaviour.
+- The React adapters keep their composition while hidden under the new
+  per-document registry, instead of treating a width of 0 as a resize and
+  showing native lines when revealed.
 
-- SUPPORT.md describes 4.3.0 and lists known limitations: generated line
-  breaks and find-in-page, Text Fragments, `innerText` and selection; print;
-  machine translation; CSP and Trusted Types; no hyphenation, justification
-  or right-to-left text; the browser floor; framework-owned text. A new FAQ
-  (typeset.us/faq, and in the README) answers what screen readers hear,
-  layout shift, SEO, copying, printing and translation, readers without
-  JavaScript, cost, and when it runs.
-- Stale 3.x claims are gone from current docs and the site: "audit() returns
-  []", "zero means zero", 1.4 to 1.6 ms per paragraph, 20 KB, English only,
-  cloned links. The Show HN kit, the essay, SKILL.md's frontmatter, the agent
-  contract (for-agents.md) and llms.txt describe 4.3; the 3.5 agent pages are
-  marked historical. A client's name is gone from SUPPORT.md and the CHANGELOG.
+### Added
 
-### Installation and packaging
+- Outcome reference and types: `OUTCOMES` lists every outcome code; the
+  `Outcome`, `FeatureStatus`, `QuoteStatus`, `HangingStatus`,
+  `SpacingStatus` and `TrackingStatus` types name them. `Result.outcome` and
+  `Result.features` use these types while still accepting any string, so
+  existing code compiles unchanged. OUTCOMES.md (in the package and at
+  docs/outcomes.md) says what each of the 42 outcomes and 32 feature
+  statuses means, whether it is expected, and what to do. New outcomes:
+  `native:justify`, `native:live-region`, `native:translated` and
+  `native:environment`.
+- React adapters (K5): a `ref` resolves to the host element (both are
+  `forwardRef` components; a ref was dropped before, and `TypesetRichText`'s
+  gave its class instance). `as` also accepts `div`, `li`, `blockquote`,
+  `figcaption`, `dd`, `dt`, `td`, `th`, `caption`, `label`, `legend` and
+  `summary`, with `cite`, `colSpan`, `rowSpan`, `headers`, `scope`, `htmlFor`
+  and `value` attributes. `onResult(result)` reports each composition as a
+  `Result`. `priority?: 'auto' | 'sync'`: `'sync'` composes in the commit, as
+  4.2 did for every block. New types `TypesetTag`, `TypesetAdapterProps` and
+  `Priority`.
+- A CommonJS React entry (`dist/react.cjs`) for `require()` and Jest; `.`
+  and `./react` give `import` and `require` their own types (`.d.ts` and
+  `.d.cts`), so CommonJS consumers are not told the package is ESM-only;
+  `./react` has a `default` condition; `./global` and `./go` ship
+  `global.d.ts` and `go.d.ts` declaring `window.Typeset` and
+  `window.TypesetReady`. `react-dom`, which the React entry imports for
+  `flushSync`, is an optional peer beside `react`.
+- `mount('article p', options)`, the same as `mount(document, 'article p',
+  options)`; a string first argument used to throw.
+- Development warnings: an invalid option value, an unknown option or a
+  non-string selector logs one `console.warn` each (the ESM and CommonJS
+  entries unless `process.env.NODE_ENV` is `production`; always in
+  `typeset.global.js`, `go.js` and `auto.js`), for example `[typeset]
+  smartQuotes must be "en" or false (received true)`. Production bundles
+  contain none of these checks; SUPPORT.md lists the messages.
+  `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
+  once in development builds.
+- CSS hooks: the custom property `--ts-break-display` drives every generated
+  break (set it to `inline` in print CSS to print a composition), and
+  `data-ts-stale` marks a block temporarily showing native wrapping.
+  `dist/styles.css` ships the rules; the engine also installs them as a
+  constructable stylesheet.
+- Audit: errors `stale-layout` and `alignment-lost`; reviews `bound-split`
+  (a number and its unit, an honorific and a name, a label and its number,
+  or a word and its letter designator split across lines), `split-ellipsis`,
+  `line-initial-punctuation` and `regressed-vs-native` (a composed element
+  with more line-end reviews than its native layout had). `schemaVersion`
+  is still 1 and field shapes are unchanged.
+- The automatic website loader on npm as `typeset.us/auto` (`dist/auto.js`),
+  byte for byte the same file as `https://typeset.us/go@<version>.js`, so
+  npm, jsDelivr and typeset.us serve one file with one integrity hash. Each
+  loader logs one `console.info` when no element matches.
 
-- The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no
-  longer a peer. `npm install typeset.us` no longer fails with ERESOLVE beside
-  React 18, React 19.0/19.1 or an older pinned Playwright, and no longer
-  upgrades `react` alone in apps locked to React 19.0 or 19.1 (which left
-  `react-dom` behind and threw "Incompatible React versions"). The
-  `typeset-audit` CLI still imports Playwright on demand and says how to
-  install it. `TypesetText` uses a layout effect only in the browser, so React
-  18 server rendering no longer warns. Both adapters declare `ReactElement`
-  return types, so the published `.d.ts` compiles against @types/react 18.3
-  and 19.0 with `skipLibCheck: false`. Tested by
-  `scripts/v4/verify-react-matrix.mjs` over React 18.2.0, 18.3.1, 19.0.8,
-  19.1.9, 19.2.8 and 19.3.0 in Chromium, WebKit and Firefox.
+### Performance
+
+Measured with `npm run bench` on an Apple M2 Pro, 4.2.0 and the 4.3.0
+candidate back to back (load average 4.6 to 6.2); docs/BENCHMARKS.md has every
+table.
+
+- Composition costs less: per paragraph (200-paragraph article), median
+  5.7 to 5.0 ms and p95 20.3 to 14.9 ms in Chromium; 25.8 to 21.1 ms and
+  88.2 to 64.9 ms at 4x CPU; 24 to 19 ms and 100 to 67 ms in WebKit. The
+  paragraph search is memoized and its segmenters are shared and created on
+  first use, with byte-identical output (P6).
+- `mount()` finishes sooner and blocks less: a 200-paragraph article is
+  fully composed in 1.48 s (4.2.0: 1.74 s), 6.4 s at 4x (8.0 s) and 8.2 s in
+  WebKit (10.1 s); total blocking time at 4x falls from 1,100 to 396 ms, and
+  from 8,293 to 3,501 ms for 1,000 paragraphs. The scheduler no longer
+  starves on a busy page: text near the viewport composes in the next task,
+  an idle callback that fires on its timeout still gets its 8 ms budget, and
+  offscreen blocks wait until they come near after a resize (P2).
+- Ancestor class and style changes cost nothing when layout is unchanged: 30
+  class toggles on an ancestor of 200 paragraphs recomposed 26 times with
+  9,984 DOM mutation records in 4.2.0, and 0 times with 30 records in 4.3.0
+  (P3).
+- React screens (P4, P5): pushing 38 `TypesetText` blocks commits in 19 ms
+  at 4x CPU (4.2.0: 160 ms) and 7 ms at 1x (40 ms); 1,000 blocks commit in
+  19 ms (1,446 ms) with an INP proxy of 80 ms (1,584 ms). 38
+  `TypesetRichText` blocks commit in 23 ms at 4x (78 ms) with 941 DOM
+  mutation records (3,893), and 1,000 in 38 ms (279 ms) with 0 ms of
+  blocking time (5,658 ms). Every adapter in a document shares one registry:
+  2 MutationObservers, 1 ResizeObserver and 1 IntersectionObserver however
+  many blocks render (4.2.0: one of each per block), parent re-renders that
+  change nothing (an inline `keep` array, fresh JSX, inline styles or
+  callbacks) write nothing, and unmounting no longer restores the host React
+  discards.
+- Revealed hidden text: 10 compositions instead of 196 and 83 ms of blocking
+  time at 4x instead of 1,075 ms. The first viewport of never-composed
+  revealed text finishes later (428 ms at 4x against 249 ms), because
+  on-screen reveals compose for at most 24 ms before the frame and
+  offscreen revealed text waits until it is near.
+- Per document the engine now adds one lifecycle hub: one MutationObserver
+  (stylesheets and the translation class), three document listeners
+  (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
+  one more font listener, shared by every controller and adapter.
+- Download, gzip (esbuild bundles importing one entry point): `mount` only
+  37.7 to 45.8 KB, `TypesetText` only 38.0 to 45.5 KB, `TypesetRichText`
+  only 33.4 to 41.5 KB, `smartQuotes` only 11.7 to 1.1 KB (the line-break
+  tables now tree-shake away), `go.js` 42.3 to 52.1 KB and
+  `typeset.global.js` 42.1 to 51.7 KB. The growth is the code the fixes
+  above need, measured per group and recorded in scripts/v4/budgets.json.
+
+### Packaging, loaders and CDN
+
 - npm metadata: a plain description, keywords (typography, line-breaking,
   text-wrap, orphans, widows, knuth-plass, hanging-punctuation, react and
   others), `repository.directory` so README links resolve on npmjs.com, and
   `bugs.url`. The `engines` field (`node >=22`) is removed: it made Yarn 1
   refuse installs of a browser library on older Node. The `typeset-audit`
-  CLI needs Node 18.3 or later.
-- The unpacked package is about 0.97 MB, down from 2.57 MB, 73% of which was
-  source maps embedding every engine source. The ESM and CommonJS builds stay
-  readable and unminified and ship without maps (your bundler minifies them;
-  stack traces name real functions). `typeset.global.js` and `go.js` keep
-  maps without embedded sources. Each bundle now ends with the license
-  notices of the code it embeds (@cto.af/linebreak, unicode-trie-runtime,
-  fflate and the Unicode line-break data), which minification had stripped,
-  and `license` is `MIT AND Unicode-3.0`. The notices add about 150 bytes
-  gzip to each bundle.
-
-### Loaders and CDN
-
-- The automatic website loader is on npm as `typeset.us/auto`
-  (`dist/auto.js`), byte for byte the same file as
-  `https://typeset.us/go@<version>.js`, so npm, jsDelivr and typeset.us serve
-  one file with one integrity hash. `typeset.us/go` still composes only
-  `[data-typeset]` targets. Each loader now logs one `console.info` when no
-  element matches, instead of silently doing nothing.
+  CLI needs Node 18.3 or later. `license` is `MIT AND Unicode-3.0`.
+- The unpacked package is 1.68 MB (87 files), down from 2.57 MB, 73% of
+  which was source maps embedding every engine source. The ESM and CommonJS
+  builds stay readable and unminified and ship without maps (your bundler
+  minifies them; stack traces name real functions); `typeset.global.js` and
+  `go.js` keep maps without embedded sources. Each bundle ends with the
+  license notices of the code it embeds (@cto.af/linebreak,
+  unicode-trie-runtime, fflate and the Unicode line-break data), which
+  minification had stripped.
 - Bare `cdn.jsdelivr.net/npm/typeset.us` and `unpkg.com/typeset.us` URLs serve
   `dist/typeset.global.js` (the `jsdelivr` and `unpkg` fields), not the
   CommonJS build that browsers refuse to run.
 - From the 4.3.0 cut, typeset.us publishes versioned `typeset@<v>.min.js` and
-  `typeset@<v>.esm.js`, and `sri.json` lists only immutable paths. The
+  `typeset@<v>.esm.js`, and `sri.json` lists only immutable paths; the
   go@4.2.0.js entry is unchanged. `go@4.js` follows 4.x, and `go.js` and the
   other unversioned aliases follow 4.x only: a 5.0 release will never move
   them. Versioned files are cached for a year, aliases and indexes for five
   minutes, all with `Access-Control-Allow-Origin: *`.
   docs/ops/vercel-firewall.md has the firewall bypass that stops bot
   challenges on these paths; it is applied in the Vercel project, not here.
-
-### Website copy (typeset.us)
-
-- The homepage names its baseline by engine ("Your browser, with CSS
-  text-wrap: pretty" in Chrome and Safari; "Firefox has no text-wrap:
-  pretty"), leads with the short words the browser leaves at line ends, and
-  claims a one-word last line only in an engine that produces one. It had
-  said "your browser abandons a word" in every engine, although Chrome and
-  Safari never did at any of the 96 widths.
-- A "For developers" band: the pinned script tag, npm and React, a "Do I
-  need it?" table against CSS `text-wrap`, the measured gzip size from
-  release.json (it said 38 KB; 4.2.0's loader is 42.4 KB), and links to
-  GitHub, npm, the docs and new framework recipes at /install/frameworks
-  (Next.js, Vite, Astro, SvelteKit, Vue). /utility describes the supported
-  scope instead of "universal ... fixes all of this".
-- /, /support and /library have their own titles, descriptions and unfurl
-  images.
-
-### Contributing
-
-- CONTRIBUTING.md (setup, building the candidate, running and narrowing the
-  suites, attaching `auditJSON` to a report), CODE_OF_CONDUCT.md (the
-  Contributor Covenant 2.1), ROADMAP.md (what 4.4 and 5.0 hold, and why each
-  waits), a "Bad line break" issue form that asks for the URL, width, font,
-  browser, version, `auditJSON` output and a screenshot, an integration
-  question form, and a pull request template with the rendering-change
-  checklist.
-
-### Stability
-
-- STABILITY.md states what a version number promises: API names,
-  `auditJSON` `schemaVersion` 1, outcome codes, CLI exit codes and published
-  bytes do not break in 4.x, and a minor release changes default rendering
-  only to fix a verified defect, listed under "Rendering changes" with its
-  golden-diff count. Install with `npm i -E`, or pin `go@<version>.js` with
-  its integrity hash. `go.js` and `go@4.js` follow 4.x and will never move to
-  5.0.
-- Every install line on typeset.us is generated at build time from
-  `public/sri.json`: the pinned loader with its integrity hash and
-  `crossorigin`, on the homepage, /install and each platform guide, /utility,
-  /essay, the pairing-card and reading-lab templates and the grader. The
-  evergreen `go.js` appears only with that label. Docs written before a cut
-  carry a placeholder hash that `release-cut` fills.
+- The build recipe is versioned (`scripts/build-recipe.mjs` `RECIPES`): a cut
+  at an older tag uses that line's recipe, and `verify-recipe-reproduces`
+  rebuilds the 4.2.0 tarball from its tag byte for byte (CI packs with npm
+  11.6.0, the version that packed it).
 
 ### Release trust
 
@@ -244,9 +392,9 @@ Hashes for every published version live in
   passed against the committed dist. It publishes exactly
   `public/releases/<v>/typeset.us-<v>.tgz` with npm trusted publishing and
   provenance, checks the registry's integrity and attestation, and creates a
-  GitHub Release from the CHANGELOG section with the evidence attached, so
-  evidence no longer expires with CI artifacts. docs/RELEASING.md describes
-  the whole flow.
+  GitHub Release from the CHANGELOG section with the evidence attached.
+  docs/RELEASING.md describes the flow; docs/OWNER-ACTIONS.md lists the
+  GitHub, npm and Vercel settings only the owner can apply.
 - CI and nightly run with `contents: read` only, every action is pinned to a
   commit SHA, and Dependabot watches npm and GitHub Actions.
 - SECURITY.md (also in the package): supported versions, private reporting,
@@ -254,259 +402,67 @@ Hashes for every published version live in
   fixed silently in 3.4.1, now has an advisory draft, a deprecation command
   for 3.0.0 to 3.4.0 and an `advisories` list that each cut copies into
   release.json and sri.json. The vulnerable files stay online unchanged.
-- The CHANGELOG has a 4.2.0 entry. docs/OWNER-ACTIONS.md lists the GitHub,
-  npm and Vercel settings only the owner can apply.
+- STABILITY.md states what a version number promises: API names,
+  `auditJSON` `schemaVersion` 1, outcome codes, CLI exit codes and published
+  bytes do not break in 4.x, and a minor release changes default rendering
+  only to fix a verified defect, listed under "Rendering changes" with its
+  golden-diff count. Install with `npm i -E`, or pin `go@<version>.js` with
+  its integrity hash.
 
 ### Website (typeset.us, not the package)
 
-- `/api/fetch-url` no longer reaches private networks: it resolves the host
-  and connects only to a checked address, refuses loopback, private,
-  link-local (including 169.254.169.254), CGNAT, multicast and reserved
-  addresses and their IPv6 forms, follows at most five redirects and checks
-  each, allows ports 80, 443, 8080 and 8443 only, streams the body with a
-  500 KB cap after decompression, and rate-limits each client to 12 requests
-  a minute.
-- `/audit` and `/dna` render fetched or pasted HTML inert: scripts, frames,
+- `/api/fetch-url` no longer reaches private networks: it connects only to a
+  checked address, refuses loopback, private, link-local (including
+  169.254.169.254), CGNAT, multicast and reserved addresses and their IPv6
+  forms, follows at most five redirects and checks each, allows ports 80,
+  443, 8080 and 8443 only, caps the body at 500 KB after decompression, and
+  rate-limits each client to 12 requests a minute.
+- `/audit` and `/dna` render fetched or pasted HTML inert (scripts, frames,
   plugins, `<base>`, refresh `<meta>`, event handlers and `javascript:` URLs
-  are removed; `/audit` renders the sample in a shadow root so its styles
-  cannot restyle the site, and `/dna` uses an iframe sandboxed without
-  scripts. `/dna` no longer fails on pages with inline SVG.
+  removed; `/audit` in a shadow root, `/dna` in a sandboxed iframe). `/dna`
+  no longer fails on pages with inline SVG.
 - Every page has a nonce-based Content Security Policy (`script-src` with a
-  per-request nonce and `strict-dynamic`, `object-src 'none'`,
-  `base-uri 'self'`, `frame-ancestors 'self'`), plus `nosniff`,
-  `X-Frame-Options: SAMEORIGIN` and a referrer policy. Pages are rendered
-  per request so each gets a fresh nonce. Next.js is 16.3.6; `npm audit`
-  reports no vulnerabilities.
+  per-request nonce and `strict-dynamic`, `object-src 'none'`, `base-uri
+  'self'`, `frame-ancestors 'self'`), plus `nosniff`, `X-Frame-Options:
+  SAMEORIGIN` and a referrer policy. Pages are rendered per request so each
+  gets a fresh nonce. Next.js is 16.3.6; `npm audit` reports no
+  vulnerabilities.
+- The homepage names its baseline by engine, leads with the short words the
+  browser leaves at line ends, and claims a one-word last line only in an
+  engine that produces one. A "For developers" band gives the pinned script
+  tag, npm and React, a "Do I need it?" table, the measured gzip size from
+  release.json and links to framework recipes at /install/frameworks
+  (Next.js, Vite, Astro, SvelteKit, Vue). Every install line on the site is
+  generated from `public/sri.json`. /, /support and /library have their own
+  titles, descriptions and unfurl images; /faq is new.
 
-### Rendering changes
+### Documentation
 
-Each default-output change in 4.3 is a defect fix, listed here with its
-golden-diff count: the published 4.2.0 build against the candidate over the
-same blocks in Chromium, WebKit and Firefox. The accessibility entries were
-measured with element screenshots at DPR 2, `measureLayout` line boxes,
-outcomes, feature statuses, copy text and markup; the composition entries
-with the cells of `scripts/v4/verify-golden.mjs` (85 corpus paragraphs at
-240, 320, 400 and 560 px in Georgia and the bundled Fraunces, per engine)
-whose outcome, finish features or markup differ from 4.2.0.
-
-- **Generated line breaks are word separators again (accessibility, C2).** A
-  generated `<br>` that stands in for a collapsed space is no longer
-  `aria-hidden`, so engine accessibility trees stop joining the words on either
-  side of it ("galleryguide"), including inside link and heading names. A break
-  after a hyphen or dash stays hidden, so "public-health" is still one word.
-  Spacing and hanging markers are `display: inline` instead of `inline-block`,
-  which stops Chromium dropping the word space beside them. The same applies
-  to `TypesetRichText`. Assistive technology now meets a line boundary at each
-  generated break, and WebKit accessible names contain a newline there.
-  Golden diff over 316 blocks (309 composed) in each engine: markup changed in
-  311 blocks (310 in WebKit), only in those two attributes; 1,087 of 1,103
-  generated breaks are now exposed and 16 hyphen breaks stay hidden; 0
-  screenshots, 0 line boxes, 0 outcomes, 0 feature statuses and 0 copied texts
-  changed.
-- **Live regions are no longer composed (accessibility, C4).** Text whose
-  nearest region has `aria-live="polite"` or `"assertive"`, or (without
-  `aria-live="off"`) `role="status"`, `alert`, `log`, `marquee` or `timer`, or
-  is an `<output>`, keeps native wrapping.
-  4.2 composed it and rewrote it on every resize, font load and idle pass
-  (51 mutation records on mount and 180 more across two resizes for one status
-  paragraph), and Chrome announced those rewrites, so screen readers repeated
-  status messages. `typeset()` returns `native:live-region` and writes nothing,
-  `mount()` and both loaders skip such targets (and release one whose region
-  turns live), `TypesetRichText` reports `native:live-region`, and `auditJSON()`
-  counts them under that outcome. Golden diff: paragraphs inside live regions
-  change from composed to native (5 of 8 on the live-region fixture, per
-  loader and engine); 0 of 316 blocks change in the golden A/B, which has no
-  live regions.
-- **Smart quote corrections (C15).** A single quote right after a curled
-  opening double quote now opens too: `"'Quoted' inside,"` gives
-  “‘Quoted’ inside,” (4.2 gave “’Quoted’). Rock ’n’ roll,
-  ’bout, ’round and ’nuff are elisions (4.2 gave ‘n’ and ‘bout).
-  Glyph substitutions only, length-preserving; ’90s, ’Tis, ’em, primes
-  such as 5'10" and possessives are unchanged, and single quotes never become
-  double. Golden diff: 0 of 173 corpus texts (14 with straight quotes) change;
-  the changes are exactly the patterns above. `TypesetText` also curls quotes
-  during render, so its server HTML has them (a Next production build: 8
-  curled, 0 straight, no hydration messages in three engines; 4.2 had 2 of 10
-  curled before hydration).
-- The legacy `renderFrozenLines()` export no longer sets the non-ARIA
-  `role="text"`, which emptied a composed heading's accessible name in WebKit,
-  and clears the element with `replaceChildren()` instead of `innerHTML`, so it
-  runs under Trusted Types.
-- **Justified text is left as the author set it** (`native:justify`). A
-  generated break ends its line, so every composed line took the last-line
-  alignment: `text-align: justify` became ragged right, and a `text-align-last`
-  that differs from `text-align` applied to every line, while `audit()` still
-  passed. Multi-line paragraphs whose computed `text-align` is `justify` or
-  `justify-all`, or whose `text-align-last` differs from `text-align`, are now
-  declined under every entry point (`typeset()`, `mount()`, `go.js`,
-  `TypesetText`, `TypesetRichText` and the legacy renderer). A single line
-  still reports `native:fits`. Golden diff: 336 of 336 justified cells per
-  engine (42 corpus paragraphs), 0 of the rest. `audit()` reports a new error,
-  `alignment-lost`, for a composed element whose alignment later changes to
-  one the breaks cannot keep.
-- **Abbreviations, units, honorifics, labels and letter designators stay
-  with their words** (English). Every word ending in a period counted as a
-  sentence end, so the compositor paid to break after "Dr.", "Fig.", "a.m."
-  and "U.S.", and the single-letter penalty pushed units and designators to
-  the next line ("1,200 / m", "hepatitis / C", "World War / I"). Now an
-  abbreviation (Mr, Mrs, Ms, Dr, Prof, St, Mt, Jr, Sr, vs, etc, e.g, i.e,
-  a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted initialisms and
-  single initials) ends no sentence; splitting a number from its unit, an
-  honorific from a name, a label from its number or a word from its letter
-  designator costs what a weak line end costs; and only the article and the
-  pronoun "I" pay the single-letter penalty. Golden diff: 0 of the 2,724
-  corpus cells in each engine (the corpus has none of these constructions),
-  and 43 (Chromium, Firefox) or 44 (WebKit) of 160 cells of the new
-  adversarial set (`tests/v4-corpus-adversarial.json`), 41 of 160 through
-  the legacy renderer. On that set, pairs split at line ends fall from 46
-  (WebKit 44) under 4.2.0 to 12 (WebKit 11), against 26 in the browser's
-  own layout; weak line ends stay at 46 (WebKit 46 to 48); lines added
-  over native fall from 5 to 2. No orphan, overflow or source change.
-
-Lifecycle entries were measured on the V4 corpus (85 paragraphs, every
-fourth with a link and emphasis) at 320, 440 and 600 px:
-
-- Generated `<br>` elements are written `display: var(--ts-break-display,
-  inline) !important` instead of `display: inline !important`, and the
-  `TypesetRichText` break carries `display: var(--ts-break-display, inline)`.
-  On screen nothing moves: 251, 249 and 251 of 255 blocks change markup in
-  Chromium, WebKit and Firefox, 0 differ once the break style is normalized,
-  and 0 change outcome or rendered lines. In print, breaks are now `none` and
-  text wraps natively at the paper's width, where 4.2.0 printed the screen
-  breaks and alternated long and short lines.
-- `typeset()` does not measure or compose text that is not rendered: in a
-  `display:none` subtree it keeps an existing composition (4.2.0 restored
-  native text and recorded `unmeasurable`), and text in a skipped
-  `content-visibility:auto` section records `unmeasurable` instead of being
-  composed from forced layout (4.2.0 composed it in Chromium and Firefox and
-  cached `native:verification` in WebKit). `mount()` composes it when it comes
-  into range. The corpus golden diff has no hidden text: 0 blocks change.
-- `TypesetRichText` plans once from the native text and no longer re-plans
-  after `document.fonts.ready` when nothing changed. 4.2.0 re-planned over
-  its own composed markup, so its final breaks could depend on that history.
-  Golden diff against 4.2.0 (60 corpus paragraphs, `TypesetText` and
-  `TypesetRichText` with and without options, 320, 390 and 560 px, three
-  engines; 2,160 settled blocks): 2 differ, both in WebKit at 320 px. In one,
-  4.3 now gives the same breaks as `typeset()` for the same markup, where
-  4.2.0's re-plan did not; the other is a block on which 4.2.0 differs from
-  itself between runs. Chromium and Firefox: 0.
-
-### Fixed
-
-- **Strict Content Security Policy and Trusted Types (C5).** Measurement and
-  line-wrap styles are restored property by property through the CSSOM, never
-  by writing the style attribute. Under `style-src` without `'unsafe-inline'`,
-  4.2 left `white-space: nowrap` on paragraphs and links in Chromium and WebKit,
-  erased the author's CSSOM styles in Firefox (a 300px width became the
-  container width), and logged a CSP error on every pass. `TypesetRichText`
-  declined as `native:rich-whitespace` under that policy. Published bundles no
-  longer read the bind-weight research global `__TYPESET_BIND__`; the research
-  harness builds its own loader.
-- **Hidden content stays off the clipboard (C11).** A copy that touches a
-  composed paragraph is serialized by the engine; 4.2 built its HTML from
-  `range.cloneContents()`, which keeps what native copy leaves out, so a
-  select-all or a cross-paragraph copy pasted `display:none` notes, hidden
-  inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts and
-  styles. The clone is now walked in step with its source and those nodes are
-  dropped; if the two ever disagree, only plain text is written.
-- **Framework text updates never leave stale text (C6).** Composition splits
-  author Text nodes, and frameworks keep the node they created. When Svelte,
-  Vue, Solid, Lit or React (outside the adapters) set its `.data`, 4.2 replaced
-  only line 1 and left the old lines 2..n on screen, merged them back on
-  `restore()`, and `disconnect()` kept them. Solid and Lit updates were lost
-  outright once a marker or tracking wrapper took their node's position, and
-  React threw (removeChild) when it removed a Text node tracking had moved,
-  unmounting the app. Now the mount observer removes the stale fragments
-  within the mutation's microtask, before any frame, and recomposes; every
-  cleanup drops the fragments of a node that was written to or removed instead
-  of merging them; and Text nodes Solid or Lit address by position, and React's,
-  stay in place (left empty, their text wrapped beside them). Chromium drops a
-  whitespace-only Text node beside an empty one or a comment from its
-  accessibility tree, so the engine puts an empty `<wbr>` between such a space
-  and an emptied node, and never splits a comment-adjacent node down to its
-  opening space. No rendering change: 0 pixel, line box, outcome or feature
-  differences on the framework fixtures (48 paragraphs per engine) or in the
-  golden A/B against 4.2.0.
-- `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
-  once in development builds; it leaves quotes as written, as before (C15).
-  The package build leaves `process.env.NODE_ENV` to the application's bundler.
-- `keep` works in body text. It was typed and exposed on both React adapters,
-  but body composition never received it; it only switched off native
-  retention. A kept phrase that fits the measure is now never split, a phrase
-  the browser splits can earn one extra line (not with `density: 'compact'`),
-  and a phrase longer than the measure is split as few times as possible.
-  Matching ignores case, NBSP and punctuation around the phrase, in titles
-  too, where a fitting phrase is held within the minimum line count. Native
-  retention is kept unless the native layout splits a kept phrase. Output with
-  `keep` omitted is unchanged (golden diff 0).
-
-### Lifecycle
-
-- `mount()` works when a parent page mounts into a same-origin iframe
-  document: inserted paragraphs, text edits, resizes and fonts inside the
-  iframe are picked up (nodes from another realm failed `instanceof` checks).
-- Ancestor class and style changes no longer recompose owned text. The
-  controller rechecks a layout key built from computed values (fonts, metrics,
-  width, effective scale and zoom) and composes only when it changed: 60
-  frames of an ancestor transform animation, a body class with no styles or a
-  scroll-linked custom property on `<html>` now cause 0 compositions (4.2.0:
-  92 to 174 over 40 paragraphs). Removing nodes walks the removed subtree
-  instead of every claimed element.
-- Composed text follows text metrics, not only width: fonts that finish
-  loading (including CSS-requested fonts in WebKit, which fires no loading
-  events), the text-spacing overrides of WCAG 1.4.12, a browser font-size
-  setting, rules changed through the CSSOM, and transitions or animations of
-  font weight, size or spacing. A same-width height change makes the
-  controller verify rendered lines against the composition. One set of font,
-  stylesheet and transition listeners serves every controller and
-  `TypesetRichText` in a document.
-- Hidden text keeps its composition. A tab, dialog, accordion or stack card
-  hidden with `display:none`, the `hidden` attribute or `content-visibility`
-  and shown again at the same width paints its composed lines in the first
-  frame, instead of native lines re-broken a moment later (field report b),
-  with `mount()`, `TypesetText` and `TypesetRichText`. Text an attribute
-  change reveals at a new width is composed before that frame paints. Text
-  in a skipped `content-visibility:auto` section composes when it comes into
-  range; WebKit had cached a failed measurement there.
-- No double-wrapped frames during resizes or in print. A block whose width
-  changes is recomposed once the size has held for 100 ms, not every frame;
-  meanwhile, if it is narrower than its widest composed line, it shows native
-  wrapping (`data-ts-stale`). The switch is written before the frame's layout
-  (in the mutation callback for a script-driven width, in the window's resize
-  event, or in the next animation frame for changes no observer sees). Print
-  shows native wrapping and pauses composition. `--ts-break-display` and
-  `data-ts-stale` are supported hooks; see SUPPORT.md.
-- The scheduler no longer starves on a busy page. An idle callback that fires
-  on its 200 ms timeout gets the full 8 ms budget instead of one block, and
-  text near the viewport is composed in the next task rather than waiting for
-  idle time: with 12 ms of script per frame, visible paragraphs compose in
-  about 125 ms and 60 paragraphs in about 3 s (4.2.0: about 2 s and 13 s).
-  After a resize, blocks on or within a viewport of the screen are
-  recomposed; offscreen blocks wait until they come near.
-- Machine translation no longer garbles or loses text. When the page is
-  translated (the `translated-ltr`/`translated-rtl` class Google Translate and
-  Chrome set on `<html>`, a `<font>` wrapper inside composed text, or Edge's
-  `_msttexthash`), `mount()` and `typeset()` remove their markers and unwrap
-  their wrappers by moving the existing Text nodes, never splitting, merging,
-  editing or removing one, record `native:translated`, and compose nothing
-  until the translation ends; then the current DOM is composed again.
-  `TypesetRichText` freezes instead: it stops observing and replanning, but
-  the breaks React rendered stay. 4.2.0 merged and edited the Text nodes the
-  translator was filling, which lost sentences.
-
-### API
-
-- `mount('article p', options)` is `mount(document, 'article p', options)`;
-  a string first argument used to throw.
-- `typeset()` throws `TypeError: [typeset] typeset() expects an HTMLElement
-  (received ...)` for a non-element, and `mount()` a `TypeError` naming what
-  it received, instead of raw TypeErrors from inside the engine.
-- Invalid options print one `console.warn` each in development (the ESM and
-  CommonJS entries unless `process.env.NODE_ENV` is `production`; always in
-  `typeset.global.js` and `go.js`), for example `[typeset] smartQuotes must
-  be "en" or false (received true)`. Values keep their 4.2 behaviour, and
-  production bundles contain none of these checks. SUPPORT.md lists the
-  messages.
+- The npm README is an introduction, not release notes: what Typeset does, a
+  375 px before/after image against `text-wrap: pretty`, a "Do I need it?"
+  table, pinned install paths, every option with its default, the common
+  outcomes, what it costs, what it won't do, browser requirements,
+  accessibility, baseline CSS, an FAQ, the stability promise and a glossary.
+  Every link is absolute, so it works on npmjs.com. The repository README's
+  install lines are generated from the published version and sri.json at
+  each cut.
+- SUPPORT.md describes 4.3.0 and lists known limitations: generated line
+  breaks and find-in-page, Text Fragments, `innerText` and selection; print;
+  machine translation; CSP and Trusted Types; no hyphenation or
+  justification; right-to-left text; the browser floor; framework-owned
+  text. MIGRATION.md covers 4.2 to 4.3 and links each older guide in its
+  archive.
+- Stale 3.x claims are gone from current docs and the site ("audit() returns
+  []", 1.4 to 1.6 ms per paragraph, 20 KB, English only, cloned links). The
+  Show HN kit, the essay, SKILL.md's frontmatter, the agent contract and
+  llms.txt describe 4.3; the 3.5 agent pages are marked historical.
+  docs/BENCHMARKS.md is generated from the 4.3.0 benchmark, with 4.2.0
+  alongside.
+- CONTRIBUTING.md, CODE_OF_CONDUCT.md (the Contributor Covenant 2.1),
+  ROADMAP.md, a "Bad line break" issue form that asks for the URL, width,
+  font, browser, version, `auditJSON` output and a screenshot, an
+  integration question form, and a pull request template with the
+  rendering-change checklist.
 
 ### Development
 
@@ -516,23 +472,27 @@ fourth with a link and emphasis) at 320, 440 and 600 px:
   `public/go@<v>.js` or a version number.
 - `public/releases/published.json` records every published artifact by hash;
   `verify:ledger` and CI fail if any changes.
-- `npm test` builds the candidate and runs every suite against it, including
-  the CLI, engine accessibility trees (`verify-native-ax.mjs`) and gzip size
-  budgets. `npm run test:release` runs them against the committed dist.
-- `npm run bench` is the V4 benchmark (`scripts/v4/bench-v4.mjs`): mount(),
-  typesetAll(), React screens, ancestor class storms, hidden-to-shown and late
-  fonts at 1x and 4x CPU, with long tasks, observers, listeners, DOM writes
-  and bundle sizes. It regenerates docs/BENCHMARKS.md, which described 3.x.
-  Runtime budgets run nightly and at release cut.
-- New suites in `npm test`: `verify-break-semantics` (C2), `verify-strict-csp`
-  (C5), `verify-copy-privacy` (C11), `verify-framework-text` (C6, with
-  committed Svelte, Vue, Solid and Lit fixture bundles in `tests/frameworks/`),
-  `verify-live-regions` (C4) and `verify-smart-quotes` (C15). Each fails on
-  the published 4.2.0 build.
-- Lifecycle suites in `test:v4`, each in Chromium, WebKit and Firefox:
-  `verify-iframe-mount`, `verify-recompose-storms`, `verify-reflow-triggers`,
-  `verify-visibility`, `verify-print-resize`, `verify-scheduler`,
-  `verify-translation` and `verify-options`.
+- `npm test` builds the candidate and runs every suite against it; `npm run
+  test:release` runs them against the committed dist.
+- `npm run bench` is the V4 benchmark (`scripts/v4/bench-v4.mjs`), and
+  `scripts/v4/bench-report.mjs` renders docs/BENCHMARKS.md from it, with
+  `--baseline` for a comparison. Size budgets run on every change; runtime
+  budgets (`verify-budgets --runtime`) nightly and at release cut.
+- New suites in `npm test`, each in Chromium, WebKit and Firefox where it
+  uses a browser: `verify-native-ax` (engine accessibility trees),
+  `verify-golden`, `verify-alignment`, `verify-keep`, `verify-audit`,
+  `verify-break-semantics`, `verify-strict-csp`, `verify-copy-privacy`,
+  `verify-framework-text` (with committed Svelte, Vue, Solid and Lit
+  fixture bundles in `tests/frameworks/`), `verify-live-regions`,
+  `verify-smart-quotes`, `verify-iframe-mount`, `verify-recompose-storms`,
+  `verify-reflow-triggers`, `verify-visibility`, `verify-print-resize`,
+  `verify-scheduler`, `verify-translation`, `verify-options`, `verify-react`,
+  `verify-react-node`, `verify-recipe-reproduces`, `verify-site-index`,
+  `verify-docs`, `verify-release-trust` and `verify-package-contents`. Each
+  behaviour suite fails on the published 4.2.0 build. CI-only and nightly
+  lanes: `verify-test-runners` (Vitest, Jest, attw, publint),
+  `verify-react-matrix`, `scripts/site/verify-site.mjs` and
+  `verify-safe-fetch`.
 
 ## 4.2.0 - 2026-09-17
 

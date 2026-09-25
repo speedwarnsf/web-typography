@@ -1,8 +1,9 @@
 # Show HN kit — Dustin posts, this is the ammunition
 
 Post only after 4.3.0 ships. Every number below comes from a script in the
-repository; commenters will check.
-<!-- TODO(docs-sync): refresh the numbers from the 4.3.0 bench and homepage sweep before posting. -->
+repository; commenters will check. The cost figures are from the 4.3.0
+benchmark (docs/BENCHMARKS.md) and the homepage counts from
+scripts/field/sweep-homepage.mjs run on the 4.3.0 candidate.
 
 ## The title (pick one, first is recommended)
 
@@ -42,9 +43,9 @@ leave — the first two hours of answering comments decide the thread.
 > from the command line.
 >
 > What it doesn't do: hyphenation, justification, right-to-left or non-Latin
-> scripts. Languages: English, French, German, Spanish. Cost: about 5 to 8
-> ms per paragraph on an M2 laptop, about 25 ms with the CPU slowed 4x; the
-> first screen of a 200-paragraph article is done in about 50 ms. 42 KB
+> scripts. Languages: English, French, German, Spanish. Cost: about 5 ms
+> per paragraph on an M2 laptop, about 21 ms with the CPU slowed 4x; the
+> first screen of a 200-paragraph article is done in about 55 ms. 52 KB
 > gzipped for the script tag, no dependencies, no telemetry. MIT.
 >
 > Try it on your own site at https://typeset.us/fix. If it breaks a line
@@ -62,9 +63,12 @@ leave — the first two hours of answering comments decide the thread.
   JavaScript.
 - **"Accessibility?"** The suite reads the accessibility tree Chromium and
   WebKit actually build, on every run, and Firefox's nightly, and requires
-  the words and every link and heading name to match the source.
-  <!-- TODO(docs-sync): say what screen readers hear at a generated break after C2. -->
-  Find-in-page across a generated break is a known limitation (SUPPORT.md).
+  the words and every link and heading name to match the source. A
+  generated break that replaces a space is exposed, so a screen reader meets
+  a line boundary there, as at any line end; 4.2.0 hid them and joined the
+  words. Spoken VoiceOver and NVDA output has not been checked by a person
+  yet. Find-in-page across a generated break is a known limitation
+  (SUPPORT.md).
 - **"CLS / SEO?"** The server HTML is unchanged. Composition keeps the line
   count except one line to fix a stranded word; the 4.2 audit measured CLS 0
   with 0 of 400 paragraphs changing line count. It waits for web fonts.
