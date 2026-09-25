@@ -221,13 +221,19 @@ class RichText extends Component<RichProps, State> {
       // too, so a frame never paints half of it.
       compose: (_reason, inCommit) => { if (inCommit) this.recompose(); else flushSync(this.recompose); },
       changed: fonts => this.state.stale || layoutKey(el, fonts) !== this.layout,
-      widest: () => this.state.stale || !this.state.plan?.breaks.length ? 0 : this.widest,
-      stale: () => flushSync(() => this.setState({ stale: true })),
+      // Frozen, nothing may re-render: a narrower container must not pick
+      // this host for stale mode.
+      widest: () => this.frozen || this.state.stale || !this.state.plan?.breaks.length ? 0 : this.widest,
+      // Every state update outside a commit is refused while frozen. React
+      // would remove Text nodes the translator already replaced and, with no
+      // error boundary, unmount the whole root.
+      stale: () => { if (!this.frozen) flushSync(() => this.setState({ stale: true })); },
       translation: active => {
         this.frozen = active;
         if (!active) adapterRegistry(el.ownerDocument).request(entry, 'force', false);
       },
       unsupported: () => {
+        if (this.frozen) return;
         this.reporting = performance.now();
         this.planned = propsKey(this.props);
         this.setState({ plan: { source: el.textContent || '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 },

@@ -5,7 +5,8 @@
 // split, merged, edited or removed by the engine, and no recomposition until
 // the translation ends. Signals: the root's translated-ltr/rtl class (Google,
 // Chrome), a <font> wrapper inside composed text, and Edge's _msttexthash.
-// TypesetRichText freezes. The page bundles mount() and the React adapters as
+// TypesetRichText freezes, also when its column narrows while the translator
+// holds its Text nodes. The page bundles mount() and the React adapters as
 // one engine copy. The live Google Translate smoke test needs the network and
 // is not part of this offline suite.
 import { build } from 'esbuild';
@@ -133,6 +134,52 @@ for (const { name, engine, executablePath } of browsers) {
       check('while translated: no recomposition and no engine edits to text', result.during.removedText === 0 && result.during.addedText === 0 && result.during.editedText === 0 && result.during.state.every((/** @type {any} */ s) => s.markers === 0), result.during);
       check('TypesetRichText freezes while translated', result.during.richUnchanged, result.during);
       check('translation ended: the current DOM is composed again', result.after.every((/** @type {any} */ s) => s.outcome === 'composed:rich' && s.markers > 0) && result.richOutcome === 'composed:rich', result.after);
+      await page.close();
+    }
+    // The translator fills TypesetRichText's Text nodes too, then the column
+    // narrows below the widest composed line (a rotation, a sidebar, a fluid
+    // layout). The adapter stays frozen: a re-render would make React remove
+    // Text nodes the translator replaced, and unmount the whole root.
+    {
+      const page = await open();
+      /** @type {string[]} */
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const rr = /** @type {HTMLElement} */ (document.getElementById('rr'));
+        const composed = { outcome: rr.dataset.tsOutcome, breaks: rr.querySelectorAll('br[data-ts-break]').length };
+        document.documentElement.classList.add('translated-ltr');
+        await w.frames();
+        const app = /** @type {HTMLElement} */ (document.getElementById('app'));
+        const walker = document.createTreeWalker(app, NodeFilter.SHOW_TEXT);
+        /** @type {Text[]} */
+        const nodes = [];
+        let node;
+        while ((node = walker.nextNode())) nodes.push(/** @type {Text} */ (node));
+        /** @type {[HTMLElement, Text][]} */
+        const saved = [];
+        for (const text of nodes) {
+          if (!text.data.trim()) continue;
+          const outer = document.createElement('font'), inner = document.createElement('font');
+          inner.textContent = text.data.toUpperCase();
+          outer.append(inner); saved.push([outer, text]); text.replaceWith(outer);
+        }
+        const frozen = rr.innerHTML;
+        /** @type {HTMLElement} */ (document.getElementById('react-col')).style.width = '240px';
+        await w.frames(6);
+        await new Promise(r => setTimeout(r, 400));
+        const during = { children: app.childElementCount, rr: !!document.getElementById('rr'), unchanged: document.getElementById('rr')?.innerHTML === frozen, stale: document.getElementById('rr')?.hasAttribute('data-ts-stale') };
+        for (const [font, text] of saved) font.replaceWith(text);
+        document.documentElement.classList.remove('translated-ltr');
+        await w.frames();
+        await new Promise(r => setTimeout(r, 600));
+        const after = document.getElementById('rr');
+        return { composed, during, after: { outcome: after?.dataset.tsOutcome, breaks: after?.querySelectorAll('br[data-ts-break]').length ?? 0 } };
+      });
+      check('TypesetRichText under a translator: a narrower column keeps the root mounted and the adapter frozen', result.composed.outcome === 'composed:rich' && result.composed.breaks > 0
+        && result.during.children === 2 && result.during.rr && result.during.unchanged && !result.during.stale && !pageErrors.length, { ...result, pageErrors: pageErrors.slice(0, 3) });
+      check('TypesetRichText under a translator: show original recomposes at the new width', result.after.outcome === 'composed:rich' && result.after.breaks > result.composed.breaks, result.after);
       await page.close();
     }
     // A <font> wrapper inside composed text, with no root class.
