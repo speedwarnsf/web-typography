@@ -284,9 +284,17 @@ Outside the changes below, 0 of these differ in any engine.
   there would make React remove Text nodes the translator had replaced and
   unmount the whole root). 4.2.0 merged and edited the Text nodes the
   translator was filling, which lost sentences. The Text nodes a
-  composition split stay split, so a translation can show a stray space
-  before punctuation ("dijo ,", 3 of 9 paragraphs in a live Google
-  Translate check); no text is lost (SUPPORT.md).
+  composition split stay split while the page is translated, so a
+  translation can show a stray space before punctuation ("dijo ,", 3 of 9
+  paragraphs in a live Google Translate check); no text is lost
+  (SUPPORT.md). When the translation ends, they are merged and the smart
+  quotes straightened before the text is composed again, wherever the
+  translator left them as they were: a framework writing to its own Text
+  node after "show original" no longer leaves the old text's split tails on
+  screen beside the new text, and `disconnect()` returns the author's markup
+  exactly instead of curled quotes and some 220 split Text nodes. A word
+  space beside a removed break is moved in place, so a screen reader's
+  live Chromium tree no longer reads joined words at every former break.
 - **`mount()` works in same-origin iframes (C12).** Inserted paragraphs,
   text edits, resizes and fonts inside a parent-mounted iframe document are
   picked up, and copied links keep absolute URLs there (nodes from another

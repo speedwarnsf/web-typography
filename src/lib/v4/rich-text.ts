@@ -539,9 +539,33 @@ export function releaseSplits(element: HTMLElement, splits: Iterable<SplitRecord
   }
 }
 
+/** Merge split Text nodes back only where every part is still in place,
+ * in order, holding the text it was split into; anything else is left as it
+ * is. For text a translator held (see yieldToTranslation in typeset.next):
+ * its markers and wrappers are already gone, and nothing may be removed
+ * that a merge would not put back. */
+export function rejoinSplits(element: HTMLElement, splits: Iterable<SplitRecord>): void {
+  for (const { head, parts, expected } of splits) {
+    if (parts.length < 2 || !parts.every((part, i) => part.parentNode === head.parentNode && element.contains(part) && part.data === expected[i])) continue;
+    let adjacent = true;
+    for (let i = 1; i < parts.length && adjacent; i++) {
+      let node = parts[i - 1].nextSibling;
+      while (node && node !== parts[i] && node.nodeType === Node.TEXT_NODE && !(node as Text).length) node = node.nextSibling;
+      adjacent = node === parts[i];
+    }
+    if (!adjacent) continue;
+    head.data = expected.join('');
+    for (const tail of parts.slice(1)) tail.remove();
+  }
+}
+
 export interface RichOutput {
   /** Remove this output; `written` as in releaseSplits. */
   cleanup: (written?: ReadonlySet<Node>) => void;
+  /** After a translator's release: rejoin this output's splits (see
+   * rejoinSplits) and stop handling its copies. Markers and wrappers are
+   * already gone; nothing else is touched. */
+  rejoin: () => void;
   nodes: Node[];
   /** Text nodes this output split, including author nodes; see releaseSplits. */
   heads: ReadonlySet<Text>;
@@ -660,6 +684,13 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       }
       releaseCopy();
       restoreSelection();
+    },
+    rejoin() {
+      if (released) return;
+      released = true;
+      rejoinSplits(element, splits.values());
+      if (breaks.length) wrapOverrides.delete(element);
+      releaseCopy();
     },
   };
 }

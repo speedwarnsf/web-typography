@@ -6,7 +6,9 @@
 // the translation ends. Signals: the root's translated-ltr/rtl class (Google,
 // Chrome), a <font> wrapper inside composed text, and Edge's _msttexthash.
 // TypesetRichText freezes, also when its column narrows while the translator
-// holds its Text nodes. The page bundles mount() and the React adapters as
+// holds its Text nodes. When the translation ends, split Text nodes are merged
+// and straight quotes put back, so framework writes and restore() see the
+// author's text. The page bundles mount() and the React adapters as
 // one engine copy. The live Google Translate smoke test needs the network and
 // is not part of this offline suite.
 import { build } from 'esbuild';
@@ -211,6 +213,58 @@ for (const { name, engine, executablePath } of browsers) {
         return { ...w.engineRecords(), connected: texts.every((/** @type {Text} */ t) => t.isConnected), state: w.state() };
       });
       check('an _msttexthash attribute: every host steps aside without touching Text nodes', result.removedText === 0 && result.addedText === 0 && result.editedText === 0 && result.connected && result.state.every((/** @type {any} */ s) => s.outcome === 'native:translated' && s.markers === 0), result);
+      await page.close();
+    }
+    // A round trip ("show original"), then a framework's write and a restore.
+    // The engine merges the Text nodes it split and puts straight quotes back
+    // once the translation ends: a framework writing to its own node must not
+    // leave the old text's split tails on screen, and disconnect() returns
+    // the author's markup exactly, not curled quotes and fragments.
+    {
+      const page = await open();
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const col = document.createElement('div');
+        col.className = 'col';
+        col.innerHTML = '<p class="q" id="q1">"Don\'t worry," the nurse said, "the results from Tuesday\'s test are normal, and <em>we\'ll call you</em> when the follow-up visit is booked." It\'s the <a href="#p">clinic\'s policy</a> to phone every patient within one working day of the week.</p><p class="q" id="q2"></p>';
+        document.body.append(col);
+        const q2 = /** @type {HTMLElement} */ (document.getElementById('q2'));
+        const held = document.createTextNode('The long-term follow-up study of twelve hundred participants found that peer-support programs cut relapse rates substantially between 2019 and 2023, across every region we measured.');
+        q2.append(held);
+        const original = col.innerHTML;
+        const controller = w.Typeset.mount(col, 'p.q', { smartQuotes: 'en' });
+        await controller.ready;
+        await new Promise(r => setTimeout(r, 200));
+        const composed = [...col.querySelectorAll('p')].map(p => ({ outcome: /** @type {HTMLElement} */ (p).dataset.tsOutcome, breaks: p.querySelectorAll('br[data-ts-break]').length }));
+        document.documentElement.classList.add('translated-ltr');
+        await w.frames();
+        const nodes = [];
+        const walker = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) if (/** @type {Text} */ (node).data.trim()) nodes.push(/** @type {Text} */ (node));
+        const saved = nodes.map(text => { const outer = document.createElement('font'), inner = document.createElement('font'); inner.textContent = text.data.toUpperCase(); outer.append(inner); text.replaceWith(outer); return [outer, text]; });
+        await w.frames();
+        for (const [font, text] of saved) font.replaceWith(text);
+        document.documentElement.classList.remove('translated-ltr');
+        await w.frames();
+        await new Promise(r => setTimeout(r, 500));
+        const recomposed = [...col.querySelectorAll('p')].map(p => ({ outcome: /** @type {HTMLElement} */ (p).dataset.tsOutcome, breaks: p.querySelectorAll('br[data-ts-break]').length }));
+        held.data = 'Short new text.';
+        await w.frames();
+        await new Promise(r => setTimeout(r, 300));
+        const written = q2.textContent;
+        held.data = 'The long-term follow-up study of twelve hundred participants found that peer-support programs cut relapse rates substantially between 2019 and 2023, across every region we measured.';
+        await w.frames();
+        await new Promise(r => setTimeout(r, 300));
+        controller.disconnect();
+        let empty = 0, adjacent = 0;
+        const all = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+        while ((node = all.nextNode())) { if (!(/** @type {Text} */ (node)).length) empty++; if (node.nextSibling?.nodeType === 3) adjacent++; }
+        return { composed, recomposed, written, restored: col.innerHTML === original, empty, adjacent, now: col.innerHTML.slice(0, 160) };
+      });
+      check('translation round trip: the text is composed before and after', result.composed.every((/** @type {any} */ s) => s.outcome === 'composed:rich' && s.breaks > 0) && result.recomposed.every((/** @type {any} */ s) => s.outcome === 'composed:rich' && s.breaks > 0), { composed: result.composed, recomposed: result.recomposed });
+      check('translation round trip: a framework write to its own Text node shows exactly the new text', result.written === 'Short new text.', result.written);
+      check('translation round trip: disconnect() restores the author markup exactly, with straight quotes and no split Text nodes', result.restored && result.empty === 0 && result.adjacent === 0, result);
       await page.close();
     }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }

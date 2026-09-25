@@ -1,5 +1,5 @@
 import type { LayoutMetrics } from './layout-metrics';
-import { afterComment, engineText, positional, preserveRichCopy, reactOwned, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
+import { afterComment, engineText, positional, preserveRichCopy, reactOwned, rejoinSplits, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
 import type { RichOutput, SplitRecord } from './rich-text';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
@@ -133,6 +133,11 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
     element.querySelectorAll('[' + TRACK_ATTRIBUTE + ']').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
     releaseSplits(element, splits.values(), written);
     releaseCopy(); restoreSelection();
+  }, rejoin() {
+    if (released) return;
+    released = true;
+    rejoinSplits(element, splits.values());
+    releaseCopy();
   } };
 }
 

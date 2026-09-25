@@ -269,8 +269,13 @@ function ownsOutput(el: HTMLElement, state: State): boolean {
 
 /** Release this engine's output. Original nodes, attributes, and listeners survive. */
 export function restore(element: HTMLElement): void {
+  settleTranslation(element);
   const state = states.get(element);
-  if (!state) return;
+  if (!state) {
+    // Released to a translator: only the outcome is left to remove.
+    if (element.dataset.tsOutcome === 'native:translated') delete element.dataset.tsOutcome;
+    return;
+  }
   const restoreSelection = selectionBookmark(element);
   state.optical?.cleanup();
   state.tracking?.cleanup();
@@ -290,14 +295,17 @@ export function restore(element: HTMLElement): void {
   element.removeAttribute('data-ts-stale');
 }
 
+/** Compositions released to a translator, until the translation ends. */
+const translated = new WeakMap<HTMLElement, State>();
 /** Release to a translator. Engine markers are removed and wrappers unwrapped
  * by moving their existing Text nodes; no Text node is split, merged, edited
  * or removed, since the translator holds and fills them. Quote substitutions
- * stay as they are for the same reason. A word space beside a removed break
- * or wrapper is moved in place too: Chromium left it out of its accessibility
- * tree while it collapsed at a line end and does not add it back as it comes
- * to sit mid-line, which would join the words around every former break for
- * a screen reader already running. */
+ * stay as they are for the same reason; both are undone when the translation
+ * ends (settleTranslation). A word space beside a removed break or wrapper is
+ * moved in place too: Chromium left it out of its accessibility tree while it
+ * collapsed at a line end and does not add it back as it comes to sit
+ * mid-line, which would join the words around every former break for a
+ * screen reader already running. */
 function yieldToTranslation(element: HTMLElement): void {
   const state = states.get(element);
   const spaces = new Set<Text>();
@@ -307,6 +315,7 @@ function yieldToTranslation(element: HTMLElement): void {
   for (const marker of element.querySelectorAll('[data-ts-break]')) { beside(marker); marker.remove(); }
   for (const wrapper of element.querySelectorAll('[data-ts-track], .ts-line[data-ts-generated]')) { beside(wrapper); wrapper.replaceWith(...wrapper.childNodes); }
   for (const space of spaces) if (space.parentNode && element.contains(space)) space.parentNode.insertBefore(space, space.nextSibling);
+  if (state && !translated.has(element)) translated.set(element, state);
   if (state) {
     resetStyles(element, state);
     if (element.style.getPropertyPriority('text-wrap-style') === 'important' && element.style.getPropertyValue('text-wrap-style') === 'auto') element.style.removeProperty('text-wrap-style');
@@ -315,6 +324,21 @@ function yieldToTranslation(element: HTMLElement): void {
   states.delete(element);
   for (const name of ['typesetDone', 'tsQuotes', 'tsHanging', 'tsSpacing', 'tsTracking']) delete element.dataset[name];
   element.removeAttribute('data-ts-stale');
+}
+/** The translation ended ("show original"): merge the Text nodes the released
+ * composition split and put its straight quotes back, wherever the translator
+ * left them as they were, so the next composition, a restore() or a
+ * framework's next write starts from the author's text, not from engine
+ * fragments (a write to a split author node would leave its old tails on
+ * screen beside the new text). */
+function settleTranslation(element: HTMLElement): void {
+  const state = translated.get(element);
+  if (!state || translationActive(element.ownerDocument)) return;
+  translated.delete(element);
+  const restoreSelection = selectionBookmark(element);
+  for (const output of [state.optical, state.tracking, state.spacing, state.rich]) output?.rejoin();
+  state.quotes?.restore();
+  restoreSelection();
 }
 
 /** Exact DOM measurements inherit font features, axes, tracking and transforms. */
@@ -431,6 +455,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     element.dataset.tsOutcome = 'native:translated';
     return { outcome: 'native:translated', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   }
+  settleTranslation(element);
   if (liveText(element)) {
     // Release any earlier composition and apply adapter text, then leave the
     // region alone: no measurement overrides, no markers, no attributes.

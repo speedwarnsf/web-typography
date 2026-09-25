@@ -184,7 +184,10 @@ Machine translation: when a page is translated (Google Translate and Chrome set
 Edge adds `_msttexthash`), `mount()` and `typeset()` step aside with outcome
 `native:translated`, moving but never splitting, merging or removing the Text
 nodes the translator fills, and compose the current DOM again when the
-translation ends. `TypesetRichText` only freezes: the breaks React rendered
+translation ends. Before that composition they merge the Text nodes they had
+split and put straight quotes back, wherever the translator left those nodes
+as they were, so a framework's next write to its own node and a later
+`restore()` or `disconnect()` start from the author's text. `TypesetRichText` only freezes: the breaks React rendered
 remain, so a translation of that text is read per line. `TypesetText` steps
 aside like `mount()`.
 
@@ -307,7 +310,10 @@ changes only an isolated preview, never a deployed site.
   Translate sometimes joins those segments with a stray space before
   punctuation ("dijo ,"): 3 of 9 test paragraphs in a live English to
   Spanish check, in all three engines, where the uncomposed page had none.
-  No text is lost, and showing the original restores the source exactly.
+  No text is lost, and showing the original restores the source exactly:
+  the split Text nodes are merged and curled quotes straightened again
+  before the text is composed once more (where the translator changed a
+  node, it is left as it is).
   A word space beside a removed break is moved in place as well, so a
   Chromium accessibility tree that was live before the release (a screen
   reader running) reads it; `scripts/v4/verify-native-ax.mjs` checks that
