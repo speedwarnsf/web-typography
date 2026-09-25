@@ -411,28 +411,49 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
 const liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
 // A literal, not a concatenation, so bundlers can drop it with the functions.
 const regions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+/** An element's parent in the flat tree, as assistive technology sees it:
+ * the slot it is assigned to, else its parent element, else, at the top of a
+ * shadow tree, that tree's host. */
+function flatParent(element: Element): Element | null {
+  const slot = (element as Element & { assignedSlot?: Element | null }).assignedSlot;
+  if (slot) return slot;
+  if (element.parentElement) return element.parentElement;
+  const root = element.parentNode as (Node & { host?: Element }) | null;
+  return root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE && root.host ? root.host : null;
+}
+
 /** Whether this element is inside a live region. The nearest element with a
  * non-empty aria-live decides: "off" is not live, and any other value is
  * (Chromium announces an unknown value too). An empty aria-live counts as
  * absent; without one, a status, alert, log, marquee or timer role, or
  * <output>, is live. Assistive technology announces every change there, and
  * composing rewrites the text on each resize, font load and idle pass, so
- * screen readers repeated status messages whose words had not changed. */
+ * screen readers repeated status messages whose words had not changed.
+ * Ancestors are those of the flat tree: a design system's toast or alert
+ * often puts the region on an open shadow root's wrapper around a <slot>.
+ * A role or aria-live set through ElementInternals, or inside a closed
+ * shadow root, cannot be read from outside (SUPPORT.md: data-no-typeset). */
 export function inLiveRegion(element: Element): boolean {
-  for (let region = element.closest(regions); region; region = region.parentElement?.closest(regions) ?? null) {
+  for (let region: Element | null = element; region; region = flatParent(region)) {
     const live = region.getAttribute('aria-live')?.trim().toLowerCase();
     if (live) return live !== 'off';
-    if (region.matches(liveRoles)) return true;
+    if ((region.hasAttribute('role') || region.localName === 'output') && region.matches(liveRoles)) return true;
   }
   return false;
 }
 
 /** Whether any of this element's text is in a live region: the element is
  * inside one, or contains one (a result count, a cart total or a "saved"
- * status inside a paragraph). Composing it would rewrite the region's text. */
+ * status inside a paragraph), or contains a component whose open shadow
+ * root puts the text slotted into it in one. Composing it would rewrite the
+ * region's text. */
 export function liveText(element: Element): boolean {
   if (inLiveRegion(element)) return true;
   for (const region of element.querySelectorAll(regions)) if (inLiveRegion(region)) return true;
+  for (const host of element.querySelectorAll('*')) {
+    const shadow = host.shadowRoot;
+    if (shadow) for (const slot of shadow.querySelectorAll('slot')) if (inLiveRegion(slot)) return true;
+  }
   return false;
 }
 

@@ -146,7 +146,13 @@ Outside the changes below, 0 of these differ in any engine.
   as live, as Chromium treats them; composed text moved into a live region
   (a toast) is released in the same mutation callback as the move; and
   `TypesetText` in a region keeps the quotes it curled while rendering and
-  writes a new value once, curled. Golden diff: 9 of 13 paragraphs
+  writes a new value once, curled. Regions are found through open shadow
+  roots as assistive technology sees them: text slotted into a component's
+  live wrapper (a toast or alert with `role="status"` around a `<slot>`), a
+  paragraph containing a component whose slot is live, and text in a shadow
+  root under a live region. Roles set through `ElementInternals` or inside a
+  closed shadow root cannot be read from outside; SUPPORT.md gives
+  `data-no-typeset` as the workaround. Golden diff: 9 of 13 paragraphs
   on the live-region fixture, per loader and engine (a paragraph that
   contains an `<output>` now reports `native:live-region`, not
   `native:rich-element`); 0 in the golden sets, which have no live regions.

@@ -21,6 +21,9 @@
 // later is released; one that stops being live is composed; a composed
 // paragraph moved into a live toast is released with the move itself.
 // TypesetText in a region keeps the quotes it curled while rendering.
+// Regions in shadow DOM count too: text slotted into a component's live
+// wrapper (a toast, an alert), a component with a live slot inside a
+// paragraph, and text in a shadow root under a live light-DOM region.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -185,6 +188,62 @@ await Promise.all(browsers.map(async config => {
         }
       } catch (error) {
         errors.push({ browser: config.name, error: `${loader}: ${String(/** @type {Error} */ (error).stack || error).split('\n').slice(0, 3).join(' ')}` });
+      } finally { await context.close(); }
+    }
+    // Live regions in open shadow roots, under mount().
+    {
+      const context = await browser.newContext({ viewport: { width: 420, height: 1400 } });
+      const SHADOW = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia}main{width:300px}p{margin:0 0 14px}</style>
+<script>
+const define = (name, html) => customElements.define(name, class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }).innerHTML = html; } });
+define('x-toast', '<div role="status" aria-live="polite"><slot></slot></div>');
+define('x-alert', '<div role="alert"><slot></slot></div>');
+define('x-count', '<span role="status"><slot></slot></span>');
+define('x-plain', '<div><slot></slot></div>');
+define('x-card', '<p id="inner">${TEXT.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</p>');
+</script><script src="/typeset.js"></script></head><body><main>
+<x-toast><p id="sh1">${TEXT}</p></x-toast>
+<x-alert><p id="sh2">${TEXT}</p></x-alert>
+<p id="sh4">Showing <x-count>12 of 48 results</x-count> ${COUNT}</p>
+<div aria-live="polite"><x-card id="card"></x-card></div>
+<x-plain><p id="sh5">${TEXT}</p></x-plain>
+</main></body></html>`;
+      await context.route('http://live.test/**', route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path in scripts) return route.fulfill({ contentType: 'text/javascript', body: /** @type {Record<string, string>} */ (scripts)[path] });
+        return route.fulfill({ contentType: 'text/html; charset=utf-8', body: SHADOW });
+      });
+      const page = await context.newPage();
+      page.setDefaultTimeout(20000);
+      page.on('pageerror', error => errors.push({ browser: config.name, error: `shadow: ${error.message}` }));
+      try {
+        await page.goto('http://live.test/shadow');
+        const facts = await page.evaluate(async () => {
+          const w = /** @type {any} */ (window);
+          const live = ['sh1', 'sh2', 'sh4'].map(id => /** @type {HTMLElement} */ (document.getElementById(id)));
+          const records = /** @type {string[]} */ ([]);
+          const watcher = new MutationObserver(list => { for (const r of list) { const el = r.target.nodeType === 1 ? /** @type {Element} */ (r.target) : r.target.parentElement; if (el && live.some(p => p.contains(el))) records.push(r.type); } });
+          watcher.observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
+          const controller = w.Typeset.mount(document, 'main p');
+          await controller.ready;
+          await new Promise(resolve => setTimeout(resolve, 300));
+          /** @type {HTMLElement} */ (document.querySelector('main')).style.width = '260px';
+          await new Promise(resolve => setTimeout(() => requestAnimationFrame(() => resolve(undefined)), 450));
+          records.push(...watcher.takeRecords().map(r => r.type));
+          const inner = /** @type {HTMLElement} */ (/** @type {ShadowRoot} */ (/** @type {HTMLElement} */ (document.getElementById('card')).shadowRoot).getElementById('inner'));
+          return {
+            records,
+            outcomes: Object.fromEntries(['sh1', 'sh2', 'sh4', 'sh5'].map(id => [id, /** @type {HTMLElement} */ (document.getElementById(id)).dataset.tsOutcome ?? null])),
+            breaks: live.reduce((n, p) => n + p.querySelectorAll('[data-ts-break]').length, 0),
+            audit: w.Typeset.auditJSON('main p').outcomes,
+            inner: w.Typeset.typeset(inner).outcome,
+          };
+        });
+        check('shadow DOM: text slotted into a live toast or alert, and a paragraph with a live slotted count, are never composed or written', facts.records.length === 0 && facts.breaks === 0 && !facts.outcomes.sh1 && !facts.outcomes.sh2 && !facts.outcomes.sh4 && facts.audit['native:live-region'] === 3, facts);
+        check('shadow DOM: text in a shadow root under a live light-DOM region reports native:live-region', facts.inner === 'native:live-region', facts.inner);
+        check('shadow DOM: text slotted into a component that is not live composes', facts.outcomes.sh5 === 'composed:rich', facts.outcomes);
+      } catch (error) {
+        errors.push({ browser: config.name, error: `shadow: ${String(/** @type {Error} */ (error).stack || error).split('\n').slice(0, 3).join(' ')}` });
       } finally { await context.close(); }
     }
   } finally { await browser.close(); }
