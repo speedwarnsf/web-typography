@@ -340,6 +340,14 @@ changes only an isolated preview, never a deployed site.
   changed width while the window did not) can paint one frame of
   alternating long and short lines; from the next frame the block shows
   native wrapping (`data-ts-stale`) until it is recomposed.
+- **Far text brought on screen by a jump.** Text more than a viewport
+  height below the fold (of the window, or of the pane it scrolls in)
+  composes in idle time, so it never costs a frame of a screen push or a
+  scroll. A jump that brings it on screen before then (a scrollbar drag,
+  End, an anchor link, one large wheel delta soon after a load, or while an
+  animation keeps frames pending) paints its native lines for one frame and
+  rewraps in the next. With the React adapters, `priority="sync"` composes a
+  block in its commit instead.
 - **Machine translation.** While a page is translated (Google Translate and
   Chrome set `translated-ltr`/`translated-rtl` on `<html>`, translators wrap
   text in `<font>`, Edge adds `_msttexthash`), `mount()`, the loaders,

@@ -609,8 +609,15 @@ table.
   text below the pane's fold counted as far until it was on screen, so
   blocks scrolled in within about 0.5 to 1 s of a load or screen push
   (while animations kept frames pending) painted native lines and were
-  rewrapped 2 to 5 frames later, which 4.2 did not do; now none do, in
-  three engines. `mount()` measures nearness the same way.
+  rewrapped 2 to 5 frames later, which 4.2 did not do; now none within a
+  viewport height of the window or pane do, in three engines. `mount()`
+  measures nearness the same way. Blocks further away still wait for idle
+  time, so a jump (a scrollbar drag, End, an anchor link, one large wheel
+  delta) that brings one on screen soon after a load, or while an
+  animation keeps frames pending, paints its native lines for one frame
+  and rewraps in the next (Wellth's home screen, 150 to 300 ms after its
+  prose rendered: 4 of 4 jumps at 1x, 2 of 4 at 4x; 4.2.0, which had
+  composed everything by then: 0); SUPPORT.md lists it.
 - React hosts under continuous change: a translation or fade written every
   frame on their container is no longer checked at all, as with `mount()`
   (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three
