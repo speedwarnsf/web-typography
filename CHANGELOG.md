@@ -552,7 +552,9 @@ table.
   (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three
   engines). A host whose text metrics change again within 100 ms of a check
   composing it (a font-size or spacing transition, a text-size slider)
-  shows native lines until they hold for 100 ms and is composed once, where
+  shows native lines until they hold for 100 ms and is composed once (a
+  font face finishing, even right after another, composes at once and
+  never shows native lines), where
   the first 4.3 candidate recomposed every on-screen host in every frame: a
   60-frame text-size slider over 16 blocks at 4x CPU went from 466
   compositions and 30 or more long tasks to about 40 and 2, and a 1.2 s

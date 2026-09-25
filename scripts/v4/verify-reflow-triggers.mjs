@@ -244,6 +244,37 @@ for (const { name, engine, executablePath } of browsers) {
         within(before.ms) && within(result.ms) && result.audit === 0 && result.outcomes.filter((/** @type {string} */ o) => o === 'composed:rich').length >= 2 && (trigger !== 'setFontSizes' || result.fontSize === '21px'), { before, ...result });
       await page.close();
     }
+    // 7b. Font faces that finish one after another are one-off changes, not
+    // a continuous metric change: two faces of a family no host uses, loaded
+    // 60 ms apart, must not show any composed host native lines. (The first
+    // round-2 candidate marked every visible host data-ts-stale for about
+    // 110 ms and then recomposed the same lines.)
+    {
+      const page = await open('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>' + css + '</style></head><body data-col="col"><div id="app"></div><script src="/react.js"></script></body></html>', { mount: false, react: true });
+      await page.waitForSelector('.r[data-ts-outcome]');
+      await page.addScriptTag({ url: '/engine.js' });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        await w.settle();
+        const ready = await w.until('.r');
+        /** @type {string[]} */
+        const stale = [];
+        new MutationObserver(records => { for (const record of records) if (/** @type {Element} */ (record.target).hasAttribute('data-ts-stale')) stale.push(/** @type {Element} */ (record.target).tagName); })
+          .observe(/** @type {HTMLElement} */ (document.getElementById('app')), { subtree: true, attributes: true, attributeFilter: ['data-ts-stale'] });
+        const first = new FontFace('UnusedOne', 'url(/fixture.woff2?one)'), second = new FontFace('UnusedTwo', 'url(/fixture.woff2?two)');
+        document.fonts.add(first); document.fonts.add(second);
+        const loads = [first.load().catch(() => null)];
+        await new Promise(r => setTimeout(r, 60));
+        loads.push(second.load().catch(() => null));
+        await Promise.all(loads);
+        await new Promise(r => setTimeout(r, 400));
+        await w.settle();
+        return { ready, stale, ms: await w.until('.r'), faces: [first.status, second.status], outcomes: w.blocks('.r').map((/** @type {HTMLElement} */ el) => el.dataset.tsOutcome) };
+      });
+      check('React adapters: two faces of an unused family finishing 60 ms apart show no host native lines', within(result.ready) && result.stale.length === 0 && within(result.ms)
+        && result.faces.every((/** @type {string} */ s) => s === 'loaded') && result.outcomes.filter((/** @type {string} */ o) => o === 'composed:rich').length >= 2, result);
+      await page.close();
+    }
     // 8. The audit catches a stale layout: composed, released, then respaced.
     {
       const page = await open(pageHTML());

@@ -24,7 +24,8 @@
  * composed lines no longer fit shows native lines (stale) and recomposes once
  * the size has held for RESIZE_SETTLE_MS; so does a host whose metrics change
  * again within RESIZE_SETTLE_MS of a check composing it (a font-size or
- * spacing transition, a text-size slider). Hidden hosts keep their composition
+ * spacing transition, a text-size slider), unless a font face finished in
+ * between, which composes. Hidden hosts keep their composition
  * and are checked when shown; nothing composes while the page prints; and
  * while a translator rewrites the page every host steps aside (see
  * lifecycle.ts). */
@@ -109,9 +110,9 @@ function createRegistry(doc: Document): Registry {
   const near = new Set<AdapterEntry>();
   const resizing = new Set<AdapterEntry>();
   // Hosts in `resizing` because their metrics changed continuously (process),
-  // and when a check last composed each host.
+  // and when a check last composed each host, with the font key it saw.
   const continuous = new Set<AdapterEntry>();
-  const checked = new WeakMap<AdapterEntry, number>();
+  const checked = new WeakMap<AdapterEntry, { at: number; fonts: string }>();
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
   const sizes = new WeakMap<Element, { w: number; h: number }>();
   const watchers = new Map<Element, Set<AdapterEntry>>();
@@ -219,9 +220,11 @@ function createRegistry(doc: Document): Registry {
       // Changed again soon after a check composed it: a font-size or spacing
       // transition, a text-size slider, an animation. Native lines until the
       // metrics hold for RESIZE_SETTLE_MS, then one composition, instead of a
-      // composition in every frame (long tasks, dropped frames).
+      // composition in every frame (long tasks, dropped frames). A font face
+      // finishing is a one-off change, even when faces finish in successive
+      // frames (the key holds every face's status, used or not): it composes.
       const last = checked.get(entry);
-      if (entry.widest() && last !== undefined && performance.now() - last < RESIZE_SETTLE_MS) {
+      if (entry.widest() && last !== undefined && last.fonts === fonts && performance.now() - last.at < RESIZE_SETTLE_MS) {
         writing(() => entry.stale());
         resizing.add(entry); continuous.add(entry);
         settleLater();
@@ -230,7 +233,7 @@ function createRegistry(doc: Document): Registry {
       }
     }
     run(entry, reason, false);
-    if (reason === 'check') checked.set(entry, performance.now()); else checked.delete(entry);
+    if (reason === 'check') checked.set(entry, { at: performance.now(), fonts }); else checked.delete(entry);
   }
   function settleLater(): void {
     clearTimeout(settle);
