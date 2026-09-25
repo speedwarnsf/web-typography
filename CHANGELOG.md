@@ -367,6 +367,17 @@ Outside the changes below, 0 of these differ in any engine.
   own composition breaks under its policy still fails the audit. Tested
   under `style-src 'self'; script-src 'self'; require-trusted-types-for
   'script'; trusted-types 'none'` in Chromium, WebKit and Firefox.
+- **`typeset-audit` passes correct pages longer than one screen.** Without
+  `--apply`, the CLI waited a fixed 150 ms after load, while `mount()` and
+  the loaders compose what is on screen first and the rest in later
+  batches, so the documented CI command failed a correct 200-paragraph
+  article with 176 to 193 paragraphs "unprocessed" in every engine (so did
+  4.2.0's CLI with `go@4.2.0.js`). It now waits for the page's own
+  composition: the loader's `window.TypesetReady`, or an outcome on every
+  element in scope for pages that compose from their own code, for up to
+  `--timeout` seconds (default 30) per width; a page whose composition makes
+  no progress for 2 s is audited as it is. Each report records what it
+  waited for (`waited`), and names the elements still unprocessed.
 - **Clear errors (K11).** `typeset()` throws `TypeError: [typeset] typeset()
   expects an HTMLElement (received ...)` for a non-element, and `mount()` a
   `TypeError` naming what it received, instead of raw TypeErrors from inside

@@ -5,7 +5,9 @@
 // test:v4) with the repository's Playwright; --consumer instead runs the CLI
 // installed in the packed consumer that verify-package.mjs created. Pages
 // under the strict Content Security Policy the engine supports are audited
-// in all three engines.
+// in all three engines, and so are 200-paragraph articles composed by the
+// loader and by mount() in page code: the read-only audit waits for their
+// composition to finish instead of reporting the offscreen part unprocessed.
 import http from 'node:http';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -36,7 +38,7 @@ if (consumerMode) {
 const run = (command, args, extraEnv = {}) => new Promise((accept, reject) => {
   const child = spawn(command, args, { cwd, env: { ...process.env, ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '', stderr = ''; child.stdout.on('data', c => { stdout += c; }); child.stderr.on('data', c => { stderr += c; });
-  const watchdog = setTimeout(() => child.kill('SIGKILL'), 90000);
+  const watchdog = setTimeout(() => child.kill('SIGKILL'), 150000);
   child.on('error', reject); child.on('exit', code => { clearTimeout(watchdog); accept({ code, stdout, stderr }); });
 });
 if (consumerMode) {
@@ -44,6 +46,10 @@ if (consumerMode) {
   if (peer.code !== 0) throw new Error(peer.stderr);
 }
 const goJS = await readFile(consumerMode ? `${cwd}/node_modules/typeset.us/dist/go.js` : `${cwd}/dist/go.js`);
+const globalJS = await readFile(consumerMode ? `${cwd}/node_modules/typeset.us/dist/typeset.global.js` : `${cwd}/dist/typeset.global.js`);
+const corpus = JSON.parse(await readFile('tests/v4-corpus.json', 'utf8')).paragraphs;
+const article = Array.from({ length: 200 }, (_, i) => `<p>${corpus[i % corpus.length].replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('');
+const longPage = (/** @type {string} */ script) => `<!doctype html><html lang="en"><head><style>body{margin:16px;font:17px/1.5 Georgia}article{max-width:36em}</style></head><body><article>${article}</article>${script}</body></html>`;
 const css = 'body{padding:30px}p{font:20px/1.4 Georgia;width:240px}';
 const body = '<body><p data-typeset>"Read <strong>the notes</strong> at <a href="#collection">the neighborhood gallery</a>," she said.</p>';
 const plain = `<!doctype html><html lang="en"><head><style>${css}</style></head>${body}`;
@@ -52,6 +58,9 @@ const STRICT = "style-src 'self'; script-src 'self'; require-trusted-types-for '
 const strict = `<!doctype html><html lang="en"><head><link rel="stylesheet" href="/style.css"></head>${body}`;
 const server = http.createServer((req, res) => {
   if (req.url === '/go.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(goJS); return; }
+  if (req.url === '/typeset.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(globalJS); return; }
+  if (req.url === '/long-loader') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/go.js" data-typeset-selector="article p" defer></script>')); return; }
+  if (req.url === '/long-mount') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/typeset.js"></script><script>Typeset.mount(document, "article p");</script>')); return; }
   if (req.url === '/style.css') { res.writeHead(200, { 'content-type': 'text/css' }); res.end(css); return; }
   const managed = req.url?.endsWith('managed') ? '<script src="/go.js" data-typeset-smart-quotes="en" data-typeset-optical-hanging="true" defer></script>' : '';
   if (req.url?.startsWith('/strict')) { res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': STRICT }); res.end(strict + managed + '</body></html>'); return; }
@@ -81,6 +90,8 @@ try {
     ...browsers.flatMap(({ name }) => /** @type {[string, string[], number][]} */ ([
       [`strict CSP (${name}): existing loader is inspected`, ['--url', `${base}/strict-managed`, '--widths', '320,390', '--browser', name], 0],
       [`strict CSP (${name}): preview composes explicit scope`, ['--url', `${base}/strict`, '--widths', '320,390', '--apply', '--browser', name], 0],
+      [`a 200-paragraph article (${name}): the loader's composition is awaited`, ['--url', `${base}/long-loader`, '--selector', 'article p', '--widths', '390,1440', '--browser', name], 0],
+      [`a 200-paragraph article (${name}): mount() in page code is awaited`, ['--url', `${base}/long-mount`, '--selector', 'article p', '--widths', '390,1440', '--browser', name], 0],
     ])),
   ])) {
     const result = await invoke(args);
@@ -93,7 +104,8 @@ try {
       const reports = output?.reports ?? [];
       const composed = reports.length === 2 && reports.every((/** @type {{ outcomes: Record<string, number> }} */ r) => Object.keys(r.outcomes).some(o => o.startsWith('composed')));
       const did = composed && (output?.errors ?? []).length === 0 && (label !== 'preview composes explicit scope' || reports[0]?.features?.quotes?.applied === 1)
-        && (!label.endsWith('existing loader is inspected') || reports[0]?.features?.quotes?.applied === 1);
+        && (!label.endsWith('existing loader is inspected') || reports[0]?.features?.quotes?.applied === 1)
+        && (!label.includes('200-paragraph') || reports.every((/** @type {{ examined: number, unprocessed: number }} */ r) => r.examined === 200 && r.unprocessed === 0));
       checks.push({ label, pass: did, exitCode: result.code, ...(did ? {} : { detail }) });
       const passes = result.code === 0 && output?.pass === true;
       checks.push({ label: label + ': audit passes', pass: passes, exitCode: result.code, ...(passes ? {} : { detail }) });

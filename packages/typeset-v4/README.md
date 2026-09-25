@@ -178,7 +178,10 @@ npx typeset-audit --url http://localhost:3000 --selector 'article p'
 
 The CLI is read-only (`--apply` composes an isolated preview), uploads
 nothing, and exits 0 on a pass, 1 on a failed audit and 2 on a usage or
-runtime error. It needs Node 18.3 or later; the library itself runs in the
+runtime error. It waits for the page's own composition to finish (the
+loader's `window.TypesetReady`, or an outcome on every element in scope)
+for up to `--timeout` seconds (30) per width, and names any element still
+unprocessed. It needs Node 18.3 or later; the library itself runs in the
 browser and has no Node requirement.
 
 ## What it costs

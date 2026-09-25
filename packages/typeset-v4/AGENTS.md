@@ -95,7 +95,9 @@ npx playwright install chromium. Run typeset-audit --help, or:
 
     typeset-audit --url http://localhost:3000 --selector 'article p'
 
-Read-only by default. --apply composes only an isolated preview, never the
+Read-only by default: it waits for the page's own composition to finish
+(window.TypesetReady, or an outcome on every element in scope) for up to
+--timeout seconds (30) per width. --apply composes only an isolated preview, never the
 deployed site. Exit 0 is the documented safety/coverage gate; 1 fails it;
 2 is invocation/runtime failure. stdout is JSON; errors go to stderr. Reports
 stay local. Do not upload page text, project identity or results without consent.
