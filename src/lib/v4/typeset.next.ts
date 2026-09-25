@@ -15,7 +15,7 @@ import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
@@ -577,7 +577,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
       const left = box.left + parseFloat(style.borderLeftWidth || '0') + parseFloat(style.paddingLeft || '0');
       widest = Math.max(...after.lines.map(line => line.right - left));
-      installLifecycleStyles(element.ownerDocument);
+      installLifecycleStyles(element.ownerDocument, element);
     }
     element.dataset.tsOutcome = outcome;
     element.dataset.typesetDone = '1';
@@ -1074,7 +1074,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       const width = boxOf(el).w;
       if (width > 0 && width < widest - .01) stale.push(el);
     }
-    for (const el of stale) el.setAttribute('data-ts-stale', '');
+    for (const el of stale) { lifecycleStylesFor(el); el.setAttribute('data-ts-stale', ''); }
   };
   /** The size has held: recompose what is on or near the screen now, and
    * leave offscreen blocks until they come near. A stale one is released to
@@ -1410,7 +1410,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const width = view?.innerWidth ?? 0;
     if (width !== windowWidth) {
       windowWidth = width;
-      for (const el of hidden) if (states.get(el)?.widest && !rendered(el)) { el.setAttribute('data-ts-stale', ''); enqueue(el, RELEASE); }
+      for (const el of hidden) if (states.get(el)?.widest && !rendered(el)) { lifecycleStylesFor(el); el.setAttribute('data-ts-stale', ''); enqueue(el, RELEASE); }
     }
     const visible: HTMLElement[] = [];
     for (const el of owned) if (states.get(el)?.widest && onScreen(el)) visible.push(el);

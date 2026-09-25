@@ -329,7 +329,12 @@ Outside the changes below, 0 of these differ in any engine.
   written before the frame's layout. The rules live in a constructable
   stylesheet, which the engine adds back if the page's own assignment to
   `document.adoptedStyleSheets` removed it (printed text was double-wrapped
-  in three engines after such an assignment). Offscreen text left waiting is released
+  in three engines after such an assignment), and which a shadow root
+  holding composed text adopts too: a document's sheets do not reach into
+  shadow trees, so text composed with `mount(shadowRoot, ...)` was marked
+  stale to no effect through a resize (double-wrapped in 21 to 22 of 24
+  frames, against 5 to 18 in 4.2.0, which recomposed per frame) and kept
+  its tracking and spacing in print. Offscreen text left waiting is released
   to native in idle time, so assistive technology never reads it with its
   breaks hidden: Chromium drops the word space beside a hidden break and
   WebKit joins words at the engine's markers, which after a narrowing

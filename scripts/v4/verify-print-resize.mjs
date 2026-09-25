@@ -225,6 +225,64 @@ for (const { name, engine, executablePath } of browsers) {
     const errors = await page.evaluate(() => /** @type {any} */ (window).loopErrors);
     check('no ResizeObserver loop errors', errors.length === 0, errors);
     await page.close();
+
+    // Text composed inside a shadow root (mount(shadowRoot, ...)): a
+    // document-level sheet never reaches a shadow tree, so the lifecycle
+    // rules are adopted there too; without them stale mode did nothing
+    // (double-wrapped frames through a resize) and print kept tracking.
+    {
+      const shadowPage = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+      shadowPage.setDefaultTimeout(20000);
+      await shadowPage.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}</style></head><body><x-card id="card"></x-card></body></html>');
+      await shadowPage.addScriptTag({ content: script });
+      await shadowPage.evaluate(helpers);
+      const shadow = await shadowPage.evaluate(async texts => {
+        const w = /** @type {any} */ (window);
+        const root = /** @type {HTMLElement} */ (document.getElementById('card')).attachShadow({ mode: 'open' });
+        root.innerHTML = '<style>.col{width:440px;padding:0 8px}.twin{position:absolute;visibility:hidden;left:0;right:0;top:0;margin:0}p{margin:0 0 12px}@media print{.col{width:300px}}</style>'
+          + '<div class="col" id="scol">' + texts.map((/** @type {string} */ t, /** @type {number} */ i) => `<div style="position:relative"><p class="t" id="s${i}">${t}</p><p class="twin" data-no-typeset>${t}</p></div>`).join('') + '</div>';
+        await document.fonts.ready;
+        const controller = w.Typeset.mount(root, 'p.t', { tracking: true });
+        await controller.ready;
+        await w.quiet(300);
+        const sample = (/** @type {number} */ i) => {
+          const el = /** @type {HTMLElement} */ (root.getElementById('s' + i)), twin = /** @type {HTMLElement} */ (el.nextElementSibling);
+          const lines = w.Typeset.measureLayout(el).lines.length, breaks = el.querySelectorAll('br[data-ts-break]').length, native = w.Typeset.measureLayout(twin).lines.length, stale = el.hasAttribute('data-ts-stale');
+          return { lines, breaks, native, stale, outcome: el.dataset.tsOutcome, ok: stale ? lines === native : el.dataset.tsOutcome !== 'composed:rich' || lines === breaks + 1 };
+        };
+        const composed = texts.map((/** @type {string} */ _t, /** @type {number} */ i) => sample(i));
+        const col = /** @type {HTMLElement} */ (root.getElementById('scol'));
+        const samples = /** @type {any[]} */ ([]);
+        await new Promise(resolve => {
+          let i = 0;
+          const tick = () => {
+            if (i > 0) for (let k = 0; k < texts.length; k++) samples.push({ ...sample(k), frame: i, k });
+            if (i++ >= 24) { resolve(undefined); return; }
+            col.style.width = (440 - 3 * i) + 'px';
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+        await w.quiet(500);
+        return { composed, badSamples: samples.filter(s => !s.ok).slice(0, 8), bad: samples.filter(s => !s.ok).length, frames: samples.length, staleFrames: samples.filter(s => s.stale).length, settled: texts.map((/** @type {string} */ _t, /** @type {number} */ i) => sample(i)) };
+      }, [a, b, c, d]);
+      check('shadow root: the fixture composes', shadow.composed.every(s => s.outcome === 'composed:rich' && s.ok && s.breaks > 0), shadow.composed);
+      check('shadow root: a container resized from script shows no double-wrapped frame', shadow.bad === 0 && shadow.staleFrames > 0, { bad: shadow.bad, badSamples: shadow.badSamples, frames: shadow.frames, staleFrames: shadow.staleFrames });
+      check('shadow root: the resized container settles composed', shadow.settled.every(s => s.outcome === 'composed:rich' && s.ok && !s.stale), shadow.settled);
+      await shadowPage.emulateMedia({ media: 'print' });
+      const shadowPrint = await shadowPage.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        await w.quiet(100);
+        const root = /** @type {ShadowRoot} */ (/** @type {HTMLElement} */ (document.getElementById('card')).shadowRoot);
+        const tracked = [...root.querySelectorAll('[data-ts-track]')].map(el => getComputedStyle(el).letterSpacing === getComputedStyle(/** @type {Element} */ (el.parentElement)).letterSpacing);
+        const markers = [...root.querySelectorAll('[data-ts-space][data-ts-break]')].map(el => parseFloat(getComputedStyle(el).marginLeft) === 0);
+        const breaks = [...root.querySelectorAll('br[data-ts-break]')].map(el => getComputedStyle(el).display);
+        return { tracked: tracked.length, trackedNeutral: tracked.filter(Boolean).length, markers: markers.length, markersNeutral: markers.filter(Boolean).length, breaksShown: breaks.filter(d => d !== 'none').length };
+      });
+      await shadowPage.emulateMedia({ media: 'screen' });
+      check('shadow root: print hides the breaks and neutralizes tracking and spacing', shadowPrint.breaksShown === 0 && shadowPrint.trackedNeutral === shadowPrint.tracked && shadowPrint.markersNeutral === shadowPrint.markers && shadowPrint.tracked + shadowPrint.markers > 0, shadowPrint);
+      await shadowPage.close();
+    }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }
 }

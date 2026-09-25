@@ -268,18 +268,29 @@ const sheets = new WeakMap<Document, CSSStyleSheet | null>();
  * assigns document.adoptedStyleSheets (a theme switcher, the MDN example)
  * drops it; installing again, and ensureLifecycleStyles() as printing starts,
  * before stale mode and in each pass, put it back. */
-export function installLifecycleStyles(doc: Document): void {
+export function installLifecycleStyles(doc: Document, element?: Element): void {
   const known = sheets.get(doc);
   if (known === null) return;
-  if (known) { ensureLifecycleStyles(doc); return; }
-  try {
+  if (known) ensureLifecycleStyles(doc);
+  else try {
     const Sheet = (doc.defaultView as (Window & typeof globalThis) | null)?.CSSStyleSheet;
     if (!Sheet || !('adoptedStyleSheets' in doc)) { sheets.set(doc, null); return; }
     const sheet = new Sheet();
     sheet.replaceSync(LIFECYCLE_CSS);
     sheets.set(doc, sheet);
     doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
-  } catch { sheets.set(doc, null); /* dist/styles.css carries the same rules. */ }
+  } catch { sheets.set(doc, null); /* dist/styles.css carries the same rules. */ return; }
+  if (element) lifecycleStylesFor(element);
+}
+/** A document's stylesheets do not reach into shadow trees: text composed
+ * inside a shadow root (mount(shadowRoot, ...), a component's own markup)
+ * gets the same sheet adopted by that root, or stale mode and the print
+ * rules would not apply to it. Installs nothing new. */
+export function lifecycleStylesFor(element: Element): void {
+  const root = element.getRootNode() as ShadowRoot;
+  const sheet = root.nodeType === 11 && root.host ? sheets.get(element.ownerDocument) : null;
+  if (!sheet) return;
+  try { if (!root.adoptedStyleSheets.includes(sheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]; } catch { /* dist/styles.css */ }
 }
 /** Put an installed lifecycle sheet back if the page's own assignment to
  * document.adoptedStyleSheets removed it. Installs nothing new. */

@@ -33,7 +33,7 @@ import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, styleMutation, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, styleMutation, subscribe, translationActive } from './lifecycle';
 import type { NearObserver } from './lifecycle';
 
 export type Priority = 'auto' | 'sync';
@@ -490,6 +490,8 @@ function createRegistry(doc: Document): Registry {
       // Observers start with the first host that can be composed, and a
       // document that gains layout later starts them then.
       if (!started && supported()) start();
+      // Inside a shadow root, the lifecycle rules are adopted there too.
+      lifecycleStylesFor(entry.element);
       // A page-level mount() must not compose a host React's adapter owns.
       if (!mountOwners.has(entry.element)) mountOwners.set(entry.element, identity);
       watch(entry);
