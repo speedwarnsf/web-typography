@@ -70,8 +70,10 @@ leave — the first two hours of answering comments decide the thread.
   yet. Find-in-page across a generated break is a known limitation
   (SUPPORT.md).
 - **"CLS / SEO?"** The server HTML is unchanged. Composition keeps the line
-  count except one line to fix a stranded word; the 4.2 audit measured CLS 0
-  with 0 of 400 paragraphs changing line count. It waits for web fonts.
+  count except one line to fix a stranded word or opener, which about 1 in 6
+  paragraphs take at 320 px (1 in 11 at 375 px, almost none on desktop); one
+  taken in the first screen is a small layout shift, at most 0.05 in our
+  tests, under the 0.1 "good" threshold. It waits for web fonts.
 - **"Why should I trust a script tag?"** Pinned files with integrity hashes
   that never change, an append-only ledger of every published file checked in
   CI, npm provenance from 4.3, SECURITY.md, and STABILITY.md's promise about

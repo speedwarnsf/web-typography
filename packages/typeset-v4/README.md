@@ -266,11 +266,15 @@ boundary at each generated break (engine accessibility trees are checked in
 Chromium, WebKit and Firefox). 4.2.0 hid its breaks and joined the words
 around them; see Accessibility above.
 
-**Does it cause layout shift?** Almost never. Composition keeps the
-browser's line count; body text may use one more line only to fix a
-one-word last line or a stranded sentence opener, which moves what follows by
-one line. In the 4.2 audit, 0 of 400 paragraphs changed line count and the
-measured CLS was 0. `mount()` also waits for web fonts before composing.
+**Does it cause layout shift?** Rarely, and by one line at most.
+Composition keeps the browser's line count; body text may use one more line
+only to fix a one-word last line or a stranded sentence opener, which moves
+what follows by one line. On narrow screens that line is common: about 1 in
+6 body paragraphs take it at 320 px, 1 in 11 at 375 px, almost none at 768 px
+and wider (4.2.0 the same). One taken in the first screen after the first
+paint is a small layout shift: about half of our test loads at 320 and
+375 px recorded one, at most 0.05, under the 0.1 "good" threshold. `mount()`
+also waits for web fonts before composing.
 
 **Is it bad for SEO?** No. The HTML your server sends is unchanged; Typeset
 only adds line-break elements in the browser, and search engines index the

@@ -22,7 +22,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Does it cause layout shift?',
-    a: <>Almost never. Typeset keeps the browser&rsquo;s line count, except that body text may use one more line to fix a one-word last line or a stranded sentence opener. In the 4.2 audit, 0 of 400 paragraphs changed line count and the measured cumulative layout shift was 0. <code>mount()</code> waits for web fonts before it composes.</>,
+    a: <>Rarely, and by one line at most. Typeset keeps the browser&rsquo;s line count, except that body text may use one more line to fix a one-word last line or a stranded sentence opener. On narrow screens that line is common: about 1 in 6 body paragraphs take it at 320 pixels, 1 in 11 at 375, almost none on desktop. One taken in the first screen after the first paint is a small layout shift: about half of our test loads at phone widths recorded one, at most 0.05, under the 0.1 &ldquo;good&rdquo; threshold. <code>mount()</code> waits for web fonts before it composes.</>,
   },
   {
     q: 'Is it bad for SEO?',
