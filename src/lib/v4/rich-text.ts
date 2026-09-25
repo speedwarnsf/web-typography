@@ -498,6 +498,18 @@ export function positional(node: Text): boolean {
   return !before || (before.nodeType === Node.COMMENT_NODE && (before as Comment).data.startsWith('?lit$'));
 }
 
+/** Whether this author Text node follows some other comment. Lit starts each
+ * item of an iterable (an array, map(), repeat()) and a top-level render()
+ * with an empty comment and writes a new string to the node after it; Solid
+ * ends its dynamic text with one. Nothing may go between the comment and the
+ * node, and the node may neither move nor be emptied (Solid skips a write
+ * equal to the node's current text, so an emptied node would keep a stale
+ * copy beside it): a marker at its start goes before the comment, which
+ * renders nothing, and tracking leaves its text unwrapped. */
+export function afterComment(node: Text): boolean {
+  return node.previousSibling?.nodeType === Node.COMMENT_NODE && !positional(node);
+}
+
 /** React 17+ records its fiber on every Text node it renders, and removes or
  * inserts relative to that node through the parent it knows, which throws if
  * the node has moved into a wrapper. */
@@ -543,7 +555,8 @@ const wrapOverrides = new WeakMap<Element, { value: string; priority: string }>(
  * Nothing is inserted in front of a positional author Text node (see
  * positional): a marker at its start goes after it, and the node is split
  * there and left empty, or the framework's next write would land on the
- * marker and be lost. */
+ * marker and be lost. Nor between a comment and the node after it (see
+ * afterComment): such a marker goes before the comment. */
 export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
   const restoreSelection = selectionBookmark(element);
   const hadStyle = element.hasAttribute('style');
@@ -582,7 +595,8 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     // !important beats author br{display:none}; the variable lets print CSS,
     // stale mode and authors switch every generated break off at once.
     } else marker.style.setProperty('display', 'var(--ts-break-display, inline)', 'important');
-    if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
+    if (point.offset === 0 && !engineText.has(head) && afterComment(head)) head.previousSibling!.before(marker);
+    else if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
     else {
       const tail = head.splitText(point.offset);
       engineText.add(tail);

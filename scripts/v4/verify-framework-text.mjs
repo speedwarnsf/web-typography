@@ -11,7 +11,9 @@
 //
 // Each engine runs a hand-rolled renderer that holds Text nodes, React 19
 // outside the adapters, Svelte 5, Vue 3.5, Solid 1.9 and Lit 3 (committed
-// bundles in tests/frameworks/dist, see build-framework-fixtures.mjs), under
+// bundles in tests/frameworks/dist, see build-framework-fixtures.mjs), and Lit
+// again with parts that start with an empty comment (the items of an array,
+// map() and repeat(), and a top-level render() of a string), under
 // mount() and under the website loader. Twenty updates each: every animation
 // frame is sampled for text that differs from the framework's latest value,
 // the paragraphs must recompose, and disconnect() must leave exactly the
@@ -32,9 +34,11 @@ const scripts = {
   '/fw/vanilla.js': await bundleOf('vanilla'),
   '/fw/react.js': await bundleOf('react'),
 };
-for (const name of ['svelte', 'vue', 'solid', 'lit']) scripts[`/fw/${name}.js`] = await readFile(`tests/frameworks/dist/${name}.js`, 'utf8');
+for (const name of ['svelte', 'vue', 'solid', 'lit', 'lit-parts']) scripts[`/fw/${name}.js`] = await readFile(`tests/frameworks/dist/${name}.js`, 'utf8');
 const versions = JSON.parse(await readFile('tests/frameworks/dist/versions.json', 'utf8'));
-const FRAMEWORKS = ['vanilla', 'react', 'svelte', 'vue', 'solid', 'lit'];
+const FRAMEWORKS = ['vanilla', 'react', 'svelte', 'vue', 'solid', 'lit', 'lit-parts'];
+/** The package whose version a fixture reports. @param {string} framework */
+const pkg = framework => /** @type {Record<string, string>} */ ({ solid: 'solid-js', 'lit-parts': 'lit' })[framework] ?? framework;
 const LOADERS = ['mount', 'website'];
 const page = (/** @type {string} */ framework, /** @type {string} */ loader) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 body{margin:16px;background:#fff;color:#111;font:18px/1.5 Georgia}.col{width:320px}p{margin:0 0 14px}a{color:#146044}
@@ -170,7 +174,7 @@ await Promise.all(browsers.map(async config => {
   const check = (label, pass, detail) => checks.push({ browser: config.name, label, pass: !!pass, ...(detail === undefined ? {} : { detail }) });
   try {
     for (const framework of FRAMEWORKS) for (const loader of LOADERS) {
-      const where = `${framework}${versions[framework === 'solid' ? 'solid-js' : framework] ? ' ' + versions[framework === 'solid' ? 'solid-js' : framework] : ''} under ${loader === 'website' ? 'the website loader' : 'mount()'}`;
+      const where = `${framework}${versions[pkg(framework)] ? ' ' + versions[pkg(framework)] : ''} under ${loader === 'website' ? 'the website loader' : 'mount()'}`;
       const context = await browser.newContext({ viewport: { width: 420, height: 1100 } });
       await context.route('http://fw.test/**', route => {
         const path = new URL(route.request().url()).pathname;

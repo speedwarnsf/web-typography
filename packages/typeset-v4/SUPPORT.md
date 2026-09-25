@@ -38,13 +38,17 @@ React set .data or .nodeValue on the node they created), the stale fragments
 are removed before the next frame and the paragraph recomposes; disconnect()
 leaves exactly the framework's text. Author Text nodes that Solid or Lit find by
 position, and React's, stay in place (emptied, with their text wrapped next to
-them) instead of moving into tracking wrappers. `verify-framework-text.mjs`
-runs a hand-rolled renderer, React 19, Svelte 5, Vue 3.5, Solid 1.9 and Lit 3
-through twenty updates each in three engines. Limits: direct typeset() and
-restore() without a controller see edits only by value, so an emptied node set
-to '' again is not noticed; the legacy .ts-line renderer (lineBreaks: 'legacy'
-on plain text) copies text and never sees framework writes; Lit text in arrays
-or nested templates is moved into wrappers as in 4.2. Stateful custom React
+them) instead of moving into tracking wrappers; nothing goes between a comment
+and the Text node after it (Lit starts each item of an array, map() or
+repeat(), and a top-level render(), with an empty comment and writes to the
+node after it), and such a node keeps its text, unwrapped.
+`verify-framework-text.mjs` runs a hand-rolled renderer, React 19, Svelte 5,
+Vue 3.5, Solid 1.9 and Lit 3 (template parts, and iterables with a top-level
+render()) through twenty updates each in three engines. Limits: direct
+typeset() and restore() without a controller see edits only by value, so an
+emptied node set to '' again is not noticed; the legacy .ts-line renderer
+(lineBreaks: 'legacy' on plain text) copies text and never sees framework
+writes. Stateful custom React
 children remain native. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
 hyphens and editable content remain native. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
@@ -320,7 +324,6 @@ changes only an isolated preview, never a deployed site.
 - **Framework-owned text.** `mount()` and the loaders keep text that Vue,
   Svelte, Lit, Solid or React update in place correct (see above for how and
   for the limits). Direct `typeset()` and `restore()` calls without a
-  controller notice edits only by value, the legacy `.ts-line` renderer never
-  sees framework writes, and Lit text in arrays or nested templates still
-  moves into wrappers as in 4.2. Prefer the React adapters for text React
+  controller notice edits only by value, and the legacy `.ts-line` renderer
+  never sees framework writes. Prefer the React adapters for text React
   renders, and never give one text two owners.

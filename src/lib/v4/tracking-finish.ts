@@ -1,5 +1,5 @@
 import type { LayoutMetrics } from './layout-metrics';
-import { engineText, positional, preserveRichCopy, reactOwned, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
+import { afterComment, engineText, positional, preserveRichCopy, reactOwned, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
 import type { RichOutput, SplitRecord } from './rich-text';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
@@ -79,10 +79,12 @@ export function trackingStyle(run: TrackingRun): Record<string, string> {
  * positional) or removes through its parent (React) stays where it is: its
  * text is split off into an engine node that moves, the empty author node
  * stays in place, and the run's wrappers are split around it (see
- * shieldWhitespace for the accessibility side). Other author Text nodes move
- * into the wrapper as in 4.2: frameworks that hold them write to them in
- * place, and some (Solid) skip a write when the node's text already equals
- * the new value, which an emptied node would always do for ''. */
+ * shieldWhitespace for the accessibility side). A node after another comment
+ * (see afterComment) keeps its place and its text, unwrapped: the run's
+ * wrappers are split around it. Other author Text nodes move into the
+ * wrapper as in 4.2: frameworks that hold them write to them in place, and
+ * some (Solid) skip a write when the node's text already equals the new
+ * value, which an emptied node would always do for ''. */
 export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput {
   const restoreSelection = selectionBookmark(element), texts = textRuns(element);
   const splits = new Map<Text, SplitRecord>();
@@ -104,9 +106,10 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
     for (let node: ChildNode | null = first; node; node = node.nextSibling) { nodes.push(node); if (node === last) break; }
     let wrapper: HTMLElement | null = null;
     for (const node of nodes) {
-      if (node.nodeType === Node.TEXT_NODE && !engineText.has(node as Text) && (!(node as Text).length || positional(node as Text) || reactOwned(node as Text))) {
-        // An author node that must keep its place: leave it, empty, and wrap its text.
-        if (!(node as Text).length) { wrapper = null; continue; }
+      if (node.nodeType === Node.TEXT_NODE && !engineText.has(node as Text) && (!(node as Text).length || afterComment(node as Text) || positional(node as Text) || reactOwned(node as Text))) {
+        // An author node that must keep its place: leave it, empty, and wrap
+        // its text; or, after a comment, leave it whole.
+        if (!(node as Text).length || afterComment(node as Text)) { wrapper = null; continue; }
         const piece = split(node as Text, 0);
         if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
         wrapper.append(piece);

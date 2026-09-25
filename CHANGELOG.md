@@ -186,8 +186,13 @@ Outside the changes below, 0 of these differ in any engine.
   frame, and recomposes; every cleanup drops the fragments of a node that
   was written to or removed; and Text nodes Solid or Lit address by
   position, and React's, stay in place (emptied, their text wrapped beside
-  them). Tested with a vanilla renderer, React 19, Svelte 5, Vue 3.5, Solid
-  1.9 and Lit 3 through twenty updates each in three engines.
+  them). Nothing goes between a comment and the Text node after it, which
+  keeps its text unwrapped: Lit starts each item of an array, `map()` or
+  `repeat()`, and a top-level `render()`, with an empty comment and writes
+  to the node after it, so those updates were lost too (4.2 lost them as
+  well). Tested with a vanilla renderer, React 19, Svelte 5, Vue 3.5, Solid
+  1.9 and Lit 3 (template parts, and iterables with a top-level `render()`)
+  through twenty updates each in three engines.
 - **Composed text follows text metrics, not only width (C7).** Fonts that
   finish loading (including CSS-requested fonts in WebKit, which fires no
   loading events and left 59 of 195 paragraphs stale under 4.2.0), the

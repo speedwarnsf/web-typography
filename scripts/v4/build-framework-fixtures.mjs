@@ -1,6 +1,7 @@
 // @ts-check
 // Build the framework fixtures verify-framework-text.mjs loads: the same four
-// paragraphs rendered by Svelte 5, Vue 3.5, Solid 1.9 and Lit 3, each bundled
+// paragraphs rendered by Svelte 5, Vue 3.5, Solid 1.9 and Lit 3 (twice: with
+// template parts, and with iterables and a top-level render()), each bundled
 // with its framework into one minified IIFE under tests/frameworks/dist/.
 // The bundles are committed, so the suite needs no framework install; this
 // script records how they were made. React is bundled at test time from the
@@ -46,13 +47,14 @@ const frameworks = {
 /** @type {Record<string, string>} */
 const versions = {};
 for (const name of ['svelte', 'vue', 'solid-js', 'lit']) versions[name] = JSON.parse(await readFile(join(modules, name, 'package.json'), 'utf8')).version;
-for (const name of ['svelte', 'vue', 'solid', 'lit']) {
+for (const name of ['svelte', 'vue', 'solid', 'lit', 'lit-parts']) {
+  const pkg = /** @type {Record<string, string>} */ ({ solid: 'solid-js', 'lit-parts': 'lit' })[name] ?? name;
   await build({
     entryPoints: [join(src, `${name}.js`)], outfile: join(dist, `${name}.js`), bundle: true, format: 'iife', minify: true, target: 'es2022',
     nodePaths: [modules], plugins: [frameworks], legalComments: 'eof', logLevel: 'warning',
     conditions: ['browser', 'production'],
     define: { 'process.env.NODE_ENV': '"production"', __VUE_OPTIONS_API__: 'false', __VUE_PROD_DEVTOOLS__: 'false', __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false' },
-    banner: { js: `/* Test fixture for typeset.us verify-framework-text.mjs: ${name} ${versions[name === 'solid' ? 'solid-js' : name]} and tests/frameworks/src/${name}.js. Built by scripts/v4/build-framework-fixtures.mjs. */` },
+    banner: { js: `/* Test fixture for typeset.us verify-framework-text.mjs: ${pkg === 'solid-js' ? name : pkg} ${versions[pkg]} and tests/frameworks/src/${name}.js. Built by scripts/v4/build-framework-fixtures.mjs. */` },
   });
 }
 await writeFile(join(dist, 'versions.json'), JSON.stringify(versions, null, 2) + '\n');
