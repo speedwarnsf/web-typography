@@ -16,6 +16,7 @@ import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { describe } from './validate';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -310,6 +311,9 @@ function render(element: HTMLElement, source: string, lines: FrozenLine[]): void
 
 /** Compose supported text while preserving source content and live elements. */
 export function typeset(element: HTMLElement, options: Options = {}): Result {
+  if ((element as Node | null)?.nodeType !== 1) {
+    throw new TypeError('[typeset] typeset() expects an HTMLElement (received ' + describe(element) + (typeof element === 'string' ? '; typesetAll() and mount() take selectors' : '') + ')');
+  }
   const started = performance.now();
   const mode = modeOf(element, options);
   if (element.closest('[data-typeset-react-rich]')) return { outcome: 'skipped:framework', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
@@ -656,8 +660,18 @@ export interface Controller {
 const CONTENT = 1, KEY = 2, VERIFY = 4;
 const RESIZE_SETTLE_MS = 100;
 
-/** One lifecycle owner per mount. Observers are disconnected during our writes. */
-export function mount(root: ParentNode = document, selector = defaults, options: Options = {}): Controller {
+/** One lifecycle owner per mount. Observers are disconnected during our writes.
+ * mount('article p', options) is mount(document, 'article p', options). */
+export function mount(selector: string, options?: Options): Controller;
+export function mount(root?: ParentNode, selector?: string, options?: Options): Controller;
+export function mount(target: ParentNode | string = document, selectorOrOptions?: string | Options, maybeOptions: Options = {}): Controller {
+  const byString = typeof target === 'string';
+  const root: ParentNode = byString ? document : target as ParentNode;
+  const selector = byString ? target as string : typeof selectorOrOptions === 'string' ? selectorOrOptions : defaults;
+  const options: Options = (byString && selectorOrOptions && typeof selectorOrOptions === 'object' ? selectorOrOptions : maybeOptions) || {};
+  if (![1, 9, 11].includes((root as Node | null)?.nodeType as number)) {
+    throw new TypeError('[typeset] mount() expects a Document, an Element or a selector string (received ' + describe(root) + ')');
+  }
   // Realm-safe: a parent page may mount into a same-origin iframe, whose
   // nodes fail instanceof checks against this window's constructors.
   const doc = (root as Node).nodeType === 9 ? root as Document : (root as Node).ownerDocument!;

@@ -79,6 +79,20 @@ Hashes for every published version live in
   the breaks React rendered stay. 4.2.0 merged and edited the Text nodes the
   translator was filling, which lost sentences.
 
+### API
+
+- `mount('article p', options)` is `mount(document, 'article p', options)`;
+  a string first argument used to throw.
+- `typeset()` throws `TypeError: [typeset] typeset() expects an HTMLElement
+  (received ...)` for a non-element, and `mount()` a `TypeError` naming what
+  it received, instead of raw TypeErrors from inside the engine.
+- Invalid options print one `console.warn` each in development (the ESM and
+  CommonJS entries unless `process.env.NODE_ENV` is `production`; always in
+  `typeset.global.js` and `go.js`), for example `[typeset] smartQuotes must
+  be "en" or false (received true)`. Values keep their 4.2 behaviour, and
+  production bundles contain none of these checks. SUPPORT.md lists the
+  messages.
+
 ### Rendering changes
 
 Each default-output change in 4.3 is listed here with its golden-diff count:

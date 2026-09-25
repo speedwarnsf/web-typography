@@ -100,6 +100,34 @@ translation ends. `TypesetRichText` only freezes: the breaks React rendered
 remain, so a translation of that text is read per line. `TypesetText` steps
 aside like `mount()`.
 
+Errors and warnings. For anything that is not an element, `typeset()` throws:
+`TypeError: [typeset] typeset() expects an HTMLElement (received ...)`.
+For a root that is not a document, element or selector, `mount()` throws:
+`[typeset] mount() expects a Document, an Element or a selector string (received ...)`.
+`mount('article p', options)` is
+`mount(document, 'article p', options)`. In development builds (the ESM and
+CommonJS entries when `process.env.NODE_ENV` is not `production`, and always in
+`typeset.global.js` and `go.js`) invalid options print one `console.warn` each
+and otherwise behave as before, for example:
+
+- `smartQuotes must be "en" or false (received true)`
+- `smartQuotes must be "en" or false (received "EN")`
+- `spacing must be true or false (received "false")`
+- `tracking must be true or false (received 1)`
+- `opticalHanging must be true or false (received "yes")`
+- `lineBreaks must be "unicode" or "legacy" (received "auto")`
+- `contour must be "finished" or "natural" (received "smooth")`
+- `mode must be "body", "heading", "title" or "ui" (received "para")`
+- `density must be "compact" or "editorial" (received "loose")`
+- `maxLines must be a positive integer (received 0)`
+- `keep must be an array of strings (received "Oak Street")`
+- `text must be a string (received 5)`
+- `typeset() has no option "spcing"; it is ignored`
+- `typeset() options must be an object (received "p")`
+- `mount() selector must be a string (received an object)`
+
+Production bundles drop these checks.
+
 Outstanding independent acceptance: physical iOS/Android, spoken VoiceOver/NVDA,
 non-macOS and native-application rich clipboard, and representative-device
 repeated p95/long-task budgets. Emulation and synthetic clipboard events are

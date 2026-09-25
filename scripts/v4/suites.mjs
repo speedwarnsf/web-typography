@@ -24,6 +24,7 @@ export const SUITES = [
   { name: 'verify-print-resize', report: 'output/print-resize.json', note: 'no double-wrapped frame in print or while resizing (C9)' },
   { name: 'verify-scheduler', report: 'output/scheduler.json', note: 'busy pages, visible-first work, deferred offscreen resizes (P2)' },
   { name: 'verify-translation', report: 'output/translation.json', note: 'composition steps aside for machine translation (C10)' },
+  { name: 'verify-options', report: 'output/options.json', note: 'clear errors and development option warnings (K11)' },
   { name: 'verify-tracking-clipping', report: 'output/tracking-clipping.json' },
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
