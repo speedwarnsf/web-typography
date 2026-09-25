@@ -546,6 +546,19 @@ export interface RichOutput {
   heads: ReadonlySet<Text>;
 }
 
+/** The outermost element inside `host` whose content starts with `text`
+ * (only comments and empty Text nodes before it), or null. */
+function elementStartingAt(host: HTMLElement, text: Text): Element | null {
+  let outer: Node = text, found: Element | null = null;
+  for (let parent = text.parentNode; parent && parent !== host && parent.nodeType === Node.ELEMENT_NODE; parent = parent.parentNode) {
+    let before = outer.previousSibling;
+    while (before && (before.nodeType === Node.COMMENT_NODE || (before.nodeType === Node.TEXT_NODE && !(before as Text).length))) before = before.previousSibling;
+    if (before) break;
+    outer = found = parent as Element;
+  }
+  return found;
+}
+
 /** Hosts carrying renderRichText's text-wrap-style override, with the inline
  * value it replaced, so a copy can put the author's value back. */
 const wrapOverrides = new WeakMap<Element, { value: string; priority: string }>();
@@ -595,7 +608,13 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     // !important beats author br{display:none}; the variable lets print CSS,
     // stale mode and authors switch every generated break off at once.
     } else marker.style.setProperty('display', 'var(--ts-break-display, inline)', 'important');
-    if (point.offset === 0 && !engineText.has(head) && afterComment(head)) head.previousSibling!.before(marker);
+    // A line that starts where an inline element (a link, emphasis) starts
+    // breaks before the outermost such element, not inside it: inside, the
+    // element's first fragment is an empty stub at the end of the previous
+    // line, where its focus ring, hover background and padding paint.
+    const opening = !px && !spacing && point.offset === 0 && !engineText.has(head) ? elementStartingAt(element, head) : null;
+    if (opening) opening.before(marker);
+    else if (point.offset === 0 && !engineText.has(head) && afterComment(head)) head.previousSibling!.before(marker);
     else if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
     else {
       const tail = head.splitText(point.offset);

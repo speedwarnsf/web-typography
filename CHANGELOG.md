@@ -65,6 +65,19 @@ Outside the changes below, 0 of these differ in any engine.
   neutralized, so printed text wraps natively at the paper's width, where
   4.2.0 printed the screen breaks and the page re-wrapped them into
   alternating long and short lines.
+- **A line that starts where a link starts breaks before the link.** 4.2
+  put the generated `<br>` first inside a link or other inline element whose
+  text began the line, so the element's first fragment was an empty stub at
+  the end of the line before: Firefox's default focus ring, author outlines
+  and hover backgrounds painted a sliver there, a padded link's padding sat
+  at that line's end, and WebKit link names began with a newline (16 to 19
+  of 79 corpus links at 300 px). The break now goes before the outermost
+  element that starts the line, in the DOM renderer and `TypesetRichText`;
+  the framework text an element holds is not split for it. Lines and
+  characters are unchanged, and so are widths unless the element has
+  horizontal padding, border or margin, which now starts its line as the
+  compositor planned. Golden diff: 173 of 680 rich cells per engine, markup
+  only (the break's position); 0 of the rest.
 - **Justified text is left as the author set it** (`native:justify`, C3). A
   generated break ends its line, so every composed line took the last-line
   alignment: `text-align: justify` became ragged right, and a
