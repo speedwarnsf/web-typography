@@ -55,6 +55,21 @@ export function markTranslated(doc: Document): void {
   if (hub && !hub.translated) { hub.translated = true; notify(hub, client => client.translation?.(true)); }
 }
 
+/** Whether a style attribute changed only by a translation (the transform or
+ * translate property) or opacity: a JavaScript animation (a screen push,
+ * parallax, a smooth-scroll wrapper) writes one every frame, and none of them
+ * moves a line. A scale, rotation or any other declaration is a real change. */
+export function movedOnly(before: string | null, after: string | null): boolean {
+  const declarations = (text: string | null) => new Map((text || '').split(';').map(part => part.trim()).filter(Boolean)
+    .map(part => { const at = part.indexOf(':'); return at < 0 ? [part, ''] : [part.slice(0, at).trim().toLowerCase(), part.slice(at + 1).trim()]; }));
+  const a = declarations(before), b = declarations(after);
+  for (const name of new Set([...a.keys(), ...b.keys()])) {
+    if (a.get(name) === b.get(name) || name === 'opacity' || name === 'translate') continue;
+    if (name === 'transform' && [a.get(name), b.get(name)].every(value => value === undefined || /^(?:none|(?:translate(?:3d|x|y|z)?\([^()]*\)\s*)+)$/iu.test(value))) continue;
+    return false;
+  }
+  return true;
+}
 /** Printing (or print emulation) lays text out at the paper's width, where
  * print CSS shows native wrapping; composing for it is wasted work. */
 const prints = new WeakMap<Document, MediaQueryList | undefined>();

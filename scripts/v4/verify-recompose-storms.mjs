@@ -6,8 +6,11 @@
 // font, a vw font size under a window resize, zoom) must recompose, with
 // rendered lines equal to generated breaks + 1, and an ancestor scale, which
 // moves no line, keeps the composition. Removing unrelated nodes must not scan
-// every claimed element.
+// every claimed element. The React adapters (16 TypesetText blocks) must not
+// recheck anything during a translate and fade storm on their container.
 import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { build } from 'esbuild';
 import { browsers } from './browsers.mjs';
 import { artifacts } from './candidate.mjs';
 
@@ -21,6 +24,22 @@ body{margin:0;font:17px/1.5 Georgia,serif}article{width:560px;padding:0 16px}
 p.vw{font-size:clamp(12px,2.1vw,30px);width:480px}
 </style></head><body><div id="shell"><div id="wrap"><article>${paragraphs}</article></div></div>
 <article id="notes">${Array.from({ length: 400 }, (_, i) => `<p>Note ${i + 1}.</p>`).join('')}</article><ul id="list"></ul></body></html>`;
+
+const reactTexts = corpus.slice(0, 16);
+const reactFixture = (await build({
+  stdin: { contents: `
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { TypesetText } from ${JSON.stringify(resolve(artifacts.react))};
+flushSync(() => createRoot(document.getElementById('app')).render(${JSON.stringify(reactTexts)}.map((text, i) => h(TypesetText, { key: i, text }))));
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
+const reactPage = `<!doctype html><html lang="en"><head><style>body{margin:16px;font:17px/1.5 Georgia,serif}#wrap{width:560px}</style>
+<script>
+window.styleReads = 0; const read = window.getComputedStyle; window.getComputedStyle = function () { window.styleReads++; return read.apply(this, arguments); };
+</script></head><body><div id="wrap"><div id="app"></div></div><script src="/react.js"></script></body></html>`;
 
 /** @type {{ checks: { browser: string, label: string, pass: boolean, detail?: unknown }[], errors: { browser: string, error: string }[] }} */
 const report = { checks: [], errors: [] };
@@ -157,6 +176,48 @@ for (const { name, engine, executablePath } of browsers) {
     });
     check('removing 1000 unrelated nodes costs the controller under 1 ms', removal.overheadMs < 1, removal);
     await context.close();
+
+    // The React adapters under the same storms.
+    const reactContext = await browser.newContext({ viewport: { width: 1000, height: 800 } });
+    const react = await reactContext.newPage();
+    react.setDefaultTimeout(20000);
+    await react.route('http://storms.test/**', route => new URL(route.request().url()).pathname === '/react.js'
+      ? route.fulfill({ contentType: 'text/javascript', body: reactFixture }) : route.fulfill({ contentType: 'text/html; charset=utf-8', body: reactPage }));
+    await react.goto('http://storms.test/');
+    await react.waitForFunction(() => document.querySelectorAll('#app p[data-ts-outcome]').length === 16);
+    await react.waitForTimeout(1500);
+    await react.evaluate(() => {
+      const w = /** @type {any} */ (window);
+      w.frames = (/** @type {number} */ n, /** @type {(i: number) => void} */ step) => new Promise(resolve => {
+        let i = 0;
+        const tick = () => { step(i); if (++i < n) requestAnimationFrame(tick); else resolve(undefined); };
+        requestAnimationFrame(tick);
+      });
+      w.hosts = () => /** @type {HTMLElement[]} */ ([...document.querySelectorAll('#app p')]);
+      w.compositions = 0;
+      new MutationObserver(records => {
+        const hosts = new Set();
+        for (const record of records) if ([...record.addedNodes].some(node => node.nodeName === 'BR')) hosts.add((record.target.nodeType === 1 ? /** @type {Element} */ (record.target) : record.target.parentElement)?.closest('p'));
+        w.compositions += hosts.size;
+      }).observe(/** @type {HTMLElement} */ (document.getElementById('app')), { subtree: true, childList: true });
+      // Composed blocks that paint their composition (not stale, not double-wrapped).
+      w.intact = () => w.hosts().filter((/** @type {HTMLElement} */ el) => {
+        const range = document.createRange(); range.selectNodeContents(el);
+        const tops = new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top)));
+        return el.dataset.tsOutcome === 'composed:rich' && !el.hasAttribute('data-ts-stale') && tops.size === el.querySelectorAll('br[data-ts-break]').length + 1;
+      }).length;
+    });
+    const storm = await react.evaluate(async () => {
+      const w = /** @type {any} */ (window);
+      const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+      w.styleReads = 0;
+      await w.frames(60, (/** @type {number} */ i) => { wrap.style.transform = `translateX(${i % 7}px)`; wrap.style.opacity = String(.9 + (i % 10) / 100); });
+      wrap.style.transform = ''; wrap.style.opacity = '';
+      await new Promise(r => setTimeout(r, 500));
+      return { styleReads: w.styleReads, compositions: w.compositions, intact: w.intact() };
+    });
+    check('React: a translate and fade storm on the container reads no computed style and composes nothing', storm.styleReads < 50 && storm.compositions === 0 && storm.intact === 16, storm);
+    await reactContext.close();
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }
 }

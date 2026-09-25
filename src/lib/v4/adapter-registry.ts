@@ -29,7 +29,7 @@ import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
-import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
 
 export type Priority = 'auto' | 'sync';
 export type Reason = 'mount' | 'force' | 'check';
@@ -130,7 +130,7 @@ function createRegistry(doc: Document): Registry {
     const height = win?.innerHeight ?? 0, width = win?.innerWidth ?? 0;
     return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width;
   };
-  const observeDocument = () => mutations?.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: OBSERVED });
+  const observeDocument = () => mutations?.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: OBSERVED });
 
   function run(entry: AdapterEntry, reason: Reason, inCommit: boolean): void {
     pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element);
@@ -273,6 +273,10 @@ function createRegistry(doc: Document): Registry {
       const target = record.target.nodeType === 1 ? record.target as Element : record.target.parentElement;
       if (!target) continue;
       if (record.type === 'attributes' && record.attributeName?.startsWith('_mst')) { markTranslated(doc); continue; }
+      // A translation or fade, written every frame by an animation (a screen
+      // push, a card entrance) on a host or an ancestor, moves no line: no
+      // check, as in mount(). A scale still is one (see transformOnly).
+      if (record.type === 'attributes' && record.attributeName === 'style' && movedOnly(record.oldValue, target.getAttribute('style'))) continue;
       const host = hostOf(target);
       // A translator wrapping a host's text in <font>.
       if (host && !translationActive(doc) && [...record.addedNodes].some(node => node.nodeName === 'FONT')) { markTranslated(doc); continue; }

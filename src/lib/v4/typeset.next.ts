@@ -15,7 +15,7 @@ import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, installLifecycleStyles, markTranslated, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
@@ -231,21 +231,6 @@ function layoutKey(el: HTMLElement): string {
  * they did, so a composition made without the transform stays correct. */
 function transformOnly(a: string, b: string): boolean {
   return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
-}
-/** Whether a style attribute changed only by a translation (the transform or
- * translate property) or opacity: a JavaScript animation (a screen push,
- * parallax, a smooth-scroll wrapper) writes one every frame, and none of them
- * moves a line. A scale, rotation or any other declaration is a real change. */
-function movedOnly(before: string | null, after: string | null): boolean {
-  const declarations = (text: string | null) => new Map((text || '').split(';').map(part => part.trim()).filter(Boolean)
-    .map(part => { const at = part.indexOf(':'); return at < 0 ? [part, ''] : [part.slice(0, at).trim().toLowerCase(), part.slice(at + 1).trim()]; }));
-  const a = declarations(before), b = declarations(after);
-  for (const name of new Set([...a.keys(), ...b.keys()])) {
-    if (a.get(name) === b.get(name) || name === 'opacity' || name === 'translate') continue;
-    if (name === 'transform' && [a.get(name), b.get(name)].every(value => value === undefined || /^(?:none|(?:translate(?:3d|x|y|z)?\([^()]*\)\s*)+)$/iu.test(value))) continue;
-    return false;
-  }
-  return true;
 }
 function optionsKey(options: Options): string {
   return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
