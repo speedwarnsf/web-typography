@@ -65,34 +65,34 @@
         "nodeWrites": 1
       },
       "react-typeset-38": {
-        "commitMs": 161,
-        "tbtMs": 136,
-        "longestTaskMs": 186,
-        "mutationObservers": 38,
-        "mutationObserve": 1596,
-        "resizeObservers": 38,
-        "resizeObserve": 76,
-        "intersectionObservers": 38,
+        "commitMs": 18,
+        "tbtMs": 73,
+        "longestTaskMs": 123,
+        "mutationObservers": 1,
+        "mutationObserve": 39,
+        "resizeObservers": 1,
+        "resizeObserve": 39,
+        "intersectionObservers": 1,
         "intersectionObserve": 38,
-        "windowListeners": 38,
+        "windowListeners": 1,
         "documentListeners": 1,
-        "fontListeners": 39,
+        "fontListeners": 3,
         "nodeWrites": 1210
       },
       "react-rich-38": {
-        "commitMs": 78,
-        "tbtMs": 271,
+        "commitMs": 20,
+        "tbtMs": 110,
         "longestTaskMs": 151,
-        "mutationObservers": 38,
-        "mutationObserve": 2394,
-        "resizeObservers": 38,
-        "resizeObserve": 76,
-        "intersectionObservers": 0,
-        "intersectionObserve": 0,
-        "windowListeners": 38,
+        "mutationObservers": 1,
+        "mutationObserve": 39,
+        "resizeObservers": 1,
+        "resizeObserve": 39,
+        "intersectionObservers": 1,
+        "intersectionObserve": 38,
+        "windowListeners": 1,
         "documentListeners": 1,
-        "fontListeners": 38,
-        "nodeWrites": 3893
+        "fontListeners": 2,
+        "nodeWrites": 941
       },
       "storm": {
         "elapsedMs": 1357,
@@ -196,6 +196,20 @@
       "to": 42456,
       "item": "K4, K5",
       "reason": "Feature detection that reports native:environment instead of throwing in jsdom, happy-dom and older engines (environment.ts and the adapters' unsupported path), and forwardRef hosts with onResult."
+    },
+    {
+      "budget": "runtime.react-rich-38.intersectionObservers",
+      "from": 0,
+      "to": 1,
+      "item": "P5",
+      "reason": "TypesetRichText now shares the document registry's single IntersectionObserver (visible-first scheduling), in place of 38 MutationObservers, 38 ResizeObservers and 38 window and font listeners it created before."
+    },
+    {
+      "budget": "runtime.react-rich-38.intersectionObserve",
+      "from": 0,
+      "to": 38,
+      "item": "P5",
+      "reason": "TypesetRichText now shares the document registry's single IntersectionObserver (visible-first scheduling), in place of 38 MutationObservers, 38 ResizeObservers and 38 window and font listeners it created before."
     }
   ],
   "lowered": [
@@ -205,6 +219,139 @@
       "to": 877,
       "item": "K4",
       "reason": "The vendored Unicode line-break module now initializes on first use, so a bundle that never breaks lines tree-shakes it away (it had top-level side effects: trie inflation and a TextDecoder)."
+    },
+    {
+      "budget": "runtime.react-typeset-38.commitMs",
+      "from": 161,
+      "to": 18,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.tbtMs",
+      "from": 136,
+      "to": 73,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.longestTaskMs",
+      "from": 186,
+      "to": 123,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.mutationObservers",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.resizeObservers",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.intersectionObservers",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.windowListeners",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.fontListeners",
+      "from": 39,
+      "to": 3,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.mutationObserve",
+      "from": 1596,
+      "to": 39,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-typeset-38.resizeObserve",
+      "from": 76,
+      "to": 39,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.commitMs",
+      "from": 78,
+      "to": 20,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.tbtMs",
+      "from": 271,
+      "to": 110,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.mutationObservers",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.resizeObservers",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.windowListeners",
+      "from": 38,
+      "to": 1,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.fontListeners",
+      "from": 38,
+      "to": 2,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.mutationObserve",
+      "from": 2394,
+      "to": 39,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.resizeObserve",
+      "from": 76,
+      "to": 39,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
+    },
+    {
+      "budget": "runtime.react-rich-38.nodeWrites",
+      "from": 3893,
+      "to": 941,
+      "item": "P4, P5",
+      "reason": "Measured (Chromium 4x, median of 3, darwin-arm64) after the React adapters moved to one registry per document with visible-first composition."
     }
   ]
 }
