@@ -86,6 +86,109 @@ for (const [input, expected] of TABLE) {
     check(`education time: ${name} (${input.length} characters) under 100 ms`, ms < 100, { ms: Math.round(ms * 10) / 10 });
   }
 }
+// Education is linear at 120 KB. Two paths were still quadratic after the
+// 'n look-back: the character before each quote was read back from the
+// growing output string, which flattened it once per quote, and each 'round,
+// 'bout or 'nuff searched the rest of the text for a closing quote when no
+// sentence end followed. In node, 120 KB of "it's " took 278 to 353 ms (4.2.0:
+// 2 ms) and 120 KB of " 'round" 742 to 858 ms (4.2.0: 6 ms), and server
+// rendering TypesetText with smartQuotes="en" took 604 and 1,601 ms.
+/** @type {[string, string, number][]} */
+const LARGE = [["it's ", "it's ", 24000], [" 'round", " 'round", 17142], [" 'round, then one closing quote", " 'round", 17142], ['"x" ', '"x" ', 30000], [" 'bout it.", " 'bout it.", 12000], [" rock 'n' roll", " rock 'n' roll", 8571]];
+const large = (/** @type {string} */ unit, /** @type {number} */ count, /** @type {string} */ name) => unit.repeat(count) + (name.includes('closing') ? " x'" : '');
+for (const [name, unit, count] of LARGE) {
+  const input = large(unit, count, name);
+  smartQuotes(input.slice(0, 50));
+  const began = performance.now();
+  smartQuotes(input);
+  const ms = performance.now() - began;
+  check(`education time: 120 KB of ${JSON.stringify(name)} (${input.length.toLocaleString('en-US')} characters) under 50 ms`, ms < 50, { ms: Math.round(ms * 10) / 10 });
+}
+{
+  // The same output as the release candidate's function (4f1815c), on a
+  // million random texts built from quotes, elisions, pair words, sentence
+  // ends, spaces and letters and digits in and out of the BMP, and on the
+  // corpora and the docs' paragraphs, as written and with straight quotes.
+  /** @param {string} text */
+  const reference = text => {
+    const elision = /^(?:\d{2}s\b|tis\b|twas\b|em\b|cause\b|til\b)/iu;
+    const loose = /^(?:bout|round|nuff)\b/iu;
+    const nPairs = new Set(['rock', 'rhythm', 'fish', 'salt', 'pick', 'shake', 'surf', 'drag', 'grab', 'meet', 'stop', 'park', 'cash', 'wash',
+      'rip', 'plug', 'spick', 'bump', 'nip', 'scratch', 'peel', 'lock', 'snack', 'bread', 'mix']);
+    const nPairLongest = Math.max(...[...nPairs].map(word => word.length));
+    const pairWordBefore = (/** @type {number} */ index) => {
+      let end = index;
+      while (end > 0 && /\s/u.test(text[end - 1])) end--;
+      let start = end;
+      while (start > 0 && end - start <= nPairLongest) {
+        const low = text.charCodeAt(start - 1);
+        if (low >= 0xdc00 && low <= 0xdfff && start > 1 && /^\p{L}$/u.test(text.slice(start - 2, start))) start -= 2;
+        else if (/\p{L}/u.test(text[start - 1])) start--;
+        else break;
+      }
+      return start < end && end - start <= nPairLongest && nPairs.has(text.slice(start, end).toLowerCase());
+    };
+    const closesLater = (/** @type {number} */ index) => {
+      const rest = text.slice(index + 1);
+      const end = rest.search(/[.!?](?:\s|$)/u);
+      return /[\p{L}\p{N}.,!?]['\u2019](?![\p{L}\p{N}])/u.test(end < 0 ? rest : rest.slice(0, end + 1));
+    };
+    let doubleOpen = false, singleOpen = false, out = '';
+    for (let index = 0; index < text.length; index++) {
+      const quote = text[index];
+      if (!/["'\u201c\u201d\u2018\u2019]/u.test(quote)) { out += quote; continue; }
+      if (quote === '\u201c') doubleOpen = true;
+      else if (quote === '\u201d') doubleOpen = false;
+      else if (quote === '\u2018') singleOpen = true;
+      if (quote !== '"' && quote !== "'") { out += quote; continue; }
+      const before = out[index - 1] || '';
+      const after = text[index + 1] || '';
+      const opening = !before || /[\s([{\u2014\u2013\u201c\u2018]/u.test(before);
+      if (quote === '"') {
+        if (opening && after && !/\s/u.test(after)) { doubleOpen = true; out += '\u201c'; }
+        else if (/\d/u.test(before) && !doubleOpen) out += quote;
+        else { doubleOpen = false; out += '\u201d'; }
+        continue;
+      }
+      const rest = text.slice(index + 1);
+      if (/\p{L}/u.test(before) && /\p{L}/u.test(after)) out += '\u2019';
+      else if (opening && (elision.test(rest) || (loose.test(rest) && !closesLater(index))
+        || (/^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && pairWordBefore(index)))) out += '\u2019';
+      else if (opening && after && !/\s/u.test(after)) { singleOpen = true; out += '\u2018'; }
+      else if (/\d/u.test(before) && !singleOpen) out += quote;
+      else { singleOpen = false; out += '\u2019'; }
+    }
+    return out;
+  };
+  let seed = 1515;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const atoms = ["'", "'", '"', '"', '\u2018', '\u2019', '\u201c', '\u201d', ' ', ' ', '\n', '\t', '\u00a0', 'a', 'x', 'Q', '5', '9', '.', '!', '?', ',', ';', '(', '[', '{', '\u2014', '\u2013', '-',
+    'round', 'bout', 'nuff', 'Round', 'n', 'N', 'tis', 'twas', 'em', 'cause', 'til', '90s', 'rock', 'fish', 'roll', "'round", "'bout", "'n'", "'n", " rock 'n' roll", ".'", "s'", "it's",
+    '\ud835\udc00', '\ud835\udfce', '\ud83d\ude00', '\ud835', '\udc00', '\u4e00', '\u00e9', '_'];
+  /** @type {string[]} */
+  const texts = [];
+  for (let n = 0; n < 1_000_000; n++) {
+    let text = '';
+    for (let parts = Math.floor(random() * 24); parts > 0; parts--) text += atoms[Math.floor(random() * atoms.length)];
+    texts.push(text);
+  }
+  /** @type {string[]} */
+  const prose = TABLE.map(([input]) => input);
+  const collect = (/** @type {unknown} */ value) => { if (typeof value === 'string') prose.push(value); else if (Array.isArray(value)) value.forEach(collect); else if (value && typeof value === 'object') Object.values(value).forEach(collect); };
+  for (const file of ['tests/v4-corpus.json', 'corpus.json', 'tests/v4-corpus-adversarial.json']) collect(JSON.parse(await readFile(file, 'utf8')));
+  for (const file of ['README.md', 'CHANGELOG.md', 'ROADMAP.md', 'docs/show-hn.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/README.md']) prose.push(...(await readFile(file, 'utf8')).split(/\n{2,}/u));
+  const corpus = [...prose, ...prose.map(text => text.replace(/[\u2018\u2019]/gu, "'").replace(/[\u201c\u201d]/gu, '"'))];
+  let differ = 0, curled = 0;
+  /** @type {{ input: string, expected: string, actual: string }[]} */
+  const examples = [];
+  for (const text of [...texts, ...corpus]) {
+    const expected = reference(text), actual = smartQuotes(text);
+    if (expected !== text) curled++;
+    if (expected !== actual && differ++ < 3) examples.push({ input: text.slice(0, 200), expected: expected.slice(0, 200), actual: actual.slice(0, 200) });
+  }
+  check(`education matches the release candidate on ${texts.length.toLocaleString('en-US')} random texts and ${corpus.length.toLocaleString('en-US')} corpus and docs paragraphs`,
+    texts.length >= 1_000_000 && corpus.length > 1000 && curled > 500_000 && differ === 0, { random: texts.length, corpus: corpus.length, curled, differ, examples });
+}
 {
   // No change on real prose against the published 4.2.0 function.
   const { smartQuotes: published } = await import(pathToFileURL(resolve('public/releases/4.2.0/index.js')).href);
@@ -112,10 +215,23 @@ export const App = () => h('main', null,
   h(TypesetText, { id: 'off', text: ${JSON.stringify(TEXT)} }),
   h(TypesetRichText, { id: 'rich', lang: 'en', smartQuotes: 'en' }, h('span', null, ${JSON.stringify(RICH)})));
 `;
-const serverModule = (await build({ stdin: { contents: tree + `\nimport { renderToString } from 'react-dom/server';\nexport const html = renderToString(h(App));`, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'node', target: 'node22', external: ['react', 'react-dom'], define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' })).outputFiles[0].text;
+const serverModule = (await build({ stdin: { contents: tree + `\nimport { renderToString } from 'react-dom/server';\nexport const html = renderToString(h(App));\nexport const renderText = text => renderToString(h(TypesetText, { smartQuotes: 'en', lang: 'en', text }));`, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'node', target: 'node22', external: ['react', 'react-dom'], define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' })).outputFiles[0].text;
 const serverFile = resolve('output/smart-quotes-server.mjs');
 await writeFile(serverFile, serverModule);
 const { html: serverHTML } = await import(pathToFileURL(serverFile).href + '?' + Date.now());
+// Server rendering educates the whole text before any size budget applies:
+// the release candidate took 604 ms on 120 KB of "it's " and 1,601 ms on
+// 120 KB of " 'round" (4.2.0: 2 ms).
+{
+  const { renderText } = await import(pathToFileURL(serverFile).href + '?' + Date.now());
+  renderText("warm 'up' it's");
+  for (const [name, unit, count] of LARGE.slice(0, 2)) {
+    const began = performance.now();
+    const html = renderText(unit.repeat(count));
+    const ms = performance.now() - began;
+    check(`server HTML: TypesetText with smartQuotes on 120 KB of ${JSON.stringify(name)} renders in under 100 ms`, ms < 100, { ms: Math.round(ms * 10) / 10, length: html.length });
+  }
+}
 const paragraph = (/** @type {string} */ id) => (serverHTML.match(new RegExp(`<p[^>]*id="${id}"[^>]*>([\\s\\S]*?)</p>`)) ?? [])[1] ?? '';
 const decode = (/** @type {string} */ html) => html.replace(/<[^>]+>/g, '').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 check('server HTML: TypesetText with smartQuotes and no lang has curled quotes', decode(paragraph('plain')) === smartQuotes(TEXT), decode(paragraph('plain')));
@@ -140,6 +256,24 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 await Promise.all(browsers.map(async config => {
   const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
   try {
+    {
+      // The script-tag build's smartQuotes at 120 KB (the release candidate:
+      // 223 to 2,458 ms in WebKit, 250 to 776 ms in Chromium, 1,149 ms on
+      // 'round in Firefox).
+      const page = await browser.newPage();
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><body></body></html>');
+      await page.addScriptTag({ path: artifacts.bundle });
+      const times = await page.evaluate(LARGE => LARGE.map(([name, unit, count]) => {
+        const input = unit.repeat(count) + (name.includes('closing') ? " x'" : '');
+        /** @type {any} */ (window).Typeset.smartQuotes(input.slice(0, 50));
+        const began = performance.now();
+        /** @type {any} */ (window).Typeset.smartQuotes(input);
+        return { name, length: input.length, ms: Math.round((performance.now() - began) * 10) / 10 };
+      }), LARGE);
+      for (const { name, length, ms } of times) check(`education time in the browser: 120 KB of ${JSON.stringify(name)} (${length.toLocaleString('en-US')} characters) under 100 ms`, ms < 100, { ms }, config.name);
+      await page.close();
+    }
     for (const mode of /** @type {const} */ (['production', 'development'])) {
       const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
       page.setDefaultTimeout(20000);
