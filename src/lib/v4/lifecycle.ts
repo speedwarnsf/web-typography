@@ -86,6 +86,39 @@ export function rendered(element: Element): boolean {
   return typeof check !== 'function' || check.call(element, { contentVisibilityAuto: true });
 }
 
+/** Watches whether elements are within a viewport height of what shows them. */
+export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
+/** IntersectionObservers that report an element within a viewport height of
+ * what shows it: the window, or the nearest scroll container it scrolls in.
+ * An app shell's overflow:auto pane clips its content, and a root margin on
+ * the window does not reach past that clip, so text below the fold there
+ * was never near until it was on screen. One observer per scrollport; an
+ * element's scrollport is found once. Null without IntersectionObserver. */
+export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
+  const view = doc.defaultView as (Window & typeof globalThis) | null;
+  if (!view || typeof view.IntersectionObserver !== 'function') return null;
+  const observers = new Map<Element | null, IntersectionObserver>();
+  const roots = new WeakMap<Element, Element | null>();
+  const scrollport = (element: Element): Element | null => {
+    for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
+      const cs = view.getComputedStyle(node);
+      if (/^(?:auto|scroll|overlay)$/u.test(cs.overflowY) || /^(?:auto|scroll|overlay)$/u.test(cs.overflowX)) return node;
+    }
+    return null;
+  };
+  return {
+    observe(element) {
+      let root = roots.get(element);
+      if (root === undefined) { root = scrollport(element); roots.set(element, root); }
+      let observer = observers.get(root);
+      if (!observer) { observer = new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }); observers.set(root, observer); }
+      observer.observe(element);
+    },
+    unobserve(element) { const root = roots.get(element); if (root !== undefined) observers.get(root)?.unobserve(element); },
+    disconnect() { for (const observer of observers.values()) observer.disconnect(); observers.clear(); },
+  };
+}
+
 /** Re-arm font notifications. WebKit fires no loading events for fonts a
  * stylesheet requests, so every face still loading is watched directly. */
 export function armFonts(doc: Document): void {

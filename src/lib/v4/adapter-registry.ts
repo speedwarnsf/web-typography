@@ -13,7 +13,8 @@
  * top to bottom, before that frame paints, so a visible block is never painted
  * native and then rewrapped (only visible work beyond VISIBLE_BUDGET_MS, on a
  * very slow device, continues in the following frame). Hosts within a
- * viewport of the screen follow within a small frame budget, and the rest
+ * viewport height of the screen, or of the scroll container they scroll in,
+ * follow within a small frame budget, and the rest
  * compose in long idle periods, not in what is left of an animation frame.
  * Triggers (ancestor class or style changes, fonts, window resizes, a host's
  * height changing at the same width, and the document lifecycle hub's
@@ -31,7 +32,8 @@ import { contentWidth } from './layout-metrics';
 import { fontKey } from './adapter-keys';
 import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
+import type { NearObserver } from './lifecycle';
 
 export type Priority = 'auto' | 'sync';
 export type Reason = 'mount' | 'force' | 'check';
@@ -122,7 +124,7 @@ function createRegistry(doc: Document): Registry {
   // When idle work was first requested and has not run since.
   let idleSince = 0;
   let settle: ReturnType<typeof setTimeout> | undefined;
-  let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
+  let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: NearObserver | null = null;
   let writingDepth = 0;
   let started = false;
   let windowWidth = win?.innerWidth ?? 0;
@@ -431,13 +433,15 @@ function createRegistry(doc: Document): Registry {
       observer = new win.ResizeObserver(resized);
       for (const target of watchers.keys()) observer.observe(target);
     }
-    if (win && typeof win.IntersectionObserver === 'function') viewport = new win.IntersectionObserver(observations => {
+    // Near: within a viewport height of the window, or of the scroll
+    // container a host scrolls in.
+    viewport = nearObserver(doc, observations => {
       for (const observation of observations) {
         const entry = entries.get(observation.target as HTMLElement);
         if (!entry) continue;
         if (observation.isIntersecting) { near.add(entry); schedule(); } else near.delete(entry);
       }
-    }, { rootMargin: '100% 0px' });
+    });
     // Fonts (including those a stylesheet requests late, which WebKit loads
     // without any event), window resizes and the end of printing, stylesheet
     // changes, metric transitions, content-visibility and translation all come

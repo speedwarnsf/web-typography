@@ -474,6 +474,13 @@ table.
   dropped about 8 frames per slide at 4x CPU in Chrome, and the first 4.3
   candidate still composed in 41 of a 900 ms slide's short idle periods
   (Firefox 17). Engines without idle callbacks (WebKit) keep a 50 ms timer.
+  Near means within a viewport height of the window or of the scroll
+  container the text scrolls in: in an app shell's `overflow: auto` pane,
+  text below the pane's fold counted as far until it was on screen, so
+  blocks scrolled in within about 0.5 to 1 s of a load or screen push
+  (while animations kept frames pending) painted native lines and were
+  rewrapped 2 to 5 frames later, which 4.2 did not do; now none do, in
+  three engines. `mount()` measures nearness the same way.
 - React hosts under continuous change: a translation or fade written every
   frame on their container is no longer checked at all, as with `mount()`
   (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three

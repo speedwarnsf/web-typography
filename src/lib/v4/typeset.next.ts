@@ -15,7 +15,7 @@ import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
@@ -958,7 +958,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
     return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
   };
-  const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+  // Within a viewport height of the window, or of the scroll container a
+  // block scrolls in (see nearObserver).
+  const viewport = nearObserver(doc, entries => {
     let near = false;
     for (const entry of entries) {
       const el = entry.target as HTMLElement;
@@ -976,7 +978,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     }
     // Visible work waits for no idle period.
     if (near) schedule();
-  }, { rootMargin: '100% 0px' });
+  });
   /** Queue a job. New or changed text takes one intersection snapshot to
    * learn whether it is near the screen; rechecks come from callers that
    * already read layout, and say so with `near`. */

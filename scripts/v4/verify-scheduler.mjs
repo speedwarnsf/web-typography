@@ -11,6 +11,11 @@
 //   React adapters during an animation (a screen push): offscreen blocks
 //   compose in idle callbacks, but never in the short idle periods left in
 //   animation frames, where a composition on a slow device drops frames.
+//   An app shell's overflow:auto pane: text below its fold is near when it
+//   is within a viewport height of the pane, so blocks scrolled in soon after
+//   they mount (an entrance animation keeping frames pending) paint composed,
+//   never native lines rewrapped a few frames later; with TypesetText, and
+//   with mount() once its first pass could have run.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -24,6 +29,26 @@ const busyPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><st
 <body><article>${Array.from({ length: 60 }, (_, i) => `<p>${escape(corpus[i % corpus.length])}</p>`).join('')}</article></body></html>`;
 // Short paragraphs keep 1000 compositions affordable in every engine.
 const short = (/** @type {number} */ i) => escape(corpus[i % corpus.length].split(' ').slice(0, 26 + (i % 9)).join(' '));
+// Twelve blocks below a 640 px hero, in a 100vh overflow:auto scroller.
+const nestedTexts = corpus.slice(0, 12).map((/** @type {string} */ text) => text.split(' ').slice(0, 60).join(' '));
+const nestedFixture = (await build({
+  stdin: { contents: `
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { TypesetText } from ${JSON.stringify(resolve(artifacts.react))};
+const texts = ${JSON.stringify(nestedTexts)};
+window.mountNested = kind => {
+  const scroller = document.getElementById('scroller');
+  if (kind === 'mount') { for (const text of texts) { const p = document.createElement('p'); p.className = 'r'; p.textContent = text; scroller.insertBefore(p, document.getElementById('tail')); } window.Typeset.mount(scroller, 'p.r'); return; }
+  const host = document.createElement('div'); scroller.insertBefore(host, document.getElementById('tail'));
+  flushSync(() => createRoot(host).render(texts.map((text, i) => h(TypesetText, { key: i, text, className: 'r' }))));
+};
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
+const nestedPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>html,body{margin:0}body{font:17px/1.45 Georgia,serif}.r{width:360px;margin:0 12px 14px}#scroller{height:100vh;overflow-y:auto}</style></head>
+<body><div id="scroller"><div id="hero" style="height:640px;background:#eee"></div><div id="tail" style="height:1600px"></div></div></body></html>`;
 const reactFixture = (await build({
   stdin: { contents: `
 import { createElement as h } from 'react';
@@ -171,6 +196,65 @@ for (const { name, engine, executablePath } of browsers) {
       check('React adapters: every offscreen block composes after the animation', result.composed === result.hosts, result);
       if (result.idleCallbacks) check('React adapters: no composition in an idle period shorter than 20 ms (the rest of an animation frame)', result.shortIdleCompositions === 0, result);
       await page.close();
+    }
+    // Text in an overflow:auto scroller, scrolled in soon after it mounts.
+    // mount() composes nothing before the page's first paint, so its text is
+    // scrolled in once its first pass could have run.
+    for (const kind of ['react', 'mount']) {
+      for (const delay of kind === 'react' ? [0, 300] : [300]) {
+        const page = await browser.newPage({ viewport: { width: 400, height: 700 } });
+        page.setDefaultTimeout(20000);
+        await page.setContent(nestedPage);
+        await page.addScriptTag({ content: script });
+        await page.addScriptTag({ content: nestedFixture });
+        await page.evaluate(() => document.fonts.ready);
+        const result = await page.evaluate(async ({ kind, delay }) => {
+          const w = /** @type {any} */ (window);
+          /** Painted line starts of a block, read after layout and before paint. */
+          const lines = (/** @type {Element} */ el) => {
+            const out = [], range = document.createRange(), walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let top = null;
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              for (const match of /** @type {Text} */ (node).data.matchAll(/\S+/g)) {
+                range.setStart(node, /** @type {number} */ (match.index)); range.setEnd(node, /** @type {number} */ (match.index) + 1);
+                const rect = range.getClientRects()[0];
+                if (!rect) continue;
+                const t = Math.round(rect.top - el.getBoundingClientRect().top);
+                if (t !== top) { out.push(match[0]); top = t; }
+              }
+            }
+            return out.join(' ');
+          };
+          const painted = /** @type {{ i: number, lines: string }[][]} */ ([]);
+          let armed = false, frames = 0;
+          const tick = document.createElement('div');
+          tick.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:1px;visibility:hidden';
+          document.body.append(tick);
+          new ResizeObserver(() => {
+            if (!armed) return;
+            painted.push([...document.querySelectorAll('.r')].map((el, i) => ({ i, rect: el.getBoundingClientRect() })).filter(({ rect }) => rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight)
+              .map(({ i }) => ({ i, lines: lines(/** @type {Element} */ (document.querySelectorAll('.r')[i])) })));
+          }).observe(tick);
+          const frame = () => { frames++; tick.style.width = (frames % 2 ? 2 : 1) + 'px'; if (armed && frames < 300) requestAnimationFrame(frame); };
+          const t0 = performance.now();
+          w.mountNested(kind);
+          // An entrance animation keeps frames pending for 700 ms.
+          const hero = /** @type {HTMLElement} */ (document.getElementById('hero'));
+          const animate = () => { const p = (performance.now() - t0) / 700; hero.style.transform = `translateY(${Math.round(20 * (1 - Math.min(1, p)))}px)`; if (p < 1) requestAnimationFrame(animate); };
+          requestAnimationFrame(animate);
+          await new Promise(r => setTimeout(r, Math.max(0, delay - (performance.now() - t0))));
+          const scroller = /** @type {HTMLElement} */ (document.getElementById('scroller'));
+          armed = true; requestAnimationFrame(frame);
+          await new Promise(resolve => { let k = 0; const step = () => { scroller.scrollTop += 80; if (++k < 6) requestAnimationFrame(step); else resolve(undefined); }; requestAnimationFrame(step); });
+          await new Promise(r => setTimeout(r, 2000));
+          armed = false;
+          const final = [...document.querySelectorAll('.r')].map(el => lines(el));
+          const flashes = painted.flatMap((blocks, f) => blocks.filter(b => b.lines !== final[b.i]).map(b => ({ frame: f, block: b.i })));
+          return { frames: painted.length, flashFrames: new Set(flashes.map(x => x.frame)).size, flashBlocks: [...new Set(flashes.map(x => x.block))], composed: [...document.querySelectorAll('.r')].filter(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome).length };
+        }, { kind, delay });
+        check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller, scrolled in ${delay} ms after mounting: no block paints native lines and is rewrapped`, result.flashFrames === 0 && result.frames > 0 && result.composed === 12, result);
+        await page.close();
+      }
     }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }
