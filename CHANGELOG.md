@@ -82,8 +82,17 @@ Hashes for every published version live in
 
 ### Rendering changes
 
-None yet. Each default-output change in 4.3 is listed here with its golden-diff
-count.
+Each default-output change in 4.3 is listed here with its golden-diff count.
+
+- `TypesetRichText` plans once from the native text and no longer re-plans
+  after `document.fonts.ready` when nothing changed. 4.2.0 re-planned over
+  its own composed markup, so its final breaks could depend on that history.
+  Golden diff against 4.2.0 (60 corpus paragraphs, `TypesetText` and
+  `TypesetRichText` with and without options, 320, 390 and 560 px, three
+  engines; 2,160 settled blocks): 2 differ, both in WebKit at 320 px. In one,
+  4.3 now gives the same breaks as `typeset()` for the same markup, where
+  4.2.0's re-plan did not; the other is a block on which 4.2.0 differs from
+  itself between runs. Chromium and Firefox: 0.
 
 ### Development
 

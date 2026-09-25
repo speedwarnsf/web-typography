@@ -8,9 +8,16 @@
 // Recomposition only on real changes (P4): parent re-renders with an inline
 // keep array and fresh JSX children, and a 60-frame ancestor transform,
 // write nothing inside the hosts; a real style change still recomposes;
-// 60 rapid updates in five React scheduling modes end exact. Lifecycle: no
-// observers or listeners survive unmounting or 30 fast mount cycles, and
-// StrictMode renders without warnings.
+// 60 rapid updates in six React scheduling modes end exact; resizing never
+// shows doubled lines after its first frame. One registry per document (P5):
+// observers and listeners do not grow with the number of blocks, a pushed
+// screen paints with every on-screen block composed, offscreen blocks follow
+// in idle time, priority="sync" composes in the commit, and Suspense and
+// Activity reveals paint composed. API (K5): refs resolve to hosts, wider
+// hosts compose, onResult reports. Missing APIs (K4): without
+// Intl.Segmenter, ResizeObserver and requestIdleCallback every entry imports
+// and text stays native. Lifecycle: no observers or listeners survive
+// unmounting or 30 fast mount cycles, and no React warnings.
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';

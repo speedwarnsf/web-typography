@@ -1,6 +1,6 @@
 // @ts-check
 // The suites test:v4 runs, in order, and where each writes its report.
-/** @typedef {{ name: string, report?: string, note?: string }} Suite */
+/** @typedef {{ name: string, report?: string, note?: string, timeout?: number }} Suite */
 /** @type {Suite[]} */
 export const SUITES = [
   { name: 'verify-ledger', report: 'output/ledger-verification.json', note: 'published artifacts unchanged' },
@@ -17,7 +17,7 @@ export const SUITES = [
   { name: 'verify-wrap-ownership', report: 'output/wrap-ownership-regression.json' },
   { name: 'verify-controller', report: 'output/controller-regression.json' },
   { name: 'verify-mount-ownership', report: 'output/mount-ownership-regression.json' },
-  { name: 'verify-react', report: 'output/react.json', note: 'React 18 and 19 adapters in three engines: recomposition, scheduling, lifecycle, API' },
+  { name: 'verify-react', report: 'output/react.json', note: 'React 18 and 19 adapters in three engines: recomposition, scheduling, lifecycle, API', timeout: 360 },
   { name: 'verify-react-node', report: 'output/react-node.json', note: 'React adapters outside a browser: TypeScript contracts' },
   { name: 'verify-tracking-clipping', report: 'output/tracking-clipping.json' },
   { name: 'verify-loaders', report: 'output/loaders.json' },

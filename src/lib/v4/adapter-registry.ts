@@ -89,6 +89,7 @@ function createRegistry(doc: Document): Registry {
   let settle: ReturnType<typeof setTimeout> | undefined;
   let mutations: MutationObserver | null = null, sizes: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
   let writingDepth = 0;
+  let started = false;
 
   // The adapters render synchronously in test runners, so a DOM emulation
   // (no layout yet or ever) is answered at once rather than queued.
@@ -103,11 +104,11 @@ function createRegistry(doc: Document): Registry {
   function run(entry: AdapterEntry, reason: Reason, inCommit: boolean): void {
     pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element);
     if (!entries.has(entry.element)) return;
-    const started = performance.now(), length = entry.element.textContent?.length || 1;
+    const begun = performance.now(), length = entry.element.textContent?.length || 1;
     writing(() => entry.compose(reason, inCommit));
     // Learn this device's cost per character of composed text, so a budget
     // can decline a composition that would overrun it before starting it.
-    const perChar = (performance.now() - started) / length;
+    const perChar = (performance.now() - begun) / length;
     costPerChar = costPerChar ? costPerChar * .8 + perChar * .2 : perChar;
   }
   /** Whether a composition of `entry` is expected to finish within `budget` ms from `start`. */
@@ -274,8 +275,12 @@ function createRegistry(doc: Document): Registry {
   };
 
   function start(): void {
+    started = true;
     if (win && typeof win.MutationObserver === 'function') { mutations = new win.MutationObserver(mutated); observeDocument(); }
-    if (win && typeof win.ResizeObserver === 'function') sizes = new win.ResizeObserver(resized);
+    if (win && typeof win.ResizeObserver === 'function') {
+      sizes = new win.ResizeObserver(resized);
+      for (const target of watchers.keys()) sizes.observe(target);
+    }
     if (win && typeof win.IntersectionObserver === 'function') viewport = new win.IntersectionObserver(observations => {
       for (const observation of observations) {
         const entry = entries.get(observation.target as HTMLElement);
@@ -290,6 +295,7 @@ function createRegistry(doc: Document): Registry {
     win?.addEventListener('resize', windowResized);
   }
   function stop(): void {
+    started = false;
     mutations?.disconnect(); sizes?.disconnect(); viewport?.disconnect();
     mutations = sizes = viewport = null;
     const fonts = doc.fonts as FontFaceSet | undefined;
@@ -297,14 +303,16 @@ function createRegistry(doc: Document): Registry {
     fonts?.removeEventListener?.('loading', fontsLoading);
     win?.removeEventListener('resize', windowResized);
     clearTimeout(settle); settle = undefined;
-    pending.clear(); near.clear(); resizing.clear(); watchers.clear(); parents.clear();
+    pending.clear(); near.clear(); resizing.clear();
   }
 
   return {
     identity, entries, writing,
     add(entry) {
-      if (!entries.size && supported()) start();
       entries.set(entry.element, entry);
+      // Observers start with the first host that can be composed, and a
+      // document that gains layout later starts them then.
+      if (!started && supported()) start();
       // A page-level mount() must not compose a host React's adapter owns.
       if (!mountOwners.has(entry.element)) mountOwners.set(entry.element, identity);
       watch(entry);
@@ -321,6 +329,7 @@ function createRegistry(doc: Document): Registry {
     request(entry, reason, inCommit) {
       if (!entries.has(entry.element)) return;
       if (!supported()) { entry.unsupported(); return; }
+      if (!started) start();
       if (entry.priority === 'sync') { run(entry, reason, inCommit); return; }
       if (inCommit) {
         if (!commitStart) { commitStart = performance.now(); queueMicrotask(() => { commitStart = 0; }); }
