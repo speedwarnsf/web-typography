@@ -99,6 +99,8 @@ function inlineStyle(element: HTMLElement): Map<string, [string, string]> {
  * and erased author CSSOM styles in Firefox. Removing the attribute is allowed. */
 function restoreInlineStyle(element: HTMLElement, saved: Map<string, [string, string]>, hadAttribute: boolean): void {
   const style = element.style;
+  // No attribute before: removing ours restores everything in one write.
+  if (!hadAttribute) { removeStyleAttribute(element); return; }
   for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.has(name)) style.removeProperty(name);
   for (const [name, [value, priority]] of saved) {
     if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
@@ -558,7 +560,8 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       // Restore through the CSSOM only (strict CSP); see restoreInlineStyle.
       if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
         && element.style.getPropertyPriority('text-wrap-style') === 'important') {
-        if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
+        if (!hadStyle && element.style.length === 1) removeStyleAttribute(element);
+        else if (wrapStyle) element.style.setProperty('text-wrap-style', wrapStyle, wrapPriority);
         else element.style.removeProperty('text-wrap-style');
         if (!hadStyle && !element.style.length) removeStyleAttribute(element);
       }
