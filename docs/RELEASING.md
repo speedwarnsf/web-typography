@@ -11,6 +11,11 @@ a tag. Nothing is published from a laptop.
 - The docs in `packages/typeset-v4/` describe x.y.z: `npm run test:v4`
   includes `verify-docs`, which checks install lines, options and links.
 - CI is green on the commit you will cut from.
+- Your npm is 11.6.0 (`npm install -g npm@11.6.0`; `npm --version`). The
+  cut packs the tarball with the npm on your PATH, and CI's release-check
+  rebuilds it with npm 11.6.0 and compares bytes: npm 11.8.0 packs the same
+  files into different bytes, so a cut packed with another npm fails
+  release-check after you tag it.
 
 ## 2. Cut
 

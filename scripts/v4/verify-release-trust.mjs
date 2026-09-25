@@ -67,6 +67,11 @@ try {
   check('Dependabot watches npm and GitHub Actions', /package-ecosystem: npm/.test(dependabot) && /package-ecosystem: github-actions/.test(dependabot));
   check('Dependabot leaves the pinned esbuild alone (reproducible builds)', /dependency-name: esbuild/.test(dependabot));
 
+  // The release process names what the workflows assume: the npm that
+  // packs the tarball (release-check rebuilds it with this one).
+  const releasing = await readFile('docs/RELEASING.md', 'utf8');
+  const pinnedNpm = [...new Set([...release.matchAll(/npm install -g (npm@\S+)/g)].map(m => m[1]))];
+  check('RELEASING.md says to cut with the npm the release workflow rebuilds with', pinnedNpm.length === 1 && releasing.includes(pinnedNpm[0]), { pinnedNpm });
   const security = await readFile('SECURITY.md', 'utf8');
   check('SECURITY.md names supported versions, private reporting and response targets', /\| 4\.3\.x \|/.test(security) && /\| 4\.2\.x \| Security fixes only \|/.test(security) && /security\/advisories\/new/.test(security) && /3 business days/.test(security));
   const packaged = await readFile('packages/typeset-v4/SECURITY.md', 'utf8').catch(() => '');
