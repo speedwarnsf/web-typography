@@ -77,8 +77,10 @@ try {
   // (-0.37 MB) would reach about 1.0 MB; that trade-off is the owner's. The
   // review fixes of round 1 took it to 1.75 MB (engine code in four module
   // copies and three script builds, and the docs that describe them), and
-  // those of round 2 to 1.82 MB (the same copies, plus the CLI's wait).
-  check('unpacked package is under 1.85 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1850000, packed.unpackedSize);
+  // those of round 2 to 1.82 MB (the same copies, plus the CLI's wait), and
+  // those of round 3 to 1.85 MB (the same copies of this round's fixes, and
+  // the limits and outcome notes they document).
+  check('unpacked package is under 1.9 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1900000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];

@@ -217,11 +217,11 @@ Composition runs in the browser, on the main thread.
   near 20 ms because only about 6 ms of composition runs inside it, and
   the rest of the on-screen work runs in the next frame. Re-renders that
   change nothing write nothing.
-- Download, gzip: 54.9 KB for `go@4.3.0.js` or `auto.js`; with esbuild,
-  Rollup, webpack or Vite, which tree-shake, 48.7 KB for a bundle that
-  imports only `mount` and 48.5 KB for `TypesetText`. A bundler that does
+- Download, gzip: 55.6 KB for `go@4.3.0.js` or `auto.js`; with esbuild,
+  Rollup, webpack or Vite, which tree-shake, 49.4 KB for a bundle that
+  imports only `mount` and 49.3 KB for `TypesetText`. A bundler that does
   not tree-shake, such as Metro (Expo, React Native Web), ships all of
-  `typeset.us/react`: 60.5 KB for `TypesetText` (4.2.0: 43.2 KB). No
+  `typeset.us/react`: 61.4 KB for `TypesetText` (4.2.0: 43.2 KB). No
   runtime dependencies.
 
 These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the

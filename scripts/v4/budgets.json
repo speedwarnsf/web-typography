@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 48692,
-      "TypesetText-only": 48531,
-      "TypesetRichText-only": 44521,
-      "smartQuotes-only": 1349,
-      "react.js+shared": 51848,
-      "TypesetText-no-tree-shaking": 60528,
-      "go.js": 54889,
-      "typeset.global.js": 54553
+      "mount-only": 49408,
+      "TypesetText-only": 49292,
+      "TypesetRichText-only": 45416,
+      "smartQuotes-only": 1478,
+      "react.js+shared": 52723,
+      "TypesetText-no-tree-shaking": 61447,
+      "go.js": 55580,
+      "typeset.global.js": 55224
     },
     "raised": [
       {
@@ -112,6 +112,30 @@
           "react.js+shared": 51848,
           "go.js": 54889,
           "typeset.global.js": 54553
+        }
+      },
+      {
+        "by": "4.3 review fixes, round 3",
+        "reason": "Measured per commit with the release recipe on typeset.global.js (react.js+shared in parentheses): the 'n pair look-back read backwards +118 B (+110; smartQuotes-only +129 B), trailing punctuation stripped by a backward scan +42 B (+59), only stylesheet changes in <head> as style changes +173 B (+174), a scrollport must scroll vertically +11 B (+10), the document's first composition not counted against the visible budget (+33), font loads exempt from continuous settling (+18), copied plain text with its rendered white space +138 B (+161), TypesetRichText's sibling break before a line-starting element (+108), infinite animations not awaited +18 B (+19), the lifecycle sheet adopted by shadow roots +59 B (+67), the resize settle timer armed once per batch +4 B, the audit's hanging-indent allowance +91 B (+116) and own-key option lookup +17 B.",
+        "before": {
+          "mount-only": 48692,
+          "TypesetText-only": 48531,
+          "TypesetRichText-only": 44521,
+          "smartQuotes-only": 1349,
+          "react.js+shared": 51848,
+          "TypesetText-no-tree-shaking": 60528,
+          "go.js": 54889,
+          "typeset.global.js": 54553
+        },
+        "after": {
+          "mount-only": 49408,
+          "TypesetText-only": 49292,
+          "TypesetRichText-only": 45416,
+          "smartQuotes-only": 1478,
+          "react.js+shared": 52723,
+          "TypesetText-no-tree-shaking": 61447,
+          "go.js": 55580,
+          "typeset.global.js": 55224
         }
       }
     ]
@@ -249,7 +273,7 @@
   "calibrated": {
     "size": {
       "date": "2026-09-25",
-      "dist": "output/fx2/dist (the round 2 candidate)"
+      "dist": "output/candidate/dist (the round 3 candidate, 15bf0bb)"
     },
     "runtime": {
       "date": "2026-09-25",
@@ -619,6 +643,61 @@
           "from": null,
           "to": 60528,
           "reason": "new: TypesetText as a bundler without tree shaking ships it (4.2.0: 43,196 B)"
+        }
+      ],
+      "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 review fixes, round 3",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 48692,
+          "to": 49408,
+          "reason": "linear smart-quote and punctuation scans, the <head> stylesheet filter, vertical scrollports, rendered white space in copied text, infinite animations not awaited, shadow-root lifecycle sheets, batched settle timer, audit hanging indents, own-key option lookup (see size.raised, round 3)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 48531,
+          "to": 49292,
+          "reason": "as mount-only, plus the registry's cold-start budget and font-load exemption"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 44521,
+          "to": 45416,
+          "reason": "as TypesetText-only, plus the sibling break before a line-starting element"
+        },
+        {
+          "budget": "size.gzip.smartQuotes-only",
+          "from": 1349,
+          "to": 1478,
+          "reason": "the 'n pair word is read backwards from the quote in bounded time instead of by a regex over all preceding text (quadratic: seconds for a few KB)"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 51848,
+          "to": 52723,
+          "reason": "as TypesetText-only and TypesetRichText-only together"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": 60528,
+          "to": 61447,
+          "reason": "as react.js+shared"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 54889,
+          "to": 55580,
+          "reason": "as mount-only"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 54553,
+          "to": 55224,
+          "reason": "as mount-only"
         }
       ],
       "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"
