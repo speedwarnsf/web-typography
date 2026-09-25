@@ -170,17 +170,18 @@ Event Timing duration of the click (Chromium only).
 ## Bundle size
 
 esbuild bundles (minified, tree-shaken) importing one entry point from the
-package, React external, and the shipped browser files. Bytes.
+package, React external, and the shipped browser files. Bytes, measured
+after the first round of review fixes (the timings above predate them).
 
 | What a consumer imports | Minified | gzip | brotli |
 |---|---|---|---|
-| mount-only | 115,726 | 45,809 | 40,569 |
-| TypesetText-only | 114,937 | 45,457 | 40,218 |
-| TypesetRichText-only | 101,057 | 41,473 | 36,833 |
-| smartQuotes-only | 1,997 | 1,106 | 1,018 |
-| react.js+shared | 124,942 | 48,401 | 42,794 |
-| go.js | 131,978 | 52,057 | 45,404 |
-| typeset.global.js | 131,070 | 51,726 | 45,070 |
+| mount-only | 119,973 | 47,311 | 41,831 |
+| TypesetText-only | 118,913 | 46,833 | 41,321 |
+| TypesetRichText-only | 104,688 | 42,795 | 38,003 |
+| smartQuotes-only | 2,450 | 1,349 | 1,244 |
+| react.js+shared | 129,267 | 49,898 | 44,164 |
+| go.js | 136,227 | 53,453 | 46,589 |
+| typeset.global.js | 135,319 | 53,116 | 46,422 |
 
 ## Reading the numbers
 

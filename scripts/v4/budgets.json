@@ -3,13 +3,13 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 45809,
-      "TypesetText-only": 45457,
-      "TypesetRichText-only": 41473,
-      "smartQuotes-only": 1106,
-      "react.js+shared": 48401,
-      "go.js": 52057,
-      "typeset.global.js": 51726
+      "mount-only": 47311,
+      "TypesetText-only": 46833,
+      "TypesetRichText-only": 42795,
+      "smartQuotes-only": 1349,
+      "react.js+shared": 49898,
+      "go.js": 53453,
+      "typeset.global.js": 53116
     },
     "raised": [
       {
@@ -67,6 +67,28 @@
           "react.js+shared": 48401,
           "go.js": 52057,
           "typeset.global.js": 51726
+        }
+      },
+      {
+        "by": "4.3 review fixes, round 1",
+        "reason": "Measured per commit with the release recipe on typeset.global.js (react.js+shared in parentheses): the C13 context rules for \"I\" and sentence-final abbreviations +396 B (+448), mount()'s translation and fade filter and style-only discovery +261 B, C15's 'n' pairs and closing-quote look-ahead +223 B (smartQuotes-only +248), clipboard residue +113 B (+150), links that start a line +93 B (+217), live regions around text, aria-live values and moves +143 B (+38), TypesetText's curled quotes in a region +50 B (+66), revealed text never double-wrapped +88 B (+92), Lit's comment-adjacent text +26 B (+33); the adapter registry's height check +137 B and long-idle scheduling +70 B are React-only. A literal live-region selector took smartQuotes-only back down by 63 B.",
+        "before": {
+          "mount-only": 45809,
+          "TypesetText-only": 45457,
+          "TypesetRichText-only": 41473,
+          "smartQuotes-only": 1106,
+          "react.js+shared": 48401,
+          "go.js": 52057,
+          "typeset.global.js": 51726
+        },
+        "after": {
+          "mount-only": 47311,
+          "TypesetText-only": 46833,
+          "TypesetRichText-only": 42795,
+          "smartQuotes-only": 1349,
+          "react.js+shared": 49898,
+          "go.js": 53453,
+          "typeset.global.js": 53116
         }
       }
     ]
@@ -479,6 +501,55 @@
       ],
       "reasonForRaises": "Times: a single group's earlier measurement against the merged build's median of three at load 4-7, within noise of 4.2.0 in a paired run (mount-200 first viewport 216 ms for 4.2.0 and 229 ms for 4.3.0; React 38-block commits 160 and 78 ms for 4.2.0). Counts: the React lanes gain the lifecycle hub's MutationObserver and its observe() calls (2 per document), which the react branch did not have. late-font nodeWrites 97885 -> 100720 and hidden intersectionObserve: C7 recomposes after a late font where 4.2.0 did not (WebKit left 59 of 195 paragraphs stale), and C8 observes revealed offscreen text until it comes near.",
       "measured": "scripts/v4/verify-budgets.mjs --runtime --repeat 3, chromium@4x, darwin-arm64, load 4.5-7"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 review fixes, round 1",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 45809,
+          "to": 47311,
+          "reason": "C13 context lists, mount()'s movedOnly filter, live-region scope and moves, clipboard and link-start handling (see size.raised, round 1)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 45457,
+          "to": 46833,
+          "reason": "as mount-only, plus the registry's same-width height check (C7), reveal handling (C8) and long-idle scheduling (P5)"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 41473,
+          "to": 42795,
+          "reason": "the registry's height check, reveals and long-idle scheduling, the frozen stale path, live regions around text and breaks before a link in renderChildren"
+        },
+        {
+          "budget": "size.gzip.smartQuotes-only",
+          "from": 1106,
+          "to": 1349,
+          "reason": "C15: 'n' only inside a closed list of pairs, and 'round/'bout/'nuff only when no closing quote follows in the sentence"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 48401,
+          "to": 49898,
+          "reason": "as TypesetText-only and TypesetRichText-only together"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 52057,
+          "to": 53453,
+          "reason": "as mount-only"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 51726,
+          "to": 53116,
+          "reason": "as mount-only"
+        }
+      ],
+      "measured": "scripts/v4/bench-sizes.mjs on a candidate built at each fix commit (release recipe, Node 24 zlib)"
     }
   ]
 }

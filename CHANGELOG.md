@@ -22,10 +22,10 @@ changes only where 4.2.0 had a verified defect; each change is listed under
 Every count compares the published 4.2.0 build with the 4.3.0 candidate, in
 the same pages, in Chromium, WebKit and Firefox:
 
-- `scripts/v4/verify-golden.mjs`: 3,380 cells per engine (85 corpus
+- `scripts/v4/verify-golden.mjs`: 3,412 cells per engine (85 corpus
   paragraphs at 240, 320, 400 and 560 px in Georgia and the bundled Fraunces,
   plain, with a link and emphasis, through the legacy renderer, with quotes
-  and hanging, as titles and justified, plus a 20-paragraph adversarial set).
+  and hanging, as titles and justified, plus a 22-paragraph adversarial set).
   A cell changes when its outcome, finishing features, breaks or characters
   differ.
 - A golden A/B of 316 blocks per engine (audit fixture, 40 corpus
@@ -55,7 +55,8 @@ Outside the changes below, 0 of these differ in any engine.
   are now exposed (16 hyphen breaks stay hidden), with 0
   screenshots, line boxes, outcomes, feature statuses or copied texts
   changed. In verify-golden 2,016 (WebKit 2,011) of 2,724 corpus cells per engine
-  differ only in these attributes and C9's below.
+  differ only in these attributes and C9's below, 173 of them also in the
+  position of a break before a link (below).
 - **Generated breaks are displayed through `--ts-break-display` (C9).** The
   break's inline style is `display: var(--ts-break-display, inline)
   !important` (4.2.0: `display: inline !important`), and the
@@ -441,10 +442,10 @@ table.
   (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
   one more font listener, shared by every controller and adapter.
 - Download, gzip (esbuild bundles importing one entry point): `mount` only
-  37.7 to 45.8 KB, `TypesetText` only 38.0 to 45.5 KB, `TypesetRichText`
-  only 33.4 to 41.5 KB, `smartQuotes` only 11.7 to 1.1 KB (the line-break
-  tables now tree-shake away), `go.js` 42.3 to 52.1 KB and
-  `typeset.global.js` 42.1 to 51.7 KB. The growth is the code the fixes
+  37.7 to 47.3 KB, `TypesetText` only 38.0 to 46.8 KB, `TypesetRichText`
+  only 33.4 to 42.8 KB, `smartQuotes` only 11.7 to 1.3 KB (the line-break
+  tables now tree-shake away), `go.js` 42.3 to 53.5 KB and
+  `typeset.global.js` 42.1 to 53.1 KB. The growth is the code the fixes
   above need, measured per group and recorded in scripts/v4/budgets.json.
 
 ### Packaging, loaders and CDN

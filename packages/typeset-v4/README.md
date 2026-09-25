@@ -193,8 +193,8 @@ Composition runs in the browser, on the main thread.
 - React: one registry per document serves every block, and a screen of 38
   `TypesetText` blocks commits in about 20 ms at 4x CPU. Re-renders that
   change nothing write nothing.
-- Download, gzip: 52.1 KB for `go@4.3.0.js` or `auto.js`, 45.8 KB for a
-  bundle that imports only `mount`, 45.5 KB for `TypesetText`. No runtime
+- Download, gzip: 53.5 KB for `go@4.3.0.js` or `auto.js`, 47.3 KB for a
+  bundle that imports only `mount`, 46.8 KB for `TypesetText`. No runtime
   dependencies.
 
 These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the
