@@ -1,0 +1,25 @@
+{
+  "note": "Health and public-information copy built around the constructions the 4.2 compositor split: abbreviations read as sentence ends, honorifics and names, numbers and units, labels and numbers, letter designators, initialisms and compounds, plus control paragraphs for the article 'a' and the pronoun 'I'. Used by verify-golden (C13, C16).",
+  "paragraphs": [
+    { "id": "clinic", "text": "Your first visit is with Dr. Alvarez, who will review your labs and answer questions. Bring a list of medicines and arrive by 8 a.m. so Dr. Chen can see you before the clinic gets busy." },
+    { "id": "academic", "text": "As shown in Fig. 4 and discussed on p. 17, the U.S. sample was smaller than the U.K. sample, but the effect held in both groups after adjustment for age and income." },
+    { "id": "news", "text": "Mr. Okafor told reporters on Tuesday that the office would close at 5 p.m. each day until the audit by Ms. Lindqvist was complete and the board had voted." },
+    { "id": "trail", "text": "The trail climbs 1,200 m over 14 km, so bring water, a map, and a warm layer for the exposed ridge near the top." },
+    { "id": "hepatitis", "text": "If you were born between 1945 and 1965, ask your doctor about a one-time test for hepatitis C, even if you feel fine and have never had symptoms." },
+    { "id": "testing", "text": "Free testing for hepatitis C and HIV is available at every clinic, and staff can talk you through vitamin D levels, Plan B access, and the PrEP options that fit your life." },
+    { "id": "medicare", "text": "Medicare Part D helps pay for prescription drugs, while Part B covers visits to your doctor and many of the preventive screenings you need each year." },
+    { "id": "contraception", "text": "Emergency contraception such as Plan B works best when it is taken as soon as possible after unprotected sex, and it is sold without a prescription." },
+    { "id": "vitamin", "text": "Most adults need some vitamin D every day, and many people get enough of it from sunlight, fatty fish, eggs, and fortified milk or cereal." },
+    { "id": "recipe", "text": "Whisk 500 g of flour with 10 g of salt, then pour in 2 L of warm water a little at a time until the dough comes together into a soft ball." },
+    { "id": "history", "text": "My grandfather served in World War I and later ran a small shop that sold size S shirts and type A batteries to the whole neighborhood for decades." },
+    { "id": "dosage", "text": "Take 500 mg twice a day with food for 10 days, and keep the bottle below 25 °C. Call Dr. Patel if the fever stays above 38 °C for more than 48 hours." },
+    { "id": "diabetes", "text": "People with type 2 diabetes can lower their risk of complications, and a study described in Table 3 found that walking for 30 min a day helped most of them." },
+    { "id": "initials", "text": "The report by J. R. Moreno and the U.S. Department of Health found that 40 percent of adults in the U.S. had not been screened in the past five years." },
+    { "id": "funding", "text": "The county set aside $2.5 million for outreach, and No. 7 on the list of priorities was a mobile clinic that visits rural towns every week." },
+    { "id": "compounds", "text": "Long-term care for older adults with COVID-19 depends on well-trained staff, up-to-date vaccines and a follow-up visit within 7 days of discharge." },
+    { "id": "pronoun", "text": "When I was young I thought that I would never leave the town where I grew up, but I did, and after a while I stopped looking back at all." },
+    { "id": "article", "text": "She took a train to a city she had never seen, found a room above a bakery, and spent a year learning a trade from a woman who ran a print shop." },
+    { "id": "sentence-ends", "text": "Nobody told us what the money was for. We asked the board to explain what they voted on. They said that the plan was something to be proud of." },
+    { "id": "control", "text": "The program opens in March. Staff will train volunteers in each county. Families can sign up online or by phone, and every call is answered by a person." }
+  ]
+}

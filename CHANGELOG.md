@@ -20,13 +20,34 @@ Hashes for every published version live in
   `isolated-space`, a word space alone beside an inline-block engine marker,
   which Chromium drops from its accessibility tree. 4.2.0's composed output
   has both, so audits of composed pages that passed under 4.2.0 can now fail.
+- `issue.target` now resolves: every selector started `html:nth-of-type(0)`
+  and matched nothing. Targets start from a unique id, from `body`, or are
+  `:root`.
+- Line-end reviews follow the compositor's own policy, which removes false
+  positives: a word before sentence punctuation ("…what it was for.") and a
+  letter designator ("type A") are valid line ends; an abbreviation is not a
+  sentence end, so "Dr. Jones" and "8 a.m. Monday" are not stranded openers;
+  untagged text gets no English word lists, as the compositor gives it none
+  (text composed through the legacy break path still does).
+- New review items: `bound-split` (a number and its unit, an honorific and a
+  name, a label and its number, or a word and its letter designator split
+  across lines), `split-ellipsis`, `line-initial-punctuation` (a line opening
+  with a dash or closing punctuation) and `regressed-vs-native` (a composed
+  element with more line-end reviews than its native layout had; 11 of 671
+  composed corpus cells at 4 widths in Chromium under 4.3). New error:
+  `alignment-lost` (see Rendering changes). Field shapes and `schemaVersion`
+  are unchanged.
 
 ### Rendering changes
 
-Each default-output change in 4.3 is listed here with its golden-diff count:
-the published 4.2.0 build against the candidate over the same blocks in
-Chromium, WebKit and Firefox (element screenshots at DPR 2, `measureLayout`
-line boxes, outcomes, feature statuses, copy text and markup).
+Each default-output change in 4.3 is a defect fix, listed here with its
+golden-diff count: the published 4.2.0 build against the candidate over the
+same blocks in Chromium, WebKit and Firefox. The accessibility entries were
+measured with element screenshots at DPR 2, `measureLayout` line boxes,
+outcomes, feature statuses, copy text and markup; the composition entries
+with the cells of `scripts/v4/verify-golden.mjs` (85 corpus paragraphs at
+240, 320, 400 and 560 px in Georgia and the bundled Fraunces, per engine)
+whose outcome, finish features or markup differ from 4.2.0.
 
 - **Generated line breaks are word separators again (accessibility, C2).** A
   generated `<br>` that stands in for a collapsed space is no longer
@@ -71,6 +92,36 @@ line boxes, outcomes, feature statuses, copy text and markup).
   `role="text"`, which emptied a composed heading's accessible name in WebKit,
   and clears the element with `replaceChildren()` instead of `innerHTML`, so it
   runs under Trusted Types.
+- **Justified text is left as the author set it** (`native:justify`). A
+  generated break ends its line, so every composed line took the last-line
+  alignment: `text-align: justify` became ragged right, and a `text-align-last`
+  that differs from `text-align` applied to every line, while `audit()` still
+  passed. Multi-line paragraphs whose computed `text-align` is `justify` or
+  `justify-all`, or whose `text-align-last` differs from `text-align`, are now
+  declined under every entry point (`typeset()`, `mount()`, `go.js`,
+  `TypesetText`, `TypesetRichText` and the legacy renderer). A single line
+  still reports `native:fits`. Golden diff: 336 of 336 justified cells per
+  engine (42 corpus paragraphs), 0 of the rest. `audit()` reports a new error,
+  `alignment-lost`, for a composed element whose alignment later changes to
+  one the breaks cannot keep.
+- **Abbreviations, units, honorifics, labels and letter designators stay
+  with their words** (English). Every word ending in a period counted as a
+  sentence end, so the compositor paid to break after "Dr.", "Fig.", "a.m."
+  and "U.S.", and the single-letter penalty pushed units and designators to
+  the next line ("1,200 / m", "hepatitis / C", "World War / I"). Now an
+  abbreviation (Mr, Mrs, Ms, Dr, Prof, St, Mt, Jr, Sr, vs, etc, e.g, i.e,
+  a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted initialisms and
+  single initials) ends no sentence; splitting a number from its unit, an
+  honorific from a name, a label from its number or a word from its letter
+  designator costs what a weak line end costs; and only the article and the
+  pronoun "I" pay the single-letter penalty. Golden diff: 0 of the 2,724
+  corpus cells in each engine (the corpus has none of these constructions),
+  and 43 (Chromium, Firefox) or 44 (WebKit) of 160 cells of the new
+  adversarial set (`tests/v4-corpus-adversarial.json`), 41 of 160 through
+  the legacy renderer. On that set, pairs split at line ends fall from 46
+  (WebKit 44) under 4.2.0 to 12 (WebKit 11), against 26 in the browser's
+  own layout; weak line ends stay at 46 (WebKit 46 to 48); lines added
+  over native fall from 5 to 2. No orphan, overflow or source change.
 
 ### Fixed
 
@@ -111,6 +162,15 @@ line boxes, outcomes, feature statuses, copy text and markup).
 - `TypesetRichText` with `smartQuotes="en"` but no `lang` of its own warns
   once in development builds; it leaves quotes as written, as before (C15).
   The package build leaves `process.env.NODE_ENV` to the application's bundler.
+- `keep` works in body text. It was typed and exposed on both React adapters,
+  but body composition never received it; it only switched off native
+  retention. A kept phrase that fits the measure is now never split, a phrase
+  the browser splits can earn one extra line (not with `density: 'compact'`),
+  and a phrase longer than the measure is split as few times as possible.
+  Matching ignores case, NBSP and punctuation around the phrase, in titles
+  too, where a fitting phrase is held within the minimum line count. Native
+  retention is kept unless the native layout splits a kept phrase. Output with
+  `keep` omitted is unchanged (golden diff 0).
 
 ### Development
 

@@ -3,7 +3,7 @@ import type { FrozenLine } from './typeset';
 import { composeTitle } from './title-layout';
 import { contentWidth, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
-import { inLiveRegion, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified } from './rich-text';
+import { inLiveRegion, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
 import { applySmartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
@@ -11,7 +11,7 @@ import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
 import { languageOf, languageWeakEnding } from './break-opportunities';
-import { strandedOpener } from './phrase-boundaries';
+import { boundPair, proseBoundary, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
@@ -70,6 +70,9 @@ interface State {
   tracking?: RichOutput;
   /** Every Text node an output split, with its data as composed. */
   heads: Map<Text, string>;
+  /** Composed with English lexical preferences (declared English, or the
+   * legacy break path, which applies them to untagged text). */
+  english: boolean;
 }
 const states = new WeakMap<HTMLElement, State>();
 
@@ -145,7 +148,7 @@ function signature(el: HTMLElement, options: Options): string {
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
     cs.fontSizeAdjust, cs.fontSynthesis, cs.textRendering, cs.letterSpacing, cs.wordSpacing,
-    cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.direction,
+    cs.lineHeight, cs.textTransform, cs.whiteSpace, cs.textAlign, cs.textAlignLast, cs.direction,
     cs.writingMode, cs.display, cs.textWrap, cs.hyphens, cs.wordBreak, cs.lineBreak, cs.overflowWrap, cs.getPropertyValue('-webkit-line-clamp'),
     el.closest('[lang]')?.getAttribute('lang'), el.dataset.typesetMode,
     options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour,
@@ -334,6 +337,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const before = measureLayout(element);
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
+  // The composition's style fingerprint as the last verification confirmed
+  // it, so a finish pass reads it again only after a rollback.
+  let fingerprinted: string | undefined;
+  // Natural word spaces measured for the contour serve the spacing finish.
+  // Only within this call: a later call may see different fonts.
+  const spaceWidths = new Map<string, number>();
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
     let optical: RichOutput | undefined;
     let spacing: RichOutput | undefined;
@@ -343,9 +352,9 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       spacing: options.spacing === false ? 'off' : mode !== 'body' ? 'native:spacing-mode' : 'native:spacing-uncomposed',
       tracking: options.tracking === false || options.spacing === false ? 'off' : mode !== 'body' ? 'native:tracking-mode' : 'native:tracking-uncomposed' };
     if (options.spacing !== false && mode === 'body' && outcome === 'composed:rich') {
-      const plan = planSpacingFinish(element, measureLayout(element));
+      const plan = planSpacingFinish(element, measureLayout(element), spaceWidths);
       targets = finishTargets(plan.before.lines.map(line => line.width), plan.before.width);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
         spacing = renderRichText(element, [], [], plan.adjustments);
@@ -353,12 +362,13 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
           spacing.cleanup(); spacing = undefined; features.spacing = 'native:spacing-verification';
         }
       }
+      fingerprinted = spacing || !plan.adjustments.length ? fingerprint : undefined;
     } else if (options.spacing !== false && mode === 'body' && outcome === 'composed') {
       features.spacing = Array.from(element.querySelectorAll<HTMLElement>('.ts-line')).some(line => parseFloat(line.style.wordSpacing)) ? 'applied' : 'unchanged';
     }
     if (targets && options.tracking !== false && ['applied', 'unchanged'].includes(features.spacing)) {
       const plan = planTrackingFinish(element, measureLayout(element), targets);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       features.tracking = plan.outcome;
       if (plan.runs.length) {
         tracking = renderTracking(element, plan);
@@ -366,10 +376,11 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
           tracking.cleanup(); tracking = undefined; features.tracking = 'native:tracking-verification';
         }
       }
+      fingerprinted = tracking || !plan.runs.length ? fingerprint : undefined;
     }
     if (options.opticalHanging && (outcome === 'composed:rich' || outcome === 'native:fits')) {
       const layout = measureLayout(element);
-      const fingerprint = richFingerprint(element);
+      const fingerprint = fingerprinted ?? richFingerprint(element);
       const plan = planOpticalHanging(element, layout);
       features.hanging = plan.outcome;
       if (plan.hangs.length) {
@@ -394,6 +405,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       appliedStyles: { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize },
       signature: signature(element, options), result,
       rich, hadStyle, quotes, optical, spacing, tracking, heads,
+      english: options.lineBreaks !== 'unicode' || languageOf(element.closest('[lang]')?.getAttribute('lang')) === 'en',
     });
     return result;
   };
@@ -417,7 +429,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   if (cs.overflow !== 'visible' && cs.textOverflow === 'ellipsis') return finish('native:clamped');
   if (cs.display === 'inline') return finish('native:inline');
   if (options.lineBreaks === 'unicode' || options.opticalHanging || options.smartQuotes || element.children.length || nodes.some(node => node.nodeType !== Node.TEXT_NODE)) {
-    const plan = planRichText(element, { ...options, mode }, before);
+    const plan = planRichText(element, { ...options, mode }, before, spaceWidths);
     search = plan.search;
     if (plan.outcome !== 'composed:rich') return finish(plan.outcome, plan.constraint);
     rich = renderRichText(element, plan.breaks);
@@ -427,9 +439,11 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       rich.cleanup(); rich = undefined;
       return finish('native:verification');
     }
+    fingerprinted = plan.styleSignature;
     return finish('composed:rich');
   }
   if (before.lines.length === 1 && before.overflow <= 0.5) return finish('native:fits');
+  if (breaksChangeAlignment(cs)) return finish('native:justify');
   if (mode === 'ui') return finish('native:ui');
   if (source.length > 12000 || source.trim().split(/\s+/u).length > 500) return finish('native:budget');
   const measure = makeMeasurer(element);
@@ -452,7 +466,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const maxLines = options.maxLines || before.lines.length + (before.lastSingleton || options.density === 'editorial' ? 1 : 0);
       const tail = parts.slice(-2).join(' ');
       const unavoidableOrphan = before.lastSingleton && measure.measure(tail) > before.width;
-      const composed = composeParagraph(tokens, before.width, ch, { maxLines, candidateBar: 1, allowOrphan: unavoidableOrphan });
+      const composed = composeParagraph(tokens, before.width, ch, { maxLines, candidateBar: 1, allowOrphan: unavoidableOrphan, keep: options.keep });
       const spaceEm = measure.measure(' ') / fontSize;
       lines = composed && (options.spacing === false ? composed : shapeExactLines(composed, ch, before.width, false, spaceEm, fontSize));
       if (lines && !finalValidate(lines, ch, false, spaceEm, unavoidableOrphan)) lines = null;
@@ -505,6 +519,37 @@ export interface AuditReport {
   features: Record<'quotes' | 'hanging' | 'spacing' | 'tracking', Record<string, number>>;
   issues: AuditIssue[];
 }
+/**
+ * What a reader notices where lines end, judged by the policy the compositor
+ * applies to this text: English lexical preferences for declared English (or
+ * text the legacy path composed), the language profile for fr/de/es, and no
+ * word lists for untagged text, which the compositor treats neutrally.
+ */
+function lineReview(layout: LayoutMetrics, language: string, english: boolean): { type: string; detail: string }[] {
+  const review: { type: string; detail: string }[] = [];
+  const add = (type: string, detail: string) => review.push({ type, detail });
+  if (layout.lastSingleton) add('orphan', 'One word on the final line; may be unavoidable');
+  if (layout.firstSingleton) add('first-singleton', 'One word on the first line; may be unavoidable');
+  for (const [index, line] of layout.lines.slice(0, -1).entries()) {
+    const words = line.text.trim().split(/\s+/u);
+    const word = words.at(-1) || '', previous = words.at(-2), earlier = words.at(-3);
+    const first = layout.lines[index + 1].text.trim().split(/\s+/u)[0] || '';
+    const at = 'Line ' + (index + 1);
+    // A word before sentence punctuation ends its sentence ("through."), and
+    // a letter designator completes its phrase ("type A"); both may end a line.
+    const designated = previous !== undefined && boundPair(previous, word, earlier) === 'designator';
+    const weak = !proseBoundary(word) && !designated && (english ? isWeakEnding(word)
+      : language !== 'und' && language !== 'en' && language !== 'invalid' && languageWeakEnding(word, language));
+    if (weak) add('weak-line-end', at + ' ends on "' + word + '"');
+    if (english && strandedOpener(line.text)) add('stranded-opener', at + ' leaves a sentence or clause opener at its end');
+    const pair = english ? boundPair(word, first, previous) : null;
+    if (pair) add('bound-split', at + ' separates "' + word + '" from "' + first + '" (' + { unit: 'number and unit', honorific: 'honorific and name', label: 'label and number', designator: 'word and letter designator' }[pair] + ')');
+    if (/^\./u.test(first)) add('split-ellipsis', 'Line ' + (index + 2) + ' begins with the rest of a split ellipsis');
+    else if (/^[\u2013\u2014,;:!?)\]}\u201D\u2019\u00BB]/u.test(first)) add('line-initial-punctuation', 'Line ' + (index + 2) + ' begins with "' + first[0] + '"');
+  }
+  return review;
+}
+
 export function auditReport(selector = defaults): AuditReport {
   const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
@@ -520,6 +565,13 @@ export function auditReport(selector = defaults): AuditReport {
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
     if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
+    // Composed while left-aligned, then justified: every generated break now
+    // ends a line that takes the last-line alignment.
+    const style = getComputedStyle(element);
+    if (outcome.startsWith('composed') && breaksChangeAlignment(style)) {
+      add('alignment-lost', 'error', 'text-align: ' + style.textAlign + (style.textAlignLast && style.textAlignLast !== 'auto' ? ', text-align-last: ' + style.textAlignLast : '')
+        + ' cannot apply to composed lines, which each end in a generated break');
+    }
     // A generated break at a space stands in for that space, which collapses at
     // the line end. Hidden from assistive technology, it leaves nothing between
     // the two words. (A break after a hyphen or dash separates no words.)
@@ -540,18 +592,20 @@ export function auditReport(selector = defaults): AuditReport {
       for (const sibling of [marker.previousSibling, marker.nextSibling]) if (sibling?.nodeType === 3 && /^\s+$/.test((sibling as Text).data)) isolatedSpaces++;
     }
     if (isolatedSpaces) add('isolated-space', 'error', isolatedSpaces + ' word space' + (isolatedSpaces === 1 ? ' stands' : 's stand') + ' alone beside inline-block engine markers; Chromium drops ' + (isolatedSpaces === 1 ? 'it' : 'them') + ' from the accessibility tree');
-    if (layout.lastSingleton) add('orphan', 'review', 'One word on the final line; may be unavoidable');
-    if (layout.firstSingleton) add('first-singleton', 'review', 'One word on the first line; may be unavoidable');
-    for (const [index, line] of layout.lines.slice(0, -1).entries()) {
-      const word = line.text.trim().split(/\s+/u).at(-1) || '';
-      const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
-      if (language === 'und' ? isWeakEnding(word) : language !== 'invalid' && languageWeakEnding(word, language)) add('weak-line-end', 'review', 'Line ' + (index + 1) + ' ends on "' + word + '"');
-      if (['en', 'und'].includes(language) && strandedOpener(line.text)) add('stranded-opener', 'review', 'Line ' + (index + 1) + ' leaves a sentence or clause opener at its end');
-    }
     const state = states.get(element);
-    if (state && state.output !== element.textContent) add('stale-output', 'error', 'Content changed since the last composition');
+    const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
+    const english = language === 'en' || (language === 'und' && !!state?.english);
+    const review = lineReview(layout, language, english);
+    for (const item of review) add(item.type, 'review', item.detail);
+    const current = !!state && state.output === element.textContent;
+    if (state && !current) add('stale-output', 'error', 'Content changed since the last composition');
+    // More line-end problems than the browser's own layout had.
+    if (current && outcome.startsWith('composed')) {
+      const native = lineReview(state.result.before, language, english).length;
+      if (review.length > native) add('regressed-vs-native', 'review', review.length + ' line review items after composition; the native layout had ' + native);
+    }
     if (outcome === 'native:no-candidate') {
-      const constraint = state?.output === element.textContent ? state.result.constraint : undefined;
+      const constraint = current ? state!.result.constraint : undefined;
       const detail = constraint?.kind === 'unbreakable-run'
         ? 'A run needs ' + constraint.requiredWidth.toFixed(3) + 'px in ' + constraint.availableWidth.toFixed(3) + 'px with the permitted breaks'
         : constraint?.kind === 'line-budget'
@@ -570,10 +624,15 @@ export function audit(selector?: string): AuditIssue[] { return auditReport(sele
  * an empty selector match is never reported as a successful audit. */
 export function auditJSON(selector = defaults) {
   const report = auditReport(selector);
+  // A selector document.querySelector resolves to the element: from a unique
+  // id, or else from body (or :root for the root element itself).
   const identify = (element: HTMLElement) => {
     const path: string[] = [];
+    const doc = element.ownerDocument;
     for (let el: HTMLElement | null = element; el; el = el.parentElement) {
-      if (el.id) { path.unshift('#' + CSS.escape(el.id)); break; }
+      if (el.id && doc.querySelectorAll('#' + CSS.escape(el.id)).length === 1) { path.unshift('#' + CSS.escape(el.id)); break; }
+      if (el === doc.documentElement) { path.unshift(':root'); break; }
+      if (el === doc.body) { path.unshift('body'); break; }
       path.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + (Array.from(el.parentElement?.children || []).filter(sibling => sibling.tagName === el!.tagName).indexOf(el) + 1) + ')');
     }
     return path.join(' > ');

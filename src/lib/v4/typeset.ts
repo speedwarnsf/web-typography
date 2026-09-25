@@ -1,6 +1,6 @@
 'use client';
 
-import { proseBoundary } from './phrase-boundaries';
+import { boundPair, keptPhrases, proseBoundary } from './phrase-boundaries';
 
 /**
  * typeset.ts — Typographic refinement utility
@@ -129,6 +129,8 @@ const LINKING_END_WORDS = new Set([
   "isn't","aren't","wasn't","weren't","hasn't","haven't","hadn't","mustn't",
 ]);
 export function isWeakEnding(word: string): boolean {
+  // "…what it was for." ends a sentence, which is a good place to end a line.
+  if (proseBoundary(word)) return false;
   const clean = word.replace(/[^A-Za-z0-9\u2019']+$/g, '').toLowerCase();
   return WEAK_END_WORDS.has(clean) || LINKING_END_WORDS.has(clean);
 }
@@ -206,10 +208,12 @@ function bindOpenerOf(part: string): string | undefined {
  * expression. Release builds define it as `undefined`, so no published bundle
  * reads a page global that could change composition.
  *
- * There is deliberately no numberUnit weight. It was measured, found to have
- * no supporting evidence in any corpus, and therefore not shipped.
+ * The 3.x numberUnit weight was measured against the 85-paragraph corpus,
+ * which has no numbers with units, and was not shipped. 4.3's pair weight
+ * (numbers and units, honorifics, labels, letter designators) is derived on
+ * tests/v4-corpus-adversarial.json instead; see docs/BINDING.md.
  */
-interface BindWeights { toponym: number }
+interface BindWeights { toponym: number; pair: number }
 // Re-derived 2026-07-24 against the fixed predicate and closed list, over 85
 // real paragraphs x 7 measures (24-78ch), in Chromium and WebKit — which
 // agreed on every cell. 1600 sits inside a plateau, [800, 2000], where the
@@ -225,8 +229,19 @@ interface BindWeights { toponym: number }
 // Do not read precision into this number. The metric cannot separate any
 // value inside the plateau, so 1600 is a conservative point in a flat region,
 // not an optimum. See docs/BINDING.md for the full method and its limits.
-const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600 };
+//
+// pair (a number and its unit, an honorific and a name, a label and its
+// number, a word and its letter designator; see phrase-boundaries.ts) is a
+// multiple of the measure profile's weak-end penalty. Swept 2026-09-24 over
+// the adversarial set (20 paragraphs x 4 widths x 2 fonts, 3 engines):
+// 0.75 / 1 / 1.25 / 1.5 / 2 left 14 / 12 / 9 / 8 / 6 pairs split (native
+// 26, 4.2.0 46) and 46 / 46 / 49 / 52 / 53 weak line ends (4.2.0 46) in
+// Chromium. 1 is the largest weight that adds no weak line end.
+const DEFAULT_BIND_WEIGHTS: BindWeights = { toponym: 1600, pair: 1 };
 declare const __TYPESET_BIND_OVERRIDE__: Partial<BindWeights> | undefined;
+/** A kept phrase that fits the measure is split only when nothing else can
+ * satisfy the paragraph's hard constraints. */
+const KEEP_UNSPLIT = 1e6;
 function bindWeights(): BindWeights {
   const o = typeof __TYPESET_BIND_OVERRIDE__ === 'undefined' ? undefined : __TYPESET_BIND_OVERRIDE__;
   return o ? { ...DEFAULT_BIND_WEIGHTS, ...o } : DEFAULT_BIND_WEIGHTS;
@@ -749,6 +764,9 @@ export interface ParagraphOptions {
   breakPenalty?: (end: number) => number;
   contourWidths?: (lines: ParagraphLine[]) => number[];
   onSearch?: (evidence: ParagraphSearchEvidence) => void;
+  /** Author phrases to keep on one line: never split where the phrase fits
+   * the measure, and split as little as possible where it cannot. */
+  keep?: readonly string[];
 }
 export interface ParagraphLine { tokens: Token[]; width: number; fill: number }
 export interface ParagraphState { tokenIndex: number; lines: ParagraphLine[]; cost: number }
@@ -760,8 +778,16 @@ export interface ParagraphProblem {
   minRemaining: number[];
   options: ParagraphOptions;
   widthBetween: (start: number, end: number) => number;
+  /** Scores the line tokens.slice(end - lineTokens.length, end) at `fill`. */
   scoreLine: (tokens: Token[], fill: number, last: boolean, end: number) => number;
   scoreTransition: (lines: { fill: number }[], last: boolean) => number;
+  /** What the search calls, with results identical to the above: scoreLine
+   * for the line [start, end) at its measured fill (computed once per line),
+   * the break penalty at `end`, and scoreTransition given the line count and
+   * the newest three fills. */
+  lineScore: (start: number, end: number) => number;
+  breakCost: (end: number) => number;
+  transition: (lines: number, fill: number, previousFill: number, earlierFill: number, last: boolean) => number;
 }
 
 /** Internal scoring model shared by the compositor and offline search tests. */
@@ -820,8 +846,19 @@ export function createParagraphProblem(
   const candidateBar = opts.candidateBar ?? profile.candidateBar;
   const prefixWidths = [0];
   for (const token of contentTokens) prefixWidths.push(prefixWidths[prefixWidths.length - 1] + token.width);
-  const widthBetween = (start: number, end: number) =>
-    opts.measureRange?.(start, end) ?? (prefixWidths[end] - prefixWidths[start] + Math.max(0, end - start - 1) * spaceWidth);
+  // Every quantity below depends only on a line's (start, end), and the search
+  // asks for the same line about a dozen times, so each is computed once.
+  // Rows are indexed by start and then by line length, so they stay short.
+  const widthRows: number[][] = [];
+  const widthBetween = (start: number, end: number) => {
+    const row = widthRows[start] ??= [];
+    let width = row[end - start];
+    if (width === undefined) {
+      width = opts.measureRange?.(start, end) ?? (prefixWidths[end] - prefixWidths[start] + Math.max(0, end - start - 1) * spaceWidth);
+      row[end - start] = width;
+    }
+    return width;
+  };
   const minRemaining = Array<number>(contentTokens.length + 1).fill(Infinity);
   minRemaining[contentTokens.length] = 0;
   if (opts.maxLines) {
@@ -834,29 +871,53 @@ export function createParagraphProblem(
   }
 
   // --- Lexical helpers for scoring ---
-  const isContent = (t: Token) => t.kind !== "space";
   const isLexical = (t: Token) =>
     t.kind === "word" || t.kind === "compound" || t.kind === "longSlug";
 
-  function firstContentToken(toks: Token[]): Token | null {
-    return toks.find(isContent) ?? null;
+  // Per-token facts, derived once rather than once per candidate line.
+  const count = contentTokens.length;
+  const lexicalPrefix = new Int32Array(count + 1);
+  const lastLexicalAt = new Int32Array(count);
+  const lastBoundaryAt = new Int32Array(count);
+  const linkingEnd: boolean[] = [];
+  const weakLetter: boolean[] = [];
+  const designator: boolean[] = [];
+  const boundary: boolean[] = [];
+  const openerLength: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const t = contentTokens[i];
+    const lexical = isLexical(t);
+    lexicalPrefix[i + 1] = lexicalPrefix[i] + (lexical ? t.text.split(/\s+/u).filter(Boolean).length : 0);
+    lastLexicalAt[i] = lexical ? i : i ? lastLexicalAt[i - 1] : -1;
+    linkingEnd[i] = LINKING_END_WORDS.has(t.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, ""));
+    boundary[i] = proseBoundary(t.text);
+    lastBoundaryAt[i] = boundary[i] ? i : i ? lastBoundaryAt[i - 1] : -1;
+    openerLength[i] = t.text.replace(/[^A-Za-z0-9]/g, "").length;
   }
-  function lastContentToken(toks: Token[]): Token | null {
-    for (let i = toks.length - 1; i >= 0; i--) {
-      if (isContent(toks[i])) return toks[i];
+  // Pairs that read as one unit (phrase-boundaries.ts): a number and its unit,
+  // an honorific and a name, a label and its number, a word and its letter
+  // designator. Splitting one costs what a weak line end costs, so it happens
+  // only where every alternative is as bad; it remains a cost, never a weld.
+  // A letter designator may end a line ("…hepatitis C"), so of the single
+  // letters only the article ("a", "A") and the pronoun "I" pay the letter
+  // penalty, and "A" and "I" only when they are not designators ("type A",
+  // "World War I").
+  const english = opts.englishLexical !== false;
+  const pairCost = english ? new Float64Array(count + 1) : null;
+  const pairWeight = profile.weakEndPenalty * bindWeights().pair;
+  for (let i = 0; i < count; i++) {
+    const kind = english && i > 0 ? boundPair(contentTokens[i - 1].text, contentTokens[i].text, i > 1 ? contentTokens[i - 2].text : undefined) : null;
+    if (kind && pairCost) pairCost[i] = pairWeight;
+    designator[i] = kind === 'designator';
+    weakLetter[i] = contentTokens[i].text === 'a' || ((contentTokens[i].text === 'A' || contentTokens[i].text === 'I') && !designator[i]);
+  }
+  // Author keep phrases (the public keep option), matched over these tokens.
+  const keepCost = opts.keep?.length ? new Float64Array(count + 1) : null;
+  if (keepCost) {
+    for (const { start, end } of keptPhrases(contentTokens.map(t => t.text), opts.keep)) {
+      const cost = widthBetween(start, end) <= measurePx ? KEEP_UNSPLIT : profile.weakEndPenalty;
+      for (let at = start + 1; at < end; at++) keepCost[at] = Math.max(keepCost[at], cost);
     }
-    return null;
-  }
-  function lastLexicalToken(toks: Token[]): Token | null {
-    for (let i = toks.length - 1; i >= 0; i--) {
-      if (isLexical(toks[i])) return toks[i];
-    }
-    return null;
-  }
-  function lexicalWordCount(toks: Token[]): number {
-    let n = 0;
-    for (const t of toks) { if (isLexical(t)) n += t.text.split(/\s+/u).filter(Boolean).length; }
-    return n;
   }
 
   // Protected compound boundary check
@@ -925,19 +986,21 @@ export function createParagraphProblem(
     return partners.has(b) ? weight : 0;
   }
 
-  // Score a single line using lexical helpers
-  const scoreLine = (
-    lineTokens: Token[],
+  // Score the line holding content tokens [start, breakEnd).
+  const scoreRange = (
+    start: number,
     fill: number,
     isLast: boolean,
     breakEnd: number
   ): number => {
     let penalty = 0;
 
-    const lexCount = lexicalWordCount(lineTokens);
-    const firstContent = firstContentToken(lineTokens);
-    const lastContent = lastContentToken(lineTokens);
-    const lastLexical = lastLexicalToken(lineTokens);
+    const lastIndex = breakEnd - 1;
+    const lexCount = lexicalPrefix[breakEnd] - lexicalPrefix[start];
+    const firstContent = contentTokens[start];
+    const lastContent = contentTokens[lastIndex];
+    const lastLexicalIndex = lastLexicalAt[lastIndex] >= start ? lastLexicalAt[lastIndex] : -1;
+    const lastLexical = lastLexicalIndex >= 0 ? contentTokens[lastLexicalIndex] : null;
 
     // One lexical word on the final line. A lone repeated closer that completes
     // an epistrophe is intentional rhythm, not a widow — allow it (tiny cost).
@@ -1025,20 +1088,18 @@ export function createParagraphProblem(
       penalty += 1e9;
     }
 
-    // Weak lexical word at line end: penalty, not hard fail
-    if (!isLast && lastLexical?.weakEnd) {
+    // Weak lexical word at line end: penalty, not hard fail. "type A" may end a line.
+    if (!isLast && lastLexical?.weakEnd && !designator[lastLexicalIndex]) {
       penalty += profile.weakEndPenalty;
     }
 
     // Gentle: copula/auxiliary verb stranded at a line end ("…Advertising is").
-    if (opts.englishLexical !== false && !isLast && lastLexical && LINKING_END_WORDS.has(
-      lastLexical.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, "")
-    )) {
+    if (opts.englishLexical !== false && !isLast && lastLexical && linkingEnd[lastLexicalIndex]) {
       penalty += profile.linkingEndPenalty;
     }
 
-    // Extra penalty for single-letter lexical endings like "a" / "I"
-    if (opts.englishLexical !== false && !isLast && lastLexical && /^[A-Za-z]$/.test(lastLexical.text)) {
+    // Extra penalty for the single-letter words "a", "A" and "I" at a line end
+    if (opts.englishLexical !== false && !isLast && lastLexical && weakLetter[lastLexicalIndex]) {
       penalty += profile.weakEndPenalty * 1.5;
     }
 
@@ -1052,13 +1113,15 @@ export function createParagraphProblem(
     if (opts.englishLexical !== false && !isLast) {
       penalty += bindPenaltyAt(breakEnd);
     }
+    if (!isLast && pairCost) penalty += pairCost[breakEnd];
+    if (!isLast && keepCost) penalty += keepCost[breakEnd];
 
     // Sentence-start dangling — BOTH modes. Penalize a non-last line that
     // crosses a sentence boundary and ends on the first word(s) of the next
     // sentence (e.g. "…public good. That"). The bump-down alternative wins
     // whenever the shortened previous line's fill penalty stays under this, so
     // it only fires "where width allows" and never overrides orphanPenalty.
-  if (opts.englishLexical !== false && !isLast && lastContent && !proseBoundary(lastContent.text)) {
+  if (opts.englishLexical !== false && !isLast && lastContent && !boundary[lastIndex]) {
       // Distance matters (2026-07-09, the essay's odd-rag regression): the
       // sin is a new sentence's OPENING stranded at the line end ("…word.
       // Books"), not a line that merely carries a boundary and reads on.
@@ -1067,16 +1130,13 @@ export function createParagraphProblem(
       // 50%-fill lines to avoid mid-line periods. Charge by how few words
       // the new sentence got before the break: one word = stranded opener,
       // two = mild, three or more = an ordinary healthy line.
-      let wordsIntoSentence = -1; // -1: no boundary before lastContent
-      for (const t of lineTokens) {
-        if (t === lastContent) break;
-        if (t.kind === "space") continue;
-      if (proseBoundary(t.text)) wordsIntoSentence = 0;
-        else if (wordsIntoSentence >= 0) wordsIntoSentence++;
-      }
+      // -1: no boundary before lastContent; otherwise the words after the
+      // line's last boundary, up to but not including lastContent.
+      const lastBoundary = lastIndex > start ? lastBoundaryAt[lastIndex - 1] : -1;
+      const wordsIntoSentence = lastBoundary >= start ? lastIndex - 1 - lastBoundary : -1;
       if (wordsIntoSentence === 0) {
         // lastContent is the new sentence's FIRST word, stranded at the edge.
-        const openerLen = lastContent.text.replace(/[^A-Za-z0-9]/g, "").length;
+        const openerLen = openerLength[lastIndex];
         penalty += openerLen <= 4 ? 7000 : DANGLING_START_PENALTY;
       } else if (wordsIntoSentence === 1) {
         // Two words in — readable, but the opening still clings to the edge.
@@ -1093,14 +1153,13 @@ export function createParagraphProblem(
     return penalty;
   };
 
-  // Score transition for the NEWEST line only (not full history — that was double-counting)
-  const scoreTransition = (lines: { fill: number }[], isLast: boolean): number => {
-    if (lines.length < 2 || isLast) return 0; // the last line is short by design
+  // Score transition for the NEWEST line only (not full history — that was
+  // double-counting). `lines` counts the lines so far, the newest included;
+  // only the newest three fills matter.
+  const transition = (lines: number, currFill: number, prevFill: number, prevPrevFill: number, isLast: boolean): number => {
+    if (lines < 2 || isLast) return 0; // the last line is short by design
 
     let penalty = 0;
-    const i = lines.length - 1;
-    const currFill = lines[i].fill;
-    const prevFill = lines[i - 1].fill;
 
     // Graduated cliff cost with REAL teeth. This used to charge nothing
     // below a 22% jump — cliffs were free while the fill ladder charged
@@ -1117,8 +1176,7 @@ export function createParagraphProblem(
     // Flat-shelf applies ONLY to the justified look (three matched FULL
     // lines). Three even lines at reading fills are book-normal — the old
     // rule punished smoothness itself.
-    if (lines.length >= 3) {
-      const prevPrevFill = lines[i - 2].fill;
+    if (lines >= 3) {
       const avg = (currFill + prevFill + prevPrevFill) / 3;
       if (avg > 0.9 &&
           Math.abs(prevPrevFill - prevFill) < 0.04 &&
@@ -1129,9 +1187,33 @@ export function createParagraphProblem(
 
     return penalty;
   };
+  const scoreTransition = (lines: { fill: number }[], isLast: boolean): number => {
+    const i = lines.length - 1;
+    return transition(lines.length, lines[i]?.fill ?? 0, lines[i - 1]?.fill ?? 0, lines[i - 2]?.fill ?? 0, isLast);
+  };
+
+  // The line [start, end) at its measured fill, computed once per line.
+  const scoreRows: number[][] = [];
+  const lineScore = (start: number, end: number): number => {
+    const row = scoreRows[start] ??= [];
+    let score = row[end - start];
+    if (score === undefined) {
+      score = scoreRange(start, widthBetween(start, end) / measurePx, end === count, end);
+      row[end - start] = score;
+    }
+    return score;
+  };
+  const breakCosts: number[] = [];
+  const breakCost = (end: number): number => {
+    let cost = breakCosts[end];
+    if (cost === undefined) breakCosts[end] = cost = opts.breakPenalty?.(end) || 0;
+    return cost;
+  };
+  const scoreLine = (lineTokens: Token[], fill: number, isLast: boolean, breakEnd: number): number =>
+    scoreRange(breakEnd - lineTokens.length, fill, isLast, breakEnd);
 
   return { tokens: contentTokens, beamWidth: tokens.length > 120 ? 80 : 48, measurePx, candidateBar, minRemaining, options: opts,
-    widthBetween, scoreLine, scoreTransition };
+    widthBetween, scoreLine, scoreTransition, lineScore, breakCost, transition };
 }
 
 /** Compose using bounded search over the shared scoring model. */
@@ -1166,66 +1248,98 @@ export interface ParagraphSearchEvidence {
   contourScore: number | null;
 }
 
+/** A search state: the layout so far, as a chain back to the empty layout.
+ * Children share their parent's lines instead of copying them. */
+interface SearchNode {
+  tokenIndex: number;
+  cost: number;
+  /** Lines so far; the newest spans [start, tokenIndex). */
+  lines: number;
+  start: number;
+  width: number;
+  fill: number;
+  parent: SearchNode | null;
+}
+
 /** Exact for small graphs within budget; bounded beam search otherwise. */
 export function searchParagraph(problem: ParagraphProblem, limits: { exactStates?: number; exactTokens?: number } = {}): ParagraphSearchResult {
-  const { tokens: contentTokens, candidateBar, minRemaining, widthBetween, scoreLine, scoreTransition } = problem;
+  const { tokens: contentTokens, candidateBar, minRemaining, widthBetween, lineScore, breakCost, transition } = problem;
   const { options: opts, measurePx, beamWidth: BEAM } = problem;
-  const completes: ParagraphState[] = [];
+  const n = contentTokens.length;
+  const linesOf = (node: SearchNode): ParagraphLine[] => {
+    const lines: ParagraphLine[] = [];
+    for (let at: SearchNode | null = node; at?.lines; at = at.parent) {
+      lines.push({ tokens: contentTokens.slice(at.start, at.tokenIndex), width: at.width, fill: at.fill });
+    }
+    return lines.reverse();
+  };
+  const transitionAfter = (node: SearchNode, fill: number, last: boolean): number =>
+    transition(node.lines + 1, fill, node.fill, node.parent ? node.parent.fill : 0, last);
+  const child = (node: SearchNode, end: number, width: number, fill: number, cost: number): SearchNode =>
+    ({ tokenIndex: end, cost, lines: node.lines + 1, start: node.tokenIndex, width, fill, parent: node });
+  const root = (): SearchNode => ({ tokenIndex: 0, cost: 0, lines: 0, start: 0, width: 0, fill: 0, parent: null });
+  const byCost = (a: SearchNode, b: SearchNode) => a.cost - b.cost || a.lines - b.lines;
+  const completes: SearchNode[] = [];
   let visited = 0;
   let completed = 0;
   const result = (method: 'exact' | 'beam'): ParagraphSearchResult => {
-    const ranked = rankParagraphLayouts(completes, opts.contourWidths);
+    completes.sort(byCost);
+    // The ranking never looks past the cheapest layout's slack, so only those
+    // layouts are materialized; it sees exactly the pool it always did.
+    const cheapest = completes[0];
+    const slack = cheapest ? rankingSlack(cheapest.cost, cheapest.lines) : 0;
+    const pool: ParagraphState[] = cheapest
+      ? completes.filter(s => s.cost <= cheapest.cost + slack).map(s => ({ tokenIndex: s.tokenIndex, lines: linesOf(s), cost: s.cost }))
+      : [];
+    const ranked = rankParagraphLayouts(pool, opts.contourWidths);
     return { method, visited, winner: ranked.winner, evidence: { method, completed, retained: completes.length,
       eligible: ranked.eligible, poolLimit: method === 'beam' ? 200 : null, finished: !!opts.contourWidths,
-      cheapestCost: completes[0]?.cost ?? null, selectedCost: ranked.winner?.cost ?? null, contourScore: ranked.score } };
+      cheapestCost: cheapest?.cost ?? null, selectedCost: ranked.winner?.cost ?? null, contourScore: ranked.score } };
   };
   if (opts.maxLines && minRemaining[0] > opts.maxLines) return result('exact');
-  if (contentTokens.length <= (limits.exactTokens ?? 18)) {
-    const stack: ParagraphState[] = [{ tokenIndex: 0, lines: [], cost: 0 }];
+  if (n <= (limits.exactTokens ?? 18)) {
+    const stack: SearchNode[] = [root()];
     while (stack.length && visited < (limits.exactStates ?? 4096)) {
       const state = stack.pop()!;
       visited++;
-      if (state.tokenIndex === contentTokens.length) { completes.push(state); completed++; continue; }
-      if (opts.maxLines && state.lines.length >= opts.maxLines) continue;
-      for (let end = contentTokens.length; end > state.tokenIndex; end--) {
+      if (state.tokenIndex === n) { completes.push(state); completed++; continue; }
+      if (opts.maxLines && state.lines >= opts.maxLines) continue;
+      for (let end = n; end > state.tokenIndex; end--) {
         const width = widthBetween(state.tokenIndex, end);
         const fill = width / measurePx;
-        const last = end === contentTokens.length;
+        const last = end === n;
         if (fill > (state.tokenIndex === 0 && last ? 1 : candidateBar)) continue;
-        if (opts.maxLines && state.lines.length + 1 + minRemaining[end] > opts.maxLines) continue;
-        const lineTokens = contentTokens.slice(state.tokenIndex, end);
-        const lines = [...state.lines, { tokens: lineTokens, width, fill }];
-        stack.push({ tokenIndex: end, lines, cost: state.cost + scoreLine(lineTokens, fill, last, end)
-          + (last ? 0 : opts.breakPenalty?.(end) || 0) + scoreTransition(lines, last) });
+        if (opts.maxLines && state.lines + 1 + minRemaining[end] > opts.maxLines) continue;
+        stack.push(child(state, end, width, fill, state.cost + lineScore(state.tokenIndex, end)
+          + (last ? 0 : breakCost(end)) + transitionAfter(state, fill, last)));
       }
     }
     if (!stack.length) return result('exact');
   }
   // Restart a budget-exhausted exact search without duplicate completed paths.
   completes.length = 0; completed = 0;
-  let beam: ParagraphState[] = [{ tokenIndex: 0, lines: [], cost: 0 }];
+  let beam: SearchNode[] = [root()];
   let iterations = 0;
   const MAX_ITERATIONS = 500;  // Safety valve for very long paragraphs
 
   while (beam.length > 0 && iterations < MAX_ITERATIONS) {
     iterations++;
 
-    const newBeam: ParagraphState[] = [];
+    const newBeam: SearchNode[] = [];
 
     for (const state of beam) {
       visited++;
       const start = state.tokenIndex;
-      if (opts.maxLines && state.lines.length >= opts.maxLines) continue;
+      if (opts.maxLines && state.lines >= opts.maxLines) continue;
 
 
       // Try all legal line candidates from this position
-      for (let end = start + 1; end <= contentTokens.length; end++) {
-        const lineTokens = contentTokens.slice(start, end);
+      for (let end = start + 1; end <= n; end++) {
         const width = widthBetween(start, end);
         const fill = width / measurePx;
 
         // Skip overfull lines (but allow slight overflow for last line)
-        const isLast = end === contentTokens.length;
+        const isLast = end === n;
         // Hard admissibility cap. This was 0.85, which made browser-quality
         // fills (87-99%) inadmissible by construction — every paragraph set
         // ~15% looser than the browser and cost 2-3 extra lines at 375px
@@ -1234,18 +1348,13 @@ export function searchParagraph(problem: ParagraphProblem, limits: { exactStates
         // wise. The bar leaves headroom so word-spacing contraction never
         // overflows (.97 at reading measures, .985 wide — see profile).
         if (fill > ((start === 0 && isLast) ? 1 : candidateBar)) break;
-        if (opts.maxLines && state.lines.length + 1 + minRemaining[end] > opts.maxLines) continue;
+        if (opts.maxLines && state.lines + 1 + minRemaining[end] > opts.maxLines) continue;
 
-        const linePenalty = scoreLine(lineTokens, fill, isLast, end) + (isLast ? 0 : opts.breakPenalty?.(end) || 0);
-        const newLines = [...state.lines, { tokens: lineTokens, width, fill }];
-        const transitionPenalty = scoreTransition(newLines, isLast);
+        const linePenalty = lineScore(start, end) + (isLast ? 0 : breakCost(end));
+        const transitionPenalty = transitionAfter(state, fill, isLast);
 
         // Finished layouts must not compete with unfinished, cheaper prefixes.
-        (isLast ? completes : newBeam).push({
-          tokenIndex: end,
-          lines: newLines,
-          cost: state.cost + linePenalty + transitionPenalty,
-        });
+        (isLast ? completes : newBeam).push(child(state, end, width, fill, state.cost + linePenalty + transitionPenalty));
         if (isLast) completed++;
       }
     }
@@ -1253,7 +1362,7 @@ export function searchParagraph(problem: ParagraphProblem, limits: { exactStates
     // Keep top BEAM states
     newBeam.sort((a, b) => a.cost - b.cost);
     beam = newBeam.slice(0, BEAM);
-    completes.sort((a, b) => a.cost - b.cost || a.lines.length - b.lines.length);
+    completes.sort(byCost);
     if (completes.length > 200) completes.length = 200;
   }
 
@@ -1277,6 +1386,19 @@ export function paragraphContour(widths: readonly number[]): number {
   return 2 * spread + 3 * step + 1.5 * shift;
 }
 
+/** Slack capped below the weak-end penalty: the contour re-rank may trade
+ * fill economics for shape. It compares total costs, so it can still adopt a
+ * layout that ends on a weak word when the cheapest one pays about as much
+ * in other penalties (a 97% line and a cliff); verify-golden records such a
+ * case among its trade-offs. */
+function rankingSlack(cheapestCost: number, lines: number): number {
+  const isLong = lines >= 10;
+  return Math.min(
+    cheapestCost * (isLong ? 0.2 : 0.15) + (isLong ? 1200 : 600),
+    3200
+  );
+}
+
 export function rankParagraphLayouts(completes: ParagraphState[], widths?: (lines: ParagraphLine[]) => number[]): { winner: ParagraphState | null; eligible: number; score: number | null } {
   if (completes.length === 0) return { winner: null, eligible: 0, score: null };
 
@@ -1289,14 +1411,7 @@ export function rankParagraphLayouts(completes: ParagraphState[], widths?: (line
   // "two-register" drift where the opening sets full and the tail sets loose.
   completes.sort((a, b) => a.cost - b.cost || a.lines.length - b.lines.length);
   let winner = completes[0];
-  const isLong = winner.lines.length >= 10;
-  // Slack capped below the weak-end penalty: the contour re-rank may trade
-  // fill economics for shape, but can never adopt a candidate carrying a
-  // violation the cheapest one avoided.
-  const slack = Math.min(
-    winner.cost * (isLong ? 0.2 : 0.15) + (isLong ? 1200 : 600),
-    3200
-  );
+  const slack = rankingSlack(winner.cost, winner.lines.length);
   const nearOptimal = completes.filter(s => s.cost <= winner.cost + slack);
 
   const score = (state: ParagraphState) => paragraphContour(widths ? widths(state.lines) : state.lines.map(line => line.fill));

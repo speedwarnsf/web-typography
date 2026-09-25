@@ -1,5 +1,5 @@
 import type { LayoutMetrics } from './layout-metrics';
-import { strandedOpener } from './phrase-boundaries';
+import { sentences, strandedOpener } from './phrase-boundaries';
 
 /** Preserve an already even paragraph only when recomposition clearly disrupts it. */
 export function retainParagraphRhythm(source: string, before: LayoutMetrics, proposedWidths: readonly number[]): boolean {
@@ -18,8 +18,7 @@ export function retainParagraphRhythm(source: string, before: LayoutMetrics, pro
   if (Math.min(...native) < .88 || spread(native) > .1
     || spread(proposed) - spread(native) < .12
     || Math.min(...native) - Math.min(...proposed) < .12) return false;
-  const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
-  for (const sentence of sentences.segment(source)) {
+  for (const sentence of sentences().segment(source)) {
     if (!sentence.index) continue;
     const line = lines.slice(0, -1).find(l => l.sourceStart < sentence.index && l.sourceEnd > sentence.index);
     if (line && source.slice(sentence.index, line.sourceEnd).trim().split(/\s+/u).length < 3) return false;

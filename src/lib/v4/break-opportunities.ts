@@ -8,6 +8,13 @@ const profiles: Record<string, ReadonlySet<string>> = {
   de: new Set('der die das den dem des ein eine einer einem einen und oder mit von zu im am an auf'.split(' ')),
   es: new Set('el la los las un una unos unas de del al y o en por para con sin'.split(' ')),
 };
+// Segmenters are stateless; one per language is created on first use.
+const segmenters = new Map<string, Intl.Segmenter>();
+function graphemeSegmenter(language: string): Intl.Segmenter {
+  let segmenter = segmenters.get(language);
+  if (!segmenter) segmenters.set(language, segmenter = new Intl.Segmenter(language, { granularity: 'grapheme' }));
+  return segmenter;
+}
 export interface BreakUnit { text: string; index: number; hyphen: boolean }
 export interface BreakAnalysis {
   unicode: string;
@@ -44,7 +51,7 @@ export function analyzeBreaks(source: string, options: { language?: string | nul
   if (/[\u000b\u000c\u0085\u2028\u2029]/u.test(source)) { result.outcome = 'native:author-breaks'; return result; }
   // Normal CSS collapses ASCII segment whitespace; preserve UTF-16 offsets.
   const normalized = source.replace(/[\t\r\n]/g, ' ');
-  const graphemes = new Set([source.length, ...Array.from(new Intl.Segmenter(language, { granularity: 'grapheme' }).segment(source), g => g.index)]);
+  const graphemes = new Set([source.length, ...Array.from(graphemeSegmenter(language).segment(source), g => g.index)]);
   const positions = [...new Rules().breaks(normalized)].map(b => b.position).filter(pos => {
     if (!graphemes.has(pos)) return false;
     if (pos < source.length && /[\u00a0\u202f\u2060\ufeff\u2011]/u.test(source[pos - 1] + source[pos])) return false;

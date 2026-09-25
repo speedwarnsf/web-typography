@@ -3,14 +3,51 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 39168,
-      "TypesetText-only": 39454,
-      "TypesetRichText-only": 34043,
+      "mount-only": 41158,
+      "TypesetText-only": 41477,
+      "TypesetRichText-only": 35880,
       "smartQuotes-only": 11712,
-      "react.js+shared": 41384,
-      "go.js": 44022,
-      "typeset.global.js": 43825
-    }
+      "react.js+shared": 43420,
+      "go.js": 46395,
+      "typeset.global.js": 46185
+    },
+    "raised": [
+      {
+        "by": "4.3 accessibility and text fixes (C2, C4, C5, C6, C11, C15)",
+        "reason": "Measured on the a11y-text branch: C11's pruned clipboard walk +0.45 KB gzip and C6's split tracking and framework-node handling +0.8 KB; C2, C4, C5 and C15 add the rest. smartQuotes-only fell by 1 B.",
+        "before": {
+          "mount-only": 37735,
+          "TypesetText-only": 38027,
+          "TypesetRichText-only": 33393,
+          "smartQuotes-only": 11713,
+          "react.js+shared": 39899,
+          "go.js": 42682,
+          "typeset.global.js": 42493
+        },
+        "after": {
+          "mount-only": 39168,
+          "TypesetText-only": 39454,
+          "TypesetRichText-only": 34043,
+          "smartQuotes-only": 11712,
+          "react.js+shared": 41384,
+          "go.js": 44022,
+          "typeset.global.js": 43825
+        }
+      },
+      {
+        "by": "4.3 composition fixes (P6, C3, C13, C14, C16)",
+        "reason": "Code the fixes need, measured per commit on typeset.global.js gzip: P6 memoized search +496 B, C3 justify guard and audit error +193 B, C14 keep matching +371 B, C13 abbreviation, unit, honorific, label and designator lists +886 B, C16 audit line review +492 B. smartQuotes-only is unchanged.",
+        "before": {
+          "mount-only": 37735,
+          "TypesetText-only": 38027,
+          "TypesetRichText-only": 33393,
+          "smartQuotes-only": 11713,
+          "react.js+shared": 39899,
+          "go.js": 42682,
+          "typeset.global.js": 42493
+        }
+      }
+    ]
   },
   "runtime": {
     "lane": "chromium@4x",

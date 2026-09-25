@@ -1,4 +1,5 @@
 import type { FrozenLine, Token } from './typeset';
+import { keptPhrases } from './phrase-boundaries';
 
 const weakEnds = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'with', 'from', 'and', 'or', 'but']);
 
@@ -37,14 +38,12 @@ export function composeTitle(
   }
   const count = minLines[0];
   if (!Number.isFinite(count) || (policy.maxLines && count > policy.maxLines)) return null;
-  const keepBreaks = new Set<number>();
-  for (const phrase of policy.keep || []) {
-    const parts = phrase.trim().split(/\s+/u);
-    for (let i = 0; i <= n - parts.length; i++) {
-      if (parts.every((part, j) => words[i + j].text === part)) {
-        for (let j = 1; j < parts.length; j++) keepBreaks.add(i + j);
-      }
-    }
+  // A kept phrase that fits the measure stays whole unless no layout of the
+  // minimum line count allows it; a longer one is split as little as possible.
+  const keepCosts = new Map<number, number>();
+  for (const { start, end } of keptPhrases(words.map(t => t.text), policy.keep)) {
+    const cost = widths[start][end] <= width + 0.25 ? 1e6 : 1500;
+    for (let at = start + 1; at < end; at++) keepCosts.set(at, Math.max(keepCosts.get(at) || 0, cost));
   }
   const target = widths[0][n] / (count * width);
   const memo = new Map<string, { cost: number; breaks: number[] } | null>();
@@ -68,7 +67,7 @@ export function composeTitle(
         cost += last ? 500 : 900 * Math.max(0, 0.65 - lineWidth / width) / 0.65;
       }
       if (!last && (policy.weakEnding?.(words[end - 1].text) ?? weakEnds.has(words[end - 1].text.toLowerCase()))) cost += 240;
-      if (!last && keepBreaks.has(end)) cost += 1500;
+      if (!last && keepCosts.has(end)) cost += keepCosts.get(end)!;
       if (!last) cost += policy.breakPenalty?.(end) || 0;
       if (!last && (words[end - 1].stickyNext || words[end]?.stickyPrev)) cost += 10000;
       if (!best || cost < best.cost) best = { cost, breaks: [end, ...rest.breaks] };

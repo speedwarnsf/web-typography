@@ -21,13 +21,16 @@ function textRuns(element: HTMLElement): TextRun[] {
   return runs;
 }
 
+let graphemeSegmenter: Intl.Segmenter | undefined;
+const graphemes = () => graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 /** A bounded residual finish: chosen breaks and existing word spaces stay fixed. */
 export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, targets: number[]): TrackingPlan {
   const result = (outcome: string, runs: TrackingRun[] = []): TrackingPlan => ({ outcome, runs, before: layout, targets });
   const style = getComputedStyle(element);
   if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb' || !['left', 'start'].includes(style.textAlign)) return result('native:tracking-layout');
   const source = element.textContent || '', texts = textRuns(element);
-  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  const segmenter = graphemes();
   const runs: TrackingRun[] = [];
   let unsupported = false;
   for (const [line, box] of layout.lines.slice(0, -1).entries()) {
