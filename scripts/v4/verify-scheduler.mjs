@@ -60,6 +60,12 @@ window.mountReact = () => { const root = createRoot(document.getElementById('app
   texts.slice(0, 4).map((text, i) => h(TypesetText, { key: 'v' + i, text, className: 'r' })),
   h('div', { style: { height: '4000px' } }),
   texts.slice(4).map((text, i) => h(TypesetText, { key: 'o' + i, text, className: 'r' }))))); };
+// The same 44 offscreen blocks in 11 horizontal carousel rows, 400 px apart.
+window.mountCarousels = () => { const root = createRoot(document.getElementById('app')); flushSync(() => root.render(h('div', null,
+  texts.slice(0, 4).map((text, i) => h(TypesetText, { key: 'v' + i, text, className: 'r' })),
+  h('div', { style: { height: '3000px' } }),
+  Array.from({ length: 11 }, (_, row) => h('div', { key: 'row' + row, className: 'row' },
+    texts.slice(4 + row * 4, 8 + row * 4).map((text, i) => h(TypesetText, { key: i, text, className: 'r' }))))))); };
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
@@ -195,6 +201,48 @@ for (const { name, engine, executablePath } of browsers) {
       await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       check('React adapters: every offscreen block composes after the animation', result.composed === result.hosts, result);
       if (result.idleCallbacks) check('React adapters: no composition in an idle period shorter than 20 ms (the rest of an animation frame)', result.shortIdleCompositions === 0, result);
+      await page.close();
+    }
+    // Offscreen text in a wrapper that does not scroll vertically: an app
+    // root with overflow-x:hidden (its overflow-y computes to auto), or
+    // horizontal carousel rows. Neither is a container the text scrolls in,
+    // so blocks thousands of pixels below the fold are not near and do not
+    // compose in the animation frames of a screen push (P5). Taken as
+    // scroll containers, every one of them was near.
+    for (const layout of ['overflow-x:hidden app root', 'carousel rows']) {
+      const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}#app{width:420px;padding:0 12px}#slide{position:fixed;top:0;left:0;width:40px;height:40px;background:#ccc}${layout === 'carousel rows' ? '.row{display:flex;gap:12px;overflow-x:auto;margin-bottom:400px}.row>.r{flex:0 0 200px;margin:0}' : '#app{overflow-x:hidden}'}</style></head><body><div id="slide"></div><div id="app"></div></body></html>`);
+      await page.evaluate(() => {
+        const w = /** @type {any} */ (window), Native = window.IntersectionObserver;
+        w.rootedObservers = 0;
+        w.IntersectionObserver = class extends Native {
+          constructor(/** @type {IntersectionObserverCallback} */ callback, /** @type {IntersectionObserverInit} */ init) { super(callback, init); if (init?.root) w.rootedObservers++; }
+        };
+      });
+      await page.addScriptTag({ content: reactFixture });
+      const result = await page.evaluate(async layout => {
+        const w = /** @type {any} */ (window);
+        await document.fonts.ready;
+        const slide = /** @type {HTMLElement} */ (document.getElementById('slide'));
+        const t0 = performance.now();
+        let during = -1;
+        const far = () => /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]).filter(el => el.getBoundingClientRect().top > 2 * innerHeight);
+        const animate = () => {
+          const t = performance.now() - t0;
+          slide.style.transform = `translateX(${Math.min(1, t / 900) * 600}px)`;
+          if (t < 900) requestAnimationFrame(animate); else during = far().filter(el => el.dataset.tsOutcome).length;
+        };
+        requestAnimationFrame(animate);
+        if (layout === 'carousel rows') w.mountCarousels(); else w.mountReact();
+        const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
+        while (performance.now() - t0 < 15000 && (during < 0 || !hosts.every(el => el.dataset.tsOutcome))) await new Promise(r => setTimeout(r, 50));
+        return { hosts: hosts.length, far: far().length, composed: hosts.filter(el => el.dataset.tsOutcome).length, farComposedDuringSlide: during,
+          rootedObservers: w.rootedObservers, idleCallbacks: typeof window.requestIdleCallback === 'function' };
+      }, layout);
+      check(`React adapters in ${layout}: no scroll-container observer, so offscreen blocks are measured against the window`, result.rootedObservers === 0 && result.far >= 40 && result.composed === result.hosts, result);
+      // Engines without idle callbacks compose offscreen work on a 50 ms timer.
+      if (result.idleCallbacks) check(`React adapters in ${layout}: no offscreen block composes during a 900 ms screen push`, result.farComposedDuringSlide === 0, result);
       await page.close();
     }
     // Text in an overflow:auto scroller, scrolled in soon after it mounts.

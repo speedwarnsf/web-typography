@@ -109,22 +109,27 @@ export function rendered(element: Element): boolean {
 /** Watches whether elements are within a viewport height of what shows them. */
 export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
 /** IntersectionObservers that report an element within a viewport height of
- * what shows it: the window, or the nearest scroll container it scrolls in.
- * An app shell's overflow:auto pane clips its content, and a root margin on
- * the window does not reach past that clip, so text below the fold there
- * was never near until it was on screen. One observer per scrollport, held
- * only while it observes something, so a scroll container a route removed
- * is not kept alive; an element's scrollport is found once. Null without
- * IntersectionObserver. */
+ * what shows it: the window, or the nearest container it scrolls in
+ * vertically (one whose content overflows it when the element is first
+ * observed). An app shell's overflow:auto pane clips its content, and a
+ * root margin on the window does not reach past that clip, so text below
+ * the fold there was never near until it was on screen. One observer per
+ * scrollport, held only while it observes something, so a scroll container
+ * a route removed is not kept alive; an element's scrollport is found once.
+ * Null without IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
   const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
   const roots = new WeakMap<Element, Element | null>();
+  // Only a container that scrolls vertically: nearness is a vertical
+  // distance. An overflow-x:hidden wrapper (its overflow-y computes to auto)
+  // as tall as the page, or a horizontal carousel row, would make every
+  // block in it near, however far below the fold, and those compose in
+  // animation frames during a screen push.
   const scrollport = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
-      const cs = view.getComputedStyle(node);
-      if (/^(?:auto|scroll|overlay)$/u.test(cs.overflowY) || /^(?:auto|scroll|overlay)$/u.test(cs.overflowX)) return node;
+      if (/^(?:auto|scroll|overlay)$/u.test(view.getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight + 1) return node;
     }
     return null;
   };
