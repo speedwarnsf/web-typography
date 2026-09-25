@@ -53,9 +53,13 @@ Code, joining scripts, unresolved relative spacing and excessive run counts
 retain untracked rendering. Verification failure rolls back tracking only.
 
 Mount once, not on a timer or repeatedly across the whole document. The controller
-discovers changed subtrees, prioritizes initial visible text, and yields between
-batches while recomposing actual source/font/width changes. Its 8ms batch target
-does not cap an individual composition, DOM discovery, or browser layout.
+discovers changed subtrees, composes visible text first, and yields between
+batches while recomposing actual source, font, metric and width changes. Ancestor
+class/style changes recheck computed values and compose only if they changed.
+Hidden text keeps its composition; a resizing block shows native wrapping
+(data-ts-stale) until its size settles; print wraps natively; a translated page
+gets native:translated. Its 8ms batch target does not cap an individual
+composition, DOM discovery, or browser layout.
 
 contour defaults to 'finished': candidate ranking predicts the same bounded
 spacing that will be rendered. 'natural' keeps the prior ranking for comparison.

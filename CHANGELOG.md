@@ -107,6 +107,13 @@ at 320, 440 and 600 px by 4.2.0 and by 4.3 in Chromium, WebKit and Firefox.
   and 0 change outcome or rendered lines. In print, breaks are now `none` and
   text wraps natively at the paper's width, where 4.2.0 printed the screen
   breaks and alternated long and short lines.
+- `typeset()` does not measure or compose text that is not rendered: in a
+  `display:none` subtree it keeps an existing composition (4.2.0 restored
+  native text and recorded `unmeasurable`), and text in a skipped
+  `content-visibility:auto` section records `unmeasurable` instead of being
+  composed from forced layout (4.2.0 composed it in Chromium and Firefox and
+  cached `native:verification` in WebKit). `mount()` composes it when it comes
+  into range. The corpus golden diff has no hidden text: 0 blocks change.
 
 ### Development
 
