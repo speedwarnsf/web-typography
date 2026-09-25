@@ -159,6 +159,12 @@ Outside the changes below, 0 of these differ in any engine.
   inputs such as CSRF tokens, `visibility:hidden` text, templates, scripts
   and styles. The clone is now walked in step with its source and those
   nodes are dropped; if the two ever disagree, only plain text is written.
+  Copied hosts also lose the engine's residue, which pasted into an editor
+  that keeps inline styles: the `text-wrap-style: auto !important` override
+  (the author's own inline value is put back, so a pasted paragraph no
+  longer turns off `text-wrap: pretty` or `balance`), `data-ts-stale`, and
+  the React adapters' `data-typeset-react` attributes, which made the
+  loaders skip pasted markup.
 - **Strict Content Security Policy and Trusted Types (C5).** Measurement and
   line-wrap styles are restored through the CSSOM, never by writing the
   style attribute. Under `style-src` without `'unsafe-inline'`, 4.2 left

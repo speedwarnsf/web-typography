@@ -235,7 +235,9 @@ and the native NSPasteboard, including cross-paragraph and partial selections.
 It covers plain text and HTML pasted into browser editors, not Word/Pages,
 mobile selection handles, Windows clipboard, or spoken screen-reader output.
 Cross-paragraph copying retains native paragraph/authored-break boundaries;
-generated line breaks and engine metadata are excluded. Relative copied links
+generated line breaks and engine metadata (data-ts and adapter attributes, and
+the engine's text-wrap-style override, replaced by the author's own inline
+value) are excluded. Relative copied links
 resolve against the source page. Site copy handlers retain precedence. From
 4.3 the copied HTML and text also leave out what the browser's own copy
 leaves out: display:none and content-visibility:hidden content, hidden inputs,

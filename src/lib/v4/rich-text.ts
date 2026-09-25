@@ -534,6 +534,10 @@ export interface RichOutput {
   heads: ReadonlySet<Text>;
 }
 
+/** Hosts carrying renderRichText's text-wrap-style override, with the inline
+ * value it replaced, so a copy can put the author's value back. */
+const wrapOverrides = new WeakMap<Element, { value: string; priority: string }>();
+
 /** Insert breaks without moving or cloning author elements. Split Text nodes
  * are reversible; their original head object is retained for restoration.
  * Nothing is inserted in front of a positional author Text node (see
@@ -547,7 +551,7 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   const wrapPriority = element.style.getPropertyPriority('text-wrap-style');
   // Browser pretty/balance must not re-break an already composed source span.
   // Keep ordinary wrapping as the overflow safety net, and own only this property.
-  if (breaks.length) element.style.setProperty('text-wrap-style', 'auto', 'important');
+  if (breaks.length) { element.style.setProperty('text-wrap-style', 'auto', 'important'); wrapOverrides.set(element, { value: wrapStyle, priority: wrapPriority }); }
   const runs = textRuns(element);
   const source = element.textContent || '';
   const markers: HTMLElement[] = [];
@@ -612,6 +616,7 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
       // nodes are never normalized.
       releaseSplits(element, splits.values(), written);
       // Restore through the CSSOM only (strict CSP); see restoreInlineStyle.
+      if (breaks.length) wrapOverrides.delete(element);
       if (breaks.length && element.style.getPropertyValue('text-wrap-style') === 'auto'
         && element.style.getPropertyPriority('text-wrap-style') === 'important') {
         if (!hadStyle && element.style.length === 1) removeStyleAttribute(element);
@@ -640,8 +645,9 @@ function hiddenFromCopy(element: Element): boolean {
  * elements, hidden inputs, script, style, template and noscript, and
  * visibility:hidden text. Source and clone are walked in step (both in
  * document order over the nodes the range touches); if they ever disagree,
- * null, so the caller never ships a clone it could not check. */
-function visibleContents(range: Range): DocumentFragment | null {
+ * null, so the caller never ships a clone it could not check. `each` sees
+ * every element that is kept, with its source. */
+function visibleContents(range: Range, each?: (source: Element, clone: Element) => void): DocumentFragment | null {
   const fragment = range.cloneContents();
   const root = range.commonAncestorContainer;
   const visibility = new Map<Element, boolean>();
@@ -671,7 +677,7 @@ function visibleContents(range: Range): DocumentFragment | null {
     const source = sources[i], clone = clones[i];
     if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
     const hidden = source.nodeType === Node.ELEMENT_NODE ? hiddenFromCopy(source as Element) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
-    if (!hidden) continue;
+    if (!hidden) { if (each && source.nodeType === Node.ELEMENT_NODE) each(source as Element, clone as Element); continue; }
     (clone as ChildNode).remove();
     while (i + 1 < sources.length && source.contains(sources[i + 1])) i++;
   }
@@ -706,13 +712,20 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return Array.from(parent?.querySelectorAll<HTMLElement>('*') || []).some(el => registered.has(el) && range.intersectsNode(el));
       });
       if (!affected) return;
-      const fragments = ranges.map(visibleContents);
+      // A composed host keeps the author's text-wrap-style, not the engine's
+      // override, which would turn off pretty or balance wherever it is pasted.
+      const fragments = ranges.map(range => visibleContents(range, (source, clone) => {
+        const saved = wrapOverrides.get(source), style = (clone as HTMLElement).style;
+        if (!saved || !style || style.getPropertyValue('text-wrap-style') !== 'auto' || style.getPropertyPriority('text-wrap-style') !== 'important') return;
+        if (saved.value) style.setProperty('text-wrap-style', saved.value, saved.priority); else style.removeProperty('text-wrap-style');
+        if (!style.length) clone.removeAttribute('style');
+      }));
       const sourceText = fragments[0]?.textContent ?? null;
       const html = fragments.some(fragment => !fragment) ? '' : (fragments as DocumentFragment[]).map(fragment => {
         fragment.querySelectorAll('[' + BREAK_ATTRIBUTE + ']').forEach(marker => marker.remove());
         fragment.querySelectorAll('[data-ts-track]').forEach(wrapper => wrapper.replaceWith(...wrapper.childNodes));
         for (const el of fragment.querySelectorAll('*')) {
-          for (const attribute of ['data-ts-outcome', 'data-typeset-done', 'data-ts-quotes', 'data-ts-hanging', 'data-ts-spacing', 'data-ts-tracking']) el.removeAttribute(attribute);
+          for (const attribute of ['data-ts-outcome', 'data-typeset-done', 'data-ts-quotes', 'data-ts-hanging', 'data-ts-spacing', 'data-ts-tracking', 'data-ts-stale', 'data-typeset-react', 'data-typeset-react-rich']) el.removeAttribute(attribute);
           // Relative links must still point to the source document after paste.
           if (el.localName === 'a' && el.namespaceURI === 'http://www.w3.org/1999/xhtml' && el.hasAttribute('href')) {
             try { el.setAttribute('href', new URL(el.getAttribute('href')!, doc.baseURI).href); } catch { /* Preserve invalid author URLs as authored. */ }

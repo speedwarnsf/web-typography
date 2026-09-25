@@ -12,7 +12,10 @@
 // pastes them into an editable sink, once on a composed page and once on an
 // uncomposed control. The composed clipboard must carry nothing hidden that
 // the control's native copy leaves out, its plain text must equal the
-// control's, and it must still hold no engine markers or data-ts attributes.
+// control's, and it must still hold no engine markers, data-ts or adapter
+// attributes (data-ts-stale, data-typeset-react), nor the engine's
+// text-wrap-style override: a host keeps the author's inline style, including
+// a text-wrap-style the engine overrode.
 // (The fixture has no visible text field: Chromium's native plain text
 // includes a text field's current value, which Selection.toString(), and so
 // the engine's cross-block text, never has. That predates and is outside C11.)
@@ -34,8 +37,8 @@ body{margin:16px;background:#fff;font:18px/1.5 Georgia}main{width:320px}p{margin
 <div>Shown text <span style="visibility:hidden">VISHIDDEN</span> after it.</div>
 <div hidden>ATTRHIDDEN</div><template>TEMPLATECONTENT</template><script type="application/json">{"SCRIPTJSON":1}</script><style>.unused::after{content:"STYLECONTENT"}</style>
 <div class="cv">CVHIDDEN</div>
-<p id="p2">Read the <em>careful</em> notes in <a href="/guide">the neighborhood gallery guide</a> before you plan a visit, because the opening hours change with the seasons and the weather.</p>
-<p id="p3">Our volunteers built a wellness data dashboard for every clinic in the county and published the results openly for anyone to review.</p>
+<p id="p2" style="color: rgb(17, 17, 17);">Read the <em>careful</em> notes in <a href="/guide">the neighborhood gallery guide</a> before you plan a visit, because the opening hours change with the seasons and the weather.</p>
+<p id="p3" style="text-wrap-style: pretty;" data-typeset-react="">Our volunteers built a wellness data dashboard for every clinic in the county and published the results openly for anyone to review.</p>
 </main><div id="sink" contenteditable="true"></div>
 ${composed ? '<script src="/typeset.js"></script>' : ''}</body></html>`;
 
@@ -78,6 +81,9 @@ for (const config of browsers) {
   try {
     /** @type {Record<string, Record<string, { html: string, text: string, handled: boolean }>>} */
     const clip = {};
+    /** The inline styles as the CSSOM holds them before composition (an engine
+     * without text-wrap-style: pretty drops that declaration). */
+    let authored = { p2: '', p3: '' };
     for (const composed of [true, false]) {
       const context = await browser.newContext({ viewport: { width: 520, height: 1200 }, ...(config.name === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
       await context.route('http://copy.test/**', route => new URL(route.request().url()).pathname === '/typeset.js'
@@ -88,8 +94,11 @@ for (const config of browsers) {
       tab.on('pageerror', error => errors.push({ browser: config.name, error: error.message }));
       await tab.goto('http://copy.test/page');
       if (composed) {
+        authored = await tab.evaluate(() => ({ p2: /** @type {HTMLElement} */ (document.getElementById('p2')).style.cssText, p3: /** @type {HTMLElement} */ (document.getElementById('p3')).style.cssText }));
         await tab.evaluate(async () => { const c = window.Typeset.mount(document, 'main p'); await c.ready; });
         check('the paragraphs compose with generated breaks', await tab.evaluate(() => ['p1', 'p2', 'p3'].every(id => document.getElementById(id)?.dataset.tsOutcome === 'composed:rich') && document.querySelectorAll('br[data-ts-break]').length > 3));
+        // p1 as the engine marks a block whose width is changing.
+        await tab.evaluate(() => document.getElementById('p1')?.setAttribute('data-ts-stale', ''));
       }
       await tab.evaluate(() => {
         const w = /** @type {any} */ (window);
@@ -115,11 +124,13 @@ for (const config of browsers) {
       const leaked = MARKS.filter(mark => (a.html.includes(mark) || a.text.includes(mark)) && !b.html.includes(mark) && !b.text.includes(mark));
       check(`${name}: the engine serializes the copy`, a.handled === true);
       check(`${name}: nothing hidden reaches the clipboard that native copy leaves out`, leaked.length === 0, { leaked, nativeKept: MARKS.filter(mark => b.html.includes(mark)) });
-      check(`${name}: no engine markers or data-ts attributes in the HTML`, !/data-ts-|data-typeset-done/.test(a.html), a.html.slice(0, 300));
+      check(`${name}: no engine markers, data-ts or adapter attributes, or wrap override in the HTML`, !/data-ts-|data-typeset-|text-wrap-style:\s*auto/.test(a.html), a.html.slice(0, 300));
       const normal = (/** @type {string} */ text) => text.replace(/\r\n/g, '\n').trim();
       check(`${name}: plain text equals native copy of the uncomposed page`, normal(a.text) === normal(b.text), { composed: a.text.slice(0, 240), native: b.text.slice(0, 240) });
     }
     check('within p1: the words on either side of each generated break keep their space', /corner shop puts out a small/.test(clip.composed['within p1'].text.replace(/\s+/g, ' ')), clip.composed['within p1'].text);
+    const tag = (/** @type {string} */ id, /** @type {string} */ style) => `<p id="${id}"${style ? ` style="${style}"` : ''}>`;
+    check('select all: the author\'s inline styles survive, including a text-wrap-style the engine overrode', clip.composed['select all'].html.includes(tag('p2', authored.p2)) && clip.composed['select all'].html.includes(tag('p3', authored.p3)), { authored, tags: clip.composed['select all'].html.match(/<p [^>]*>/g) });
     check('the link is still absolute and emphasis survives in the HTML', /href="http:\/\/copy\.test\/guide"/.test(clip.composed['p1 to p2'].html) || /href="http:\/\/copy\.test\/guide"/.test(clip.composed['select all'].html), clip.composed['select all'].html.slice(0, 400));
     check('the uncomposed control proves the page hides these marks from native copy', MARKS.filter(mark => clip.control['select all'].text.includes(mark)).length === 0, MARKS.filter(mark => clip.control['select all'].text.includes(mark)));
   } catch (error) {
