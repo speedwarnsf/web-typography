@@ -4,8 +4,10 @@ import { Children, Component, Fragment, cloneElement, createElement, createRef, 
 import type { HTMLAttributes, ReactElement, ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { BREAK_ATTRIBUTE, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
-import { contentWidth, measureLayout } from './layout-metrics';
+import { measureLayout } from './layout-metrics';
 import { childrenKey, layoutKey, propsKey } from './adapter-keys';
+import { adapterRegistry } from './adapter-registry';
+import type { AdapterEntry, Priority } from './adapter-registry';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options } from './typeset.next';
 import { smartQuotes } from './smart-quotes';
@@ -31,6 +33,10 @@ export interface TypesetRichTextProps extends Omit<HTMLAttributes<HTMLElement>, 
   spacing?: Options['spacing'];
   tracking?: Options['tracking'];
   contour?: Options['contour'];
+  /** 'auto' (default) composes in the commit only what is on screen, within
+   * a small time budget, and the rest before its first paint or in idle
+   * time. 'sync' composes in the commit, as 4.2 did, for hero text. */
+  priority?: Priority;
 }
 interface RenderPlan extends RichPlan { hangs?: OpticalHang[]; hanging?: string; spacing?: SpacingPlan; tracking?: TrackingPlan; beforeHanging?: LayoutMetrics }
 interface State { children: string; plan: RenderPlan | null; stale: boolean }
@@ -139,22 +145,17 @@ const healthy = (plan: RenderPlan): boolean => ![plan.outcome, plan.hanging, pla
 export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   state: State = { children: childrenKey(this.props.children), plan: null, stale: false };
   private host = createRef<HTMLElement>();
-  private observer?: MutationObserver;
-  private resize?: ResizeObserver;
+  private entry?: AdapterEntry;
   private releaseCopy?: () => void;
-  private frame = 0;
-  private staleFrame = 0;
-  private debounce: ReturnType<typeof setTimeout> | undefined;
   private mounted = false;
   /** Props (by value) the current plan was made for. */
   private planned = '';
   /** planKey of the current plan; an equal new plan is carried forward. */
   private base = '';
-  /** layoutKey when the current plan was made; triggers that leave it equal do nothing. */
+  /** layoutKey of the settled composition; triggers that leave it equal do nothing. */
   private layout = '';
   /** The widest rendered line of the settled composition. */
   private widest = 0;
-  private widths = new WeakMap<Element, number>();
 
   static getDerivedStateFromProps(props: TypesetRichTextProps, state: State): Partial<State> | null {
     const key = childrenKey(props.children);
@@ -162,32 +163,53 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
   }
   componentDidMount(): void {
     this.mounted = true;
-    const el = this.host.current!;
-    this.observer = new MutationObserver(this.schedule);
-    this.resize = new ResizeObserver(this.resized);
-    this.bindHost();
-    el.ownerDocument.fonts.addEventListener('loadingdone', this.schedule);
-    el.ownerDocument.defaultView?.addEventListener('resize', this.resizing);
-    el.ownerDocument.fonts.ready.then(this.schedule);
-    this.recompose(true);
+    this.bind();
+  }
+  /** Register the current host element with the document's adapter registry. */
+  private bind(): void {
+    const el = this.host.current;
+    if (!el || this.entry?.element === el) return;
+    this.unbind();
+    this.releaseCopy = preserveRichCopy(el);
+    const entry: AdapterEntry = {
+      element: el, priority: this.props.priority ?? 'auto',
+      // Outside a commit the whole plan-and-finish chain runs synchronously
+      // too, so a frame never paints half of it.
+      compose: (_reason, inCommit) => { if (inCommit) this.recompose(); else flushSync(this.recompose); },
+      changed: fonts => this.state.stale || layoutKey(el, fonts) !== this.layout,
+      widest: () => this.state.stale || !this.state.plan?.breaks.length ? 0 : this.widest,
+      stale: () => flushSync(() => this.setState({ stale: true })),
+    };
+    this.entry = entry;
+    const registry = adapterRegistry(el.ownerDocument);
+    registry.add(entry);
+    registry.request(entry, 'mount', true);
+  }
+  private unbind(): void {
+    if (this.entry) adapterRegistry(this.entry.element.ownerDocument).remove(this.entry);
+    this.entry = undefined;
+    this.releaseCopy?.(); this.releaseCopy = undefined;
   }
   private rendering(previous: TypesetRichTextProps, before: State): boolean {
     return before.plan !== this.state.plan || before.stale !== this.state.stale || before.children !== this.state.children
       || previous.as !== this.props.as || propsKey(previous) !== propsKey(this.props);
   }
   getSnapshotBeforeUpdate(previous: TypesetRichTextProps, before: State): (() => void) | null {
-    // A parent re-render that changes nothing here writes nothing here, so it
-    // needs no selection bookmark and no observer detach.
+    // A parent re-render that changes nothing here writes nothing here, and
+    // needs no selection bookmark.
     if (!this.rendering(previous, before)) return null;
-    this.observer?.disconnect();
     return this.host.current ? selectionBookmark(this.host.current) : () => {};
   }
   componentDidUpdate(previous: TypesetRichTextProps, before: State, restoreSelection: (() => void) | null): void {
     if (!restoreSelection) return;
     restoreSelection();
-    if (previous.as !== this.props.as) this.bindHost();
-    if (!this.state.plan || propsKey(this.props) !== this.planned) { this.recompose(true); return; }
-    if (before.plan === this.state.plan && before.stale === this.state.stale) { this.observe(); return; }
+    if (this.entry) this.entry.priority = this.props.priority ?? 'auto';
+    if (previous.as !== this.props.as) { this.bind(); return; }
+    if (!this.state.plan || propsKey(this.props) !== this.planned) {
+      if (this.entry) adapterRegistry(this.entry.element.ownerDocument).request(this.entry, 'force', true);
+      return;
+    }
+    if (before.plan === this.state.plan && before.stale === this.state.stale) return;
     this.settle();
   }
   /** Verify what is rendered, then take the next finishing step (spacing,
@@ -235,70 +257,14 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
       this.widest = Math.max(0, ...after.lines.map(line => line.width));
     }
     if (!this.state.stale) this.layout = layoutKey(el);
-    this.observe();
   }
   componentWillUnmount(): void {
     this.mounted = false;
-    cancelAnimationFrame(this.frame); cancelAnimationFrame(this.staleFrame);
-    clearTimeout(this.debounce);
-    this.observer?.disconnect(); this.resize?.disconnect();
-    this.host.current?.ownerDocument.fonts.removeEventListener('loadingdone', this.schedule);
-    this.host.current?.ownerDocument.defaultView?.removeEventListener('resize', this.resizing);
-    this.releaseCopy?.();
+    this.unbind();
   }
-  private observe = () => {
-    if (this.host.current) this.observer?.observe(this.host.current, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class', 'lang'] });
-    for (let ancestor = this.host.current?.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      this.observer?.observe(ancestor, { attributes: true, attributeFilter: ['style', 'class', 'lang'] });
-    }
-  };
-  private bindHost = () => {
-    this.releaseCopy?.(); this.resize?.disconnect();
-    const el = this.host.current;
-    if (!el) return;
-    this.releaseCopy = preserveRichCopy(el);
-    this.resize?.observe(el);
-    if (el.parentElement) this.resize?.observe(el.parentElement);
-  };
-  private schedule = () => {
-    if (!this.mounted || this.frame) return;
-    this.frame = requestAnimationFrame(() => { this.frame = 0; this.recompose(false); });
-  };
-  private resized = (entries: ResizeObserverEntry[]) => {
-    let changed = false;
-    for (const entry of entries) {
-      const previous = this.widths.get(entry.target);
-      this.widths.set(entry.target, entry.contentRect.width);
-      if (previous !== undefined && Math.abs(previous - entry.contentRect.width) > .01) changed = true;
-    }
-    if (changed) this.resizing();
-  };
-  /** During continuous resizing, show native wrapping wherever the composed
-   * lines no longer fit, and recompose once the size has held for 100 ms
-   * instead of on every frame. Resize observations arrive after layout; a
-   * layout change made there would be a same-depth notification the browser
-   * reports as a ResizeObserver loop error. The stale commit therefore
-   * happens in the next animation frame, before that frame's layout. */
-  private resizing = () => {
-    if (!this.mounted) return;
-    if (!this.staleFrame) this.staleFrame = requestAnimationFrame(this.staleCheck);
-    clearTimeout(this.debounce);
-    this.debounce = setTimeout(() => { this.debounce = undefined; this.recompose(false); }, 100);
-  };
-  private staleCheck = () => {
-    this.staleFrame = 0;
-    const el = this.host.current;
-    if (!this.mounted || !el || this.state.stale || !this.state.plan?.breaks.length) return;
-    // Synchronous, so this frame paints native lines rather than composed
-    // lines wrapping a second time.
-    if (contentWidth(el) + .5 < this.widest) flushSync(() => this.setState({ stale: true }));
-  };
-  private recompose = (force: boolean) => {
+  private recompose = () => {
     const el = this.host.current;
     if (!this.mounted || !el) return;
-    if (!force && this.debounce !== undefined) return;
-    if (!force && !this.state.stale && layoutKey(el) === this.layout) { this.observe(); return; }
-    this.observer?.disconnect();
     this.planned = propsKey(this.props);
     const plan: RenderPlan = planRichText(el, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
@@ -314,7 +280,7 @@ export class TypesetRichText extends Component<TypesetRichTextProps, State> {
     this.setState({ plan, stale: false });
   };
   render(): ReactElement {
-    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, ...attributes } = this.props;
+    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, priority: _priority, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
     const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);

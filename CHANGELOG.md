@@ -37,6 +37,20 @@ Hashes for every published version live in
   its composed lines no longer fit (host attribute `data-ts-stale`), and
   recomposes once the size has held for 100 ms instead of on every frame.
 - The React entry imports `flushSync` from `react-dom` (external, like `react`).
+- One adapter registry per document replaces a controller per block: one
+  MutationObserver, ResizeObserver and IntersectionObserver and one set of
+  font and window listeners for every `TypesetText` and `TypesetRichText`
+  (a 38-block screen created 38 of each). A block on screen composes before
+  its first paint: in the commit while a 6 ms budget (from a learned cost per
+  character) allows, then in the next animation frame; offscreen blocks
+  compose in idle time, nearest first. A prop change of an on-screen block
+  recomposes in its commit. Unmounting no longer restores the discarded host.
+  New prop `priority?: 'auto' | 'sync'`; `'sync'` composes every block in the
+  commit, as 4.2 did. Measured on the V4 benchmark (Chromium, 38-block push):
+  commit 164 to 17 ms, INP proxy 232 to 144 ms and total blocking time 138 to
+  68 ms at 4x CPU; 1,000 blocks at 1x commit in 18 ms instead of 1,463 ms.
+- Single-line blocks skip Unicode break analysis, and a first composition no
+  longer computes an unused signature; outcomes are unchanged.
 
 ### Rendering changes
 

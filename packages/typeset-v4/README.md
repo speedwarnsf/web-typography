@@ -73,6 +73,16 @@ Use ordinary inline host markup. Independently stateful custom children retain
 native rendering. Keep one owner per subtree. Framework-updated prose must not
 also be targeted by a script loader or imperative mount. See [support](SUPPORT.md).
 
+All adapters in a document share one registry: one MutationObserver,
+ResizeObserver and IntersectionObserver, however many blocks render. A block on
+screen is composed before its first paint; offscreen blocks compose in idle
+time, nearest first. `priority="sync"` composes in the React commit, as 4.2
+did, for hero text. Re-renders that change nothing (an inline `keep` array,
+fresh JSX children, inline styles or callbacks) write nothing. While a
+container is being resized, blocks whose composed lines no longer fit show
+native wrapping (marked `data-ts-stale`) and recompose once the size has held
+for 100 ms.
+
 ## New in 4.2
 
 Active rich-text compositions own `text-wrap-style: auto` so browser pretty or

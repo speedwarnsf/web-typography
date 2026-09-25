@@ -4,10 +4,10 @@
     "tolerance": 0.02,
     "gzip": {
       "mount-only": 37735,
-      "TypesetText-only": 38027,
-      "TypesetRichText-only": 33393,
+      "TypesetText-only": 38979,
+      "TypesetRichText-only": 36127,
       "smartQuotes-only": 11713,
-      "react.js+shared": 39899,
+      "react.js+shared": 41362,
       "go.js": 42682,
       "typeset.global.js": 42493
     }
@@ -153,5 +153,28 @@
       "repeat": 3,
       "platform": "darwin-arm64"
     }
-  }
+  },
+  "raised": [
+    {
+      "budget": "size.gzip.TypesetText-only",
+      "from": 38027,
+      "to": 38979,
+      "item": "P4, P5",
+      "reason": "The React adapters' shared per-document registry (adapter-registry.ts, one set of observers and listeners instead of one per block, visible-first scheduling) and value keys (adapter-keys.ts) that stop recompositions on no-op re-renders, ancestor mutations and resize frames."
+    },
+    {
+      "budget": "size.gzip.TypesetRichText-only",
+      "from": 33393,
+      "to": 36127,
+      "item": "P4, P5",
+      "reason": "The React adapters' shared per-document registry (adapter-registry.ts, one set of observers and listeners instead of one per block, visible-first scheduling) and value keys (adapter-keys.ts) that stop recompositions on no-op re-renders, ancestor mutations and resize frames."
+    },
+    {
+      "budget": "size.gzip.react.js+shared",
+      "from": 39899,
+      "to": 41362,
+      "item": "P4, P5",
+      "reason": "The React adapters' shared per-document registry (adapter-registry.ts, one set of observers and listeners instead of one per block, visible-first scheduling) and value keys (adapter-keys.ts) that stop recompositions on no-op re-renders, ancestor mutations and resize frames."
+    }
+  ]
 }

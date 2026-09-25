@@ -15,6 +15,8 @@ import { strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
+// Controllers share composition state, so only one may write a given target.
+import { mountOwners, mountWaiters } from './ownership';
 
 export const VERSION = '4.2.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -70,9 +72,6 @@ interface State {
   tracking?: RichOutput;
 }
 const states = new WeakMap<HTMLElement, State>();
-// Controllers share composition state, so only one may write a given target.
-const mountOwners = new WeakMap<HTMLElement, symbol>();
-const mountWaiters = new WeakMap<HTMLElement, Set<() => void>>();
 const measurements = new WeakMap<Document, Map<string, Map<string, number>>>();
 const fontVersions = new WeakMap<Document, { epoch: number }>();
 const fontIds = new WeakMap<FontFace, number>();
@@ -262,8 +261,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     return { outcome: 'skipped:excluded', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: 0 };
   }
   const prior = states.get(element);
-  const sig = signature(element, options);
-  if (prior?.signature === sig && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
+  // Only a prior composition can be current; a first one needs no signature yet.
+  if (prior && prior.signature === signature(element, options) && ownsOutput(element, prior)) return { ...prior.result, changed: false, durationMs: performance.now() - started };
   if (prior) {
     const restoreSelection = selectionBookmark(element);
     const unchanged = ownsOutput(element, prior);

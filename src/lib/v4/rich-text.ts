@@ -134,7 +134,10 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const lang = element.closest('[lang]')?.getAttribute('lang');
     if (source.length > 12000) return result('native:budget');
     const unicode = options.lineBreaks === 'unicode';
-    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens }) : null;
+    // A block that already fits on one line ends at 'native:fits' below, or
+    // at an earlier decline; it needs the analysis outcome, not its units.
+    const fits = before.lines.length === 1 && before.overflow <= .5;
+    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits }) : null;
     if (analysis && analysis.outcome !== 'supported') return result(analysis.outcome);
     if (!unicode && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return result('native:language');
     if (unicode) for (const el of [element, ...element.querySelectorAll<HTMLElement>('*')]) {

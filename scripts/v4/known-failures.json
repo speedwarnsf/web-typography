@@ -42,18 +42,6 @@
       ],
       "awaiting": "C2",
       "reason": "The CLI returns auditJSON, which reports hidden-break and isolated-space errors on composed output until C2."
-    },
-    {
-      "script": "verify-react",
-      "label": "^React 1[89]: a 60-frame ancestor transform and no-op ancestor class toggles write nothing in TypesetText hosts",
-      "awaiting": "P5",
-      "reason": "TypesetText still recomposes through a per-block mount() controller, whose engine signature includes raw ancestor class and style strings; P5 moves the adapters to a shared registry that compares a computed layout key first."
-    },
-    {
-      "script": "verify-react",
-      "label": "^React 1[89]: continuous resize paints double-wrapped TypesetText lines in at most its first frame$",
-      "awaiting": "P5",
-      "reason": "TypesetText still resizes through a per-block mount() controller that recomposes in idle callbacks; P5's registry takes the stale step and the 100 ms debounce that TypesetRichText already has."
     }
   ]
 }

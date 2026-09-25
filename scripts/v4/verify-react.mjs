@@ -41,7 +41,7 @@ for (const config of selected) {
     for (const major of majors) {
       const prefix = `React ${major}: `;
       /** @param {string} label @param {unknown} pass @param {unknown} [detail] */
-      const check = (label, pass, detail) => report.checks.push({ browser: config.name, label: prefix + label, pass: !!pass, ...(pass ? {} : { detail }) });
+      const check = (label, pass, detail) => { report.checks.push({ browser: config.name, label: prefix + label, pass: !!pass, ...(pass ? {} : { detail }) }); if (process.env.VERBOSE) process.stderr.write(`${config.name} ${prefix}${label}: ${pass ? 'ok' : 'FAIL'}\n`); };
       const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
       page.setDefaultTimeout(20000);
       page.on('pageerror', error => report.errors.push({ browser: config.name, error: prefix + error.message }));
@@ -167,6 +167,68 @@ for (const config of selected) {
           return { id, text: el.textContent, outcome: el.dataset.tsOutcome, done: el.dataset.typesetDone, overflow: el.scrollWidth > el.clientWidth + 1 };
         }));
         check(`60 updates (${name}) end on the exact text`, state.every(s => s.text === expected && s.done === '1' && s.outcome && !s.overflow), { expected, state });
+      }
+
+      // P5: one controller per document, visible blocks first.
+      const footprint = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const counts = [];
+        for (const n of [4, 40]) {
+          w.T.render('none');
+          await w.__frames(2);
+          const before = w.__snapshot();
+          w.T.render('blocks', { n, kind: 'both', labels: true });
+          await w.__quiet(300, 4000);
+          const after = w.__snapshot();
+          counts.push({ n, mo: after.mo.created - before.mo.created, ro: after.ro.created - before.ro.created, io: after.io.created - before.io.created, listeners: Object.values(after.listeners).reduce((a, b) => a + b, 0) - Object.values(before.listeners).reduce((a, b) => a + b, 0) });
+        }
+        return counts;
+      });
+      check('observers and listeners do not grow with the number of blocks (8 vs 80 hosts)', footprint[0].mo === footprint[1].mo && footprint[0].ro === footprint[1].ro && footprint[0].io === footprint[1].io && footprint[0].listeners === footprint[1].listeners && footprint[1].mo <= 1 && footprint[1].ro <= 1 && footprint[1].io <= 1, footprint);
+      await page.evaluate(() => /** @type {any} */ (window).T.render('none'));
+      const push = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const first = await w.__afterFirstPaint(() => w.T.render('blocks', { n: 30, kind: 'both', labels: true }));
+        const started = performance.now();
+        while (performance.now() - started < 1500 && w.__composedState().some((/** @type {any} */ h) => !h.composed)) await new Promise(r => setTimeout(r, 50));
+        return { first, settledMs: Math.round(performance.now() - started), last: w.__composedState() };
+      });
+      const onScreen = push.first.filter((/** @type {any} */ h) => h.visible);
+      check('a pushed screen paints its first frame with every on-screen block composed', onScreen.length > 4 && onScreen.every((/** @type {any} */ h) => h.composed), onScreen.filter((/** @type {any} */ h) => !h.composed));
+      check('offscreen blocks wait for idle time and compose within 1.5 s', push.first.some((/** @type {any} */ h) => !h.visible && !h.composed) && push.last.every((/** @type {any} */ h) => h.composed), { settledMs: push.settledMs, pending: push.last.filter((/** @type {any} */ h) => !h.composed).length });
+      const sync = await page.evaluate(() => {
+        const w = /** @type {any} */ (window);
+        w.T.render('blocks', { n: 30, kind: 'both', labels: true, priority: 'sync' });
+        return w.__composedState();
+      });
+      check('priority="sync" composes every block in the commit, on screen or not', sync.every((/** @type {any} */ h) => h.composed), sync.filter((/** @type {any} */ h) => !h.composed).map((/** @type {any} */ h) => h.id));
+      const suspense = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        // Mounted suspended: the blocks first render when the data arrives.
+        w.T.render('suspense', { suspendMs: 300 });
+        const fallback = await new Promise(resolve => { const t0 = performance.now(); const poll = () => document.getElementById('fallback') ? resolve(true) : performance.now() - t0 > 2000 ? resolve(false) : setTimeout(poll, 10); poll(); });
+        // The frame that removes the fallback is the reveal.
+        const revealed = await new Promise(resolve => {
+          const observer = new w.__NativeMO(() => { if (!document.getElementById('fallback')) { observer.disconnect(); requestAnimationFrame(() => setTimeout(() => resolve(w.__composedState()), 0)); } });
+          observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+          setTimeout(() => { observer.disconnect(); resolve([]); }, 3000);
+        });
+        return { fallback, revealed };
+      });
+      check('a Suspense reveal paints composed', suspense.fallback && suspense.revealed.length === 6 && suspense.revealed.every((/** @type {any} */ h) => h.composed), suspense);
+      if (major === '19') {
+        const activity = await page.evaluate(async () => {
+          const w = /** @type {any} */ (window);
+          w.T.render('activity');
+          await w.__quiet(300);
+          w.api.flushSync(() => w.api.setMode('hidden'));
+          await w.__frames(3);
+          const hidden = w.__composedState();
+          const shown = await w.__afterFirstPaint(() => w.api.flushSync(() => w.api.setMode('visible')));
+          const text = Array.from(document.querySelectorAll('.blk'), el => el.textContent);
+          return { hidden, shown, text };
+        });
+        check('an Activity reveal paints composed with the text intact', activity.shown.length === 6 && activity.shown.every((/** @type {any} */ h) => h.composed && h.visible) && activity.text.every(t => t && t.length > 40), activity);
       }
 
       // Lifecycle: nothing survives unmounting.

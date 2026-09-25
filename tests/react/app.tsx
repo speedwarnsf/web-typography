@@ -25,8 +25,8 @@ const w = window as any;
 w.__results = results;
 const counted = (id: string) => (result: { outcome: string }) => { results[id] = (results[id] || 0) + 1; w.__lastResult = w.__lastResult || {}; w.__lastResult[id] = result; };
 
-interface BlocksProps { n: number; kind: 'both' | 'text' | 'rich' | 'labels' | 'plain'; inlineKeep?: boolean; tick: number; onResult?: boolean; width?: number | string; labels?: boolean }
-function Blocks({ n, kind, inlineKeep, onResult, width = 330, labels }: BlocksProps) {
+interface BlocksProps { n: number; kind: 'both' | 'text' | 'rich' | 'labels' | 'plain'; inlineKeep?: boolean; tick: number; onResult?: boolean; width?: number | string; labels?: boolean; priority?: string }
+function Blocks({ n, kind, inlineKeep, onResult, width = 330, labels, priority }: BlocksProps) {
   const out: React.ReactNode[] = [];
   for (let i = 0; i < n; i++) {
     const style = { width };
@@ -34,8 +34,9 @@ function Blocks({ n, kind, inlineKeep, onResult, width = 330, labels }: BlocksPr
     const text = label ? LABELS[i % LABELS.length] : TEXTS[i % 3];
     const extra = onResult ? { onResult: counted('t' + i) } : {};
     if (kind === 'plain') { out.push(h('p', { key: 'p' + i, className: 'blk', style }, text)); continue; }
-    if (kind !== 'rich') out.push(h(Text, { key: 't' + i, id: 't' + i, lang: 'en', className: 'blk', style, text, ...(inlineKeep ? { keep: ['price tag'] } : {}), ...extra }));
-    if (kind === 'both' || kind === 'rich') out.push(h(Rich, { key: 'r' + i, id: 'r' + i, lang: 'en', className: 'blk rich', style, ...(onResult ? { onResult: counted('r' + i) } : {}) }, label ? text : rich(i)));
+    const p = priority ? { priority } : {};
+    if (kind !== 'rich') out.push(h(Text, { key: 't' + i, id: 't' + i, lang: 'en', className: 'blk', style, text, ...(inlineKeep ? { keep: ['price tag'] } : {}), ...extra, ...p }));
+    if (kind === 'both' || kind === 'rich') out.push(h(Rich, { key: 'r' + i, id: 'r' + i, lang: 'en', className: 'blk rich', style, ...(onResult ? { onResult: counted('r' + i) } : {}), ...p }, label ? text : rich(i)));
   }
   return h('div', { className: 'col' }, out);
 }
@@ -72,6 +73,22 @@ function App({ scenario, props }: { scenario: string; props: any }) {
   return content;
 }
 
+/** Which adapter hosts are composed (have an outcome) and which are on screen. */
+function composedState() {
+  const hosts = Array.from(document.querySelectorAll<HTMLElement>('[data-typeset-react], [data-typeset-react-rich]'));
+  return hosts.map(el => {
+    const r = el.getBoundingClientRect();
+    return { id: el.id, visible: r.bottom > 0 && r.top < innerHeight && r.width > 0 && r.height > 0, composed: !!el.dataset.tsOutcome };
+  });
+}
+w.__composedState = composedState;
+/** State as the first frame after `change` paints: a task queued from an
+ * animation frame callback registered before the change runs after that paint. */
+w.__afterFirstPaint = (change: () => void) => new Promise(resolve => {
+  requestAnimationFrame(() => setTimeout(() => resolve(composedState()), 0));
+  change();
+});
+
 let root: ReturnType<typeof createRoot> | null = null;
 w.T = {
   version: React.version,
@@ -80,6 +97,7 @@ w.T = {
     const host = document.getElementById('root')!;
     root = createRoot(host);
     for (const key of Object.keys(results)) delete results[key];
+    if (props.suspendMs) { const r = { done: false } as any; r.promise = new Promise<void>(res => setTimeout(() => { r.done = true; res(); }, props.suspendMs)); resource = r; }
     w.__lastResult = {};
     const app = h(App, { scenario, props });
     flushSync(() => root!.render(strict ? h(StrictMode, null, app) : app));

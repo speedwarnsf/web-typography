@@ -33,7 +33,7 @@ export function languageWeakEnding(word: string, language: string): boolean {
 
 /** Unicode opportunities, conservatively tailored to horizontal Latin-script CSS.
  * This never inserts hyphens or treats a word boundary as a legal line break. */
-export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string } = {}): BreakAnalysis {
+export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string; outcomeOnly?: boolean } = {}): BreakAnalysis {
   const language = languageOf(options.language);
   const result: BreakAnalysis = { unicode: UNICODE_VERSION, language, outcome: 'supported', units: [], opportunities: [] };
   if (!['und', 'en', 'fr', 'de', 'es'].includes(language)) { result.outcome = 'native:language'; return result; }
@@ -42,6 +42,8 @@ export function analyzeBreaks(source: string, options: { language?: string | nul
   }
   if (source.includes('\u00ad')) { result.outcome = 'native:soft-hyphen'; return result; }
   if (/[\u000b\u000c\u0085\u2028\u2029]/u.test(source)) { result.outcome = 'native:author-breaks'; return result; }
+  // The outcome alone (a block that already fits on one line needs no units).
+  if (options.outcomeOnly) return result;
   // Normal CSS collapses ASCII segment whitespace; preserve UTF-16 offsets.
   const normalized = source.replace(/[\t\r\n]/g, ' ');
   const graphemes = new Set([source.length, ...Array.from(new Intl.Segmenter(language, { granularity: 'grapheme' }).segment(source), g => g.index)]);
