@@ -1,21 +1,24 @@
 ---
 name: typeset-audit
 description: >-
-  Audit and fix line-break quality in English long-form web prose: orphans,
-  widows, weak line endings, and ragged right edges. Unlike typography advice,
-  this is a machine-checkable gate — audit() returns [] or it names the exact
-  failing lines, and a composition that fails its own self-check restores the
-  browser's layout. Installs the typeset.us paragraph compositor (beam-search
-  line breaking with post-render self-verification) to fix what the audit finds.
-  Use when asked to check or fix orphans, widows, or bad line breaks; when
-  text-wrap: pretty or balance isn't enough; or for symptoms like "one word
-  alone on the last line", "the right edge looks ragged", or "line breaks look
-  wrong after deploy".
+  Check and fix line breaks in web prose with typeset.us 4.x: short words
+  ("a", "the", "of") stranded at line ends, one-word last lines, ragged right
+  edges, and the same problems in Firefox, which has no text-wrap: pretty.
+  Start with CSS text-wrap: balance for headings and pretty for paragraphs.
+  Then install the pinned go@<version>.js with its integrity hash from
+  https://typeset.us/sri.json, or `npm i -E typeset.us` (mount() for static
+  DOM, TypesetText/TypesetRichText from typeset.us/react for React-owned
+  text), and verify with auditJSON(selector) or `npx typeset-audit`: a pass
+  means a nonempty scope, no hard errors and no unprocessed targets, and
+  every element's outcome (composed:rich, native:fits, ...) is explained in
+  OUTCOMES.md. Use when asked about orphans, widows, bad or ugly line breaks,
+  when text-wrap: pretty or balance is not enough, or for "one word alone on
+  the last line" and "the right edge looks ragged".
 ---
 
 # typeset.us
 
-> Historical V3 integration guidance below. For the current 4.0.0 release,
+> Historical V3 integration guidance below. For the current 4.x release,
 > use https://typeset.us/for-agents.md and its linked support/migration contract.
 > The old audit-array, clipboard, API and performance statements below are
 > not the V4 contract. Do not apply this archived procedure to V4.

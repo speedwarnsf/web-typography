@@ -1,5 +1,10 @@
 # typeset.us for coding agents
 
+> **Historical.** This page describes typeset.us 3.5.x and is kept for the
+> record. Its API, audit and performance statements are not the 4.x contract.
+> Current instructions: packages/typeset-v4/for-agents.md, served at
+> https://typeset.us/for-agents.md.
+
 If you are an AI coding agent asked to fix orphans, widows, a ragged right
 edge, or bad line breaks — and `text-wrap: pretty` wasn't enough — this page
 is the whole job: a three-line recipe, the exact things that go wrong, and a

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import CodeBlock from "@/components/CodeBlock";
+import { inertDocument } from "@/lib/inert-html";
 
 /* ── Types ── */
 type AuditCheck = {
@@ -410,14 +411,22 @@ function checkOpenTypeFeatures(container: HTMLElement): { missing: string[] } {
 
 /* ── Main Audit Function ── */
 function performAudit(html: string): AuditResult {
+  // Untrusted HTML: parsed inert (no scripts or event handlers run) and
+  // rendered inside a shadow root, so its stylesheets style only the sample
+  // and never typeset.us itself.
+  const host = document.createElement("div");
+  host.style.position = "absolute";
+  host.style.left = "-9999px";
+  host.style.width = "600px";
+  host.style.fontSize = "16px";
+  host.style.lineHeight = "1.6";
+  const shadow = host.attachShadow({ mode: "open" });
+  const source = inertDocument(html);
+  source.querySelectorAll("style, link").forEach((sheet) => shadow.appendChild(document.importNode(sheet, true)));
   const container = document.createElement("div");
-  container.innerHTML = html;
-  container.style.position = "absolute";
-  container.style.left = "-9999px";
-  container.style.width = "600px";
-  container.style.fontSize = "16px";
-  container.style.lineHeight = "1.6";
-  document.body.appendChild(container);
+  container.append(...Array.from(source.body.childNodes, (node) => document.importNode(node, true)));
+  shadow.appendChild(container);
+  document.body.appendChild(host);
 
   // Let styles compute
   const checks: AuditCheck[] = [];
@@ -600,7 +609,7 @@ function performAudit(html: string): AuditResult {
   });
 
   // Clean up
-  document.body.removeChild(container);
+  document.body.removeChild(host);
 
   // Calculate overall score
   const overallScore = Math.round(checks.reduce((sum, check) => sum + check.score, 0) / checks.length);

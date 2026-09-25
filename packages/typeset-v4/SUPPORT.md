@@ -1,24 +1,34 @@
-# Typeset 4.2.0 support contract
+# Typeset 4.3.0 support contract
 
-4.2.0 is released with owner approval within the range below. Local tests
+4.3.0 is released with owner approval within the range below. Local tests
 are not certification for every device, browser, font, or sentence.
+What each outcome means: OUTCOMES.md. What a version promises: STABILITY.md
+in the repository.
 
 - Horizontal LTR Latin prose/titles; declared English, French, German and
   Spanish. Untagged Latin uses neutral preferences.
 - Ordinary inline links, bold, italics and supported semantic spans. Author
   elements are not cloned/reparented by the imperative rich renderer.
-- React 19.2.3 is the local target. React 18 is not declared supported. Next
-  acceptance requires a real packed consumer build with the version recorded.
+- React 18.2 and later, and every React 19 minor (peer `^18.2.0 || ^19.0.0`).
+  `scripts/v4/verify-react-matrix.mjs` installs the packed package beside
+  18.2.0, 18.3.1, 19.0.8, 19.1.9, 19.2.8 and 19.3.0, then server-renders,
+  hydrates and composes both adapters in Chromium, WebKit and Firefox, and
+  type-checks against @types/react 18.3, 19.0 and latest. Next acceptance
+  requires a real packed consumer build with the version recorded.
 - Chromium, WebKit and Firefox through Playwright. Reports record versions;
   no untested historical minimum is inferred.
 - Intl.Segmenter, ResizeObserver, MutationObserver and a layout engine are
   required to compose. Where one is missing (jsdom and happy-dom under Jest or
   Vitest, older engines), every entry still imports, text stays native and
   the outcome is `native:environment`; nothing throws. document.fonts is
-  optional. Node 22+ for CLI/tooling.
+  optional. The library has no Node requirement and the package declares no
+  `engines` field, so no package manager refuses it. The `typeset-audit` CLI
+  needs Node 18.3 or later (its help and argument parsing run on 18.3.0 and
+  18.20.8; full audits are tested on Node 22 and 24) plus Playwright, which
+  has its own Node floor.
 - ESM and CommonJS for both the core and the React entry (`react.cjs` for
   `require()` and Jest); script-tag builds with typed globals (`./global`,
-  `./go`).
+  `./go`) and the automatic loader (`./auto`).
 
 Prefer the React adapters for text React renders. From 4.3, mount() and the
 website loader also keep framework-updated text correct: when a framework
@@ -221,7 +231,39 @@ No install hooks, telemetry, page-content uploads or required runtime service.
 Mount's incremental discovery, initial visible-text priority and yielded batches
 reduce redundant work; real text, font and width changes still recompose.
 The 8ms batch target cannot preempt one paragraph or a browser layout.
-Large-document discovery/layout can still create long tasks. Static SceneF
-snapshot benchmarking is not live hydration, server, or physical-device proof.
+Large-document discovery/layout can still create long tasks. Benchmarks of a
+static snapshot of a client site are not live hydration, server, or
+physical-device proof.
 The audit CLI navigates only your explicit URL and reports locally; --apply
 changes only an isolated preview, never a deployed site.
+
+## Known limitations
+
+- **Generated line breaks are real `<br>` elements.** Find-in-page does not
+  match a phrase that spans one, a Text Fragment link (`#:~:text=`) to such
+  a phrase does not scroll, and `innerText` and `selection.toString()`
+  contain a newline at each. Copying through the browser's copy command is
+  cleaned (no extra newlines), and the source text in the DOM is unchanged.
+  A newline-free rendering is on the roadmap.
+- **Print.** <!-- TODO(docs-sync): C9 changes how composed text prints; describe the 4.3 behaviour. -->
+  Until then, printed pages can re-wrap composed lines at the paper width.
+- **Machine translation.** <!-- TODO(docs-sync): C10 steps aside on translated pages; describe it. -->
+  Browser translation of composed text can come out garbled, because
+  spacing and tracking wrappers split sentences into segments.
+- **Content Security Policy and Trusted Types.** The 4.x composition path
+  (`mount`, `typeset`, the loaders and the React adapters) assigns no HTML
+  strings, uses no `eval`, and injects no `<style>` elements, so it needs no
+  `unsafe-eval` and no Trusted Types policy. (The retained v3 helpers, such
+  as `renderFrozenLines`, are not part of that path.) <!-- TODO(docs-sync): C5 makes style restoration strict-CSP safe; state the exact policy that passes. -->
+- **No hyphenation, no justification.** Text with `hyphens: auto` or soft
+  hyphens keeps the browser's layout.
+  <!-- TODO(docs-sync): C3 declines justified text with native:justify; confirm. -->
+- **Right-to-left, vertical and non-Latin text** keeps the browser's layout.
+- **Browser floor.** Needs `Intl.Segmenter`, `ResizeObserver`,
+  `MutationObserver`, `document.fonts` and CSS `text-wrap`: Chrome and Edge
+  114, Safari 17.4 and Firefox 125, or later. Tested in Playwright's
+  Chromium, WebKit and Firefox; the versions are in each report.
+  <!-- TODO(docs-sync): K4 keeps older engines native without throwing; say so. -->
+- **Framework-owned text.** Do not point `mount()` or a loader at text that
+  Vue, Svelte, Lit, Solid or React update in place; use the React adapters or
+  leave it native. <!-- TODO(docs-sync): C6 makes mount() safe under framework text updates; relax this. -->

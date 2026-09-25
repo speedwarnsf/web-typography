@@ -1,0 +1,18 @@
+{
+  "note": "Known vulnerabilities in published typeset.us files. release-cut.mjs copies this list into public/release.json and public/sri.json at each cut. Published files are never changed; affected versions are deprecated on npm. Fill in id and url when the GitHub advisory is published.",
+  "advisories": [
+    {
+      "id": null,
+      "url": null,
+      "title": "DOM XSS in the 3.x Typeset.auto() heading branch",
+      "severity": "moderate",
+      "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N",
+      "cwe": "CWE-79",
+      "npm": { "package": "typeset.us", "affected": ">=3.0.0 <3.4.1", "patched": "3.4.1" },
+      "pins": ["go@3.3.2.js", "go@3.4.0.js"],
+      "condition": "the page calls Typeset.auto() and an element with data-typeset-heading contains attacker-influenced text",
+      "fixedIn4x": "no 4.x release contains this code",
+      "details": "https://github.com/speedwarnsf/web-typography/blob/master/docs/security/advisory-3x-heading-xss.md"
+    }
+  ]
+}

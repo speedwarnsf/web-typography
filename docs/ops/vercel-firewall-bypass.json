@@ -1,0 +1,29 @@
+{
+  "name": "Release assets: skip bot challenges",
+  "description": "Versioned loaders, release archives and machine-readable indexes that other sites and tools fetch. GET and HEAD only.",
+  "active": true,
+  "conditionGroup": [
+    {
+      "conditions": [
+        {
+          "type": "path",
+          "op": "re",
+          "value": "^/(?:go@[0-9]+(?:\\.[0-9]+\\.[0-9]+)?\\.js|go\\.js|typeset@[0-9]+\\.[0-9]+\\.[0-9]+\\.(?:min|esm)\\.js|typeset\\.(?:min|esm)\\.js|typeset\\.css|releases/.*|sri\\.json|release\\.json|for-agents\\.md|capabilities\\.json|llms\\.txt)$"
+        },
+        {
+          "type": "method",
+          "op": "inc",
+          "value": [
+            "GET",
+            "HEAD"
+          ]
+        }
+      ]
+    }
+  ],
+  "action": {
+    "mitigate": {
+      "action": "bypass"
+    }
+  }
+}

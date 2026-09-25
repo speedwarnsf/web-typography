@@ -39,6 +39,7 @@ import PrevNextStrip from "@/components/PrevNextStrip";
 import GlyphField from "@/components/chrome/GlyphField";
 import ScrollHairline from "@/components/chrome/ScrollHairline";
 import BloomMenu from "@/components/chrome/BloomMenu";
+import { PINNED_VERSION } from "@/lib/install-snippet";
 
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans", display: "swap" });
@@ -71,9 +72,9 @@ const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: 
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://typeset.us'),
-  title: "Typeset — A New Era in Web Typography",
+  title: "Typeset: better line breaks for web text",
   description:
-    "The web finally knows how to break lines. Watch the proof, live: beam-search composition, hanging punctuation, and Tschichold spacing — set by its own engine, in your browser.",
+    "No stranded short words or one-word last lines. Grammar-aware line breaks that keep links and styling intact, checked after rendering in Chrome, Safari and Firefox.",
 };
 
 export const viewport = {
@@ -81,6 +82,10 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
 };
+
+// Every page is rendered per request so it carries that request's CSP nonce
+// (src/proxy.ts).
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const fontVars = [
@@ -106,7 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PrevNextStrip />
           <SectionFooter />
           <footer className="px-6 py-6 text-center text-xs text-neutral-500" data-no-typeset>
-            <a href="/releases/4.2.0/">Typeset 4.2.0</a>
+            <a href={`/releases/${PINNED_VERSION}/`}>Typeset {PINNED_VERSION}</a>
             {' / '}<a href="/releases/3.5.1/">V3 archive</a>
           </footer>
           <BackToTop />

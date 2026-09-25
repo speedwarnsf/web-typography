@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import typeset, { measureLayout, restore } from '@/lib/typeset-site';
 import { withDemoMeasurement } from '@/lib/typeset-demo';
 import { strandedOpener } from '@/lib/v4/phrase-boundaries';
+import { LOADER_GZIP_KB, NPM_INSTALL, PINNED_SNIPPET, PINNED_VERSION } from '@/lib/install-snippet';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -27,7 +28,7 @@ const PROOF_TEXT =
   'Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned, because it is. It fills each line until the words run out, and calls that typography.';
 
 const MANIFESTO_TEXT =
-  'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing -- visible at a glance, impossible to fake.';
+  'Anyone can license the same typefaces. The tell is the setting. A rag that breathes. A line that ends where the thought ends. A quotation mark hanging in the margin, because the eye wants edges, not excuses. For forty years the browser could not do this, so design teams shipped text they would never have signed in print. That era is over. Clean type is the quietest possible proof that your team knows what it is doing — visible at a glance, impossible to fake.';
 
 const CRAFT = [
   {
@@ -52,7 +53,8 @@ const CRAFT = [
   },
 ];
 
-const INSTALL_LINE = '<script src="https://typeset.us/go.js" defer></script>';
+// The pinned loader with its integrity hash, from public/sri.json.
+const INSTALL_LINE = PINNED_SNIPPET;
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -347,6 +349,16 @@ function ProofStage({ reduced }: { reduced: boolean }) {
   const stackRef = useRef<HTMLDivElement>(null);
   const userTouched = useRef(false);
   const demoed = useRef(false);
+  // Whether the browser panel really has text-wrap: pretty (Chrome, Safari)
+  // or not (Firefox); the copy claims only what this engine does.
+  const [pretty, setPretty] = useState<boolean | null>(null);
+  useEffect(() => {
+    const el = browserRef.current;
+    if (!el) return;
+    const cs = getComputedStyle(el);
+    const wrap = cs.getPropertyValue('text-wrap-style') || cs.getPropertyValue('text-wrap');
+    setPretty(/pretty/.test(wrap));
+  }, []);
 
   useEffect(() => {
     const update = () => {
@@ -473,10 +485,11 @@ function ProofStage({ reduced }: { reduced: boolean }) {
       <p className="v2-label">01 — The Proof</p>
       <h2 className="v2-h2">Your phone wraps text. A book sets it.</h2>
       <p className="v2-body v2-narrow">
-        Same words, same space, both rendered by your browser right now. One is
-        how every phone shows text — wherever the words happen to fall. The
-        other is how every book you&rsquo;ve ever trusted was set. Then squeeze
-        the column and watch which one falls apart.
+        Same words, same space, both rendered by your browser right now. The
+        first is your browser doing its best on its own. Watch the ends of its
+        lines: little words like &ldquo;a&rdquo; and &ldquo;the&rdquo; left
+        behind, thoughts snapped in half. The second is set the way a book
+        would set it. Then squeeze the column.
       </p>
 
       <div className="v2-stage">
@@ -527,6 +540,11 @@ function ProofStage({ reduced }: { reduced: boolean }) {
               ? 'Lines break wherever the words run out — by chance.'
               : 'Every line ends where it should — by intention. This is Typeset, live.'}
           </p>
+          {/* Name the baseline honestly: Chrome and Safari already apply
+              text-wrap: pretty here (globals.css); Firefox has none. */}
+          <p data-no-typeset className="v2-baseline" id="v2-baseline">
+            {pretty === null ? 'Your browser: CSS text wrapping.' : pretty ? 'Your browser, with CSS text-wrap: pretty.' : 'Your browser. Firefox has no text-wrap: pretty, so it fills each line in turn.'}
+          </p>
         </div>
 
         <div ref={stackRef} className="v2-stack" style={{ width: `${width}px` }}>
@@ -553,9 +571,10 @@ function ProofStage({ reduced }: { reduced: boolean }) {
           )}
         </div>
 
-        <p className="v2-squeeze-note">
-          Drag the slider: somewhere in there, your browser abandons a word.
-          The book version never does — at any width.
+        <p className="v2-squeeze-note" id="v2-squeeze-note">
+          Drag the slider and count the short words your browser leaves hanging
+          at line ends. The book carries them down to the next line.
+          {pretty === false && ' Somewhere in there, your browser also leaves a single word alone on the last line; the book never does.'}
         </p>
 
         {stats && (
@@ -593,6 +612,65 @@ function ProofStage({ reduced }: { reduced: boolean }) {
           Try it on your own text
         </a>
       </div>
+    </section>
+  );
+}
+
+// ─── For developers: the paths in, and whether you need it ──────────────────
+
+const REACT_LINES = `import { TypesetRichText } from 'typeset.us/react';
+
+<TypesetRichText lang="en">
+  Read <a href="/notes">the notes</a> first.
+</TypesetRichText>`;
+
+const MOUNT_LINES = `import { mount } from 'typeset.us';
+
+mount(document, 'article p, article h2');`;
+
+function DevelopersBand() {
+  return (
+    <section id="developers" className="v2-section" data-no-typeset>
+      <p className="v2-label">For developers</p>
+      <h2 className="v2-h2">Three ways in. All of them pinned.</h2>
+      <div className="v2-dev-grid">
+        <div className="v2-dev-card">
+          <p className="v2-dev-k">Any site, one tag</p>
+          <code className="v2-dev-code">{PINNED_SNIPPET}</code>
+          <p className="v2-dev-note">Version {PINNED_VERSION}, with its integrity hash. The file never changes.</p>
+        </div>
+        <div className="v2-dev-card">
+          <p className="v2-dev-k">npm</p>
+          <code className="v2-dev-code">{NPM_INSTALL}</code>
+          <pre className="v2-dev-code">{MOUNT_LINES}</pre>
+        </div>
+        <div className="v2-dev-card">
+          <p className="v2-dev-k">React 18.2+ and 19</p>
+          <pre className="v2-dev-code">{REACT_LINES}</pre>
+        </div>
+      </div>
+      <h3 className="v2-dev-h3">Do I need it?</h3>
+      <ul className="v2-dev-need">
+        <li><span>Balanced headlines</span><span>CSS <code>text-wrap: balance</code></span></li>
+        <li><span>No one-word last lines in Chrome and Safari</span><span>CSS <code>text-wrap: pretty</code></span></li>
+        <li><span>No &ldquo;a&rdquo;, &ldquo;the&rdquo; or &ldquo;of&rdquo; stranded at line ends; names kept together</span><span className="v2-gold">Typeset</span></li>
+        <li><span>The same result in Firefox</span><span className="v2-gold">Typeset</span></li>
+        <li><span>Links and styling kept exactly; results your CI can check</span><span className="v2-gold">Typeset</span></li>
+        <li><span>Justified text with hyphenation</span><span>Not Typeset: CSS <code>hyphens: auto</code></span></li>
+      </ul>
+      <p className="v2-body v2-narrow">
+        {LOADER_GZIP_KB}&nbsp;KB gzipped for the script tag. No dependencies, no
+        network calls, no tracking. Every result is checked after it renders,
+        and a paragraph Typeset cannot improve keeps your browser&rsquo;s layout.
+      </p>
+      <nav className="v2-links">
+        <a href="https://github.com/speedwarnsf/web-typography">GitHub</a>
+        <a href="https://www.npmjs.com/package/typeset.us">npm</a>
+        <a href={`/releases/${PINNED_VERSION}/README.md`}>Docs</a>
+        <a href="/install/frameworks">Next, Vite, Astro, Svelte, Vue</a>
+        <a href="/install">No-code platforms</a>
+        <a href="/faq">FAQ</a>
+      </nav>
     </section>
   );
 }
@@ -687,7 +765,7 @@ function Closing() {
       <p className="v2-body v2-narrow">
         The same engine that set this page: beam-search composition, hanging
         punctuation, smart quotes, self-checks that fall back to the browser
-        rather than ever make your text worse. 38&nbsp;KB gzipped,
+        rather than ever make your text worse. {LOADER_GZIP_KB}&nbsp;KB gzipped,
         no&nbsp;dependencies, generated from the source you can read.
       </p>
       <nav className="v2-links">
@@ -712,6 +790,7 @@ export default function V2Page() {
       <style dangerouslySetInnerHTML={{ __html: V2_CSS }} />
       <Hero reduced={reduced} />
       <ProofStage reduced={reduced} />
+      <DevelopersBand />
       <Manifesto />
       <CraftGrid />
       <Closing />
@@ -1034,6 +1113,44 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   font-size: .95rem; line-height: 1.65; color: #a8a8a8;
   margin: 0;
   text-wrap: pretty;
+}
+
+/* ── Baseline label ── */
+.v2-baseline {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+  color: #8a8a8a; margin: 8px 0 0;
+}
+
+/* ── For developers ── */
+.v2-dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: #1c1c1c; border: 1px solid #1c1c1c; margin: 36px 0 44px; }
+.v2-dev-card { background: #070707; padding: 22px 20px; min-width: 0; }
+.v2-dev-k {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px; letter-spacing: .25em; text-transform: uppercase;
+  color: ${GOLD}; margin: 0 0 14px;
+}
+.v2-dev-code {
+  display: block; margin: 0 0 12px;
+  font-family: var(--font-mono), monospace; font-size: .74rem; line-height: 1.6;
+  color: #d6d6d6; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.v2-dev-note { font-family: var(--font-source-sans), sans-serif; font-size: .85rem; color: #8f8f8f; margin: 0; text-wrap: pretty; }
+.v2-dev-h3 {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1.35rem; color: #efefef; margin: 0 0 14px; text-wrap: balance;
+}
+.v2-dev-need { list-style: none; padding: 0; margin: 0 0 36px; border-top: 1px solid #1c1c1c; }
+.v2-dev-need li {
+  display: flex; justify-content: space-between; gap: 18px;
+  padding: 11px 0; border-bottom: 1px solid #1c1c1c;
+  font-family: var(--font-source-sans), sans-serif; font-size: .95rem; color: #b9b9b9;
+}
+.v2-dev-need li span:last-child { text-align: right; white-space: nowrap; }
+.v2-dev-need code, .v2-dev-note code { font-family: var(--font-mono), monospace; font-size: .8em; color: #d6d6d6; }
+@media (max-width: 640px) {
+  .v2-dev-need li { flex-direction: column; gap: 2px; }
+  .v2-dev-need li span:last-child { text-align: left; }
 }
 
 /* ── Closing ── */

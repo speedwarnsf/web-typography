@@ -18,6 +18,14 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LEDGER = 'public/releases/published.json';
+/**
+ * Browser files in public/ whose bytes never change once written: the pinned
+ * loaders go@x.y.z.js and, from 4.3, typeset@x.y.z.min.js and
+ * typeset@x.y.z.esm.js. Only these may appear in public/sri.json; the
+ * aliases go.js, go@<major>.js, typeset.min.js and typeset.esm.js move with
+ * each release.
+ */
+export const IMMUTABLE_SITE_FILE = /^(?:go@\d+\.\d+\.\d+\.js|typeset@\d+\.\d+\.\d+\.(?:min|esm)\.js)$/;
 
 /** @param {Uint8Array} bytes */
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -106,13 +114,13 @@ export async function describeRelease(version, { npm = null, git = null, records
 }
 
 /**
- * Every pinned browser loader, public/go@x.y.z.js, with its SRI.
+ * Every immutable browser file in public/ (IMMUTABLE_SITE_FILE), with its SRI.
  * @param {string} [root]
  */
 export async function describePins(root = '.') {
   /** @type {Record<string, { integrity: string, sha256: string }>} */
   const pins = {};
-  for (const file of (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).sort()) {
+  for (const file of (await readdir(join(root, 'public'))).filter(f => IMMUTABLE_SITE_FILE.test(f)).sort()) {
     const bytes = await readFile(join(root, 'public', file));
     pins[file] = { integrity: integrity(bytes, 'sha384'), sha256: sha256(bytes) };
   }

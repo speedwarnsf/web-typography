@@ -8,6 +8,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const repo = process.cwd();
+// In a linked worktree, .git is a file and `clone --shared` from the worktree
+// finds no object directory; clone from the repository's common git dir,
+// which holds every commit a worktree can check out.
+const source = resolve(execFileSync('git', ['rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim());
 const verifier = resolve('scripts/v4/verify-ledger.mjs');
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 /** @type {{ label: string, pass: boolean, detail?: unknown }[]} */
@@ -17,7 +21,7 @@ try {
   /** @param {string} name */
   const fresh = name => {
     const dir = join(work, name);
-    execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', repo, dir]);
+    execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', source, dir]);
     execFileSync('git', ['checkout', '--quiet', head], { cwd: dir });
     // The working tree's (possibly uncommitted) ledger is what is under test.
     execFileSync('cp', [join(repo, 'public/releases/published.json'), join(dir, 'public/releases/published.json')]);

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/speedwarnsf/web-typography/security/advisories/new
+    about: Please do not open a public issue for a vulnerability. See SECURITY.md.
+  - name: Ask or share in Discussions
+    url: https://github.com/speedwarnsf/web-typography/discussions
+    about: Ideas, show-and-tell and open-ended questions.

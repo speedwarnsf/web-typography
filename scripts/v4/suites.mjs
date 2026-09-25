@@ -6,6 +6,7 @@ export const SUITES = [
   { name: 'verify-ledger', report: 'output/ledger-verification.json', note: 'published artifacts unchanged' },
   { name: 'verify-immutable-4.2', report: 'output/immutable-4.2.json', note: '4.2.0 byte-for-byte' },
   { name: 'verify-ledger-guards', report: 'output/ledger-guards.json', note: 'the ledger catches tampering' },
+  { name: 'verify-recipe-reproduces', report: 'output/recipe-reproduces.json', note: 'the 4.2 recipe still rebuilds 4.2.0 byte for byte' },
   { name: 'verify-release-craft', report: 'output/release-craft.json' },
   { name: 'verify-spacing', report: 'output/spacing.json' },
   { name: 'verify-promise', report: 'output/promise.json' },
@@ -41,5 +42,9 @@ export const SUITES = [
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
   { name: 'verify-cli', report: 'output/cli-verification.json' },
+  { name: 'verify-site-index', report: 'output/site-index.json', note: 'sri.json lists only immutable pins; cache headers; firewall bypass' },
+  { name: 'verify-docs', report: 'output/docs-verification.json', note: 'docs match the code and the release (outcomes, options, install lines, links)' },
+  { name: 'verify-release-trust', report: 'output/release-trust.json', note: 'pinned workflows, provenance publishing, SECURITY.md, advisories, release notes' },
+  { name: 'verify-package-contents', report: 'output/package-contents.json', note: 'the package the next release would publish' },
   { name: 'verify-budgets', report: 'output/budget-verification.json', note: 'gzip size budgets (runtime budgets: --runtime, nightly)' },
 ];

@@ -4,11 +4,12 @@
   "hashes": {
     "vendor/unicode/package-lock.json": "3dd97f482106f43d8c4236100d7691aeb8d2ab2887ed74e96c5a612974d5ad60",
     "vendor/unicode/LineBreakTest.txt": "e69884e0dde6a8724873f885d68c52dc14518abf9ae4ca9e2283b8773db3b752",
-    "src/vendor/unicode-linebreak.js": "e473b1b726e242330ad27fb8c120d106148a0238247ba0a752883ec8f8903e6f"
+    "src/vendor/unicode-linebreak.js": "b721cd90f901eb59594097c005946df66cf4931056769677945460c0e3b39997"
   },
   "lazyInit": {
     "since": "4.3.0",
     "generatedSHA256": "1eba23abb05de34100c9270b82b2a703ce6fc11a0f52d8800be3a684c1303b52",
     "note": "The generated bundle's body is wrapped in load(), run by the first new Rules(); only Rules is exported. Import no longer inflates the trie or constructs a TextDecoder. All 19,338 LineBreakTest.txt cases give identical breaks."
-  }
+  },
+  "note": "src/vendor/unicode-linebreak.js is the esbuild bundle of the pinned library with a license header (one /*! @license */ comment per component, kept in minified bundles) and, from 4.3.0, its body wrapped in load() (lazyInit); the generated code is otherwise unchanged from the 4.2.0 build."
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { createElement, forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { createElement, forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { restore, typeset } from './typeset.next';
 import type { Options, Result } from './typeset.next';
 import { adapterRegistry } from './adapter-registry';
@@ -15,6 +15,10 @@ export type { TypesetRichTextProps, TypesetAdapterProps, TypesetTag, Priority } 
 export interface TypesetTextProps extends TypesetAdapterProps {
   text: string;
 }
+
+// Layout effects do nothing during server rendering, and React 18 warns when
+// one is scheduled there. On the server the effect never runs either way.
+const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
  * React owns the semantic host and its attributes; this adapter owns only
@@ -50,7 +54,7 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
   const keepKey = keep?.join('\u0000');
   // One registration per host element. Unmounting does not restore: React
   // discards the host with its composed lines.
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const registry = adapterRegistry(element.ownerDocument);
@@ -92,9 +96,9 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     registry.request(current, 'mount', true);
     return () => { registry.remove(current); entry.current = null; };
   }, [as]);
-  useLayoutEffect(() => { if (entry.current) entry.current.priority = priority; }, [priority]);
+  useClientLayoutEffect(() => { if (entry.current) entry.current.priority = priority; }, [priority]);
   const first = useRef(true);
-  useLayoutEffect(() => {
+  useClientLayoutEffect(() => {
     if (first.current) { first.current = false; return; }
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, 'force', true);

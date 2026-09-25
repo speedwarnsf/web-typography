@@ -1,0 +1,22 @@
+# Dependency updates for the repository's tooling and website. The published
+# package has no runtime dependencies; esbuild is pinned exactly because
+# builds must stay byte-reproducible, so its updates are reviewed by hand
+# (a new esbuild changes bundle bytes and needs a recorded reason).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: esbuild
+    groups:
+      website:
+        patterns: ['next', 'react', 'react-dom', '@types/react', '@types/react-dom', 'tailwindcss', '@tailwindcss/*']
+      tooling:
+        patterns: ['typescript', 'playwright', '@playwright/test', '@types/node']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -15,11 +15,13 @@
     "test": "node scripts/v4/verify-release.mjs",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "bench": "node scripts/v4/bench-v4.mjs",
-    "budgets": "node scripts/v4/verify-budgets.mjs"
+    "budgets": "node scripts/v4/verify-budgets.mjs",
+    "docs:outcomes": "node scripts/v4/outcomes-doc.mjs",
+    "docs:image": "node scripts/v4/render-before-after.mjs"
   },
   "dependencies": {
     "html2canvas-pro": "^2.0.0",
-    "next": "16.1.6",
+    "next": "16.3.6",
     "opentype.js": "^1.3.4",
     "react": "19.2.3",
     "react-dom": "19.2.3"

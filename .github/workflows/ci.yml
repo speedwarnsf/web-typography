@@ -5,16 +5,21 @@ on:
     branches: [master, 'codex/release-*', 'release/**']
   pull_request:
 
+# Least privilege: CI reads the repository and uploads artifacts, nothing else.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The ledger's append-only check compares with earlier commits and tags.
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -56,11 +61,24 @@ jobs:
       - name: Production website build
         run: npm run build
 
+      - name: Website security (CSP, inert /audit and /dna, fetch proxy, pinned loader, npm audit)
+        run: |
+          node scripts/site/verify-safe-fetch.mjs
+          node scripts/site/verify-site.mjs --audit
+
       - name: Fresh packed npm consumer and TypeScript contracts
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+          TYPESET_CANDIDATE: ${{ github.workspace }}/output/candidate
         run: node scripts/v4/verify-package.mjs
 
       - name: Candidate package in Vitest (jsdom, happy-dom), Jest 30, attw and publint
         run: node scripts/v4/verify-test-runners.mjs
+
+      - name: React 18.2 to latest, Playwright and @types/react installs beside the packed package
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-react-matrix.mjs
 
       - name: Packed React consumer in three browsers
         run: node scripts/v4/verify-consumer-browser.mjs
@@ -70,7 +88,7 @@ jobs:
 
       - name: Retain acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: typeset-acceptance
           path: output/*.json

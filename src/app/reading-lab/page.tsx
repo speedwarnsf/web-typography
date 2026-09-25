@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import typeset, { typesetText } from "@/lib/typeset-site";
 import CodeBlock from "@/components/CodeBlock";
+import { PINNED_SNIPPET } from "@/lib/install-snippet";
 
 interface TypographySettings {
   fontSize: number;
@@ -181,7 +182,7 @@ export default function ReadingLab() {
 document.querySelectorAll('.readable-text p').forEach(typeset);
 
 // Or skip the import entirely:
-// <script src="https://typeset.us/go.js" defer></script>`;
+// ${PINNED_SNIPPET}`;
 
   const previewText = [
     "Typography is the craft of endowing human language with a durable visual form, and thus with an independent existence. Its heartwood is calligraphy—the dance, on a smaller page, of the living, speaking hand—and its roots reach into living soil, though its branches may be hung with dead conventions.",

@@ -1,6 +1,8 @@
 // @ts-check
 // Cut a release. This is the only script that writes packages/typeset-v4/dist,
-// public/releases/<v>/, public/go@<v>.js and the website aliases, and the only
+// public/releases/<v>/, the pins public/go@<v>.js, typeset@<v>.min.js and
+// typeset@<v>.esm.js, the aliases (go@<major>.js; go.js, typeset.min.js,
+// typeset.esm.js and typeset.css for 4.x only) and sri.json, and the only
 // place the package version changes. Development builds use
 // scripts/build-candidate.mjs, which writes nothing outside output/.
 //
@@ -21,8 +23,9 @@ import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, ARCHIVED_PACKAGE_FILES } from './build-recipe.mjs';
+import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor, sriIndex, pinnedGlobal, EVERGREEN_MAJOR } from './build-recipe.mjs';
 import { readLedger, describeRelease, describePins, readTarball, LEDGER } from './v4/ledger.mjs';
+import { rootInstallBlock, replaceInstallBlock, currentInstallBlock } from './v4/docs-blocks.mjs';
 
 const { values } = parseArgs({ options: {
   version: { type: 'string' }, 'dry-run': { type: 'boolean', default: false }, root: { type: 'string' },
@@ -33,9 +36,11 @@ const dryRun = values['dry-run'];
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) throw new Error('Pass --version x.y.z.');
 if (!dryRun && !values.summary) throw new Error('Pass --summary with one sentence for public/releases/' + version + '/index.html.');
 const repo = process.cwd();
+/** The integrity placeholder in pre-release docs; see verify-docs.mjs. */
+const SRI_PLACEHOLDER = 'sha384-FILLED-BY-RELEASE-CUT';
 const root = resolve(values.root ?? repo);
 const exists = (/** @type {string} */ path) => stat(path).then(() => true, () => false);
-const report = { version, dryRun, root, preconditions: /** @type {Record<string, unknown>} */ ({}), tarball: /** @type {Record<string, unknown>} */ ({}), reproduces: /** @type {Record<string, unknown> | null} */ (null), wrote: /** @type {string[]} */ ([]) };
+const report = { version, dryRun, root, recipe: /** @type {string | null} */ (null), preconditions: /** @type {Record<string, unknown>} */ ({}), tarball: /** @type {Record<string, unknown>} */ ({}), reproduces: /** @type {Record<string, unknown> | null} */ (null), wrote: /** @type {string[]} */ ([]) };
 /** @param {string} name @param {boolean} pass @param {unknown} [detail] */
 function precondition(name, pass, detail) {
   report.preconditions[name] = { pass, ...(detail === undefined ? {} : { detail }) };
@@ -56,6 +61,19 @@ const npmCache = await mkdtemp(join(tmpdir(), 'typeset-release-npm-'));
   const published = view.status === 0 && view.stdout.trim() !== '';
   precondition(`typeset.us@${version} unused on npm`, notFound && !published, notFound ? undefined : (published ? 'already published' : (view.stderr || 'npm registry unreachable').split('\n')[0]));
 }
+{
+  // Release notes come from CHANGELOG.md, so a release needs a dated section.
+  const changelog = await readFile(join(root, 'CHANGELOG.md'), 'utf8').catch(() => '');
+  const heading = changelog.split('\n').find(line => line.startsWith(`## ${version} `) || line === `## ${version}`);
+  precondition(`CHANGELOG.md has a dated "## ${version}" section`, !!heading && /^## \S+ - \d{4}-\d{2}-\d{2}$/.test(heading), heading ?? null);
+  // Docs written ahead of integration carry TODO(docs-sync) anchors; none may ship.
+  const anchors = [];
+  for (const file of ['packages/typeset-v4/README.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/for-agents.md', 'packages/typeset-v4/OUTCOMES.md', 'src/lib/v4/outcomes.ts', 'src/lib/v4/typeset.next.ts', 'CHANGELOG.md']) {
+    const text = await readFile(join(root, file), 'utf8').catch(() => '');
+    if (text.includes('TODO(docs-sync)')) anchors.push(file);
+  }
+  precondition('no TODO(docs-sync) anchors in the docs that ship', anchors.length === 0, anchors);
+}
 if (!dryRun) {
   const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();
   precondition('clean working tree', dirty === '', dirty.split('\n').slice(0, 10));
@@ -66,7 +84,7 @@ await mkdir(join(repo, 'output'), { recursive: true });
 const staging = await mkdtemp(join(repo, 'output', `release-cut-${version}-`));
 const pkgDir = 'packages/typeset-v4', distDir = `${pkgDir}/dist`;
 try {
-  for (const path of ['src/lib/v4', 'src/vendor', 'vendor/unicode', 'LICENSE']) await cp(join(root, path), join(staging, path), { recursive: true });
+  for (const path of ['src/lib/v4', 'src/vendor', 'vendor/unicode', 'LICENSE', 'SECURITY.md']) if (await exists(join(root, path))) await cp(join(root, path), join(staging, path), { recursive: true });
   await cp(join(root, pkgDir), join(staging, pkgDir), { recursive: true, filter: source => !/\/(dist|declarations|node_modules)(\/|$)/.test(source.slice(join(root, pkgDir).length)) });
   await symlink(join(repo, 'node_modules'), join(staging, 'node_modules'), 'dir');
   const pkgPath = join(staging, pkgDir, 'package.json');
@@ -74,15 +92,33 @@ try {
   const bumpedPkg = pkgText.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
   if (JSON.parse(bumpedPkg).version !== version) throw new Error('Could not set the package version.');
   await writeFile(pkgPath, bumpedPkg);
+  // capabilities.json is the machine contract; it names the version it describes.
+  const capsPath = join(staging, pkgDir, 'capabilities.json');
+  const capsText = await readFile(capsPath, 'utf8');
+  const bumpedCaps = capsText.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`);
+  if (JSON.parse(bumpedCaps).version !== version) throw new Error('Could not set the capabilities.json version.');
+  await writeFile(capsPath, bumpedCaps);
   const enginePath = join(staging, 'src/lib/v4/typeset.next.ts');
   const engineText = await readFile(enginePath, 'utf8');
   if ((engineText.match(/export const VERSION = '[^']+';/g) ?? []).length !== 1) throw new Error('Expected one VERSION constant in typeset.next.ts.');
   await writeFile(enginePath, engineText.replace(/export const VERSION = '[^']+';/, `export const VERSION = '${version}';`));
 
   // 3. Build, pack and assemble the archive inside staging.
-  await buildPackageDist({ root: staging, distDir });
+  // The recipe this version is cut with: a dry run at an older tag uses that
+  // release line's recipe and so reproduces its published bytes.
+  const recipe = recipeFor(version);
+  report.recipe = recipe.line;
+  await buildPackageDist({ root: staging, distDir, version, recipe });
+  // Docs written before the cut show the pinned loader with a placeholder
+  // hash; the loader now exists, so its integrity is known (the site's
+  // go@<v>.js is dist/auto.js from the 4.3 recipe on).
+  const loaderSRI = recipe.autoLoader ? sri(await readFile(join(staging, distDir, 'auto.js'))) : null;
+  if (loaderSRI) {
+    const readmePath = join(staging, pkgDir, 'README.md');
+    await writeFile(readmePath, (await readFile(readmePath, 'utf8')).replaceAll(SRI_PLACEHOLDER, loaderSRI));
+  }
   await emitDeclarations({ root: staging, distDir, declarationDir: `${pkgDir}/declarations`, tsc: join(repo, 'node_modules/.bin/tsc') });
-  await copyPackageFiles({ root: staging, packageDir: pkgDir });
+  await copyPackageFiles({ root: staging, packageDir: pkgDir, recipe });
   await writeManifest({ root: staging, distDir, version });
   await mkdir(join(staging, 'pack'));
   const [pack] = JSON.parse(execFileSync('npm', ['pack', '--json', '--cache', npmCache, '--pack-destination', join(staging, 'pack')], { cwd: join(staging, pkgDir), encoding: 'utf8' }));
@@ -91,15 +127,15 @@ try {
   const archive = join(staging, 'archive', version);
   await mkdir(archive, { recursive: true });
   for (const file of await readdir(join(staging, distDir))) await copyFile(join(staging, distDir, file), join(archive, file));
-  for (const file of ARCHIVED_PACKAGE_FILES) await copyFile(join(staging, pkgDir, file), join(archive, file));
+  for (const file of recipe.archivedFiles) await copyFile(join(staging, pkgDir, file), join(archive, file));
   await copyFile(join(staging, 'pack', pack.filename), join(archive, pack.filename));
   if (values.summary) await writeFile(join(archive, 'index.html'), archivePage(version, values.summary, stable));
-  await buildSite({ root: staging, distDir, siteDir: 'site', version });
+  await buildSite({ root: staging, distDir, siteDir: 'site', version, recipe });
   const go = await readFile(join(staging, 'site/go.js'));
 
   // 4. Verify the staged release with the full suite before touching the tree.
   if (!dryRun || values.verify) {
-    const env = { ...process.env, TYPESET_RELEASE_STAGING: staging, TYPESET_DIST: join(staging, distDir), TYPESET_BUNDLE: join(staging, distDir, 'typeset.global.js'), TYPESET_ESM: join(staging, distDir, 'index.js'), TYPESET_REACT: join(staging, distDir, 'react.js'), TYPESET_GO: join(staging, distDir, 'go.js'), TYPESET_STYLES: join(staging, distDir, 'styles.css'), TYPESET_SITE_GO: join(staging, 'site/go.js') };
+    const env = { ...process.env, TYPESET_RELEASE_STAGING: staging, TYPESET_DIST: join(staging, distDir), TYPESET_BUNDLE: join(staging, distDir, 'typeset.global.js'), TYPESET_ESM: join(staging, distDir, 'index.js'), TYPESET_REACT: join(staging, distDir, 'react.js'), TYPESET_GO: join(staging, distDir, 'go.js'), TYPESET_AUTO: join(staging, distDir, 'auto.js'), TYPESET_STYLES: join(staging, distDir, 'styles.css'), TYPESET_SITE_GO: join(staging, 'site/go.js') };
     const run = spawnSync(process.execPath, ['scripts/v4/verify-release.mjs', '--prebuilt'], { cwd: repo, env, stdio: 'inherit' });
     report.preconditions['staged release passes test:v4'] = { pass: run.status === 0 };
     if (run.status !== 0 && !dryRun) throw new Error('release-cut: the staged release failed test:v4. Nothing was written.');
@@ -149,18 +185,39 @@ try {
     await place(`public/go@${version}.js`, go, 'wx');
     await rename(join(root, distDir), join(staging, 'previous-dist'));
     await move(join(staging, distDir), distDir);
-    for (const file of ['package.json', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
+    for (const file of ['package.json', 'capabilities.json', 'README.md', 'LICENSE', 'THIRD-PARTY-LICENSES.txt', 'UNICODE-LICENSE.txt', 'AGENTS.md', 'SECURITY.md']) await place(`${pkgDir}/${file}`, await readFile(join(staging, pkgDir, file)));
     await place('src/lib/v4/typeset.next.ts', await readFile(join(staging, 'src/lib/v4/typeset.next.ts')));
-    for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await readFile(join(staging, 'site', file)));
+    const site = (/** @type {string} */ file) => readFile(join(staging, 'site', file));
+    const major = Number(version.split('.')[0]);
+    const isStable = !version.includes('-');
+    // Immutable versioned copies of the website bundles (listed in sri.json).
+    await place(`public/typeset@${version}.min.js`, pinnedGlobal(await site('typeset.min.js'), version), 'wx');
+    await place(`public/typeset@${version}.esm.js`, await site('typeset.esm.js'), 'wx');
+    // go@<major>.js follows its major line. The unversioned aliases follow
+    // EVERGREEN_MAJOR (4.x) only, so a 5.0 cut never restyles a go.js site.
+    if (isStable) await place(`public/go@${major}.js`, go);
+    if (isStable && major === EVERGREEN_MAJOR) {
+      for (const file of ['go.js', 'typeset.min.js', 'typeset.global.js.map', 'typeset.esm.js', 'typeset.css']) await place(`public/${file}`, await site(file));
+    }
+    const stability = await readFile(join(root, 'STABILITY.md'), 'utf8').catch(() => null);
+    if (stability && loaderSRI && stability.includes(SRI_PLACEHOLDER)) await place('STABILITY.md', stability.replaceAll(SRI_PLACEHOLDER, loaderSRI));
+    // The root README's install lines name the release just cut.
+    const rootReadme = await readFile(join(root, 'README.md'), 'utf8').catch(() => null);
+    if (rootReadme && currentInstallBlock(rootReadme)) await place('README.md', replaceInstallBlock(rootReadme, rootInstallBlock(version, sri(go))));
     await place('public/for-agents.md', await readFile(join(staging, pkgDir, 'for-agents.md')));
     await place('public/capabilities.json', await readFile(join(staging, pkgDir, 'capabilities.json')));
-    /** @type {Record<string, string>} */
-    const files = {};
-    for (const file of (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).sort(byPinVersion)) files[file] = sri(await readFile(join(root, 'public', file)));
-    for (const file of ['typeset.min.js', 'typeset.esm.js']) files[file] = sri(await readFile(join(root, 'public', file)));
-    await place('public/sri.json', JSON.stringify({ version, files, snippet: `<script src="https://typeset.us/go@${version}.js" integrity="${sri(go)}" crossorigin="anonymous" defer></script>` }, null, 2) + '\n');
+    // Known vulnerabilities in published files, which stay online unchanged.
+    const { advisories } = JSON.parse(await readFile(join(root, 'docs/security/advisories.json'), 'utf8'));
+    await place('public/sri.json', JSON.stringify(await sriIndex({ root, version, go, advisories }), null, 2) + '\n');
     const pins = (await readdir(join(root, 'public'))).filter(f => /^go@\d+\.\d+\.\d+\.js$/.test(f)).map(f => f.slice(3, -3)).filter(v => compareVersions(v, version) < 0).sort(compareVersions);
-    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length }, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+    await place('public/release.json', JSON.stringify({ version, previous, previousBrowserPin: pins.at(-1) ?? null, package: `typeset.us@${version}`, download: `/releases/${version}/${pack.filename}`, archive: previous ? `/releases/${previous}/README.md` : null, manifest: `/releases/${version}/manifest.json`, loader: { url: `/go@${version}.js`, integrity: sri(go), bytes: go.length, gzipBytes: gzipSync(go).length, npm: `typeset.us@${version}/dist/auto.js` }, aliases: { [`/go@${major}.js`]: `latest ${major}.x; no integrity hash`, '/go.js': `latest ${EVERGREEN_MAJOR}.x only; for trying Typeset out` }, advisories, validation: 'See SUPPORT.md for verified coverage and outstanding device acceptance.' }, null, 2) + '\n');
+    // Checks expected to fail until this cut (scripts/v4/known-failures.json)
+    // pass once its files are written; drop those entries so test:release on
+    // the tag does not report them as XPASS.
+    const knownPath = join(root, 'scripts/v4/known-failures.json');
+    const known = JSON.parse(await readFile(knownPath, 'utf8').catch(() => '{"entries":[]}'));
+    const remaining = (known.entries ?? []).filter((/** @type {{ awaiting?: string }} */ entry) => entry.awaiting !== `the ${version} release cut`);
+    if (known.entries && remaining.length !== known.entries.length) await place('scripts/v4/known-failures.json', JSON.stringify({ ...known, entries: remaining }, null, 2) + '\n');
     // 6. Append the new release to the ledger. It records the tarball that
     //    must be published: npm publish public/releases/<v>/<tarball>.
     const nextLedger = await readLedger(root);
@@ -177,8 +234,6 @@ try {
   await rm(npmCache, { recursive: true, force: true });
 }
 
-/** @param {string} a @param {string} b */
-function byPinVersion(a, b) { return compareVersions(a.slice(3, -3), b.slice(3, -3)); }
 
 /**
  * The archive landing page, in the form 4.1.0 and 4.2.0 shipped.

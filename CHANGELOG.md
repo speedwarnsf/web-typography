@@ -10,7 +10,7 @@ Hashes for every published version live in
 
 ---
 
-## Unreleased (4.3.0)
+## 4.3.0 - Unreleased
 
 ### Audit
 
@@ -100,6 +100,183 @@ Hashes for every published version live in
   (2.57 to 3.42 MB unpacked), mostly `react.cjs` and its source map.
 - Single-line blocks skip Unicode break analysis, and a first composition no
   longer computes an unused signature; outcomes are unchanged.
+
+### API (additive)
+
+- `OUTCOMES` lists every outcome code; the `Outcome`, `FeatureStatus`,
+  `QuoteStatus`, `HangingStatus`, `SpacingStatus` and `TrackingStatus` types
+  name them. `Result.outcome` and `Result.features` use these types while
+  still accepting any string, so existing code compiles unchanged.
+  OUTCOMES.md (also in the package and at docs/outcomes.md) says what each of
+  the 38 outcomes and 32 feature statuses means, whether it is expected, and
+  what to do, grouped as composed, nothing to improve, unsupported content,
+  couldn't improve safely and not processed.
+- Every option documents its default in the type declarations. The
+  `lineBreaks` comment said the default was the legacy path; the package
+  default is `'unicode'`.
+
+### Documentation
+
+- The npm README is an introduction, not release notes: what Typeset does,
+  a 375 px before/after image against `text-wrap: pretty`, a "Do I need it?"
+  table (CSS `balance` and `pretty` first; Typeset for grammar-aware breaks,
+  Firefox parity, preserved markup and checkable results; not for justified
+  text), three pinned install paths, every option with its default, the
+  common outcomes, what it costs, what it won't do, browser requirements,
+  accessibility, baseline CSS for before the script runs, an FAQ, the
+  stability promise and a glossary. Every link is absolute, so it works on
+  npmjs.com. "New in" notes live here in the CHANGELOG.
+- The repository README states the positioning against `text-wrap`, and its
+  install lines are generated from the published version and sri.json at
+  each cut (it had pinned 4.1.0).
+
+- SUPPORT.md describes 4.3.0 and lists known limitations: generated line
+  breaks and find-in-page, Text Fragments, `innerText` and selection; print;
+  machine translation; CSP and Trusted Types; no hyphenation, justification
+  or right-to-left text; the browser floor; framework-owned text. A new FAQ
+  (typeset.us/faq, and in the README) answers what screen readers hear,
+  layout shift, SEO, copying, printing and translation, readers without
+  JavaScript, cost, and when it runs.
+- Stale 3.x claims are gone from current docs and the site: "audit() returns
+  []", "zero means zero", 1.4 to 1.6 ms per paragraph, 20 KB, English only,
+  cloned links. The Show HN kit, the essay, SKILL.md's frontmatter, the agent
+  contract (for-agents.md) and llms.txt describe 4.3; the 3.5 agent pages are
+  marked historical. A client's name is gone from SUPPORT.md and the CHANGELOG.
+
+### Installation and packaging
+
+- The React peer is `^18.2.0 || ^19.0.0` (was `^19.2.3`), and Playwright is no
+  longer a peer. `npm install typeset.us` no longer fails with ERESOLVE beside
+  React 18, React 19.0/19.1 or an older pinned Playwright, and no longer
+  upgrades `react` alone in apps locked to React 19.0 or 19.1 (which left
+  `react-dom` behind and threw "Incompatible React versions"). The
+  `typeset-audit` CLI still imports Playwright on demand and says how to
+  install it. `TypesetText` uses a layout effect only in the browser, so React
+  18 server rendering no longer warns. Both adapters declare `ReactElement`
+  return types, so the published `.d.ts` compiles against @types/react 18.3
+  and 19.0 with `skipLibCheck: false`. Tested by
+  `scripts/v4/verify-react-matrix.mjs` over React 18.2.0, 18.3.1, 19.0.8,
+  19.1.9, 19.2.8 and 19.3.0 in Chromium, WebKit and Firefox.
+- npm metadata: a plain description, keywords (typography, line-breaking,
+  text-wrap, orphans, widows, knuth-plass, hanging-punctuation, react and
+  others), `repository.directory` so README links resolve on npmjs.com, and
+  `bugs.url`. The `engines` field (`node >=22`) is removed: it made Yarn 1
+  refuse installs of a browser library on older Node. The `typeset-audit`
+  CLI needs Node 18.3 or later.
+- The unpacked package is about 0.97 MB, down from 2.57 MB, 73% of which was
+  source maps embedding every engine source. The ESM and CommonJS builds stay
+  readable and unminified and ship without maps (your bundler minifies them;
+  stack traces name real functions). `typeset.global.js` and `go.js` keep
+  maps without embedded sources. Each bundle now ends with the license
+  notices of the code it embeds (@cto.af/linebreak, unicode-trie-runtime,
+  fflate and the Unicode line-break data), which minification had stripped,
+  and `license` is `MIT AND Unicode-3.0`. The notices add about 150 bytes
+  gzip to each bundle.
+
+### Loaders and CDN
+
+- The automatic website loader is on npm as `typeset.us/auto`
+  (`dist/auto.js`), byte for byte the same file as
+  `https://typeset.us/go@<version>.js`, so npm, jsDelivr and typeset.us serve
+  one file with one integrity hash. `typeset.us/go` still composes only
+  `[data-typeset]` targets. Each loader now logs one `console.info` when no
+  element matches, instead of silently doing nothing.
+- Bare `cdn.jsdelivr.net/npm/typeset.us` and `unpkg.com/typeset.us` URLs serve
+  `dist/typeset.global.js` (the `jsdelivr` and `unpkg` fields), not the
+  CommonJS build that browsers refuse to run.
+- From the 4.3.0 cut, typeset.us publishes versioned `typeset@<v>.min.js` and
+  `typeset@<v>.esm.js`, and `sri.json` lists only immutable paths. The
+  go@4.2.0.js entry is unchanged. `go@4.js` follows 4.x, and `go.js` and the
+  other unversioned aliases follow 4.x only: a 5.0 release will never move
+  them. Versioned files are cached for a year, aliases and indexes for five
+  minutes, all with `Access-Control-Allow-Origin: *`.
+  docs/ops/vercel-firewall.md has the firewall bypass that stops bot
+  challenges on these paths; it is applied in the Vercel project, not here.
+
+### Website copy (typeset.us)
+
+- The homepage names its baseline by engine ("Your browser, with CSS
+  text-wrap: pretty" in Chrome and Safari; "Firefox has no text-wrap:
+  pretty"), leads with the short words the browser leaves at line ends, and
+  claims a one-word last line only in an engine that produces one. It had
+  said "your browser abandons a word" in every engine, although Chrome and
+  Safari never did at any of the 96 widths.
+- A "For developers" band: the pinned script tag, npm and React, a "Do I
+  need it?" table against CSS `text-wrap`, the measured gzip size from
+  release.json (it said 38 KB; 4.2.0's loader is 42.4 KB), and links to
+  GitHub, npm, the docs and new framework recipes at /install/frameworks
+  (Next.js, Vite, Astro, SvelteKit, Vue). /utility describes the supported
+  scope instead of "universal ... fixes all of this".
+- /, /support and /library have their own titles, descriptions and unfurl
+  images.
+
+### Contributing
+
+- CONTRIBUTING.md (setup, building the candidate, running and narrowing the
+  suites, attaching `auditJSON` to a report), CODE_OF_CONDUCT.md (the
+  Contributor Covenant 2.1), ROADMAP.md (what 4.4 and 5.0 hold, and why each
+  waits), a "Bad line break" issue form that asks for the URL, width, font,
+  browser, version, `auditJSON` output and a screenshot, an integration
+  question form, and a pull request template with the rendering-change
+  checklist.
+
+### Stability
+
+- STABILITY.md states what a version number promises: API names,
+  `auditJSON` `schemaVersion` 1, outcome codes, CLI exit codes and published
+  bytes do not break in 4.x, and a minor release changes default rendering
+  only to fix a verified defect, listed under "Rendering changes" with its
+  golden-diff count. Install with `npm i -E`, or pin `go@<version>.js` with
+  its integrity hash. `go.js` and `go@4.js` follow 4.x and will never move to
+  5.0.
+- Every install line on typeset.us is generated at build time from
+  `public/sri.json`: the pinned loader with its integrity hash and
+  `crossorigin`, on the homepage, /install and each platform guide, /utility,
+  /essay, the pairing-card and reading-lab templates and the grader. The
+  evergreen `go.js` appears only with that label. Docs written before a cut
+  carry a placeholder hash that `release-cut` fills.
+
+### Release trust
+
+- Releases are published by `.github/workflows/release.yml` from a `v*` tag,
+  only after CI passed on that commit, `scripts/v4/release-check.mjs` rebuilt
+  the ledger-recorded tarball from the tag byte for byte, and every suite
+  passed against the committed dist. It publishes exactly
+  `public/releases/<v>/typeset.us-<v>.tgz` with npm trusted publishing and
+  provenance, checks the registry's integrity and attestation, and creates a
+  GitHub Release from the CHANGELOG section with the evidence attached, so
+  evidence no longer expires with CI artifacts. docs/RELEASING.md describes
+  the whole flow.
+- CI and nightly run with `contents: read` only, every action is pinned to a
+  commit SHA, and Dependabot watches npm and GitHub Actions.
+- SECURITY.md (also in the package): supported versions, private reporting,
+  response targets. The DOM XSS in the 3.x `Typeset.auto()` heading branch,
+  fixed silently in 3.4.1, now has an advisory draft, a deprecation command
+  for 3.0.0 to 3.4.0 and an `advisories` list that each cut copies into
+  release.json and sri.json. The vulnerable files stay online unchanged.
+- The CHANGELOG has a 4.2.0 entry. docs/OWNER-ACTIONS.md lists the GitHub,
+  npm and Vercel settings only the owner can apply.
+
+### Website (typeset.us, not the package)
+
+- `/api/fetch-url` no longer reaches private networks: it resolves the host
+  and connects only to a checked address, refuses loopback, private,
+  link-local (including 169.254.169.254), CGNAT, multicast and reserved
+  addresses and their IPv6 forms, follows at most five redirects and checks
+  each, allows ports 80, 443, 8080 and 8443 only, streams the body with a
+  500 KB cap after decompression, and rate-limits each client to 12 requests
+  a minute.
+- `/audit` and `/dna` render fetched or pasted HTML inert: scripts, frames,
+  plugins, `<base>`, refresh `<meta>`, event handlers and `javascript:` URLs
+  are removed; `/audit` renders the sample in a shadow root so its styles
+  cannot restyle the site, and `/dna` uses an iframe sandboxed without
+  scripts. `/dna` no longer fails on pages with inline SVG.
+- Every page has a nonce-based Content Security Policy (`script-src` with a
+  per-request nonce and `strict-dynamic`, `object-src 'none'`,
+  `base-uri 'self'`, `frame-ancestors 'self'`), plus `nosniff`,
+  `X-Frame-Options: SAMEORIGIN` and a referrer policy. Pages are rendered
+  per request so each gets a fresh nonce. Next.js is 16.3.6; `npm audit`
+  reports no vulnerabilities.
 
 ### Rendering changes
 
@@ -357,6 +534,34 @@ fourth with a link and emphasis) at 320, 440 and 600 px:
   `verify-visibility`, `verify-print-resize`, `verify-scheduler`,
   `verify-translation` and `verify-options`.
 
+## 4.2.0 - 2026-09-17
+
+The next public release after 4.1.0. No public API was renamed and no
+required peer was added. (This entry was written after the release, from its
+acceptance record, docs/RELEASE-4.2.0.md.)
+
+- Two mounts from one engine copy no longer fight over the same element. The
+  first mount owns it; a waiting mount takes over only when the first releases
+  it. `controller.stats.overlappingTargets` counts the overlaps, and should be
+  0 in a correct integration.
+- Inline `white-space: nowrap` phrases keep their no-break boundary inside an
+  otherwise wrapping linked or styled paragraph, instead of sending the whole
+  paragraph back to native layout.
+- Declared-English text prefers breaks outside capitalized name and
+  designator pairs such as "Oak Street" or "Marquee Cinemas" when they fit.
+  It is a bounded preference, not a parser, and never widens a line past its
+  box.
+- Title mode may end on a substantial final location word when that avoids
+  splitting a recognized name.
+- While a rich paragraph is composed, Typeset sets `text-wrap-style: auto`
+  on it, so the browser's own `pretty` or `balance` cannot rewrap the chosen
+  breaks. Teardown restores the author's wrapping and keeps unrelated style
+  changes made in the meantime.
+
+Rendering: paragraphs with inline nowrap phrases, name pairs or overlapping
+mounts can break differently from 4.1.0. Pins, archives and 4.1.0 remain
+unchanged: https://typeset.us/releases/4.1.0/.
+
 ## 4.1.0 - 2026-09-17
 
 The next public release after 4.0.0. Private 4.0.1-dev labels are not public pins.
@@ -375,7 +580,7 @@ The next public release after 4.0.0. Private 4.0.1-dev labels are not public pin
   replacement; tracking, clipping, inline-code and controller regression suites.
 
 Existing 4.0.0 and v3 pins/archives remain unchanged. Read the migration and
-support contracts before upgrading. No SceneF integration changes are included.
+support contracts before upgrading. No changes specific to any client site are included.
 The scheduler reduces redundant work, not all layout cost; external device,
 spoken screen-reader and representative-device acceptance limits remain.
 

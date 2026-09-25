@@ -13,7 +13,10 @@ export type Platform = {
   note?: string;
 };
 
-export const SNIPPET = '<script src="https://typeset.us/go.js" defer></script>';
+import { PINNED_SNIPPET } from './install-snippet';
+
+/** The pinned loader with its integrity hash (from public/sri.json). */
+export const SNIPPET = PINNED_SNIPPET;
 
 export const PLATFORMS: Record<string, Platform> = {
   ghost: {

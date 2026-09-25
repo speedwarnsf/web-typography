@@ -1,14 +1,18 @@
 {
   "name": "typeset.us",
   "version": "4.2.0",
-  "description": "Measured paragraph composition for linked, styled, and changing web text, with optical hanging and a verified spacing finish.",
+  "description": "Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.",
+  "keywords": ["typography", "line-breaking", "line-break", "text-wrap", "text-wrap-pretty", "orphans", "widows", "rag", "knuth-plass", "hanging-punctuation", "smart-quotes", "react", "paragraph"],
   "author": "Dustin York (https://typeset.us)",
   "homepage": "https://typeset.us",
-  "repository": { "type": "git", "url": "git+https://github.com/speedwarnsf/web-typography.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/speedwarnsf/web-typography.git", "directory": "packages/typeset-v4" },
+  "bugs": { "url": "https://github.com/speedwarnsf/web-typography/issues" },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/typeset.release.d.ts",
+  "jsdelivr": "./dist/typeset.global.js",
+  "unpkg": "./dist/typeset.global.js",
   "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"] } },
   "exports": {
     ".": {
@@ -22,16 +26,16 @@
     },
     "./global": { "types": "./dist/global.d.ts", "default": "./dist/typeset.global.js" },
     "./go": { "types": "./dist/go.d.ts", "default": "./dist/go.js" },
+    "./auto": "./dist/auto.js",
     "./styles.css": "./dist/styles.css",
     "./capabilities.json": "./capabilities.json",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "bin", "README.md", "AGENTS.md", "MIGRATION.md", "SUPPORT.md", "for-agents.md", "capabilities.json", "LICENSE", "THIRD-PARTY-LICENSES.txt", "UNICODE-LICENSE.txt"],
+  "files": ["dist", "bin", "README.md", "AGENTS.md", "MIGRATION.md", "SUPPORT.md", "SECURITY.md", "OUTCOMES.md", "for-agents.md", "capabilities.json", "LICENSE", "THIRD-PARTY-LICENSES.txt", "UNICODE-LICENSE.txt"],
   "bin": { "typeset-audit": "./bin/audit.mjs" },
-  "sideEffects": ["./dist/styles.css", "./dist/typeset.global.js", "./dist/go.js"],
-  "engines": { "node": ">=22" },
+  "sideEffects": ["./dist/styles.css", "./dist/typeset.global.js", "./dist/go.js", "./dist/auto.js"],
   "publishConfig": { "tag": "latest", "access": "public" },
-  "peerDependencies": { "react": "^19.2.3", "playwright": "^1.58.2" },
-  "peerDependenciesMeta": { "react": { "optional": true }, "playwright": { "optional": true } },
-  "license": "MIT"
+  "peerDependencies": { "react": "^18.2.0 || ^19.0.0" },
+  "peerDependenciesMeta": { "react": { "optional": true } },
+  "license": "MIT AND Unicode-3.0"
 }

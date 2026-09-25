@@ -1,0 +1,77 @@
+name: Bad line break
+description: Typeset broke a line badly, changed text or styling, or left a paragraph it should have set.
+labels: ["bad break"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. A line break depends on the exact width, font and browser, so
+        these fields are what make it reproducible. Nothing here is sent anywhere else.
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: A public page that shows it, or say "private" and paste HTML below.
+      placeholder: https://example.com/post
+    validations:
+      required: true
+  - type: input
+    id: width
+    attributes:
+      label: Viewport or column width
+      description: The window width, or the text column's width in px (DevTools shows it).
+      placeholder: 390px viewport, 358px column
+    validations:
+      required: true
+  - type: input
+    id: font
+    attributes:
+      label: Font
+      description: Family, size and line height of the paragraph (DevTools > Computed).
+      placeholder: Source Serif 4, 18px / 1.5
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS, with versions
+      placeholder: Safari 26.1 on iOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Typeset version and how it is loaded
+      description: Typeset.VERSION in the console, and go@x.y.z.js, go.js, npm or React.
+      placeholder: 4.3.0 via go@4.3.0.js
+    validations:
+      required: true
+  - type: textarea
+    id: audit
+    attributes:
+      label: auditJSON output
+      description: |
+        In the page's console run `copy(JSON.stringify(Typeset.auditJSON('YOUR SELECTOR'), null, 2))`
+        and paste here, or run `npx typeset-audit --url <page> --selector '<selector>' --widths <width>`.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you see, and what you expected
+      description: Quote the lines as they break, and how you think they should break.
+      placeholder: |
+        Line 2 ends with "the" and line 3 starts with "museum"...
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image here. Include the whole paragraph.
+  - type: textarea
+    id: html
+    attributes:
+      label: HTML of the paragraph (if the page is private)
+      render: html

@@ -4,49 +4,63 @@
     {
       "script": "verify-native-ax",
       "label": "^candidate: .* (composed block words|link names|heading names) equal source$",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed packages/typeset-v4/dist, which is the published 4.2.0 build with the joined-word defect until 4.3.0 is cut."
     },
     {
       "script": "verify-break-semantics",
       "label": ": (a break that replaces a space is exposed to assistive technology|spacing and hanging markers are hidden and display:inline)$|^legacy renderFrozenLines (runs under Trusted Types with no policy|sets no role and keeps the words|keeps the heading name)$",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, which hides generated breaks, uses inline-block markers and sets role=text in renderFrozenLines (C2)."
     },
     {
       "script": "verify-strict-csp",
       "label": "^(strict CSP|without the policy): ",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, which restores styles through the style attribute (C5)."
     },
     {
       "script": "verify-copy-privacy",
       "label": ": nothing hidden reaches the clipboard that native copy leaves out$",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11)."
     },
     {
       "script": "verify-framework-text",
       "label": " under (mount\\(\\)|the website loader): |^typeset\\(\\) and restore\\(\\) without a controller",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist and website loader, which leave stale framework text and crash React (C6)."
     },
     {
       "script": "verify-live-regions",
       "label": ": ",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, which composes live regions (C4)."
     },
     {
       "script": "verify-smart-quotes",
       "label": "^education: |^server HTML: TypesetText with (smartQuotes and no lang|lang=\"en\") has curled quotes$|: TypesetRichText without lang warns once$",
-      "modes": ["release"],
+      "modes": [
+        "release"
+      ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "test:release runs the committed 4.2.0 dist, with the quote misfires and client-only TypesetText education (C15)."
     },
@@ -67,6 +81,30 @@
       ],
       "awaiting": "the 4.3.0 release cut",
       "reason": "The committed 4.2.0 declarations reject as=\"div\", refs, onResult and priority, and inline @types/react 19.2 internals that fail with @types/react 18."
+    },
+    {
+      "script": "verify-site-index",
+      "label": "^sri\\.json: typeset\\.(min|esm)\\.js is a ledger-listed immutable path$",
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "The committed public/sri.json was written by the 4.2.0 cut, which also hashed the mutable aliases typeset.min.js and typeset.esm.js. The 4.3.0 cut rewrites it with sriIndex(), which lists only immutable, ledger-listed paths (K6)."
+    },
+    {
+      "script": "verify-loaders",
+      "label": "^package go\\.js without \\[data-typeset\\] targets logs one console\\.info",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, whose go.js stays silent when no element matches (K6)."
+    },
+    {
+      "script": "verify-package-contents",
+      "label": "^(React adapters declare ReactElement|exports \\./auto -> dist/auto\\.js|unpacked package is under 1\\.2 MB|dist/\\S+ keeps all four third-party license notices|only typeset\\.global\\.js and go\\.js ship source maps)",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release packs the committed 4.2.0 dist beside the 4.3 package.json: it has inferred React types, no dist/auto.js, maps with embedded sources and no license comments (K3, K6, K7)."
     }
   ]
 }

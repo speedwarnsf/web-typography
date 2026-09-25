@@ -14,6 +14,8 @@ on real pages.
 | `verify-scenef-startup.mjs` | `SCENEF_URL` | Startup and scroll long tasks at 4x CPU with and without the loader. |
 | `verify-scenef-webkit-parity.mjs` | `SCENEF_URL` | Tab focus after selection matches native behaviour in WebKit. |
 | `verify-scenef-ownership.mjs` | network (scenef.com) | An isolated experiment with a source build; never changes SceneF. |
+| `verify-cdn-reachability.mjs` | network; `--base` (default `https://typeset.us`) | Loaders, release archives and indexes answer automated GETs with 200, no firewall challenge, and the cache and CORS headers from `next.config.ts` (see docs/ops/vercel-firewall.md). |
+| `sweep-homepage.mjs` | `--base` (default `https://typeset.us`) | The homepage proof slider at every width from 250 to 345 px in three engines: short words left hanging and one-word last lines, browser against Typeset (the figures the README quotes). |
 | `benchmark-scenef.mjs` | `output/scenef-week-static.html` snapshot | Composition cost on a script-free SceneF /week snapshot. |
 
 Browser paths come from `scripts/v4/browsers.mjs`. Reports are written to

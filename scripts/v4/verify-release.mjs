@@ -10,8 +10,8 @@
 //
 // The candidate is built first by build-candidate.mjs and every suite loads it
 // through TYPESET_DIST, TYPESET_BUNDLE, TYPESET_ESM, TYPESET_REACT, TYPESET_GO,
-// TYPESET_STYLES and TYPESET_SITE_GO. Each suite gets a watchdog; failures are
-// summarised by suite, browser and check. scripts/v4/known-failures.json lists
+// TYPESET_AUTO, TYPESET_STYLES and TYPESET_SITE_GO. Each suite gets a
+// watchdog; failures are summarised by suite, browser and check. scripts/v4/known-failures.json lists
 // checks that are expected to fail until a named plan item lands; such a
 // suite reports XFAIL, and fails as XPASS once those checks pass, so the entry
 // has to be removed in the change that fixes them.
@@ -48,7 +48,7 @@ if (values.prebuilt) {
   headline = `${mode} ${process.env.TYPESET_DIST}`;
 } else if (values.release) {
   const dist = resolve('packages/typeset-v4/dist');
-  env = { TYPESET_DIST: dist, TYPESET_BUNDLE: `${dist}/typeset.global.js`, TYPESET_ESM: `${dist}/index.js`, TYPESET_REACT: `${dist}/react.js`, TYPESET_GO: `${dist}/go.js`, TYPESET_STYLES: `${dist}/styles.css`, TYPESET_SITE_GO: resolve('public/go.js') };
+  env = { TYPESET_DIST: dist, TYPESET_BUNDLE: `${dist}/typeset.global.js`, TYPESET_ESM: `${dist}/index.js`, TYPESET_REACT: `${dist}/react.js`, TYPESET_GO: `${dist}/go.js`, TYPESET_AUTO: `${dist}/auto.js`, TYPESET_STYLES: `${dist}/styles.css`, TYPESET_SITE_GO: resolve('public/go.js') };
   mode = 'release';
   const { version } = JSON.parse(await readFile(`${dist}/manifest.json`, 'utf8'));
   headline = `release: committed packages/typeset-v4/dist ${version}`;

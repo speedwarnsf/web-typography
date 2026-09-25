@@ -1,4 +1,10 @@
-/* Generated from pinned @cto.af/linebreak 4.0.3. See vendor/unicode/THIRD-PARTY-LICENSES.txt. */
+/* Generated from pinned @cto.af/linebreak 4.0.3 (vendor/unicode). The /*! notices
+ * below survive minification; the full license texts are THIRD-PARTY-LICENSES.txt
+ * and UNICODE-LICENSE.txt in the typeset.us package. */
+/*! @license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT */
+/*! @license @cto.af/unicode-trie-runtime (c) 2023, from foliojs/unicode-trie, MIT */
+/*! @license fflate (c) 2026 Arjun Barrett, MIT */
+/*! @license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0 */
 /* Typeset 4.3: the module body runs on first use, not at import. At import it inflated the trie and constructed a TextDecoder, which throws where TextDecoder is missing (Jest's jsdom environment) and costs every page that never breaks Unicode text. Only Rules is exported. */
 let loaded;
 function load(){if(loaded)return loaded;
