@@ -409,7 +409,8 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
 }
 
 const liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
-const regions = '[aria-live], ' + liveRoles;
+// A literal, not a concatenation, so bundlers can drop it with the functions.
+const regions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
 /** Whether this element is inside a live region. The nearest element with a
  * non-empty aria-live decides: "off" is not live, and any other value is
  * (Chromium announces an unknown value too). An empty aria-live counts as
