@@ -191,11 +191,20 @@ Outside the changes below, 0 of these differ in any engine.
   composed lines in the first frame instead of native lines re-broken a
   moment later, with `mount()`, `TypesetText` and `TypesetRichText`. Text an
   attribute change reveals at a new width composes before that frame paints.
+  Text that is hidden while the window's width changes shows native
+  wrapping from then on, so a reveal by CSS alone (a `:checked` tab, a media
+  query) or by an attribute nothing observes paints no alternating long and
+  short lines; any other reveal at a new width shows native wrapping from
+  its second frame until it is recomposed. No reveal raises a
+  ResizeObserver loop error (the React adapters composed inside the
+  observer callback).
 - **No double-wrapped frames during resizes or in print (C9).** A block
   whose width changes is recomposed once the size has held for 100 ms, not
   every frame; meanwhile, if it is narrower than its widest composed line,
   it shows native wrapping. The switch is written before the frame's layout.
-  Print shows native wrapping and pauses composition.
+  Print shows native wrapping and pauses composition. A width only layout
+  can show (a stylesheet rule, a composed block moved into a narrower
+  container) can still paint its first frame double-wrapped.
 - **Machine translation no longer garbles or loses text (C10).** When the
   page is translated (the `translated-ltr`/`translated-rtl` class Google
   Translate and Chrome set, a `<font>` wrapper inside composed text, or

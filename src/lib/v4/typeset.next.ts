@@ -849,6 +849,10 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   const deferred = new Set<HTMLElement>();
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
   let guardFrame = 0;
+  // Blocks the ResizeObserver saw shown again, guarded in the next frame.
+  const shownNow = new Set<HTMLElement>();
+  let shownFrame = 0;
+  let windowWidth = view?.innerWidth ?? 0;
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1145,7 +1149,11 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       if (Math.abs(previous.w - width) > .01) {
         for (const el of watched.get(entry.target) || []) {
           // Revealed: a retained composition is already painting; verify it.
-          if (!previous.w || hidden.has(el)) revealed(el, VERIFY);
+          // Shown by CSS alone or an attribute this controller does not watch
+          // (aria-expanded, :checked, a media query) at another width, it may
+          // paint alternating long and short lines this frame; from the next
+          // it shows native wrapping until it is recomposed.
+          if (!previous.w || hidden.has(el)) { revealed(el, VERIFY); shownNow.add(el); }
           else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) resizeStarted(el);
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
@@ -1155,6 +1163,11 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
         recheck(entry.target as HTMLElement, VERIFY);
       }
     }
+    if (shownNow.size && !shownFrame && view) shownFrame = view.requestAnimationFrame(() => {
+      shownFrame = 0;
+      if (!stopped) guard(shownNow);
+      shownNow.clear();
+    });
     if (pending.size) schedule();
   });
   const parents = new Map<HTMLElement, HTMLElement | null>();
@@ -1259,6 +1272,17 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // get a key recheck, which composes nothing unless it changed.
   const resized = () => {
     if (stopped || !fontsReady) return;
+    // Hidden text is likely to be shown at another width once the window's
+    // width changes: it shows native wrapping until then. Written now, inside
+    // a hidden subtree, this moves nothing; at the reveal it would be a
+    // ResizeObserver loop error, and a reveal by CSS alone would paint
+    // alternating long and short lines. A height-only resize (a mobile URL
+    // bar) leaves it composed.
+    const width = view?.innerWidth ?? 0;
+    if (width !== windowWidth) {
+      windowWidth = width;
+      for (const el of hidden) if (states.get(el)?.widest && !rendered(el)) el.setAttribute('data-ts-stale', '');
+    }
     const visible: HTMLElement[] = [];
     for (const el of owned) if (states.get(el)?.widest && onScreen(el)) visible.push(el);
     const changed = widthChanged(visible);
@@ -1324,8 +1348,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       unsubscribe();
       if (settleTimer !== undefined) clearTimeout(settleTimer);
       if (guardFrame) view?.cancelAnimationFrame(guardFrame);
+      if (shownFrame) view?.cancelAnimationFrame(shownFrame);
       if (restoreContent) for (const el of owned) restore(el);
-      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear(); deferred.clear();
+      owned.clear(); pending.clear(); nearby.clear(); hidden.clear(); resizing.clear(); deferred.clear(); shownNow.clear();
       watched.clear(); parents.clear();
       for (const el of blocked.keys()) stopWaiting(el);
       for (const el of claimed) release(el);

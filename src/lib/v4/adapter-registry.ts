@@ -61,8 +61,10 @@ const FRAME_BUDGET_MS = 12;
 const VISIBLE_BUDGET_MS = 120;
 const IDLE_SLICE_MS = 8;
 const RESIZE_SETTLE_MS = 100;
-// Edge's translator tags the nodes it rewrites with these attributes.
-const OBSERVED = ['class', 'style', 'lang', '_msttexthash', '_msthash'];
+// Edge's translator tags the nodes it rewrites with the _mst attributes; the
+// hidden and open attributes reveal text, which then composes before the
+// reveal paints.
+const OBSERVED = ['class', 'style', 'lang', 'hidden', 'open', '_msttexthash', '_msthash'];
 
 /** A content-box height as a ResizeObserver reports it (NaN for an inline box). */
 function contentHeight(el: Element): number {
@@ -108,6 +110,7 @@ function createRegistry(doc: Document): Registry {
   let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: IntersectionObserver | null = null;
   let writingDepth = 0;
   let started = false;
+  let windowWidth = win?.innerWidth ?? 0;
   let unsubscribe: (() => void) | undefined;
 
   // The adapters render synchronously in test runners, so a DOM emulation
@@ -284,10 +287,7 @@ function createRegistry(doc: Document): Registry {
       if (!width) continue;
       for (const entry of watchers.get(observation.target) || []) {
         if (previous.w === 0 && entry.element.isConnected && visible(entry.element)) {
-          // Revealed (display:none, a collapsed panel): compose before this
-          // frame paints. A composition keeps the line count, so the host
-          // keeps its size and no new observation is raised.
-          if (!revealed.has(entry)) { revealed.add(entry); resizing.delete(entry); run(entry, 'check', false); }
+          if (!revealed.has(entry)) { revealed.add(entry); resizing.delete(entry); reveal(entry); }
         } else if (!revealed.has(entry)) resizing.add(entry);
       }
     }
@@ -296,12 +296,32 @@ function createRegistry(doc: Document): Registry {
     clearTimeout(settle);
     settle = later(settled, RESIZE_SETTLE_MS);
   }
+  /** Shown again, seen only here: a reveal this registry's MutationObserver
+   * sees (a class, style, hidden or open attribute) composes in the next
+   * frame, before it paints. Here, inside the observer callback, any change
+   * to the host's height is a ResizeObserver loop error. A retained
+   * composition that still fits paints as composed; one that no longer fits
+   * (the width changed while hidden, unseen) is recomposed before the next
+   * frame. Native text (never composed, or stale) is composed now only if
+   * that keeps its height, and otherwise before the next frame. */
+  function reveal(entry: AdapterEntry): void {
+    const el = entry.element;
+    if (!entry.widest() && !printing(doc)) {
+      const before = el.getBoundingClientRect().height;
+      run(entry, 'check', false);
+      if (entries.has(el) && Math.abs(el.getBoundingClientRect().height - before) > .01) writing(() => entry.stale());
+    }
+    enqueue(entry, 'check');
+  }
   /** Before the next frame's layout: native lines wherever composed ones no
    * longer fit. Not in the observer callback, where the height change would be
-   * a same-depth notification (a ResizeObserver loop error). */
+   * a same-depth notification (a ResizeObserver loop error). A hidden host
+   * whose container changed width will be shown at another width: it shows
+   * native lines from now, a write inside a hidden subtree that moves nothing. */
   function staleCheck(): void {
     staleQueued = false;
-    const doomed = [...resizing].filter(entry => entries.has(entry.element) && rendered(entry.element) && entry.widest() > contentWidth(entry.element) + .5);
+    const doomed = [...resizing].filter(entry => entries.has(entry.element) && entry.widest()
+      && (rendered(entry.element) ? entry.widest() > contentWidth(entry.element) + .5 : entry.element.isConnected));
     for (const entry of doomed) writing(() => entry.stale());
   }
   function settled(): void {
@@ -321,6 +341,11 @@ function createRegistry(doc: Document): Registry {
   };
   const windowResized = () => {
     for (const entry of entries.values()) resizing.add(entry);
+    // Hidden text is likely to be shown at another width once the window's
+    // width changes: native lines until then (see staleCheck). A height-only
+    // resize (a mobile URL bar) leaves it composed.
+    const width = win?.innerWidth ?? 0;
+    if (width !== windowWidth) { windowWidth = width; if (!staleQueued) { staleQueued = true; frame(staleCheck); } }
     clearTimeout(settle);
     settle = later(settled, RESIZE_SETTLE_MS);
   };

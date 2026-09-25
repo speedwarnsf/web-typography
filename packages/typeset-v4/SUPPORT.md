@@ -147,6 +147,9 @@ and it is recomposed. Both hooks are supported; the engine installs their rules
 as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. Hidden text (display:none, the hidden attribute, a closed dialog,
 content-visibility) keeps its composition and is not measured until shown.
+Text that is hidden while the window's width changes shows native wrapping
+until it is shown and recomposed, since it will likely be shown at another
+width.
 
 Composed text follows text metrics as well as width: fonts that finish
 loading (including fonts a stylesheet requests late, for which WebKit fires
@@ -269,6 +272,13 @@ changes only an isolated preview, never a deployed site.
   `--ts-break-display: inline` on an element in print CSS to print its
   screen composition instead. 4.2.0 printed the screen breaks, which the
   narrower page re-wrapped into alternating long and short lines.
+- **Widths seen only after layout.** A width change the engine cannot see
+  before the browser lays out (a stylesheet rule, a composed block moved
+  into a narrower container, text shown by CSS alone or by an attribute the
+  engine does not watch, such as `aria-expanded`, after its container
+  changed width while the window did not) can paint one frame of
+  alternating long and short lines; from the next frame the block shows
+  native wrapping (`data-ts-stale`) until it is recomposed.
 - **Machine translation.** While a page is translated (Google Translate and
   Chrome set `translated-ltr`/`translated-rtl` on `<html>`, translators wrap
   text in `<font>`, Edge adds `_msttexthash`), `mount()`, the loaders,

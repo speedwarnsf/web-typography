@@ -5,7 +5,11 @@
 // boxes as before it was hidden, for mount(), TypesetText and TypesetRichText.
 // Nothing may report 'unmeasurable' after the reveal, and no ResizeObserver
 // loop error may be reported. Text in a content-visibility:auto section
-// composes once scrolled into range (WebKit cached a failure).
+// composes once scrolled into range (WebKit cached a failure). Reveals only a
+// ResizeObserver can see (CSS alone, an attribute nothing observes, a class
+// changed inside an animation frame) raise no loop error either; one after
+// the window narrowed paints no alternating long and short lines, and text
+// mounted hidden composes once shown.
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -23,6 +27,7 @@ body{margin:0;font:17px/1.45 Georgia,serif}section,dialog{width:340px;padding:8p
 .off{display:none}.cvh{content-visibility:hidden}
 #tabs[data-tab="b"] #tab-a{display:none}#tabs[data-tab="a"] #tab-b{display:none}
 #stack>.card:not(:last-child){display:none}
+#s-radio{width:40vw}#rb:checked~#s-radio{display:none}#s-mh{display:none}#s-mh[data-open]{display:block}
 .spacer{height:2600px}#cv{content-visibility:auto;contain-intrinsic-size:auto 400px}
 </style></head><body>
 <section id="s-class">${container('class', 0)}</section>
@@ -32,6 +37,8 @@ body{margin:0;font:17px/1.45 Georgia,serif}section,dialog{width:340px;padding:8p
 <div id="stack"><section class="card" id="s-stack">${container('stack', 4)}</section></div>
 <section id="s-cvhidden">${container('cvhidden', 5)}</section>
 <section id="s-late"><p class="m">${escape(text(1))}</p></section><dialog id="d-late" style="top:400px"><p class="m">${escape(text(2))}</p></dialog>
+<div id="radio"><input type="radio" name="tab" id="ra" checked><input type="radio" name="tab" id="rb"><section id="s-radio">${container('radio', 6)}</section></div>
+<section id="s-mh">${container('mh', 7)}</section>
 <div class="spacer"></div>
 <section id="cv"><p class="m" id="cv-p">${escape(text(6))}</p></section>
 <script src="/react.js"></script></body></html>`;
@@ -42,7 +49,7 @@ import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { TypesetText, TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
-const texts = ${JSON.stringify(Array.from({ length: 6 }, (_, i) => text(i + 10)))};
+const texts = ${JSON.stringify(Array.from({ length: 8 }, (_, i) => text(i + 10)))};
 window.renderReact = () => {
   for (const el of document.querySelectorAll('.react')) {
     const t = texts[Number(el.dataset.i)], words = t.split(' ');
@@ -85,8 +92,14 @@ for (const { name, engine, executablePath } of browsers) {
       await new Promise(r => setTimeout(r, 400));
       w.snapshot = (/** @type {Element} */ scope) => [...scope.querySelectorAll('.m, .rt, .rr')].map(el => {
         const block = /** @type {HTMLElement} */ (el);
-        return { kind: block.classList.contains('m') ? 'mount' : block.classList.contains('rt') ? 'TypesetText' : 'TypesetRichText', outcome: block.dataset.tsOutcome, breaks: block.querySelectorAll('br[data-ts-break]').length, lines: w.Typeset.measureLayout(block).lines.map((/** @type {any} */ line) => line.text) };
+        return { kind: block.classList.contains('m') ? 'mount' : block.classList.contains('rt') ? 'TypesetText' : 'TypesetRichText', outcome: block.dataset.tsOutcome, breaks: block.querySelectorAll('br[data-ts-break]').length, lines: w.Typeset.measureLayout(block).lines.map((/** @type {any} */ line) => line.text), stale: block.hasAttribute('data-ts-stale') };
       });
+      // What a frame paints: read by a ResizeObserver created after the
+      // engine's, so after its callbacks and before the paint.
+      w.painted = (/** @type {Element} */ scope) => new Promise(resolve => requestAnimationFrame(() => {
+        const probe = new ResizeObserver(() => { probe.disconnect(); resolve(w.snapshot(scope)); });
+        probe.observe(document.body);
+      }));
     });
     const show = {
       class: ['document.getElementById("s-class").classList.add("off")', 'document.getElementById("s-class").classList.remove("off")'],
@@ -159,6 +172,75 @@ for (const { name, engine, executablePath } of browsers) {
         return (/** @type {any[]} */ (first)).filter(b => b.kind === 'mount').map(b => ({ outcome: b.outcome, intact: b.lines.length === b.breaks + 1, top }));
       }, { hide, reveal, id });
       check(`${label} at a new width: the mount() block is composed for it in the first frame`, result.length === 1 && result[0].outcome === 'composed:rich' && result[0].intact, result);
+    }
+    /** Composed lines shown with native ones added: alternating long and short lines. */
+    const doubled = (/** @type {any} */ b) => !b.stale && b.breaks > 0 && b.lines.length !== b.breaks + 1;
+    const intact = (/** @type {any} */ b) => b.outcome === 'composed:rich' && !b.stale && b.lines.length === b.breaks + 1;
+    // Shown by CSS alone (a :checked radio tab) after the window narrowed
+    // while it was hidden.
+    {
+      await page.evaluate(async () => {
+        /** @type {HTMLElement} */ (document.getElementById('s-radio')).scrollIntoView({ block: 'start' });
+        await new Promise(r => setTimeout(r, 300));
+        /** @type {HTMLInputElement} */ (document.getElementById('rb')).checked = true;
+        await new Promise(r => setTimeout(r, 300));
+      });
+      await page.setViewportSize({ width: 700, height: 800 });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const section = /** @type {HTMLElement} */ (document.getElementById('s-radio'));
+        const errors = w.loopErrors.length;
+        await new Promise(r => setTimeout(r, 300));
+        const painted = w.painted(section);
+        /** @type {HTMLInputElement} */ (document.getElementById('ra')).checked = true;
+        const first = await painted;
+        await new Promise(r => setTimeout(r, 700));
+        return { first, settled: w.snapshot(section), loopErrors: w.loopErrors.length - errors };
+      });
+      await page.setViewportSize({ width: 900, height: 800 });
+      for (const [index, block] of result.first.entries()) {
+        check(`shown by CSS alone after the window narrowed: ${block.kind} paints no double-wrapped lines in the first frame`, !doubled(block), { breaks: block.breaks, lines: block.lines.length, stale: block.stale });
+        check(`shown by CSS alone after the window narrowed: ${block.kind} is composed for the new width`, intact(result.settled[index]) && !result.loopErrors, { ...result.settled[index], lines: result.settled[index].lines.length, loopErrors: result.loopErrors });
+      }
+    }
+    // Mounted hidden (never composed), then shown by an attribute nothing
+    // observes; hidden again, narrowed, and shown the same way; hidden with a
+    // class, narrowed, and shown by a class change inside an animation frame.
+    {
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const section = /** @type {HTMLElement} */ (document.getElementById('s-mh'));
+        const wait = (/** @type {number} */ ms) => new Promise(r => setTimeout(r, ms));
+        /** @type {HTMLElement} */ (document.getElementById('s-radio')).scrollIntoView({ block: 'start' });
+        await wait(200);
+        const out = /** @type {Record<string, unknown>} */ ({});
+        let errors = w.loopErrors.length;
+        section.setAttribute('data-open', '');
+        await wait(700);
+        out.mounted = { settled: w.snapshot(section), loopErrors: w.loopErrors.length - errors };
+        errors = w.loopErrors.length;
+        section.removeAttribute('data-open');
+        await wait(300);
+        section.style.width = '290px';
+        await wait(300);
+        section.setAttribute('data-open', '');
+        await wait(700);
+        out.narrowed = { settled: w.snapshot(section), loopErrors: w.loopErrors.length - errors };
+        errors = w.loopErrors.length;
+        section.classList.add('off');
+        await wait(300);
+        section.style.width = '340px';
+        await wait(300);
+        await new Promise(resolve => requestAnimationFrame(() => { section.classList.remove('off'); resolve(undefined); }));
+        await wait(700);
+        out.frame = { settled: w.snapshot(section), loopErrors: w.loopErrors.length - errors };
+        return out;
+      });
+      for (const [key, label] of [['mounted', 'mounted hidden and shown by an attribute nothing observes'], ['narrowed', 'hidden, narrowed and shown by an attribute nothing observes'], ['frame', 'hidden, widened and shown by a class changed inside an animation frame']]) {
+        const run = /** @type {any} */ (result)[key];
+        check(`${label}: every block composes, with no ResizeObserver loop error`, run.loopErrors === 0 && run.settled.length === 3 && run.settled.every(intact),
+          { loopErrors: run.loopErrors, blocks: run.settled.map((/** @type {any} */ b) => ({ kind: b.kind, outcome: b.outcome, breaks: b.breaks, lines: b.lines.length, stale: b.stale })) });
+      }
     }
     // content-visibility:auto, far below the fold, then scrolled into view.
     const cv = await page.evaluate(async () => {
