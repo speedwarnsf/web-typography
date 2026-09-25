@@ -92,12 +92,14 @@ export interface NearObserver { observe(element: Element): void; unobserve(eleme
  * what shows it: the window, or the nearest scroll container it scrolls in.
  * An app shell's overflow:auto pane clips its content, and a root margin on
  * the window does not reach past that clip, so text below the fold there
- * was never near until it was on screen. One observer per scrollport; an
- * element's scrollport is found once. Null without IntersectionObserver. */
+ * was never near until it was on screen. One observer per scrollport, held
+ * only while it observes something, so a scroll container a route removed
+ * is not kept alive; an element's scrollport is found once. Null without
+ * IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
-  const observers = new Map<Element | null, IntersectionObserver>();
+  const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
   const roots = new WeakMap<Element, Element | null>();
   const scrollport = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
@@ -110,12 +112,21 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
     observe(element) {
       let root = roots.get(element);
       if (root === undefined) { root = scrollport(element); roots.set(element, root); }
-      let observer = observers.get(root);
-      if (!observer) { observer = new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }); observers.set(root, observer); }
-      observer.observe(element);
+      let entry = observers.get(root);
+      if (!entry) { entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      entry.observer.observe(element);
+      entry.targets.add(element);
     },
-    unobserve(element) { const root = roots.get(element); if (root !== undefined) observers.get(root)?.unobserve(element); },
-    disconnect() { for (const observer of observers.values()) observer.disconnect(); observers.clear(); },
+    unobserve(element) {
+      const root = roots.get(element);
+      const entry = root === undefined ? undefined : observers.get(root);
+      if (!entry) return;
+      entry.observer.unobserve(element);
+      entry.targets.delete(element);
+      // The window's observer stays; a scroll container's goes with its last target.
+      if (root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(root); }
+    },
+    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); },
   };
 }
 

@@ -205,6 +205,17 @@ for (const { name, engine, executablePath } of browsers) {
         const page = await browser.newPage({ viewport: { width: 400, height: 700 } });
         page.setDefaultTimeout(20000);
         await page.setContent(nestedPage);
+        // Observers rooted at a scroll container, to see that none outlives its targets.
+        await page.evaluate(() => {
+          const w = /** @type {any} */ (window), Native = window.IntersectionObserver;
+          w.rootedObservers = [];
+          w.IntersectionObserver = class extends Native {
+            constructor(/** @type {IntersectionObserverCallback} */ callback, /** @type {IntersectionObserverInit} */ init) {
+              super(callback, init);
+              if (init?.root) { const record = { live: true }; w.rootedObservers.push(record); const disconnect = this.disconnect.bind(this); this.disconnect = () => { record.live = false; disconnect(); }; }
+            }
+          };
+        });
         await page.addScriptTag({ content: script });
         await page.addScriptTag({ content: nestedFixture });
         await page.evaluate(() => document.fonts.ready);
@@ -250,9 +261,11 @@ for (const { name, engine, executablePath } of browsers) {
           armed = false;
           const final = [...document.querySelectorAll('.r')].map(el => lines(el));
           const flashes = painted.flatMap((blocks, f) => blocks.filter(b => b.lines !== final[b.i]).map(b => ({ frame: f, block: b.i })));
-          return { frames: painted.length, flashFrames: new Set(flashes.map(x => x.frame)).size, flashBlocks: [...new Set(flashes.map(x => x.block))], composed: [...document.querySelectorAll('.r')].filter(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome).length };
+          return { frames: painted.length, flashFrames: new Set(flashes.map(x => x.frame)).size, flashBlocks: [...new Set(flashes.map(x => x.block))], composed: [...document.querySelectorAll('.r')].filter(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome).length,
+            rootedObservers: w.rootedObservers.length, liveRootedObservers: w.rootedObservers.filter((/** @type {any} */ o) => o.live).length };
         }, { kind, delay });
         check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller, scrolled in ${delay} ms after mounting: no block paints native lines and is rewrapped`, result.flashFrames === 0 && result.frames > 0 && result.composed === 12, result);
+        check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller: the scroller's observer is released once nothing waits on it`, result.rootedObservers > 0 && result.liveRootedObservers === 0, result);
         await page.close();
       }
     }
