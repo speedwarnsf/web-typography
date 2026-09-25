@@ -154,7 +154,7 @@ function signature(el: HTMLElement, options: Options, layout = layoutKey(el)): s
 
 /** A composition still renders as composed: one line per generated line, no
  * native wraps added by a font, spacing or size change since it was verified. */
-export function layoutIntact(el: HTMLElement): boolean {
+function layoutIntact(el: HTMLElement): boolean {
   const outcome = el.dataset.tsOutcome;
   if (outcome !== 'composed:rich' && outcome !== 'composed') return true;
   const lines = measureLayout(el).lines.length;
