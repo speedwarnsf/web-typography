@@ -61,7 +61,13 @@ for (const { name, engine, executablePath } of browsers) {
     await tab.addScriptTag({ content: subject });
     const targets = await tab.evaluate(() => {
       const api = window.Typeset;
-      for (const el of document.querySelectorAll('section p, h2, blockquote p, figcaption, #unique p')) api.typeset(el);
+      const composed = document.querySelectorAll('section p, h2, blockquote p, figcaption, #unique p');
+      for (const el of composed) api.typeset(el);
+      // Text edited after composition: every composed element then carries a
+      // stale-output error, so targets are checked on composed elements as well
+      // as unprocessed ones. (4.2.0's own output carried hidden-break errors
+      // everywhere; 4.3's has none to rely on.)
+      for (const el of composed) el.append(' ');
       const issues = api.audit(), json = api.auditJSON();
       return {
         count: issues.length, sameOrder: json.issues.length === issues.length,
