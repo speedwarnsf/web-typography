@@ -864,7 +864,29 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(flush, { timeout: 200 });
     else timer = setTimeout(() => flush(), 16);
   };
+  /** Class, style and visibility attributes restyle a subtree. Owned text in it
+   * gets a layout-key recheck instead of a recomposition: most changes (a menu
+   * class, a transform, a scroll-linked variable) leave every line unchanged. */
+  const attributesChanged = (target: HTMLElement) => {
+    const affected = ownedWithin(target);
+    // A width this change sets (a sidebar drag, a container animation):
+    // guard the frame about to paint, and recompose once it settles.
+    const resized = fontsReady && affected.length ? widthChanged(affected) : [];
+    if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
+    for (const el of affected) if (!resizing.has(el)) enqueue(el, KEY);
+    // A tab, dialog or card this change just showed: text that could not be
+    // composed while hidden, or was hidden at another width, composes before
+    // the reveal paints. A retained composition needs nothing.
+    if (fontsReady && hidden.size && !printing(doc)) {
+      const shown = affected.filter(el => hidden.has(el) && rendered(el) && onScreen(el));
+      if (shown.length) composeNow(shown);
+    }
+    // An attribute on an author element inside owned text is new markup.
+    for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
+    discover(target);
+  };
   const observer = new MutationObserver(records => {
+    const restyled = new Set<HTMLElement>();
     for (const record of records) {
       const target = isElement(record.target) ? record.target : record.target.parentElement;
       if (!target) continue;
@@ -872,28 +894,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       if (record.type === 'childList' && !translationActive(doc) && [...record.addedNodes].some(node => node.nodeName === 'FONT')) {
         for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) if (owned.has(el)) { markTranslated(doc); break; }
       }
-      if (record.type === 'attributes') {
-        // Class and style changes restyle a subtree. Recheck what owned text
-        // computes to instead of recomposing it: most changes (a menu class,
-        // a transform, a scroll-linked variable) leave every line unchanged.
-        const affected = ownedWithin(target);
-        // A width this change sets (a sidebar drag, a container animation):
-        // guard the frame about to paint, and recompose once it settles.
-        const resized = fontsReady && affected.length ? widthChanged(affected) : [];
-        if (resized.length) { guard(resized); for (const el of resized) resizeStarted(el); }
-        for (const el of affected) if (!resizing.has(el)) enqueue(el, KEY);
-        // A tab, dialog or card this change just showed: text that could not be
-        // composed while hidden, or was hidden at another width, composes
-        // before the reveal paints. A retained composition needs nothing.
-        if (fontsReady && hidden.size && !printing(doc)) {
-          const shown = affected.filter(el => hidden.has(el) && rendered(el) && onScreen(el));
-          if (shown.length) composeNow(shown);
-        }
-        // An attribute on an author element inside owned text is new markup.
-        for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
-        discover(target);
-        continue;
-      }
+      if (record.type === 'attributes') { restyled.add(target); continue; }
       for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) {
         if (owned.has(el)) enqueue(el, CONTENT);
       }
@@ -909,6 +910,8 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
         }
       }
     }
+    // Each restyled node once per delivery, however many records it produced.
+    for (const target of restyled) attributesChanged(target);
     schedule();
   });
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
