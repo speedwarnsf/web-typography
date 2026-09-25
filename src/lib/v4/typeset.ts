@@ -1,6 +1,6 @@
 'use client';
 
-import { boundPair, boundaryBefore, keptPhrases, proseBoundary } from './phrase-boundaries';
+import { boundPair, boundaryBefore, keptPhrases, proseBoundary, stripEnd } from './phrase-boundaries';
 
 /**
  * typeset.ts — Typographic refinement utility
@@ -891,7 +891,7 @@ export function createParagraphProblem(
     const lexical = isLexical(t);
     lexicalPrefix[i + 1] = lexicalPrefix[i] + (lexical ? t.text.split(/\s+/u).filter(Boolean).length : 0);
     lastLexicalAt[i] = lexical ? i : i ? lastLexicalAt[i - 1] : -1;
-    linkingEnd[i] = LINKING_END_WORDS.has(t.text.toLowerCase().replace(/[.,;:!?’'"”]+$/, ""));
+    linkingEnd[i] = LINKING_END_WORDS.has(stripEnd(t.text.toLowerCase(), ".,;:!?’'\"”"));
     // A sentence end, including an abbreviation that ends one ("…the U.S. The").
     boundary[i] = boundaryBefore(t.text, contentTokens[i + 1]?.text);
     lastBoundaryAt[i] = boundary[i] ? i : i ? lastBoundaryAt[i - 1] : -1;

@@ -7,7 +7,15 @@ const modifiers = new Set(['new', 'old', 'first', 'last', 'next', 'previous', 's
 const nameHeads = new Set(['street', 'avenue', 'boulevard', 'road', 'lane', 'drive', 'court', 'square', 'parkway', 'terrace',
   'cinema', 'cinemas', 'theater', 'theaters', 'theatre', 'theatres', 'gallery', 'galleries', 'museum', 'library', 'university', 'college', 'hospital', 'hotel']);
 const capitalized = (text: string) => /^[('"\u2018\u201c]*\p{Lu}[\p{L}'\u2019-]*[.,;:!?!)"'\u201d\u2019]*$/u.test(text);
-const word = (text: string) => text.toLowerCase().replace(/^[("'“‘]+|[.,;:!?!)"'”’]+$/gu, '');
+/** `text` without the run of `chars` it ends with, as /[…]+$/u would
+ * remove it, read backwards: that unanchored pattern retries from every
+ * position of a long punctuation run, which costs the run's length squared. */
+export const stripEnd = (text: string, chars: string): string => {
+  let end = text.length;
+  while (end > 0 && chars.includes(text[end - 1])) end--;
+  return end === text.length ? text : text.slice(0, end);
+};
+const word = (text: string) => stripEnd(text.toLowerCase().replace(/^[("'“‘]+/u, ''), '.,;:!?)"\'”’');
 const ends = (text: string) => /[.,;:!?)]["'”’]*$/u.test(text);
 // Created on first use: a module-level Intl.Segmenter throws at import
 // where the API is missing, taking the host application down with it.
@@ -48,8 +56,8 @@ const units = new Set(['%', '‰', '°', '°C', '°F', 'K', 'm', 'km', 'cm', 'mm
   'Pa', 'kPa', 'mmHg', 'dB', 'lb', 'lbs', 'oz', 'ft', 'yd', 'mi', 'mph', 'km/h', 'kph', 'gal', 'IU', 'mol', 'mmol', 'bpm', 'KB', 'MB', 'GB',
   'TB', 'px', 'pt', 'a.m', 'p.m', 'am', 'pm', 'AM', 'PM', 'A.M', 'P.M', 'million', 'billion', 'trillion', 'percent']);
 const leading = (text: string) => text.replace(/^[("'\u201C\u2018[{]+/u, '');
-const outer = (text: string) => leading(text).replace(/["'\u201D\u2019)\]}]+$/u, '');
-const trailing = (text: string) => text.replace(/[.,;:!?"'\u201D\u2019)\]}\u2013\u2014]+$/u, '');
+const outer = (text: string) => stripEnd(leading(text), '"\'\u201D\u2019)]}');
+const trailing = (text: string) => stripEnd(text, '.,;:!?"\'\u201D\u2019)]}\u2013\u2014');
 
 /** "Dr.", "Fig.", "a.m.", "U.S." and initials such as "J." end no sentence.
  * Capital "I." and "A." are left as sentence ends ("so did I."). */
@@ -91,7 +99,7 @@ export function boundaryBefore(text: string, next: string | undefined): boolean 
   if (proseBoundary(text)) return true;
   const stem = outer(text).slice(0, -1);
   if (next === undefined || !isAbbreviation(text) || honorifics.has(stem)) return false;
-  const opener = outer(next).replace(/[.,;:!?]+$/u, '');
+  const opener = stripEnd(outer(next), '.,;:!?');
   if (!/^\p{Lu}/u.test(opener)) return false;
   if (stem === 'etc') return true;
   if (/^[ap]\.m$/iu.test(stem)) return !timeContext.has(opener.toLowerCase());

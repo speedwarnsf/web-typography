@@ -61,6 +61,26 @@ for(const config of browsers){
       check('stranded opener still found',internals.strandedOpener('the word was abandoned. Books'));
       check('a sentence-final word is not a weak ending',!internals.isWeakEnding('through.')&&!internals.isWeakEnding('for?')&&internals.isWeakEnding('through')&&internals.isWeakEnding('the,'));
       const p=document.createElement('p');document.body.append(p);
+      // Trailing punctuation is stripped in linear time. Unanchored /[…]+$/
+      // patterns retried from every position of a run: 11,000 closing
+      // brackets, quotes or periods in a paragraph under the size budget
+      // took 150-490 ms in typeset() (4.2.0: under 30 ms), per recomposition.
+      for(const char of [')','.','”',']']){
+        const run='x'+char.repeat(11000)+'x',began=performance.now();
+        internals.isAbbreviation(run);internals.proseBoundary(run);internals.boundaryBefore(run,'The');internals.boundaryBefore('U.S.',run);internals.boundPair(run,run,run);internals.strandedOpener('word '+run);
+        check('phrase checks on an 11,000-character punctuation run are linear '+JSON.stringify(char),performance.now()-began<50,Math.round(performance.now()-began));
+      }
+      {
+        const prose='Clinics across the county now offer free testing on weekends, and results arrive by text message. ';
+        const timed=text=>{const times=[];for(let i=0;i<3;i++){api.restore(p);p.textContent=text;const began=performance.now();api.typeset(p);times.push(performance.now()-began);}api.restore(p);return times.sort((a,b)=>a-b)[1];};
+        p.style.cssText='font:18px/1.5 Georgia;width:600px';
+        const plain=timed(prose.repeat(120).slice(0,11700));
+        for(const char of [')','.']){
+          const ms=timed(prose.repeat(3)+char.repeat(11000)+'x '+prose.repeat(2));
+          check('typeset() on a paragraph with an 11,000-character '+JSON.stringify(char)+' run costs about what plain text of its length does',ms<plain*2+60,{ms:Math.round(ms),plain:Math.round(plain)});
+        }
+        p.style.cssText='';
+      }
       const ink=[];
       for(const font of ['Georgia','Arial','Times New Roman','Courier New'])for(const size of [16,32,48])for(const char of ['"','\u201c','\u2018','T','V','A','O','H']){
         p.style.fontFamily=font;p.style.fontSize=size+'px';p.style.width='900px';p.textContent=char+'he gallery';

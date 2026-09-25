@@ -65,6 +65,16 @@
       "reason": "test:release runs the committed 4.2.0 dist, with the quote misfires and client-only TypesetText education (C15), and no development warnings for TypesetRichText."
     },
     {
+      "script": "verify-promise",
+      "label": "^typeset\\(\\) on a paragraph with an 11,000-character \"[.)]\" run costs about what plain text of its length does$",
+      "browser": "webkit",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, whose unanchored trailing-punctuation patterns take 0.2 s (closing parentheses) to 12 s (periods) on such a paragraph in WebKit."
+    },
+    {
       "script": "verify-react",
       "label": ".*",
       "modes": [
