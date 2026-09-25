@@ -7,7 +7,10 @@
 // rendered lines equal to generated breaks + 1, and an ancestor scale, which
 // moves no line, keeps the composition. Removing unrelated nodes must not scan
 // every claimed element. The React adapters (16 TypesetText blocks) must not
-// recheck anything during a translate and fade storm on their container.
+// recheck anything during a translate and fade storm on their container, and
+// must not recompose in every frame while the container's font size changes
+// continuously (a text-size slider, a font-size transition; Chromium at 4x
+// CPU): native lines meanwhile, one composition once the size holds.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -36,9 +39,10 @@ flushSync(() => createRoot(document.getElementById('app')).render(${JSON.stringi
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
-const reactPage = `<!doctype html><html lang="en"><head><style>body{margin:16px;font:17px/1.5 Georgia,serif}#wrap{width:560px}</style>
+const reactPage = `<!doctype html><html lang="en"><head><style>body{margin:16px;font:17px/1.5 Georgia,serif}#wrap{width:560px}#wrap.big{font-size:21px}#wrap.ease{transition:font-size 1.2s linear}</style>
 <script>
 window.styleReads = 0; const read = window.getComputedStyle; window.getComputedStyle = function () { window.styleReads++; return read.apply(this, arguments); };
+window.longTasks = []; try { new PerformanceObserver(list => { for (const e of list.getEntries()) window.longTasks.push(Math.round(e.duration)); }).observe({ type: 'longtask' }); } catch {}
 </script></head><body><div id="wrap"><div id="app"></div></div><script src="/react.js"></script></body></html>`;
 
 /** @type {{ checks: { browser: string, label: string, pass: boolean, detail?: unknown }[], errors: { browser: string, error: string }[] }} */
@@ -206,6 +210,7 @@ for (const { name, engine, executablePath } of browsers) {
         const tops = new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top)));
         return el.dataset.tsOutcome === 'composed:rich' && !el.hasAttribute('data-ts-stale') && tops.size === el.querySelectorAll('br[data-ts-break]').length + 1;
       }).length;
+      w.composed = () => w.hosts().filter((/** @type {HTMLElement} */ el) => el.dataset.tsOutcome === 'composed:rich').length;
     });
     const storm = await react.evaluate(async () => {
       const w = /** @type {any} */ (window);
@@ -217,6 +222,29 @@ for (const { name, engine, executablePath } of browsers) {
       return { styleReads: w.styleReads, compositions: w.compositions, intact: w.intact() };
     });
     check('React: a translate and fade storm on the container reads no computed style and composes nothing', storm.styleReads < 50 && storm.compositions === 0 && storm.intact === 16, storm);
+    if (name === 'chromium') {
+      const cdp = await reactContext.newCDPSession(react);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      for (const kind of ['slider', 'transition']) {
+        const result = await react.evaluate(async kind => {
+          const w = /** @type {any} */ (window);
+          const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+          w.compositions = 0; w.longTasks.length = 0;
+          if (kind === 'slider') await w.frames(60, (/** @type {number} */ i) => { wrap.style.fontSize = (17 + i * 2 / 60).toFixed(2) + 'px'; });
+          else { wrap.classList.add('ease'); wrap.classList.add('big'); }
+          await new Promise(r => setTimeout(r, 2500));
+          const out = { compositions: w.compositions, longTasks: [...w.longTasks], intact: w.intact(), composed: w.composed(), stale: document.querySelectorAll('#app [data-ts-stale]').length };
+          wrap.classList.remove('ease', 'big'); wrap.style.fontSize = '';
+          await new Promise(r => setTimeout(r, 2500));
+          return out;
+        }, kind);
+        // Long tasks: the change's first composition and the final one (4.3
+        // before this check: 30 or more for the slider, 4 for the transition).
+        check(`React at 4x CPU: a ${kind === 'slider' ? 'text-size slider (60 frames)' : 'font-size transition'} recomposes each block a few times, not every frame, and ends composed`,
+          result.compositions <= 64 && result.longTasks.length <= (kind === 'slider' ? 6 : 2) && result.composed >= 14 && result.intact === result.composed && result.stale === 0, result);
+      }
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    }
     await reactContext.close();
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }

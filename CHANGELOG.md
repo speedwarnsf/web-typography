@@ -471,6 +471,16 @@ table.
   dropped about 8 frames per slide at 4x CPU in Chrome, and the first 4.3
   candidate still composed in 41 of a 900 ms slide's short idle periods
   (Firefox 17). Engines without idle callbacks (WebKit) keep a 50 ms timer.
+- React hosts under continuous change: a translation or fade written every
+  frame on their container is no longer checked at all, as with `mount()`
+  (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three
+  engines). A host whose text metrics change again within 100 ms of a check
+  composing it (a font-size or spacing transition, a text-size slider)
+  shows native lines until they hold for 100 ms and is composed once, where
+  the first 4.3 candidate recomposed every on-screen host in every frame: a
+  60-frame text-size slider over 16 blocks at 4x CPU went from 466
+  compositions and 30 or more long tasks to about 40 and 2, and a 1.2 s
+  font-size transition from 3 or 4 long tasks to 1.
 - Revealed hidden text: 10 compositions instead of 196 and 83 ms of blocking
   time at 4x instead of 1,075 ms. The first viewport of never-composed
   revealed text finishes later (428 ms at 4x against 249 ms), because

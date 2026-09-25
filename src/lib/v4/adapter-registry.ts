@@ -21,7 +21,9 @@
  * compare each host's computed layout key and do nothing when it is
  * unchanged. During a continuous resize a host whose
  * composed lines no longer fit shows native lines (stale) and recomposes once
- * the size has held for RESIZE_SETTLE_MS. Hidden hosts keep their composition
+ * the size has held for RESIZE_SETTLE_MS; so does a host whose metrics change
+ * again within RESIZE_SETTLE_MS of a check composing it (a font-size or
+ * spacing transition, a text-size slider). Hidden hosts keep their composition
  * and are checked when shown; nothing composes while the page prints; and
  * while a translator rewrites the page every host steps aside (see
  * lifecycle.ts). */
@@ -104,6 +106,10 @@ function createRegistry(doc: Document): Registry {
   const pending = new Map<AdapterEntry, Reason>();
   const near = new Set<AdapterEntry>();
   const resizing = new Set<AdapterEntry>();
+  // Hosts in `resizing` because their metrics changed continuously (process),
+  // and when a check last composed each host.
+  const continuous = new Set<AdapterEntry>();
+  const checked = new WeakMap<AdapterEntry, number>();
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
   const sizes = new WeakMap<Element, { w: number; h: number }>();
   const watchers = new Map<Element, Set<AdapterEntry>>();
@@ -201,10 +207,32 @@ function createRegistry(doc: Document): Registry {
   }
   /** Compose (or check) one pending host. */
   function process(entry: AdapterEntry, reason: Reason, fonts: string): void {
-    // A host being resized is checked once its size settles, not per frame.
-    // A hidden host keeps its composition; it is checked when shown.
-    if (reason === 'check' && (resizing.has(entry) || !rendered(entry.element) || !entry.changed(fonts))) { pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element); return; }
+    const drop = () => { pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element); };
+    if (reason === 'check') {
+      // A host being resized, or whose metrics keep changing, is checked once
+      // they settle, not per frame; a change meanwhile moves the settle on.
+      if (resizing.has(entry)) { if (continuous.has(entry)) settleLater(); drop(); return; }
+      // A hidden host keeps its composition; it is checked when shown.
+      if (!rendered(entry.element) || !entry.changed(fonts)) { drop(); return; }
+      // Changed again soon after a check composed it: a font-size or spacing
+      // transition, a text-size slider, an animation. Native lines until the
+      // metrics hold for RESIZE_SETTLE_MS, then one composition, instead of a
+      // composition in every frame (long tasks, dropped frames).
+      const last = checked.get(entry);
+      if (entry.widest() && last !== undefined && performance.now() - last < RESIZE_SETTLE_MS) {
+        writing(() => entry.stale());
+        resizing.add(entry); continuous.add(entry);
+        settleLater();
+        drop();
+        return;
+      }
+    }
     run(entry, reason, false);
+    if (reason === 'check') checked.set(entry, performance.now()); else checked.delete(entry);
+  }
+  function settleLater(): void {
+    clearTimeout(settle);
+    settle = later(settled, RESIZE_SETTLE_MS);
   }
   /** On-screen work, before this frame paints, top to bottom, then nearby
    * hosts within FRAME_BUDGET_MS. Only visible work beyond VISIBLE_BUDGET_MS
@@ -371,8 +399,8 @@ function createRegistry(doc: Document): Registry {
   }
   function settled(): void {
     settle = undefined;
-    for (const entry of resizing) if (entries.has(entry.element)) enqueue(entry, 'check');
-    resizing.clear();
+    for (const entry of resizing) if (entries.has(entry.element)) { checked.delete(entry); enqueue(entry, 'check'); }
+    resizing.clear(); continuous.clear();
   }
   const fontsChanged = () => check();
   // A transition or animation of text metrics ended on or around a host.
@@ -425,7 +453,7 @@ function createRegistry(doc: Document): Registry {
     mutations = observer = viewport = null;
     unsubscribe?.(); unsubscribe = undefined;
     clearTimeout(settle); settle = undefined;
-    pending.clear(); near.clear(); resizing.clear(); idleSince = 0;
+    pending.clear(); near.clear(); resizing.clear(); continuous.clear(); idleSince = 0;
   }
 
   return {
@@ -442,7 +470,7 @@ function createRegistry(doc: Document): Registry {
     remove(entry) {
       if (entries.get(entry.element) !== entry) return;
       entries.delete(entry.element);
-      pending.delete(entry); near.delete(entry); resizing.delete(entry);
+      pending.delete(entry); near.delete(entry); resizing.delete(entry); continuous.delete(entry);
       viewport?.unobserve(entry.element);
       unwatch(entry);
       releaseOwner(entry.element, identity);
