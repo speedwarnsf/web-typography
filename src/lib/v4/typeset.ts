@@ -1384,8 +1384,10 @@ export function paragraphContour(widths: readonly number[]): number {
 }
 
 /** Slack capped below the weak-end penalty: the contour re-rank may trade
- * fill economics for shape, but can never adopt a candidate carrying a
- * violation the cheapest one avoided. */
+ * fill economics for shape. It compares total costs, so it can still adopt a
+ * layout that ends on a weak word when the cheapest one pays about as much
+ * in other penalties (a 97% line and a cliff); verify-golden records such a
+ * case among its trade-offs. */
 function rankingSlack(cheapestCost: number, lines: number): number {
   const isLong = lines >= 10;
   return Math.min(
