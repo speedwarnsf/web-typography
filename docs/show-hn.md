@@ -63,7 +63,9 @@ leave — the first two hours of answering comments decide the thread.
   JavaScript.
 - **"Accessibility?"** The suite reads the accessibility tree Chromium and
   WebKit actually build, on every run, and Firefox's nightly, and requires
-  the words and every link and heading name to match the source. A
+  the paragraph words in Chromium and Firefox, and every link and heading
+  name in all three, to match the source (WebKit's inspector exposes no
+  paragraph text, so its words are not checked). A
   generated break that replaces a space is exposed, so a screen reader meets
   a line boundary there, as at any line end; 4.2.0 hid them and joined the
   words. Spoken VoiceOver and NVDA output has not been checked by a person
