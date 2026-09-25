@@ -770,6 +770,25 @@ function visibleContents(range: Range, each?: (source: Element, clone: Element) 
   return fragment;
 }
 
+/** The plain text of `source`, the characters `range` selects inside one
+ * composed root, as the browser's own copy gives it. Every composed block
+ * collapses white space (white-space is normal, or nowrap inline), so the
+ * source's own line wrapping, indentation and tabs are not text: runs of
+ * white space are one space, none at the block's start or end, and a
+ * no-break space is copied as a space. */
+function renderedText(source: string, range: Range, root: HTMLElement): string {
+  const blank = (start: boolean) => {
+    const outside = root.ownerDocument.createRange();
+    outside.selectNodeContents(root);
+    if (start) outside.setEnd(range.startContainer, range.startOffset); else outside.setStart(range.endContainer, range.endOffset);
+    return !/[^ \t\n\r\f]/.test(outside.toString());
+  };
+  let text = source.replace(/[ \t\n\r\f]+/g, ' ');
+  if (text.startsWith(' ') && blank(true)) text = text.slice(1);
+  if (text.endsWith(' ') && blank(false)) text = text.slice(0, -1);
+  return text.replace(/\u00a0/g, ' ');
+}
+
 const copyRoots = new WeakMap<Document, WeakMap<HTMLElement, number>>();
 /** Source copying is independent of visual line breaks. Respect site handlers. */
 export function preserveRichCopy(element: HTMLElement): () => void {
@@ -821,8 +840,10 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         return container.innerHTML;
       }).join('');
       let text: string;
-      // Inside one composed root: the source characters, whatever the lines.
-      if (ranges.length === 1 && containingRoot(ranges[0]) && sourceText !== null) text = sourceText;
+      // Inside one composed root: the source characters, whatever the lines,
+      // with their white space as it renders.
+      const single = ranges.length === 1 ? containingRoot(ranges[0]) : null;
+      if (single && sourceText !== null) text = renderedText(sourceText, ranges[0], single);
       else {
         // Let the browser serialize real paragraphs, lists and authored breaks.
         // Hide only generated markers for this synchronous read; source nodes,
@@ -830,7 +851,9 @@ export function preserveRichCopy(element: HTMLElement): () => void {
         const restore = Array.from(doc.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'))
           .filter(marker => ranges.some(range => range.intersectsNode(marker)))
           .map(marker => override(marker, { display: 'none' }));
-        try { text = selection.toString(); }
+        // Native copy gives a no-break space as a space; toString() keeps it
+        // in Chromium and WebKit.
+        try { text = selection.toString().replace(/\u00a0/g, ' '); }
         finally { restore.forEach(undo => undo()); }
       }
       event.clipboardData.setData('text/plain', text);

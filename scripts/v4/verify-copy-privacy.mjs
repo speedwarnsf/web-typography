@@ -16,6 +16,8 @@
 // attributes (data-ts-stale, data-typeset-react), nor the engine's
 // text-wrap-style override: a host keeps the author's inline style, including
 // a text-wrap-style the engine overrode.
+// A copy inside one paragraph whose source is hard-wrapped and indented
+// pastes the text as it renders, not the source's white space.
 // (The fixture has no visible text field: Chromium's native plain text
 // includes a text field's current value, which Selection.toString(), and so
 // the engine's cross-block text, never has. That predates and is outside C11.)
@@ -27,6 +29,16 @@ const watchdog = setTimeout(() => { console.error('verify-copy-privacy: watchdog
 watchdog.unref();
 
 const bundle = await readFile(artifacts.bundle, 'utf8');
+// Hard-wrapped, indented source (Markdown output, templated HTML), with a
+// tab, a double space and no-break spaces: none of that white space renders,
+// and native copy gives single spaces. A copy inside the composed paragraph
+// pasted the source's own newlines and indentation, and kept U+00A0.
+const P4 = `
+        Clinics across the county now offer free testing on weekends.
+        No appointment is needed for walk-in visits, and results
+        arrive by text message within two days. The fox\tjumps  far away,
+        and doses of 50\u00a0mg start at 9\u00a0a.m. each morning.
+    `;
 const MARKS = ['INTERNALNOTE', 'CSRFTOKEN8F3A2C', 'VISHIDDEN', 'ATTRHIDDEN', 'TEMPLATECONTENT', 'SCRIPTJSON', 'STYLECONTENT', 'CVHIDDEN'];
 const page = (/** @type {boolean} */ composed) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 body{margin:16px;background:#fff;font:18px/1.5 Georgia}main{width:320px}p{margin:0 0 14px}.admin-note{display:none}.cv{content-visibility:hidden}#sink{min-height:40px;border:1px solid #999}
@@ -39,6 +51,7 @@ body{margin:16px;background:#fff;font:18px/1.5 Georgia}main{width:320px}p{margin
 <div class="cv">CVHIDDEN</div>
 <p id="p2" style="color: rgb(17, 17, 17);">Read the <em>careful</em> notes in <a href="/guide">the neighborhood gallery guide</a> before you plan a visit, because the opening hours change with the seasons and the weather.</p>
 <p id="p3" style="text-wrap-style: pretty;" data-typeset-react="">Our volunteers built a wellness data dashboard for every clinic in the county and published the results openly for anyone to review.</p>
+<p id="p4">${P4}</p>
 </main><div id="sink" contenteditable="true"></div>
 ${composed ? '<script src="/typeset.js"></script>' : ''}</body></html>`;
 
@@ -53,6 +66,8 @@ const SELECTIONS = {
   'p1 to p2': [['#p1', 6], ['#p2', 3]],
   'select all': [['main', 0], ['main', -1]],
   'within p1': [['#p1', 6], ['#p1', -10]],
+  'within p4, across the source\'s line wraps': [['#p4', P4.indexOf('No appointment')], ['#p4', P4.indexOf('two days') + 8]],
+  'all of p4': [['#p4', 0], ['#p4', -1]],
 };
 /** @param {[[string, number], [string, number]]} points */
 function select(points) {
@@ -96,7 +111,7 @@ for (const config of browsers) {
       if (composed) {
         authored = await tab.evaluate(() => ({ p2: /** @type {HTMLElement} */ (document.getElementById('p2')).style.cssText, p3: /** @type {HTMLElement} */ (document.getElementById('p3')).style.cssText }));
         await tab.evaluate(async () => { const c = window.Typeset.mount(document, 'main p'); await c.ready; });
-        check('the paragraphs compose with generated breaks', await tab.evaluate(() => ['p1', 'p2', 'p3'].every(id => document.getElementById(id)?.dataset.tsOutcome === 'composed:rich') && document.querySelectorAll('br[data-ts-break]').length > 3));
+        check('the paragraphs compose with generated breaks', await tab.evaluate(() => ['p1', 'p2', 'p3', 'p4'].every(id => document.getElementById(id)?.dataset.tsOutcome === 'composed:rich') && document.querySelectorAll('br[data-ts-break]').length > 3));
         // p1 as the engine marks a block whose width is changing.
         await tab.evaluate(() => document.getElementById('p1')?.setAttribute('data-ts-stale', ''));
       }

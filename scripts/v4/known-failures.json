@@ -30,12 +30,12 @@
     },
     {
       "script": "verify-copy-privacy",
-      "label": ": nothing hidden reaches the clipboard that native copy leaves out$|: no engine markers, data-ts or adapter attributes, or wrap override in the HTML$|^select all: the author's inline styles survive, including a text-wrap-style the engine overrode$",
+      "label": ": nothing hidden reaches the clipboard that native copy leaves out$|: no engine markers, data-ts or adapter attributes, or wrap override in the HTML$|^select all: the author's inline styles survive, including a text-wrap-style the engine overrode$|^(select all|within p4, across the source's line wraps|all of p4): plain text equals native copy of the uncomposed page$",
       "modes": [
         "release"
       ],
       "awaiting": "the 4.3.0 release cut",
-      "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11), and copies its text-wrap-style override and data-ts-stale with each host."
+      "reason": "test:release runs the committed 4.2.0 dist, whose copy handler serializes hidden content (C11), copies its text-wrap-style override and data-ts-stale with each host, pastes a paragraph's source white space (hard wraps, indentation, tabs) and keeps no-break spaces."
     },
     {
       "script": "verify-framework-text",

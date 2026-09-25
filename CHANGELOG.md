@@ -261,7 +261,12 @@ Outside the changes below, 0 of these differ in any engine.
   (the author's own inline value is put back, so a pasted paragraph no
   longer turns off `text-wrap: pretty` or `balance`), `data-ts-stale`, and
   the React adapters' `data-typeset-react` attributes, which made the
-  loaders skip pasted markup.
+  loaders skip pasted markup. Plain text from a copy inside one composed
+  paragraph is its text as it renders, as the browser's copy gives it:
+  4.2 pasted the source's own white space, so hard-wrapped HTML (Markdown
+  output, templated pages) pasted a newline and indentation mid-sentence,
+  with tabs and double spaces kept; and in Chromium and WebKit every copy
+  kept no-break spaces, which the browser's copy turns into spaces.
 - **Strict Content Security Policy and Trusted Types (C5).** Measurement and
   line-wrap styles are restored through the CSSOM, never by writing the
   style attribute. Under `style-src` without `'unsafe-inline'`, 4.2 left
