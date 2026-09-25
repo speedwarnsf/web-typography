@@ -9,13 +9,17 @@
 // altered no words, so screen readers repeated status messages.
 //
 // Each engine loads a page with prose inside role=status, aria-live=polite
-// (with an aria-live=off island, which is not live), role=alert and <output>,
-// plus a control paragraph outside, under mount(), the npm go.js, the website
-// loader and both React adapters. A MutationObserver installed before any
-// loader counts records inside the regions through composition, a resize, a
-// web font load and an idle flush: there must be none, while the control
-// paragraph composes. A region that turns live later is released; one that
-// stops being live is composed.
+// (with an aria-live=off island, which is not live), role=alert, <output>, an
+// empty aria-live under role=status (as if absent: still live) and an unknown
+// aria-live value (live in Chromium), paragraphs that contain an inline
+// aria-live or role=status span (a result count, a "saved" status), plus a
+// control paragraph outside, under mount(), the npm go.js, the website loader
+// and both React adapters. A MutationObserver installed before any loader
+// counts records inside the regions through composition, a resize, a web
+// font load, an idle flush and an app update: there must be none but the
+// app's own, while the control paragraph composes. A region that turns live
+// later is released; one that stops being live is composed; a composed
+// paragraph moved into a live toast is released with the move itself.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -27,6 +31,8 @@ const watchdog = setTimeout(() => { console.error('verify-live-regions: watchdog
 watchdog.unref();
 
 const TEXT = 'Your appointment is confirmed for Tuesday morning at the county clinic, and a reminder with directions will arrive by text message the day before your visit.';
+const UPDATE = 'Your appointment is moved to Thursday morning at the county clinic, and a reminder with directions will arrive by text message the day before your visit.';
+const COUNT = 'for clinics near you that offer walk-in appointments on weekday evenings and weekends, with interpreters for every visit.';
 const scripts = {
   '/typeset.js': await readFile(artifacts.bundle, 'utf8'),
   '/go.js': await readFile(artifacts.go, 'utf8'),
@@ -34,12 +40,17 @@ const scripts = {
   '/react.js': (await build({ stdin: { contents: `
 import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import { TypesetText, TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
 const text = ${JSON.stringify(TEXT)};
-createRoot(document.getElementById('react')).render(h('main', null,
-  h('div', { role: 'status', 'data-region': '' }, h(TypesetText, { id: 'rt', lang: 'en', smartQuotes: 'en', text })),
+const root = createRoot(document.getElementById('react'));
+const tree = (value, count) => h('main', null,
+  h('div', { role: 'status', 'data-region': '' }, h(TypesetText, { id: 'rt', lang: 'en', smartQuotes: 'en', text: value })),
   h('div', { 'aria-live': 'polite', 'data-region': '' }, h(TypesetRichText, { id: 'rr', lang: 'en' }, h('span', null, 'Your appointment is ', h('strong', null, 'confirmed'), ' for Tuesday morning at the county clinic, and a reminder with directions will arrive by text message the day before your visit.'))),
-  h(TypesetRichText, { id: 'rc', lang: 'en' }, h('span', null, text))));
+  h(TypesetRichText, { id: 'ri', lang: 'en' }, 'Showing ', h('span', { 'aria-live': 'polite', 'data-region': '' }, count), ' ' + ${JSON.stringify(COUNT)}),
+  h(TypesetRichText, { id: 'rc', lang: 'en' }, h('span', null, text)));
+root.render(tree(text, '12 of 48 results'));
+window.update = (value, count) => flushSync(() => root.render(tree(value, count)));
 `, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' })).outputFiles[0].text,
   // Installed before any loader, so it sees every write.
   '/watch.js': `window.records = []; window.watcher = new MutationObserver(list => { for (const r of list) { const el = r.target.nodeType === 1 ? r.target : r.target.parentElement; if (el && el.closest('[data-region]')) window.records.push(r.type + (r.attributeName ? ':' + r.attributeName : '')); } }); window.watcher.observe(document, { subtree: true, childList: true, characterData: true, attributes: true });`,
@@ -55,7 +66,12 @@ ${loader === 'go' ? '<script src="/reset.js" defer></script><script src="/go.js"
 <div role="alert" data-region><p id="s3" data-typeset>${TEXT}</p></div>
 <output data-region><p id="s4" data-typeset>${TEXT}</p></output>
 <div aria-live="polite"><div aria-live="off"><p id="off" data-typeset>${TEXT}</p></div></div>
+<div role="status" data-region><div aria-live=""><p id="s5" data-typeset>${TEXT}</p></div></div>
+<div aria-live="false" data-region><p id="s6" data-typeset>${TEXT}</p></div>
+<p id="i1" data-typeset>Showing <span aria-live="polite" data-region>12 of 48 results</span> ${COUNT}</p>
+<p id="i2" data-typeset>Your changes to the appointment form were <span role="status" data-region>saved</span> a moment ago, and a confirmation with directions will arrive by text message.</p>
 <p id="control" data-typeset>${TEXT}</p>
+<div id="toast" aria-live="polite"></div><p id="mover" data-typeset>${TEXT}</p>
 <div id="later"><p id="l1" data-typeset>${TEXT}</p></div>
 <div id="stops" aria-live="assertive"><p id="l2" data-typeset>${TEXT}</p></div>
 </main><div id="react"></div>${loader === 'react' ? '<script src="/typeset.js"></script><script src="/reset.js"></script><script src="/react.js"></script>' : ''}</body></html>`;
@@ -101,7 +117,8 @@ await Promise.all(browsers.map(async config => {
           out.control = outcome('control');
           out.off = outcome('off');
           out.audit = T.auditJSON('main p').outcomes;
-          out.react = { rt: outcome('rt'), rr: outcome('rr'), rc: outcome('rc') };
+          out.react = { rt: outcome('rt'), rr: outcome('rr'), ri: outcome('ri'), rc: outcome('rc') };
+          out.rtText = document.getElementById('rt')?.textContent ?? null;
           return out;
         });
         const where = loader === 'react' ? 'React adapters' : loader === 'go' ? 'the npm go.js' : loader === 'website' ? 'the website loader' : 'mount()';
@@ -109,13 +126,35 @@ await Promise.all(browsers.map(async config => {
         if (loader === 'react') {
           const textRecords = records.filter(r => !r.startsWith('attributes'));
           check(`${where}: no text or node mutation inside live regions across mount, resize, font load and idle`, textRecords.length === 0, textRecords.slice(0, 5));
-          check(`${where}: TypesetRichText reports native:live-region and still composes outside`, /** @type {any} */ (facts.react).rr === 'native:live-region' && /** @type {any} */ (facts.react).rc === 'composed:rich', facts.react);
+          check(`${where}: TypesetRichText reports native:live-region inside a region and around one, and still composes outside`, /** @type {any} */ (facts.react).rr === 'native:live-region' && /** @type {any} */ (facts.react).ri === 'native:live-region' && /** @type {any} */ (facts.react).rc === 'composed:rich', facts.react);
           check(`${where}: TypesetText in a live region is left alone`, !/** @type {any} */ (facts.react).rt && !facts.breaksInRegions, facts.react);
           const rt = await page.evaluate(() => /** @type {any} */ (window).Typeset.typeset(document.getElementById('rt')).outcome);
           check(`${where}: typeset() reports native:live-region`, rt === 'native:live-region', rt);
+          // An app update: new TypesetText text, a new count in the inline region.
+          const updated = await page.evaluate(async ({ value }) => {
+            const w = /** @type {any} */ (window);
+            w.watcher.takeRecords(); w.records = [];
+            w.update(value, '13 of 48 results');
+            await new Promise(resolve => setTimeout(() => requestAnimationFrame(() => resolve(undefined)), 450));
+            w.records.push(...w.watcher.takeRecords().map((/** @type {MutationRecord} */ r) => r.type));
+            const records = /** @type {string[]} */ (w.records).filter(r => !r.startsWith('attributes'));
+            return { records, rt: document.getElementById('rt')?.textContent, ri: /** @type {HTMLElement} */ (document.getElementById('ri')).dataset.tsOutcome, riMarkers: document.querySelectorAll('#ri [data-ts-break]').length };
+          }, { value: UPDATE });
+          check(`${where}: an app update writes the regions once each, and nothing else`, updated.records.length <= 2 && updated.rt === UPDATE && updated.ri === 'native:live-region' && updated.riMarkers === 0, updated);
         } else {
           check(`${where}: no mutation inside live regions across mount, resize, font load and idle`, records.length === 0 && first === 0, records.slice(0, 5));
-          check(`${where}: live-region paragraphs report native:live-region and the control composes`, /** @type {any} */ (facts.audit)['native:live-region'] === 5 && facts.control === 'composed:rich' && facts.off === 'composed:rich', { audit: facts.audit, control: facts.control, off: facts.off });
+          check(`${where}: live-region paragraphs report native:live-region and the control composes`, /** @type {any} */ (facts.audit)['native:live-region'] === 9 && facts.control === 'composed:rich' && facts.off === 'composed:rich', { audit: facts.audit, control: facts.control, off: facts.off });
+          // An app update inside the inline regions: only the app's records.
+          const app = await page.evaluate(async () => {
+            const w = /** @type {any} */ (window);
+            w.watcher.takeRecords(); w.records = [];
+            /** @type {HTMLElement} */ (document.querySelector('#i1 span')).textContent = '13 of 48 results';
+            /** @type {HTMLElement} */ (document.querySelector('#i2 span')).textContent = 'saved again';
+            await new Promise(resolve => setTimeout(() => requestAnimationFrame(() => resolve(undefined)), 450));
+            w.records.push(...w.watcher.takeRecords().map((/** @type {MutationRecord} */ r) => r.type));
+            return { records: w.records, i1: /** @type {HTMLElement} */ (document.getElementById('i1')).querySelectorAll('[data-ts-break]').length };
+          });
+          check(`${where}: an app update of an inline region is its only mutation`, app.records.length === 2 && app.i1 === 0, app);
           if (loader === 'mount') {
             const turned = await page.evaluate(async () => {
               const wait = () => new Promise(resolve => setTimeout(resolve, 450));
@@ -127,6 +166,20 @@ await Promise.all(browsers.map(async config => {
               return { composedBefore, released: !l1.dataset.tsOutcome && !l1.querySelector('[data-ts-break]'), composed: l2.dataset.tsOutcome, direct: /** @type {any} */ (window).Typeset.typeset(l1).outcome };
             });
             check(`${where}: a region that turns live is released; one that stops is composed`, turned.composedBefore === 'composed:rich' && turned.released && turned.composed === 'composed:rich' && turned.direct === 'native:live-region', turned);
+            const moved = await page.evaluate(async () => {
+              const p = /** @type {HTMLElement} */ (document.getElementById('mover')), toast = /** @type {HTMLElement} */ (document.getElementById('toast'));
+              const before = { outcome: p.dataset.tsOutcome, breaks: p.querySelectorAll('[data-ts-break]').length };
+              toast.append(p);
+              // The engine's mutation callback runs in this checkpoint, before the next task and frame.
+              await Promise.resolve();
+              const released = !p.dataset.tsOutcome && !p.querySelector('[data-ts-break]');
+              const later = new MutationObserver(() => {});
+              later.observe(toast, { subtree: true, childList: true, characterData: true, attributes: true });
+              /** @type {HTMLElement} */ (document.querySelector('main')).style.width = '280px';
+              await new Promise(resolve => setTimeout(resolve, 450));
+              return { before, released, later: later.takeRecords().length };
+            });
+            check(`${where}: a composed paragraph moved into a live toast is released with the move, and not touched again`, moved.before.outcome === 'composed:rich' && moved.before.breaks > 0 && moved.released && moved.later === 0, moved);
           }
         }
       } catch (error) {

@@ -103,8 +103,14 @@ Outside the changes below, 0 of these differ in any engine.
   `native:live-region`. 4.2 composed it and rewrote it on every resize, font
   load and idle pass (51 mutation records on mount and 180 more across two
   resizes for one status paragraph), and Chrome announced those rewrites, so
-  screen readers repeated status messages. Golden diff: 5 of 8 paragraphs on
-  the live-region fixture, per loader and engine; 0 in the golden sets,
+  screen readers repeated status messages. A paragraph that contains a live
+  region (an inline result count or "saved" status) is declined the same
+  way; an empty `aria-live` counts as absent and any other value but `off`
+  as live, as Chromium treats them; composed text moved into a live region
+  (a toast) is released in the same mutation callback as the move. Golden
+  diff: 9 of 13 paragraphs on the live-region fixture, per loader and
+  engine (a paragraph that contains an `<output>` now reports
+  `native:live-region`, not `native:rich-element`); 0 in the golden sets,
   which have no live regions.
 - **Smart quote corrections (C15).** A single quote right after a curled
   opening double quote now opens too: `"'Quoted' inside,"` gives

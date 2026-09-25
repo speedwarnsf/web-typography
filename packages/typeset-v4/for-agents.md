@@ -19,8 +19,8 @@ Languages: en, fr, de, es; neutral Latin-script preferences; no language inferen
 Unsupported: automatic hyphenation; soft hyphens; mixed languages in one block;
 RTL and vertical text; editable text; inline widgets; unsupported box decoration
 and scale/rotation/perspective transforms. Justified text (native:justify) and
-live regions (native:live-region: aria-live, or role status/alert/log/marquee/timer,
-or <output>) are declined on purpose. Supported sliced inline-code boxes
+live regions (native:live-region: text in or containing aria-live, or role
+status/alert/log/marquee/timer, or <output>) are declined on purpose. Supported sliced inline-code boxes
 and pure 2D translation are measured in context. Inspect native reasons.
 
 For DOM text: import mount, restore and auditJSON from 'typeset.us'; mount

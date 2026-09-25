@@ -33,8 +33,8 @@ in the CHANGELOG with the number of test paragraphs it changed.
    - Justified paragraphs (`text-align: justify`, or a `text-align-last`
      that differs from `text-align`) keep the browser's layout, as
      `native:justify`. 4.2 set them ragged right.
-   - Text inside live regions (`aria-live`, `role="status"` and similar)
-     keeps the browser's layout, as `native:live-region`.
+   - Text inside or containing live regions (`aria-live`, `role="status"`
+     and similar) keeps the browser's layout, as `native:live-region`.
    - Print wraps natively. To print a composition, set
      `--ts-break-display: inline` in print CSS.
    - A block that is being resized shows native wrapping (`data-ts-stale`)

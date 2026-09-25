@@ -212,8 +212,9 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   declared languages keep the browser's layout.
 - **Editable text and live regions.** Editable content keeps the browser's
   layout, and so does text inside an `aria-live` region or a `status`,
-  `alert`, `log`, `marquee` or `timer` role (`native:live-region`), whose
-  every change a screen reader would announce.
+  `alert`, `log`, `marquee` or `timer` role, or text that contains one, such
+  as a paragraph with an inline result count (`native:live-region`): a
+  screen reader would announce its every change.
 
 ## Browsers
 
@@ -239,8 +240,8 @@ WebKit). A generated break that replaces a space is exposed to assistive
 technology, so a screen reader meets a line boundary there, as at any line
 end, and reads the words apart; a break after a hyphen stays hidden, so
 "public-health" is still one word. `auditJSON()` fails if a generated break
-hides a word space. Text in live regions is never composed, so status
-messages are not re-announced. Spoken VoiceOver and NVDA output has not
+hides a word space. Text in or around a live region is never composed, so
+status messages are not re-announced. Spoken VoiceOver and NVDA output has not
 been checked by a person yet (SUPPORT.md).
 
 ## Recommended CSS

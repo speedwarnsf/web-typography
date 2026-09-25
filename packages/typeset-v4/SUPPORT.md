@@ -121,9 +121,13 @@ layout rounding allowance remains; fallback is reported instead of presenting
 unprocessed native text as successful composition.
 
 Live regions stay native: from 4.3, text inside aria-live (unless the nearest
-region says off), role status, alert, log, marquee or timer, or <output> is
-never composed, measured or rewritten, because assistive technology announces
-every change there. Its outcome is `native:live-region`.
+region says off; an empty aria-live counts as absent, and any other value as
+live, as Chromium treats it), role status, alert, log, marquee or timer, or
+<output>, and text that contains such a region (a paragraph with an inline
+result count or "saved" status), is never composed, measured or rewritten,
+because assistive technology announces every change there. Its outcome is
+`native:live-region`. Composed text moved into a live region, or given one,
+is released in the same mutation callback as that change.
 
 Strict Content Security Policy: from 4.3 the engine needs no 'unsafe-inline'
 for styles and no 'unsafe-eval'. It writes and restores styles through the

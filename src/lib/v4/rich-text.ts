@@ -409,17 +409,30 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
 }
 
 const liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
-/** Whether this element is inside a live region: the nearest region says
- * aria-live polite or assertive, or has a status, alert, log, marquee or timer
- * role, or is <output>, and does not say aria-live off. Assistive technology
- * announces every change there, and composing rewrites the text on each
- * resize, font load and idle pass, so screen readers repeated status messages
- * whose words had not changed. */
+const regions = '[aria-live], ' + liveRoles;
+/** Whether this element is inside a live region. The nearest element with a
+ * non-empty aria-live decides: "off" is not live, and any other value is
+ * (Chromium announces an unknown value too). An empty aria-live counts as
+ * absent; without one, a status, alert, log, marquee or timer role, or
+ * <output>, is live. Assistive technology announces every change there, and
+ * composing rewrites the text on each resize, font load and idle pass, so
+ * screen readers repeated status messages whose words had not changed. */
 export function inLiveRegion(element: Element): boolean {
-  const region = element.closest('[aria-live], ' + liveRoles);
-  if (!region) return false;
-  const live = region.getAttribute('aria-live')?.trim().toLowerCase();
-  return live === 'polite' || live === 'assertive' || (live !== 'off' && region.matches(liveRoles));
+  for (let region = element.closest(regions); region; region = region.parentElement?.closest(regions) ?? null) {
+    const live = region.getAttribute('aria-live')?.trim().toLowerCase();
+    if (live) return live !== 'off';
+    if (region.matches(liveRoles)) return true;
+  }
+  return false;
+}
+
+/** Whether any of this element's text is in a live region: the element is
+ * inside one, or contains one (a result count, a cart total or a "saved"
+ * status inside a paragraph). Composing it would rewrite the region's text. */
+export function liveText(element: Element): boolean {
+  if (inLiveRegion(element)) return true;
+  for (const region of element.querySelectorAll(regions)) if (inLiveRegion(region)) return true;
+  return false;
 }
 
 /** Whether a generated break at `offset` stands in for a collapsed space. */

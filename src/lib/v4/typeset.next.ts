@@ -3,7 +3,7 @@ import type { FrozenLine } from './typeset';
 import { composeTitle } from './title-layout';
 import { contentWidth, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
-import { inLiveRegion, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
+import { inLiveRegion, liveText, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
 import { applySmartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
@@ -404,7 +404,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     element.dataset.tsOutcome = 'native:translated';
     return { outcome: 'native:translated', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
   }
-  if (inLiveRegion(element)) {
+  if (liveText(element)) {
     // Release any earlier composition and apply adapter text, then leave the
     // region alone: no measurement overrides, no markers, no attributes.
     if (states.has(element)) restore(element);
@@ -694,7 +694,7 @@ export function auditReport(selector = defaults): AuditReport {
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
     if (element.closest('[data-ts-generated], [data-ts-probe]')) continue;
     report.examined++;
-    const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? 'excluded' : inLiveRegion(element) ? 'native:live-region' : 'unprocessed');
+    const outcome = element.dataset.tsOutcome || (element.closest(excluded) ? 'excluded' : liveText(element) ? 'native:live-region' : 'unprocessed');
     report.outcomes[outcome] = (report.outcomes[outcome] || 0) + 1;
     for (const [feature, value] of [['quotes', element.dataset.tsQuotes], ['hanging', element.dataset.tsHanging], ['spacing', element.dataset.tsSpacing], ['tracking', element.dataset.tsTracking]] as const) {
       const status = value || 'off';
@@ -861,7 +861,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
   const within = (el: Node) => el === root || root.contains(el);
-  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !inLiveRegion(el);
+  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !liveText(el);
   const stopWaiting = (el: HTMLElement) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -902,7 +902,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (isElement(root) && (scope as Node).contains(root as Node)) scope = root;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
     if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !inLiveRegion(el));
+    return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
   };
   const viewport = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
     let near = false;
@@ -1075,6 +1075,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   const observer = new MutationObserver(records => {
     const restyled = new Set<HTMLElement>();
     const stale = new Set<HTMLElement>(), written = new Set<Node>();
+    // Owned text that may now be in a live region: moved into one (a toast),
+    // given one, or under a region that turned live.
+    const live = new Set<HTMLElement>();
     for (const record of records) {
       const target = isElement(record.target) ? record.target : record.target.parentElement;
       if (!target) continue;
@@ -1085,15 +1088,23 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       // Restyles (including a region turning live, or an exclusion) are
       // handled per node in attributesChanged, whose recheck releases what is
       // no longer eligible.
-      if (record.type === 'attributes') { restyled.add(target); continue; }
+      if (record.type === 'attributes') {
+        restyled.add(target);
+        if (record.attributeName === 'aria-live' || record.attributeName === 'role') for (const el of ownedWithin(target)) live.add(el);
+        continue;
+      }
       for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) {
         if (!owned.has(el)) continue;
         enqueue(el, CONTENT);
+        if (record.type === 'childList') live.add(el);
         const state = states.get(el);
         if (state?.heads.size && staleSplit(el, state, record, written)) stale.add(el);
       }
       if (record.type === 'childList') {
-        for (const node of record.addedNodes) if (isElement(node)) discover(node);
+        for (const node of record.addedNodes) if (isElement(node)) {
+          discover(node);
+          if (inLiveRegion(node)) for (const el of ownedWithin(node)) live.add(el);
+        }
         if (!owned.has(target) && target.matches(selector) && !target.closest(excluded)) discover(target);
         for (const node of record.removedNodes) {
           if (!isElement(node) || within(node)) continue;
@@ -1104,11 +1115,16 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
         }
       }
     }
-    if (stale.size) {
+    const released = [...live].filter(el => owned.has(el) && liveText(el));
+    if (stale.size || released.length) {
       // Still inside the mutation's microtask checkpoint, so no frame shows
       // the stale tails. Our own writes here are not observed.
       observer.disconnect();
       for (const el of stale) { const state = states.get(el); if (state) releaseOutput(el, state, written); }
+      // Text now in a live region is released with the change that put it
+      // there: one update for assistive technology, not a second one (an
+      // announcement) on the next pass.
+      for (const el of released) { restore(el); drop(el); }
       observe();
     }
     // Each restyled node once per delivery, however many records it produced.

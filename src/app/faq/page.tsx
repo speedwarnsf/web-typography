@@ -18,7 +18,7 @@ const QA: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'What do screen readers hear?',
-    a: <>The same words as the source, with a line boundary at each generated break, as at any line end. The test suite reads the accessibility tree Chromium and WebKit actually build on every run, and Firefox&rsquo;s nightly, and requires every composed paragraph&rsquo;s words, and every link and heading name, to match the source text. Text in live regions is never composed, so status messages are not announced again. Spoken VoiceOver and NVDA output has not yet been checked by a person; see <a href={`/releases/${PINNED_VERSION}/SUPPORT.md`}>SUPPORT.md</a>.</>,
+    a: <>The same words as the source, with a line boundary at each generated break, as at any line end. The test suite reads the accessibility tree Chromium and WebKit actually build on every run, and Firefox&rsquo;s nightly, and requires every composed paragraph&rsquo;s words, and every link and heading name, to match the source text. Text in or around a live region is never composed, so status messages are not announced again. Spoken VoiceOver and NVDA output has not yet been checked by a person; see <a href={`/releases/${PINNED_VERSION}/SUPPORT.md`}>SUPPORT.md</a>.</>,
   },
   {
     q: 'Does it cause layout shift?',

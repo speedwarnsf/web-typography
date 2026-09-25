@@ -3,7 +3,7 @@
 import { Children, Component, Fragment, cloneElement, createElement, forwardRef, isValidElement } from 'react';
 import type { AllHTMLAttributes, ForwardedRef, HTMLAttributes, ReactElement, ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { BREAK_ATTRIBUTE, breakReplacesSpace, inLiveRegion, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
+import { BREAK_ATTRIBUTE, breakReplacesSpace, liveText, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
 import { measureLayout } from './layout-metrics';
 import { assignRef, childrenKey, layoutKey, propsKey } from './adapter-keys';
 import { adapterRegistry } from './adapter-registry';
@@ -364,8 +364,9 @@ class RichText extends Component<RichProps, State> {
     if (this.state.plan && (!rendered(el) || printing(el.ownerDocument))) return;
     this.reporting = performance.now();
     this.planned = propsKey(this.props);
-    // A live region announces every change: never measure or break it.
-    const plan: RenderPlan = inLiveRegion(el)
+    // A live region announces every change: never measure or break it, or
+    // text that contains one.
+    const plan: RenderPlan = liveText(el)
       ? { source: el.textContent || '', breaks: [], widths: [], outcome: 'native:live-region', styleSignature: '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 } }
       : planRichText(el, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
