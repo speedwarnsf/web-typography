@@ -57,7 +57,14 @@ Outside the changes below, 0 of these differ in any engine.
   in 311 (310 in WebKit) blocks, and 1,087 of 1,103 generated breaks
   are now exposed (16 hyphen breaks stay hidden), with 0
   screenshots, line boxes, outcomes, feature statuses or copied texts
-  changed. In verify-golden 2,016 (WebKit 2,011) of 2,724 corpus cells per engine
+  changed. One effect reaches beyond the page: a reader view that extracts
+  the live DOM (Firefox's Reader View, Readability-based read-later tools)
+  drops `aria-hidden` nodes, so 4.2.0's breaks never reached it, and now
+  keeps them without their style, showing the page's composed lines in its
+  own wider column: with Firefox's Readability.js, 35 of 40 corpus
+  paragraphs composed at 375 px are double-wrapped at a 660 px reader
+  measure (36 composed at 1024 px; 4.2.0: 0). SUPPORT.md lists it under
+  known limitations. In verify-golden 2,016 (WebKit 2,011) of 2,724 corpus cells per engine
   differ only in these attributes and C9's below, 173 of them also in the
   position of a break before a link (below).
 - **Generated breaks are displayed through `--ts-break-display` (C9).** The

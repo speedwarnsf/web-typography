@@ -306,6 +306,19 @@ changes only an isolated preview, never a deployed site.
   contain a newline at each. Copying through the browser's copy command is
   cleaned (no extra newlines), and the source text in the DOM is unchanged.
   A newline-free rendering is on the roadmap.
+- **Reader views keep the composed lines.** A reader view that extracts the
+  live page (Firefox's Reader View, and read-later tools built on Mozilla's
+  Readability that capture the rendered DOM) keeps each generated break,
+  which since 4.3 is exposed to assistive technology rather than
+  `aria-hidden`, but not its style, so it shows the page's composed lines
+  inside its own wider column and larger type: alternating long and short
+  lines, or a narrow ragged column when the page was composed for a phone.
+  Measured with Firefox's own Readability.js on 40 corpus paragraphs
+  composed at 375 px and read at a 660 px measure: 35 double-wrapped
+  (1024 px composition: 36); 4.2.0, whose breaks were `aria-hidden`: 0. The
+  text itself is complete. Services that fetch the server's HTML are
+  unaffected: nothing is composed there. Chrome's accessibility-tree-based
+  Reading mode may also see a line break at each; this was not measured.
 - **Print.** Printed text wraps natively at the paper's width: in print,
   `--ts-break-display` is `none` and spacing, hanging and tracking are
   neutralized, and composition pauses until printing ends. Set
