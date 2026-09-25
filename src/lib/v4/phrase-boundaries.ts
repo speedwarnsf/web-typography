@@ -57,7 +57,10 @@ const units = new Set(['%', '‰', '°', '°C', '°F', 'K', 'm', 'km', 'cm', 'mm
   'TB', 'px', 'pt', 'a.m', 'p.m', 'am', 'pm', 'AM', 'PM', 'A.M', 'P.M', 'million', 'billion', 'trillion', 'percent']);
 const leading = (text: string) => text.replace(/^[("'\u201C\u2018[{]+/u, '');
 const outer = (text: string) => stripEnd(leading(text), '"\'\u201D\u2019)]}');
-const trailing = (text: string) => stripEnd(text, '.,;:!?"\'\u201D\u2019)]}\u2013\u2014');
+/** What `leading` removes from the start of a word and `trailing` from its end. */
+const openingMarks = '("\'\u201C\u2018[{';
+const closingMarks = '.,;:!?"\'\u201D\u2019)]}\u2013\u2014';
+const trailing = (text: string) => stripEnd(text, closingMarks);
 
 /** "Dr.", "Fig.", "a.m.", "U.S." and initials such as "J." end no sentence.
  * Capital "I." and "A." are left as sentence ends ("so did I."). */
@@ -135,11 +138,25 @@ export function boundPair(previous: string, next: string, before?: string): Boun
   return null;
 }
 
+interface KeepNode { next: Map<number, KeepNode>; phrase: boolean }
+/** A hyphen, dash or slash joins a unit to the next without a space. */
+const joins = (code: number) => code === 0x2d || code === 0x2010 || code === 0x2013 || code === 0x2014 || code === 0x2f;
 /**
  * Where author `keep` phrases occur in a run of break units: [start, end)
  * unit ranges spanning at least one break. Matching ignores case, treats
  * NBSP and runs of spaces as one space, ignores punctuation around the
  * phrase, and joins a unit that ends in a hyphen or dash to the next.
+ *
+ * From each start, units are joined (with a space, or none after a hyphen,
+ * dash or slash) and the joined text, less its opening and closing marks,
+ * is compared with the phrases. That text only ever grows at its end as
+ * units are added, and it takes in the closing marks it passed over (an en
+ * dash run, say) once any other character follows them, so it is walked
+ * down a trie of the phrases character by character instead of being
+ * rebuilt: the walk from a start ends as soon as no phrase can be reached.
+ * Rebuilding and rescanning the joined text at every unit cost the cube of
+ * a run of dash units, which strip to nothing and so never ended the
+ * search: 1,000 em dash units took 4.6 s.
  */
 export function keptPhrases(texts: readonly string[], keep: readonly string[] | undefined): { start: number; end: number }[] {
   const normalize = (text: string) => text.toLowerCase().replace(/[\s\u00A0\u202F]+/gu, ' ').trim();
@@ -150,15 +167,54 @@ export function keptPhrases(texts: readonly string[], keep: readonly string[] | 
     .filter(phrase => phrase.includes(' ') || /[-\u2010\u2013\u2014/]./u.test(phrase)))];
   const found: { start: number; end: number }[] = [];
   if (!phrases.length) return found;
-  const longest = Math.max(...phrases.map(phrase => phrase.length));
-  for (let start = 0; start < texts.length; start++) {
-    let joined = '';
-    for (let end = start + 1; end <= texts.length; end++) {
-      const unit = normalize(texts[end - 1]);
-      joined += (end === start + 1 || /[-\u2010\u2013\u2014/]$/u.test(joined) ? '' : ' ') + unit;
-      const bare = trailing(leading(joined));
-      if (bare.length > longest) break;
-      if (end - start > 1 && phrases.includes(bare)) found.push({ start, end });
+  const root: KeepNode = { next: new Map(), phrase: false };
+  for (const phrase of phrases) {
+    let node = root;
+    for (let i = 0; i < phrase.length; i++) {
+      let child = node.next.get(phrase.charCodeAt(i));
+      if (!child) node.next.set(phrase.charCodeAt(i), child = { next: new Map(), phrase: false });
+      node = child;
+    }
+    node.phrase = true;
+  }
+  const walk = (node: KeepNode | null, text: string, from: number, to: number): KeepNode | null => {
+    for (let i = from; node && i < to; i++) node = node.next.get(text.charCodeAt(i)) ?? null;
+    return node;
+  };
+  // Each unit once: its normal form, where its opening marks end, and where
+  // its closing marks begin (0 when it is nothing but closing marks).
+  const units = texts.map(text => {
+    const unit = normalize(text);
+    let open = 0, close = unit.length;
+    while (open < unit.length && openingMarks.includes(unit[open])) open++;
+    while (close > 0 && closingMarks.includes(unit[close - 1])) close--;
+    return { unit, open, close };
+  });
+  for (let start = 0; start < units.length; start++) {
+    // The joined text is `lead` (opening marks only, until `opened`), then
+    // `bare` (what is compared), then closing marks. `at` is bare's place in
+    // the trie, `ahead` the place of bare and the closing marks after it,
+    // through which any longer bare passes; `last` is the joined text's last
+    // UTF-16 unit (-1 while it is empty).
+    let opened = false, at: KeepNode | null = root, ahead: KeepNode | null = root, last = -1;
+    for (let end = start + 1; end <= units.length; end++) {
+      const { unit, open, close } = units[end - 1];
+      if (end > start + 1 && !joins(last)) {
+        // A space, which is neither mark, then the unit.
+        opened = true;
+        at = walk(walk(ahead, ' ', 0, 1), unit, 0, close);
+        ahead = walk(at, unit, close, unit.length);
+        last = unit.length ? unit.charCodeAt(unit.length - 1) : 0x20;
+      } else {
+        let from = 0;
+        if (!opened) { from = open; opened = open < unit.length; }
+        if (close > from) { at = walk(ahead, unit, from, close); ahead = walk(at, unit, close, unit.length); }
+        else ahead = walk(ahead, unit, from, unit.length);
+        if (unit.length) last = unit.charCodeAt(unit.length - 1);
+      }
+      if (end - start > 1 && at?.phrase) found.push({ start, end });
+      // No phrase is reachable, and bare, unchanged from here, is none.
+      if (!ahead && !at?.phrase) break;
     }
   }
   return found;
