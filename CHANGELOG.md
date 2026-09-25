@@ -279,6 +279,20 @@ Outside the changes below, 0 of these differ in any engine.
   Print shows native wrapping and pauses composition. A width only layout
   can show (a stylesheet rule, a composed block moved into a narrower
   container) can still paint its first frame double-wrapped.
+- **Ancestor transforms no longer leave text native for good.** A transform
+  changes no line, so a composition made before one is now kept: a drawer
+  that scales the page behind it or a card's hover scale no longer rewraps
+  composed text. Text declined as `native:transformed` because a transform
+  was still animating (a dialog or popover's `@starting-style` scale-in, a
+  class-driven scale, a card inserted with `element.animate()`, the drawer
+  closing) is composed when that transition or animation ends, with
+  `mount()`, the loaders and `TypesetText`; 4.2.0 and the earlier 4.3
+  candidate left it native until an unrelated trigger. In WebKit, font keys
+  no longer change when the engine collects an unreferenced `FontFace`
+  wrapper, which made the first recheck after composition recompose every
+  block on pages with `@font-face` rules. `verify-reflow-triggers` covers
+  the drawer, the dialog and the scale-in in three engines (15 checks failed
+  before). The golden sets have no transforms: 0 changed.
 - **Machine translation no longer garbles or loses text (C10).** When the
   page is translated (the `translated-ltr`/`translated-rtl` class Google
   Translate and Chrome set, a `<font>` wrapper inside composed text, or

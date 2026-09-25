@@ -204,13 +204,14 @@ function layoutKey(el: HTMLElement): string {
   const inset = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0') + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.borderRightWidth || '0');
   // Transforms, zoom and scale on any ancestor change glyph advances without
   // changing a computed style here; their ratio to the layout width does.
+  // The two drawn-size terms come first (see transformOnly).
   const used = parseFloat(cs.width);
   const layout = cs.boxSizing === 'border-box' ? used : used + inset;
   const scale = layout > 0 ? Math.round(box.width / layout * 1000) / 1000 : 1;
   const zoom = (el as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
-  return JSON.stringify([
+  return JSON.stringify([Math.max(0, box.width - inset), scale, layout,
     fontVersion(el.ownerDocument), el.ownerDocument.fonts?.status,
-    Math.max(0, box.width - inset), scale, zoom, cs.font, cs.fontFamily, cs.fontSize,
+    zoom, cs.font, cs.fontFamily, cs.fontSize,
     cs.fontWeight, cs.fontStyle, cs.fontStretch, cs.fontFeatureSettings,
     cs.fontVariationSettings, cs.fontOpticalSizing, cs.fontVariant, cs.fontKerning,
     cs.fontSizeAdjust, cs.fontSynthesis, cs.textRendering, cs.letterSpacing, cs.wordSpacing,
@@ -224,6 +225,12 @@ function layoutKey(el: HTMLElement): string {
     // Author descendants only: the engine's own tracking spans need no fingerprint.
     el.querySelector(':not([data-ts-break]):not(.ts-line):not([data-ts-track])') ? richFingerprint(el) : '',
   ]);
+}
+/** Whether two layout keys differ only in the size a transform draws the
+ * element at (a scale, a rotation), not in its layout: its lines break where
+ * they did, so a composition made without the transform stays correct. */
+function transformOnly(a: string, b: string): boolean {
+  return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
 }
 /** Whether a style attribute changed only by a translation (the transform or
  * translate property) or opacity: a JavaScript animation (a screen push,
@@ -1006,6 +1013,27 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (!viewport || (box.bottom > -height && box.top < 2 * height)) enqueue(el, job, true);
     else { deferred.add(el); viewport.observe(el); }
   };
+  /** Owned text declined under each running animation, rechecked when it ends. */
+  const animating = new WeakMap<Animation, Set<HTMLElement>>();
+  const awaitTransforms = (el: HTMLElement) => {
+    for (const animation of doc.getAnimations?.() ?? []) {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      if (!target || animation.playState === 'finished' || !(target === el || target.contains(el))) continue;
+      let waiting = animating.get(animation);
+      if (!waiting) {
+        const set = waiting = new Set();
+        animating.set(animation, set);
+        const ended = () => {
+          animating.delete(animation);
+          if (stopped) return;
+          for (const block of set) if (owned.has(block)) recheck(block, KEY);
+          schedule();
+        };
+        animation.finished.then(ended, ended);
+      }
+      waiting.add(el);
+    }
+  };
   /** Queue matching elements this controller does not own yet. */
   const discover = (scope: ParentNode = root) => {
     for (const el of select(scope)) if (!owned.has(el)) enqueue(el);
@@ -1300,17 +1328,28 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     const state = states.get(el);
     if (!(job & CONTENT) && state && owned.has(el) && !rendered(el)) { hidden.add(el); return; }
     hidden.delete(el);
-    if (!(job & CONTENT) && state?.signature && owned.has(el) && layoutKey(el) === state.layout) {
+    const key = !(job & CONTENT) && state?.signature && owned.has(el) ? layoutKey(el) : '';
+    if (key && state && key === state.layout) {
       // Back at the width it was composed for: show the composition again.
       if (el.hasAttribute('data-ts-stale')) { el.removeAttribute('data-ts-stale'); job |= VERIFY; }
       // Nothing that decides layout changed. The rendered lines are the safety
       // net for anything the key cannot see.
       if (!(job & VERIFY) || layoutIntact(el)) return;
       state.signature = '';
+    } else if (key && state && state.result.outcome.startsWith('composed') && !el.hasAttribute('data-ts-stale') && transformOnly(key, state.layout)) {
+      // Only an ancestor transform changed (a drawer scaling the page behind
+      // it, a card's hover scale): the lines stay where they were composed,
+      // and recomposing under the transform would decline and rewrap them.
+      state.layout = key;
+      return;
     }
     const result = typeset(el, options);
     if (result.changed) stats.compositions++;
     if (result.outcome === 'unmeasurable') hidden.add(el);
+    // Declined while a transform animates (a dialog's @starting-style entry,
+    // a scale-in, a drawer closing): check again once it ends, since neither
+    // a CSS transition nor a Web Animation ends with a mutation.
+    if (result.outcome === 'native:transformed') awaitTransforms(el);
     if (!owned.has(el)) { owned.add(el); watch(el); }
     // Our own write may change the block's height; that is not a reason to verify.
     else if (result.changed) { const box = boxOf(el); sizes.set(el, { w: sizes.get(el)?.w ?? box.w, h: box.h }); }

@@ -5,7 +5,7 @@ import { restore, typeset } from './typeset.next';
 import type { Options, Result } from './typeset.next';
 import { adapterRegistry } from './adapter-registry';
 import type { AdapterEntry } from './adapter-registry';
-import { assignRef, layoutKey } from './adapter-keys';
+import { assignRef, layoutKey, transformOnly } from './adapter-keys';
 import { ENVIRONMENT_OUTCOME } from './environment';
 import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
@@ -74,7 +74,15 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
         // After the commit, outside the registry's own writes.
         if (callback) queueMicrotask(() => callback(result));
       },
-      changed: fonts => layoutKey(element, fonts) !== key,
+      changed: fonts => {
+        const now = layoutKey(element, fonts);
+        if (now === key) return false;
+        // Only an ancestor transform changed (a drawer's background scale, a
+        // hover scale): the composed lines stay correct, and recomposing
+        // under the transform would decline and rewrap them.
+        if (widest && transformOnly(now, key)) { key = now; return false; }
+        return true;
+      },
       widest: () => widest,
       stale() { restore(element); element.dataset.tsStale = ''; widest = 0; },
       translation(active) {

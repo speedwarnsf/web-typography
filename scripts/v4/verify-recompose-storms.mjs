@@ -3,9 +3,10 @@
 // animation, a class with no styles, a scroll-linked custom property, a fade)
 // must not recompose anything, and a translation or fade must not even
 // trigger a recheck pass; ancestor changes that do change text metrics (a theme
-// font, a vw font size under a window resize, scale, zoom) must recompose, with
-// rendered lines equal to generated breaks + 1. Removing unrelated nodes must
-// not scan every claimed element.
+// font, a vw font size under a window resize, zoom) must recompose, with
+// rendered lines equal to generated breaks + 1, and an ancestor scale, which
+// moves no line, keeps the composition. Removing unrelated nodes must not scan
+// every claimed element.
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 import { artifacts } from './candidate.mjs';
@@ -127,10 +128,14 @@ for (const { name, engine, executablePath } of browsers) {
         await w.quiet();
         return { whileApplied: outcomes, after: w.composed(), stale: w.stale() };
       }, cls);
-      // Zoom is not supported by every engine's computed style; where it has no
-      // effect the text simply stays composed and verified.
+      // A scale moves no line: the composition is kept while it applies. Zoom
+      // changes layout and is declined; it is not supported by every engine's
+      // computed style, and where it has no effect the text simply stays
+      // composed and verified.
       const declined = result.whileApplied.length === 1 && result.whileApplied[0] === 'native:transformed';
-      check(`an ancestor ${cls === 'scaled' ? 'scale' : 'zoom'} is declined and recomposed when removed`, (declined || (cls === 'zoomed' && !result.whileApplied.includes('native:transformed'))) && result.after >= 30 && result.stale === 0, result);
+      const kept = result.whileApplied.length === 1 && result.whileApplied[0] === 'composed:rich';
+      if (cls === 'scaled') check('an ancestor scale keeps the composition while it applies, and after it is removed', kept && result.after >= 30 && result.stale === 0, result);
+      else check('an ancestor zoom is declined and recomposed when removed', (declined || !result.whileApplied.includes('native:transformed')) && result.after >= 30 && result.stale === 0, result);
     }
 
     // Unrelated removals: the engine's observer callbacks while a list of 1000

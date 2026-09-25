@@ -6,7 +6,7 @@ export interface LifecycleClient {
   fonts?(): void;
   /** The window resized, or printing ended. Runs before the frame's layout. */
   resize?(): void;
-  /** A transition or animation of text metrics ended on `target`. */
+  /** A transition or animation of text metrics, or of a transform, ended on `target`. */
   metrics?(target: Element): void;
   /** A stylesheet was added, removed, edited or switched. */
   styles?(): void;
@@ -39,7 +39,8 @@ function translatedClass(doc: Document): boolean {
 export function translationActive(doc: Document): boolean {
   return latched.has(doc) || translatedClass(doc);
 }
-const metric = /^(?:font|letter-spacing|word-spacing|line-height|text-transform|text-indent|tab-size)/u;
+// Transforms too: text declined as transformed mid-transition composes once it ends.
+const metric = /^(?:font|letter-spacing|word-spacing|line-height|text-transform|text-indent|tab-size|transform$|scale$|rotate$|zoom$)/u;
 
 function notify(hub: Hub, call: (client: LifecycleClient) => void): void {
   for (const client of [...hub.clients]) call(client);

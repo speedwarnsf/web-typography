@@ -145,6 +145,29 @@ function createRegistry(doc: Document): Registry {
     // it again. (In a commit the update renders after this returns.)
     const size = sizes.get(entry.element);
     if (size && !inCommit) { const height = contentHeight(entry.element); if (!Number.isNaN(height)) size.h = height; }
+    // Declined while a transform animates (a dialog's @starting-style entry,
+    // a scale-in, a drawer closing): compose again once it ends, since neither
+    // a CSS transition nor a Web Animation ends with a mutation.
+    if (entry.element.dataset.tsOutcome === 'native:transformed') awaitTransforms(entry);
+  }
+  /** Hosts declined under each running animation, composed again when it ends. */
+  const animating = new WeakMap<Animation, Set<AdapterEntry>>();
+  function awaitTransforms(entry: AdapterEntry): void {
+    for (const animation of doc.getAnimations?.() ?? []) {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      if (!target || animation.playState === 'finished' || !(target === entry.element || target.contains(entry.element))) continue;
+      let waiting = animating.get(animation);
+      if (!waiting) {
+        const set = waiting = new Set();
+        animating.set(animation, set);
+        const ended = () => {
+          animating.delete(animation);
+          for (const host of set) if (entries.get(host.element) === host) enqueue(host, 'force');
+        };
+        animation.finished.then(ended, ended);
+      }
+      waiting.add(entry);
+    }
   }
   /** Whether a composition of `entry` is expected to finish within `budget` ms from `start`. */
   const fits = (entry: AdapterEntry, start: number, budget: number): boolean =>

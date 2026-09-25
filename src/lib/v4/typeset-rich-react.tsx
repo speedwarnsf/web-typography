@@ -5,7 +5,7 @@ import type { AllHTMLAttributes, ForwardedRef, HTMLAttributes, ReactElement, Rea
 import { flushSync } from 'react-dom';
 import { BREAK_ATTRIBUTE, breakReplacesSpace, liveText, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
 import { measureLayout } from './layout-metrics';
-import { assignRef, childrenKey, layoutKey, propsKey } from './adapter-keys';
+import { assignRef, childrenKey, layoutKey, propsKey, transformOnly } from './adapter-keys';
 import { adapterRegistry } from './adapter-registry';
 import { ENVIRONMENT_OUTCOME } from './environment';
 import type { AdapterEntry, Priority } from './adapter-registry';
@@ -241,7 +241,14 @@ class RichText extends Component<RichProps, State> {
       // Outside a commit the whole plan-and-finish chain runs synchronously
       // too, so a frame never paints half of it.
       compose: (_reason, inCommit) => { if (inCommit) this.recompose(); else flushSync(this.recompose); },
-      changed: fonts => this.state.stale || layoutKey(el, fonts) !== this.layout,
+      changed: fonts => {
+        if (this.state.stale) return true;
+        const now = layoutKey(el, fonts);
+        if (now === this.layout) return false;
+        // Only an ancestor transform changed: the composed lines stay correct.
+        if (this.layout && this.state.plan?.breaks.length && transformOnly(now, this.layout)) { this.layout = now; return false; }
+        return true;
+      },
       // Frozen, nothing may re-render: a narrower container must not pick
       // this host for stale mode.
       widest: () => this.frozen || this.state.stale || !this.state.plan?.breaks.length ? 0 : this.widest,

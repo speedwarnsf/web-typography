@@ -86,17 +86,35 @@ function typeKey(element: HTMLElement): string {
   }).join(';');
 }
 
+/** A content-box width as layout gives it, before any transform (NaN for an inline box). */
+function layoutWidth(element: Element): number {
+  const cs = getComputedStyle(element);
+  const width = parseFloat(cs.width);
+  return cs.boxSizing === 'border-box' ? width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
+    - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0') : width;
+}
+
 /** Everything a composed host's line breaks depend on, read without writing:
- * its text, its content width and its parent's, fonts, and the computed type
- * of the host and every author descendant. Ancestor attributes are not part of
- * it, only their effect on these values. */
+ * its text, its content width and its parent's (as drawn, then as laid out),
+ * fonts, and the computed type of the host and every author descendant.
+ * Ancestor attributes are not part of it, only their effect on these values.
+ * The two drawn widths come first (see transformOnly). */
 export function layoutKey(element: HTMLElement, fonts = fontKey(element.ownerDocument)): string {
   const cs = getComputedStyle(element);
+  const parent = element.parentElement;
   return json([
-    element.textContent, contentWidth(element), element.parentElement && contentWidth(element.parentElement), fonts,
+    contentWidth(element), parent && contentWidth(parent), layoutWidth(element), parent && layoutWidth(parent),
+    element.textContent, fonts,
     element.closest('[lang]')?.getAttribute('lang'), cs.textAlign, cs.textIndent, cs.textWrap, cs.getPropertyValue('-webkit-line-clamp'),
     cs.overflow, cs.textOverflow, cs.writingMode, typeKey(element),
   ]);
+}
+
+/** Whether two layout keys differ only in the size a transform draws the host
+ * at (a scale, a rotation on an ancestor), not in its layout: its lines break
+ * where they did. */
+export function transformOnly(a: string, b: string): boolean {
+  return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
 }
 
 /** Set a caller's ref to `node`; returns the cleanup a React 19 callback ref gave, if any. */

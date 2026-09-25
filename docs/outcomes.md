@@ -43,7 +43,7 @@ Left as the browser set it, because the content or its CSS is outside what Types
 | `native:mixed-language` | Part of the block declares a different language. | Yes | None, or split the block by language. |
 | `native:script` | The text contains non-Latin script or bidirectional controls. | Yes | None. Typeset composes Latin-script text only. |
 | `native:direction` | The element is right-to-left or vertical. | Yes | None. RTL and vertical text are not supported. |
-| `native:transformed` | The element or an ancestor is scaled, rotated, skewed or zoomed, so measured widths would not match what is drawn. | Yes | Remove the transform, or leave it native. |
+| `native:transformed` | The element or an ancestor is scaled, rotated, skewed or zoomed, so measured widths would not match what is drawn. A composition made before an ancestor transform is kept (lines do not move); this outcome is for text first composed while one applied. | Yes | None while it animates: mount() and the React adapters compose the text when the transition or animation ends. For a lasting transform, remove it or leave the text native. |
 | `native:decorated` | The element has ::before or ::after content that shares its lines. | Yes | Move the decoration outside the text box, or leave it native. |
 | `native:whitespace` | white-space preserves spaces or prevents wrapping (pre, pre-wrap, nowrap, break-spaces). | Yes | None; preserved whitespace is left to the browser. |
 | `native:author-breaks` | The text has its own line breaks (pre-line newlines or Unicode line separators). | Yes | None; authored breaks are kept. |

@@ -92,7 +92,9 @@ Tracking failure rolls back tracking only; it is not silently reported applied.
 Ordinary inline code with normal whitespace, emergency overflow-wrap:break-word
 and nonnegative sliced padding/borders/margins is measured with its surrounding
 text. Unsupported box decoration remains native. Identity and pure 2D translation
-transforms are supported; scale, rotation, perspective and nonzero Z are not.
+transforms are supported; text is not composed under scale, rotation,
+perspective or nonzero Z, though a composition made before such a transform
+is kept while it applies.
 
 Smart quotes are explicit English, quotes-only. Each quote keeps its kind:
 single quotes are never turned into double quotes, or the reverse. From 4.3
@@ -179,7 +181,13 @@ or line-height properties. A block whose height changes at the same width
 has its rendered lines checked against its composition, and `auditJSON()`
 reports `stale-layout` for a composed block whose line count no longer
 matches. Ancestor class and style changes recompose only when a computed
-layout key (fonts, metrics, width, effective scale and zoom) changes.
+layout key (fonts, metrics, width, effective scale and zoom) changes. A
+transform on an ancestor (a drawer that scales the page behind it, a hover
+scale) moves no line, so a composition made before it is kept; text that
+could not be composed while a transform applied (`native:transformed`, such
+as a dialog's `@starting-style` scale-in or a card inserted with
+`element.animate()`) is composed again when the transform's transition or
+animation ends.
 `mount()` also works on the document or elements of a same-origin iframe.
 The React adapters share one registry per document, with the same
 triggers (a host whose height changes at the same width has its layout key

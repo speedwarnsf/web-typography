@@ -5,7 +5,10 @@
 // once two frames and an idle period have passed and the controller's batches
 // (8 ms each) have run, and auditJSON must report no stale-layout. The audit
 // itself is checked against a known stale layout. The React adapters meet the
-// triggers that change no DOM and fire no event too.
+// triggers that change no DOM and fire no event too. Ancestor transforms do
+// not move lines: a composition survives a drawer scaling the page behind it,
+// and text declined while a transform animates (a dialog's @starting-style
+// entry, a card inserted with element.animate()) composes once it ends.
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -254,6 +257,74 @@ for (const { name, engine, executablePath } of browsers) {
       });
       check('auditJSON reports stale-layout for a composition whose metrics changed', result.clean === 0 && result.stale > 0 && result.stale === result.measuredStale && result.pass === false, result);
       await page.close();
+    }
+    // 9. Ancestor transforms: a background-scale drawer, a @starting-style
+    // dialog and an element.animate() scale-in, with mount() and the React adapters.
+    {
+      const transformCSS = '<style>#wrap{transform-origin:50% 0;transition:transform .4s}#dlg{padding:0;border:0;transition:transform .3s}@starting-style{#dlg[open]{transform:scale(.95)}}</style>';
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style>${transformCSS}</head><body data-col="col"><div id="wrap">${body()}</div><dialog id="dlg"><main class="col"><p class="t">${texts[0]}</p><p class="t">${texts[1]}</p></main></dialog><div id="host"></div><div id="app"></div></body></html>`;
+      for (const kind of ['mount', 'react']) {
+        const page = await open(html, kind === 'react' ? { mount: false, react: true } : {});
+        if (kind === 'react') {
+          await page.addScriptTag({ url: '/react.js' });
+          await page.waitForFunction(() => document.querySelectorAll('.r[data-ts-outcome="composed:rich"]').length >= 2);
+          await page.addScriptTag({ url: '/engine.js' });
+          // Rendered inside the page's wrapper and, once more, inside the dialog.
+          await page.evaluate(() => { const app = /** @type {HTMLElement} */ (document.getElementById('app')); /** @type {HTMLElement} */ (document.getElementById('wrap')).append(app); });
+        }
+        const selector = kind === 'react' ? '#wrap .r' : '#wrap p.t';
+        const result = await page.evaluate(async ({ selector, kind }) => {
+          const w = /** @type {any} */ (window);
+          const sleep = (/** @type {number} */ ms) => new Promise(resolve => setTimeout(resolve, ms));
+          const snap = (/** @type {string} */ sel) => w.blocks(sel).map((/** @type {HTMLElement} */ el) => el.dataset.tsOutcome + ':' + el.querySelectorAll('br[data-ts-break]').length).join(',');
+          await sleep(300);
+          const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+          const before = snap(selector);
+          wrap.style.transform = 'scale(0.94)';
+          await sleep(700);
+          const open = snap(selector);
+          wrap.style.transform = '';
+          await sleep(900);
+          const closed = snap(selector);
+          const out = /** @type {Record<string, unknown>} */ ({ before, open, closed, staleAfterClose: w.stale(selector).length });
+          if (kind === 'mount') {
+            /** @type {HTMLDialogElement} */ (document.getElementById('dlg')).showModal();
+            await sleep(1000);
+            out.dialog = snap('#dlg p.t');
+            /** @type {HTMLDialogElement} */ (document.getElementById('dlg')).close();
+            const card = document.createElement('main');
+            card.className = 'col';
+            card.innerHTML = '<p class="t">' + /** @type {HTMLElement} */ (document.querySelector('#wrap p.t')).textContent + '</p>';
+            /** @type {HTMLElement} */ (document.getElementById('host')).append(card);
+            card.animate([{ transform: 'scale(.92)' }, { transform: 'none' }], { duration: 300 });
+            await sleep(1000);
+            out.inserted = snap('#host p.t');
+          }
+          return out;
+        }, { selector, kind });
+        const where = kind === 'react' ? 'React adapters' : 'mount()';
+        check(`${where}: a composition is kept while a drawer scales the page behind it and after it closes`, !!result.before && !String(result.before).includes('native') && result.open === result.before && result.closed === result.before && result.staleAfterClose === 0, result);
+        if (kind === 'mount') {
+          check(`${where}: text in a @starting-style dialog composes once its entry transition ends`, /^composed:rich:\d+,composed:rich:\d+$/.test(String(result.dialog)) && !String(result.dialog).includes(':0'), result.dialog);
+          check(`${where}: text in a card inserted with an element.animate() scale-in composes once it ends`, /^composed:rich:[1-9]\d*$/.test(String(result.inserted)), result.inserted);
+        }
+        await page.close();
+      }
+      // TypesetText in a @starting-style dialog, mounted closed.
+      {
+        const dialogApp = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style>${transformCSS}</head><body data-col="col"><dialog id="dlg"><div id="app"></div></dialog></body></html>`;
+        const page = await open(dialogApp, { mount: false, react: true });
+        await page.addScriptTag({ url: '/react.js' });
+        const result = await page.evaluate(async () => {
+          const sleep = (/** @type {number} */ ms) => new Promise(resolve => setTimeout(resolve, ms));
+          await sleep(500);
+          /** @type {HTMLDialogElement} */ (document.getElementById('dlg')).showModal();
+          await sleep(1200);
+          return [...document.querySelectorAll('#dlg .r')].map(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome + ':' + el.querySelectorAll('br[data-ts-break]').length);
+        });
+        check('React adapters: text in a @starting-style dialog composes once its entry transition ends', result.length === 4 && result.every(s => /^composed:rich:[1-9]/.test(s)), result);
+        await page.close();
+      }
     }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }
