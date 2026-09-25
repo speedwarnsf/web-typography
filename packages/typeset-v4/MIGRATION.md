@@ -43,7 +43,14 @@ in the CHANGELOG with the number of test paragraphs it changed.
    - While a page is machine-translated, composition steps aside
      (`native:translated`).
    - English abbreviations, units, honorifics, labels and letter designators
-     stay with their words ("Dr. Jones", "12 kg", "Fig. 3", "type A").
+     stay with their words ("Dr. Jones", "12 kg", "Fig. 3", "type A"), and
+     a capital letter stays with the noun it modifies ("B students").
+   - A line holding text right after an HTML comment (React's server
+     rendering separator `<!-- -->`, WordPress's `<!--more-->`) is not
+     letter-spaced; the paragraph's other lines are.
+   - `go@4.3.0.js` and `typeset.us/auto` compose content inside `.demo`
+     and `[data-no-smooth]`, which `go@4.2.0.js` skipped. Mark content
+     that should stay as the browser sets it with `data-no-typeset`.
    - Quote corrections: nested quotes open correctly and 'n', 'bout, 'round
      and 'nuff are elisions; `TypesetText` curls quotes in its server HTML.
    - Generated breaks that replace a space are exposed to assistive

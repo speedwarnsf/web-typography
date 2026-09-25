@@ -156,7 +156,9 @@ explicitly. Restore or disconnect DOM ownership, unmount React, restore list
 styling, and revert the recorded dependency/deployment to roll back.
 The website go@4.3.0.js, and the identical typeset.us/auto (dist/auto.js)
 in this package, keep the broad automatic prose/headings scope and craft
-defaults of the previous website loader. Override its selector with
+defaults of the previous website loader, with one change: they also compose
+content inside .demo and [data-no-smooth], which go@4.2.0.js skipped (mark it
+data-no-typeset to keep it native). Override its selector with
 data-typeset-selector; exclude content with data-no-typeset. npm /go remains
 explicitly scoped to [data-typeset]. Both log one console.info when nothing
 matches. All old website pins remain immutable.

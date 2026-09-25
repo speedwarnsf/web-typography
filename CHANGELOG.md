@@ -22,10 +22,11 @@ changes only where 4.2.0 had a verified defect; each change is listed under
 Every count compares the published 4.2.0 build with the 4.3.0 candidate, in
 the same pages, in Chromium, WebKit and Firefox:
 
-- `scripts/v4/verify-golden.mjs`: 3,412 cells per engine (85 corpus
+- `scripts/v4/verify-golden.mjs`: 3,868 cells per engine (85 corpus
   paragraphs at 240, 320, 400 and 560 px in Georgia and the bundled Fraunces,
-  plain, with a link and emphasis, through the legacy renderer, with quotes
-  and hanging, as titles and justified, plus a 22-paragraph adversarial set).
+  plain, with a link and emphasis, with React's server-rendering comment
+  separators, through the legacy renderer, with quotes and hanging, as
+  titles and justified, plus a 29-paragraph adversarial set).
   A cell changes when its outcome, finishing features, breaks or characters
   differ.
 - A golden A/B of 316 blocks per engine (audit fixture, 40 corpus
@@ -47,8 +48,10 @@ Outside the changes below, 0 of these differ in any engine.
   them. The same applies to `TypesetRichText`. Assistive technology now meets
   a line boundary at each generated break, and WebKit accessible names
   contain a newline there. `scripts/v4/verify-native-ax.mjs` finds 0
-  unmatched words and 0 wrong link or heading names in Chromium, WebKit and
-  Firefox; 4.2.0 left 581 words unmatched in Chromium and 381 in Firefox,
+  unmatched paragraph words in Chromium and Firefox (WebKit's inspector
+  exposes no paragraph text) and 0 wrong link or heading names in Chromium,
+  WebKit and Firefox, also after a narrowing resize and, in Chromium and
+  Firefox, with a live tree across a translation; 4.2.0 left 581 words unmatched in Chromium and 381 in Firefox,
   and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
   WebKit. Attributes only: in the golden A/B, markup changed
   in 311 (310 in WebKit) blocks, and 1,087 of 1,103 generated breaks
@@ -77,10 +80,18 @@ Outside the changes below, 0 of these differ in any engine.
   the framework text an element holds is not split for it. Lines and
   characters are unchanged, and so are widths unless the element has
   horizontal padding, border or margin, which now starts its line as the
-  compositor planned. Golden diff: 173 of 680 rich cells per engine in
+  compositor planned. Where the element that starts the line has other font
+  metrics, such as inline `<code>`, 4.2.0's empty fragment also made the
+  paragraph taller than the browser's own layout, by 1 px in Chromium and
+  about 0.5 px in WebKit and Firefox; its height now matches native (a
+  word of each corpus paragraph in `<code>` at 288 to 400 px: 134 of 1,476
+  cells change height in Chromium, all by 1 px, 283 in WebKit, by 0.52 or
+  0.05 px, and 287 in Firefox, by 0.5 px; 0 with `<em>`, whose metrics
+  match). Golden diff: 173 of 680 rich cells per engine in
   verify-golden, 3 (WebKit 5) of 316 blocks in the golden A/B and 71 of
   2,160 React blocks, all markup only (the break's position), with 0
-  screenshots, line boxes, outcomes or copied texts changed; 0 of the rest.
+  screenshots, line boxes, outcomes or copied texts changed; 0 of the rest
+  (these sets have no inline code at a line start).
 - **The automatic loader composes `.demo` and `[data-no-smooth]` content.**
   The website loader (go@4.2.0.js, and 4.3's `typeset.us/auto`) always
   skipped elements with the class `demo` or the attribute
@@ -92,6 +103,24 @@ Outside the changes below, 0 of these differ in any engine.
   the way to exclude content. Loader fixture: 2 of 2 such paragraphs now
   compose (0 under go@4.2.0.js); no typeset.us page that loads go.js uses
   either. The npm `typeset.us/go` never had these exclusions.
+- **Lines holding text right after an HTML comment are not tracked** (C6).
+  Frameworks find some Text nodes by their place after a comment (Lit's part
+  markers, Solid's), so text right after any comment stays where it is,
+  whole and unwrapped, and letter spacing, which needs a wrapper, is not
+  applied to the line that holds it; the paragraph's other lines are
+  tracked, and when none can be the status is `native:tracking-comment`.
+  4.2.0 moved such text into its tracking wrappers. The first 4.3 candidate
+  rolled tracking back for the whole paragraph instead, or tracked a line
+  part way. This includes React's server-rendering separator (`<!-- -->`
+  between interpolated strings in static HTML; hydrated React text is
+  tracked as React's own) and WordPress's `<!--more-->`. Golden diff: in
+  the new "comments" cells (43 corpus paragraphs with a separator at every
+  fourth word), 314 (WebKit 312) of 344 differ from 4.2.0: 4.2.0 tracked
+  287 (WebKit, Firefox 285), 4.3.0 tracks the comment-free lines of 106
+  (WebKit 104) and reports `native:tracking-comment` for 181, and breaks
+  and spacing markers go before a comment rather than between it and its
+  text. Line breaks and characters are unchanged; 0 of the other cells
+  change.
 - **Justified text is left as the author set it** (`native:justify`, C3). A
   generated break ends its line, so every composed line took the last-line
   alignment: `text-align: justify` became ragged right, and a
@@ -112,26 +141,40 @@ Outside the changes below, 0 of these differ in any engine.
   vs, etc, e.g, i.e, a.m, p.m, p, pp, Fig, No, Vol, Ch, Inc, Ltd, Co, dotted
   initialisms and single initials) ends no sentence unless a capitalized
   common sentence opener follows it ("…in the U.S. The results", "at 7 p.m.
-  Most", "Plan B. It"); splitting a number from its unit, an honorific from
-  a name, a label from its number or a word from its letter designator
-  costs what a weak line end costs; and only the article and the pronoun
-  "I" pay the single-letter penalty. "I" is a letter designator only after a
+  Most", "Plan B. It"); "etc." ends one before any capitalized word ("etc.
+  Staff"), "a.m." and "p.m." before any but a day, a month or a time zone
+  ("9 a.m. Parking", but "9 a.m. Monday"), and "No." before any but a roman
+  numeral. Splitting a number from its unit, an honorific from a name, a
+  label from its number, a word from its letter designator, or a capital
+  letter after a function word from the lowercase word it modifies ("and B
+  students", "the X chromosome") costs what a weak line end costs; and only
+  the article and the pronoun "I" pay the single-letter penalty. "I" is a letter designator only after a
   head that takes a roman numeral ("World War I", "Phase I", "Title I") or a
   name after a regnal title ("King Henry I"), never after any other
   capitalized word ("In March I", "At Kaiser I"). Golden diff: 0 of 2,724
-  corpus cells per engine (the corpus has none of these constructions); 47
-  (Chromium, Firefox) or 49 (WebKit) of 176 cells of the new adversarial set
-  (`tests/v4-corpus-adversarial.json`, 22 paragraphs), and 44 of 176 through
+  corpus cells per engine (the corpus has none of these constructions); 53
+  (Chromium, Firefox) or 55 (WebKit) of 232 cells of the new adversarial set
+  (`tests/v4-corpus-adversarial.json`, 29 paragraphs), and 50 of 232 through
   the legacy renderer. On that set, line-end review items (the C16 audit)
-  fall from 111 under 4.2.0 to 68 (WebKit 109 to 68), against 322 in the
-  browser's own layout; pairs split at line ends fall from 54 to 14 (WebKit
-  52 to 12). The binding is a trade, not a free win: across 105 widths (240
+  fall from 137 under 4.2.0 to 92 (WebKit 135 to 92), against 426 in the
+  browser's own layout; pairs split at line ends fall from 60 to 21 (WebKit
+  58 to 19). Openers stranded after "St." or an initial ("Main St. Doors",
+  "vitamin K. Parents") are not charged, since those abbreviations often
+  continue a sentence: 8 such line ends in the adversarial set where 4.2.0,
+  which read every period as a sentence end, had none. The binding is a trade, not a free win: across 105 widths (240
   to 760 px) of the first 20 of those paragraphs, split pairs fall by about
   86% (797 to 113 in Chromium) while weak line ends rise by about 7% (554 to
   591), because a split pair costs what a weak line end costs. One recorded
   trade-off at the golden widths: at 320 px in Fraunces the recipe paragraph
   ends a line on "the", which neither the browser nor 4.2.0 does (the
-  tight-line ranking, to be retuned in 4.4). No orphan, overflow or text
+  tight-line ranking, to be retuned in 4.4). Dropping 4.2.0's false sentence
+  ends also moves breaks where no pair is involved, since their penalties had
+  steered some layouts: at the phone widths of 288 and 343 px, the review
+  found 16 (Chromium), 21 (WebKit) and 18 (Firefox) changed cells without a
+  split pair in 4.2.0 that now end one line on a weak or linking word 4.2.0
+  avoided ("…audit by Ms. Lindqvist was | complete"); by the 4.3 audit, 450
+  changed cells got better and 26 worse of 625 in Chromium. That retune
+  goes to 4.4 with the tight-line trade. No orphan, overflow or text
   change.
 - **Live regions are no longer composed** (accessibility, C4). Text whose
   nearest region has `aria-live="polite"` or `"assertive"`, or (without
@@ -177,7 +220,11 @@ Outside the changes below, 0 of these differ in any engine.
   composed from forced layout (4.2.0 composed it in Chromium and Firefox and
   cached `native:verification` in WebKit). `mount()` and the React adapters
   compose it when it comes into range; a direct `typeset()` caller calls
-  again. 0 golden cells change (the golden sets have no hidden text).
+  again. The React adapters also compose text they mounted inside a closed
+  `<details>`, `hidden="until-found"` or `content-visibility: hidden` once
+  it is shown, and text in a `content-visibility: auto` section on screen at
+  page load, as 4.2.0 did (the first 4.3 candidate left all of it native for
+  good). 0 golden cells change (the golden sets have no hidden text).
 - **`TypesetRichText` plans once from the native text** and no longer
   re-plans over its own composed markup after `document.fonts.ready` when
   nothing changed (P4, P5). 4.2.0's final breaks could depend on that

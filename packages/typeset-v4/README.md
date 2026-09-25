@@ -258,8 +258,10 @@ Typeset checks the accessibility tree the browser actually builds, not a
 DOM approximation. `scripts/v4/verify-native-ax.mjs` reads Chromium's tree
 (every word of every composed paragraph, and every link and heading name) and
 WebKit's link and heading names on every test run, and Firefox's tree
-nightly, and requires them to match the source text: in 4.3.0 every word
-of every composed paragraph, link and heading matches in all three engines
+nightly, and requires them to match the source text. In 4.3.0 every word of
+every composed paragraph matches in Chromium and Firefox, and every link and
+heading name matches in all three engines; WebKit's inspector protocol
+exposes no paragraph text, so WebKit's paragraph words are not checked
 (4.2.0 left 581 words unmatched in Chromium's tree and 381 in Firefox's,
 and 38 of 63 link names and 23 of 24 heading names wrong in Chromium and
 WebKit). A generated break that replaces a space is exposed to assistive
@@ -288,8 +290,9 @@ lets go.
 More answers: https://typeset.us/faq
 
 **What do screen readers hear?** The same words as the source, with a line
-boundary at each generated break (engine accessibility trees are checked in
-Chromium, WebKit and Firefox). 4.2.0 hid its breaks and joined the words
+boundary at each generated break (paragraph words are checked in Chromium's
+and Firefox's accessibility trees, link and heading names in all three
+engines). 4.2.0 hid its breaks and joined the words
 around them; see Accessibility above.
 
 **Does it cause layout shift?** Rarely, and by one line at most.
