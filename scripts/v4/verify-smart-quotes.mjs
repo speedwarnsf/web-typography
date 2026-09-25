@@ -3,9 +3,10 @@
 //
 // 1. The education table: a single quote right after a curled opening
 //    double quote opens too ("'Quoted' inside," gave a closing single quote),
-//    and rock 'n' roll, 'bout, 'round and 'nuff are elisions. 4.2's results
-//    for '90s, 'Tis, 'em, primes such as 5'10" and possessives are kept, and
-//    the shipped corpora change nowhere.
+//    and rock 'n' roll, 'bout, 'round and 'nuff are elisions, but a quoted
+//    key letter ('n') and a quotation that opens with 'round or 'bout still
+//    open with a left quote. 4.2's results for '90s, 'Tis, 'em, primes such
+//    as 5'10" and possessives are kept, and the shipped corpora change nowhere.
 // 2. Server rendering: TypesetText curled quotes only on the client, so server
 //    HTML, no-JS readers and crawlers kept straight quotes and the glyphs
 //    swapped after hydration. Its server HTML now has them, and hydration in
@@ -39,6 +40,14 @@ const TABLE = [
   ["It's 'bout time", 'It’s ’bout time'],
   ["come 'round later", 'come ’round later'],
   ["that's 'nuff", 'that’s ’nuff'],
+  ["fish 'n' chips", 'fish ’n’ chips'],
+  // Quotations the elisions must not take: a quoted key letter, a phrase
+  // that opens with 'round or 'bout and closes later in the sentence.
+  ["Type 'n' to cancel or 'y' to continue", 'Type ‘n’ to cancel or ‘y’ to continue'],
+  ["Press 'n' for no.", 'Press ‘n’ for no.'],
+  ["Enter 'N' or 'Y'.", 'Enter ‘N’ or ‘Y’.'],
+  ["the 'round robin' plan", 'the ‘round robin’ plan'],
+  ["He yelled 'bout face!' twice.", 'He yelled ‘bout face!’ twice.'],
   ["'cause I said so", '’cause I said so'],
   // Kept from 4.2.
   ["the '90s", 'the ’90s'],

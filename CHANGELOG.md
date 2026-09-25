@@ -139,9 +139,13 @@ Outside the changes below, 0 of these differ in any engine.
 - **Smart quote corrections (C15).** A single quote right after a curled
   opening double quote now opens too: `"'Quoted' inside,"` gives
   “‘Quoted’ inside,” (4.2 gave “’Quoted’). Rock ’n’ roll, ’bout, ’round and
-  ’nuff are elisions (4.2 gave ‘n’ and ‘bout). Glyph substitutions only and
-  length-preserving; ’90s, ’Tis, ’em, primes such as 5'10" and possessives
-  are unchanged, and single quotes never become double. Golden diff: 0 of
+  ’nuff are elisions (4.2 gave ‘n’ and ‘bout): 'n' only in a pair such as
+  fish ’n’ chips, so a quoted key letter still opens with a left quote
+  (“Type ‘n’ to cancel”), and 'round, 'bout and 'nuff only when no closing
+  single quote follows in the sentence (“the ‘round robin’ plan”). Glyph
+  substitutions only and length-preserving; ’90s, ’Tis, ’em, primes such as
+  5'10" and possessives are unchanged, and single quotes never become
+  double. Golden diff: 0 of
   173 corpus texts (14 with straight quotes). `TypesetText` also curls quotes
   during render, so its server HTML has them (a Next production build: 8
   curled, 0 straight, no hydration messages in three engines; 4.2 had 2 of
