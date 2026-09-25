@@ -7,6 +7,7 @@ import { adapterRegistry } from './adapter-registry';
 import type { AdapterEntry } from './adapter-registry';
 import { assignRef, layoutKey } from './adapter-keys';
 import { ENVIRONMENT_OUTCOME } from './environment';
+import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
 import { smartQuotes as educate } from './smart-quotes';
 export { TypesetRichText } from './typeset-rich-react';
@@ -65,7 +66,10 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
         const result: Result = typeset(element, options.current);
         widest = result.outcome.startsWith('composed') ? Math.max(0, ...result.after.lines.map(line => line.width)) : 0;
         delete element.dataset.tsStale;
-        key = layoutKey(element);
+        // No key for a decision made without measurement (a skipped
+        // content-visibility subtree, a closed <details>): revealing one keeps
+        // the host's width and style, so an equal key would leave it native.
+        key = rendered(element) ? layoutKey(element) : '';
         const callback = report.current;
         // After the commit, outside the registry's own writes.
         if (callback) queueMicrotask(() => callback(result));

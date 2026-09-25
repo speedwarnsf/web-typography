@@ -63,6 +63,38 @@ window.renderReact = () => {
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
 
+// React hosts mounted inside hidden subtrees: content-visibility:auto sections
+// on screen at load (still skipped when React commits) and far below it, a
+// closed <details>, hidden="until-found" and content-visibility:hidden. Each
+// is judged unmeasurable while hidden and must compose once shown, although
+// revealing it changes neither its width nor its style.
+const hiddenKinds = ['cvtop', 'details', 'untilfound', 'cvh', 'cvfar'];
+const mountedHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+body{margin:0;font:17px/1.45 Georgia,serif}main{width:340px;padding:8px}.cv{content-visibility:auto;contain-intrinsic-size:auto 300px}.cvh{content-visibility:hidden}
+.spacer{height:2600px}</style></head><body><main id="app"></main><script src="/mounted.js"></script></body></html>`;
+const mountedFixture = (await build({
+  stdin: { contents: `
+import { createElement as h } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
+import { TypesetText, TypesetRichText } from ${JSON.stringify(resolve(artifacts.react))};
+const texts = ${JSON.stringify(Array.from({ length: 10 }, (_, i) => text(i + 20)))};
+const hosts = (kind, n) => [
+  h(TypesetText, { key: 't', id: kind + '-t', className: 'host', text: texts[n] }),
+  h(TypesetRichText, { key: 'r', id: kind + '-r', className: 'host' }, texts[n + 1].split(' ').slice(0, 4).join(' ') + ' ', h('em', null, texts[n + 1].split(' ').slice(4, 7).join(' ')), ' ' + texts[n + 1].split(' ').slice(7).join(' ')),
+];
+flushSync(() => createRoot(document.getElementById('app')).render([
+  h('section', { key: 'cvtop', id: 'w-cvtop', className: 'cv' }, hosts('cvtop', 0)),
+  h('details', { key: 'details', id: 'w-details' }, h('summary', null, 'More'), hosts('details', 2)),
+  h('div', { key: 'untilfound', id: 'w-untilfound', hidden: 'until-found' }, hosts('untilfound', 4)),
+  h('div', { key: 'cvh', id: 'w-cvh', className: 'cvh' }, hosts('cvh', 6)),
+  h('div', { key: 'spacer', className: 'spacer' }),
+  h('section', { key: 'cvfar', id: 'w-cvfar', className: 'cv' }, hosts('cvfar', 8)),
+]));
+`, resolveDir: process.cwd(), loader: 'js' },
+  bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
+})).outputFiles[0].text;
+
 /** @type {{ checks: { browser: string, label: string, pass: boolean, detail?: unknown }[], errors: { browser: string, error: string }[] }} */
 const report = { checks: [], errors: [] };
 for (const { name, engine, executablePath } of browsers) {
@@ -256,6 +288,48 @@ for (const { name, engine, executablePath } of browsers) {
     const errors = await page.evaluate(() => /** @type {any} */ (window).loopErrors);
     check('no ResizeObserver loop errors', errors.length === 0, errors);
     await page.close();
+    // React hosts mounted hidden, then shown without a width or style change.
+    const mounted = await browser.newPage({ viewport: { width: 900, height: 800 } });
+    mounted.setDefaultTimeout(20000);
+    await mounted.route('http://visibility.test/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/mounted.js') return route.fulfill({ contentType: 'text/javascript', body: mountedFixture });
+      return route.fulfill({ contentType: 'text/html; charset=utf-8', body: mountedHtml });
+    });
+    await mounted.goto('http://visibility.test/mounted.html');
+    const states = await mounted.evaluate(async (kinds) => {
+      const wait = (/** @type {number} */ ms) => new Promise(r => setTimeout(r, ms));
+      const state = (/** @type {string} */ kind) => ['t', 'r'].map(suffix => {
+        const el = /** @type {HTMLElement} */ (document.getElementById(kind + '-' + suffix));
+        const range = document.createRange(); range.selectNodeContents(el);
+        const tops = new Set([...range.getClientRects()].filter(rect => rect.width > 0).map(rect => Math.round(rect.top)));
+        return { kind: suffix === 't' ? 'TypesetText' : 'TypesetRichText', outcome: el.dataset.tsOutcome, breaks: el.querySelectorAll('br[data-ts-break]').length, lines: tops.size };
+      });
+      await document.fonts.ready;
+      await wait(1200);
+      /** @type {Record<string, unknown>} */
+      const out = { cvtop: { shown: state('cvtop') } };
+      const reveal = {
+        details: () => { /** @type {HTMLDetailsElement} */ (document.getElementById('w-details')).open = true; },
+        untilfound: () => document.getElementById('w-untilfound')?.removeAttribute('hidden'),
+        cvh: () => document.getElementById('w-cvh')?.classList.remove('cvh'),
+        cvfar: () => document.getElementById('w-cvfar')?.scrollIntoView({ block: 'center' }),
+      };
+      for (const kind of kinds.slice(1)) {
+        const hidden = state(kind);
+        reveal[/** @type {keyof typeof reveal} */ (kind)]();
+        await wait(900);
+        out[kind] = { hidden, shown: state(kind) };
+      }
+      return out;
+    }, hiddenKinds);
+    const labels = { cvtop: 'a content-visibility:auto section on screen at load', details: 'a closed <details>, opened', untilfound: 'hidden="until-found", removed', cvh: 'content-visibility:hidden, removed', cvfar: 'a content-visibility:auto section scrolled into view' };
+    for (const kind of hiddenKinds) {
+      for (const block of /** @type {any} */ (states)[kind].shown) {
+        check(`React host mounted in ${labels[/** @type {keyof typeof labels} */ (kind)]}: ${block.kind} composes once shown`, block.outcome === 'composed:rich' && block.breaks > 0 && block.lines === block.breaks + 1, { ...block, hidden: /** @type {any} */ (states)[kind].hidden });
+      }
+    }
+    await mounted.close();
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }
   finally { await browser.close(); }
 }

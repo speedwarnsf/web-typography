@@ -343,8 +343,11 @@ class RichText extends Component<RichProps, State> {
       this.widest = Math.max(0, ...after.lines.map(line => line.width));
     }
     if (!this.state.stale) {
-      // No layout key where nothing can be measured (jsdom, happy-dom).
-      if (plan?.outcome !== ENVIRONMENT_OUTCOME) this.layout = layoutKey(el);
+      // No layout key where nothing can be measured (jsdom, happy-dom), and
+      // none for a decision made while hidden: revealing a content-visibility
+      // subtree or a <details> keeps the host's width and style, so an equal
+      // key would leave it native.
+      if (plan?.outcome !== ENVIRONMENT_OUTCOME) this.layout = plan?.outcome !== 'unmeasurable' && rendered(el) ? layoutKey(el) : '';
       if (this.reporting) this.report(el, plan);
     }
   }
@@ -387,8 +390,12 @@ class RichText extends Component<RichProps, State> {
     this.planned = propsKey(this.props);
     // A live region announces every change: never measure or break it, or
     // text that contains one.
+    const none = { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 };
     const plan: RenderPlan = liveText(el)
-      ? { source: el.textContent || '', breaks: [], widths: [], outcome: 'native:live-region', styleSignature: '', before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 } }
+      ? { source: el.textContent || '', breaks: [], widths: [], outcome: 'native:live-region', styleSignature: '', before: none }
+      // Mounted hidden (a skipped content-visibility subtree, a closed
+      // <details>): nothing can be measured until it is shown.
+      : !rendered(el) ? { source: el.textContent || '', breaks: [], widths: [], outcome: 'unmeasurable', styleSignature: '', before: none }
       : planRichText(el, this.props);
     if (!supportedTree(this.props.children)) { plan.breaks = []; plan.outcome = 'native:react-component'; }
     const base = planKey(plan, this.props);
