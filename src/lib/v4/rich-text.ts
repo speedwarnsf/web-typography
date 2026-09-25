@@ -412,9 +412,9 @@ export function shieldWhitespace(element: HTMLElement): HTMLElement[] {
       at = sibling;
       // Chromium passes over comments and empty inline elements (our markers),
       // not <br>, <wbr> or replaced elements.
-      if (sibling.nodeType === Node.COMMENT_NODE || (sibling instanceof HTMLElement && !sibling.firstChild && !['BR', 'WBR', 'IMG', 'INPUT'].includes(sibling.tagName)
-        && getComputedStyle(sibling).display === 'inline')) continue;
-      return sibling instanceof Text && !sibling.length;
+      if (sibling.nodeType === Node.COMMENT_NODE || (sibling.nodeType === Node.ELEMENT_NODE && !sibling.firstChild && !['BR', 'WBR', 'IMG', 'INPUT'].includes((sibling as Element).tagName)
+        && getComputedStyle(sibling as Element).display === 'inline')) continue;
+      return sibling.nodeType === Node.TEXT_NODE && !(sibling as Text).length;
     }
     return false;
   };
@@ -596,7 +596,8 @@ function visibleContents(range: Range): DocumentFragment | null {
     if (!visibility.has(parent)) { const cs = getComputedStyle(parent); visibility.set(parent, cs.visibility === 'visible' && cs.getPropertyValue('content-visibility') !== 'hidden'); }
     return visibility.get(parent)!;
   };
-  if (!(root instanceof Element || root instanceof Document || root instanceof DocumentFragment)) {
+  // Node types, not instanceof: a same-origin iframe's nodes come from another realm.
+  if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
     if (!visibleText(root)) fragment.replaceChildren();
     return fragment;
   }
@@ -612,7 +613,7 @@ function visibleContents(range: Range): DocumentFragment | null {
   for (let i = 0; i < sources.length; i++) {
     const source = sources[i], clone = clones[i];
     if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
-    const hidden = source instanceof Element ? hiddenFromCopy(source) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
+    const hidden = source.nodeType === Node.ELEMENT_NODE ? hiddenFromCopy(source as Element) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
     if (!hidden) continue;
     (clone as ChildNode).remove();
     while (i + 1 < sources.length && source.contains(sources[i + 1])) i++;

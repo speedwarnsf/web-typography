@@ -49,8 +49,8 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
       let adjacent: ChildNode | null = previous?.last.nextSibling || null;
       // Space markers, accessibility shields and empty author Text nodes left
       // by earlier passes do not separate a run.
-      while ((adjacent instanceof HTMLElement && (adjacent.hasAttribute('data-ts-space') || adjacent.hasAttribute('data-ts-shield')))
-        || (adjacent instanceof Text && !adjacent.length)) adjacent = adjacent.nextSibling;
+      while ((adjacent?.nodeType === Node.ELEMENT_NODE && ((adjacent as Element).hasAttribute('data-ts-space') || (adjacent as Element).hasAttribute('data-ts-shield')))
+        || (adjacent?.nodeType === Node.TEXT_NODE && !(adjacent as Text).length)) adjacent = adjacent!.nextSibling;
       if (previous && adjacent === text.node && previous.end === start) {
         previous.end = end; previous.count += count; previous.last = text.node;
       } else pieces.push({ start, end, line, px: 0, fontSize, letterSpacing, wordSpacing, last: text.node, count });
@@ -101,10 +101,10 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
     for (let node: ChildNode | null = first; node; node = node.nextSibling) { nodes.push(node); if (node === last) break; }
     let wrapper: HTMLElement | null = null;
     for (const node of nodes) {
-      if (node instanceof Text && !engineText.has(node) && (!node.length || positional(node) || reactOwned(node))) {
+      if (node.nodeType === Node.TEXT_NODE && !engineText.has(node as Text) && (!(node as Text).length || positional(node as Text) || reactOwned(node as Text))) {
         // An author node that must keep its place: leave it, empty, and wrap its text.
-        if (!node.length) { wrapper = null; continue; }
-        const piece = split(node, 0);
+        if (!(node as Text).length) { wrapper = null; continue; }
+        const piece = split(node as Text, 0);
         if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
         wrapper.append(piece);
         continue;
