@@ -279,14 +279,17 @@ for (const { name, engine, executablePath } of browsers) {
         await new Promise(r => setTimeout(r, 2500));
         return out;
       }, kind);
-      // The slider: at most 4 compositions a block and 6 long tasks (the
-      // change's first composition and the final one; 4.3 before this check:
-      // 466 compositions and 30 or more long tasks).
+      // The slider: at most 4 compositions a block (4.3 before this check:
+      // 466 compositions and 30 or more long tasks) and at most one long
+      // task a block. How many long tasks the change's first and final
+      // compositions make follows the machine's speed: 2 to 5 on an M2 Pro,
+      // 6 on GitHub's macos-15 runner, whose tasks at 4x CPU run about twice
+      // as long (55 to 145 ms). A composition every frame makes one per frame.
       const slider = await change('slider');
       check('React at 4x CPU: a text-size slider (60 frames) recomposes each block a few times, not every frame, and ends composed',
-        slider.compositions <= 4 * slider.hosts && slider.longTasks.length <= 6 && slider.composed >= 14 && slider.intact === slider.composed && slider.stale === 0, slider);
+        slider.compositions <= 4 * slider.hosts && slider.longTasks.length <= slider.hosts && slider.composed >= 14 && slider.intact === slider.composed && slider.stale === 0, slider);
       // The transition, three times; each must stay within 4 compositions a
-      // block and 4 long tasks and end composed. At 4x CPU the final
+      // block and one long task a block and end composed. At 4x CPU the final
       // composition of 16 blocks spans a few frames, and whether 0, 1, 2 or
       // 3 of those tasks cross 50 ms is timing, so one run held to 2 long
       // tasks was flaky: it failed 1 of 4 standalone runs at the gate-4 HEAD
@@ -298,13 +301,17 @@ for (const { name, engine, executablePath } of browsers) {
       // candidate (44e4721). The build before per-frame settling (8bfedc1^)
       // made 1 to 3 and 33 to 50, so no long-task limit separates it here;
       // its slider does (463 to 468 compositions and 59 long tasks, against
-      // 26 to 49 and 2 to 5). 4 is the most seen, 3, plus one; a transition
+      // 26 to 49 and 2 to 5). The limit was 4, the most seen there plus one,
+      // until GitHub's macos-15 runner, where tasks at 4x CPU run about twice
+      // as long, made 2, 12 and 4 long tasks (54 to 145 ms) in three runs
+      // with 47, 47 and 42 compositions, all ending composed. A transition
       // recomposed every frame would add a long task and a composition per
-      // block for each frame it ran.
+      // block for each of its ~72 frames (1.2 s), so one long task a block
+      // still stops it on any machine, and the composition limit does too.
       const transitions = [];
       for (let run = 0; run < 3; run++) transitions.push(await change('transition'));
       check('React at 4x CPU: a font-size transition recomposes each block a few times, not every frame, and ends composed (3 runs)',
-        transitions.every(t => t.compositions <= 4 * t.hosts && t.longTasks.length <= 4 && t.composed >= 14 && t.intact === t.composed && t.stale === 0), transitions);
+        transitions.every(t => t.compositions <= 4 * t.hosts && t.longTasks.length <= t.hosts && t.composed >= 14 && t.intact === t.composed && t.stale === 0), transitions);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     }
     await reactContext.close();

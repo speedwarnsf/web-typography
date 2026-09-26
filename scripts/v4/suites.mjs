@@ -33,7 +33,7 @@ export const SUITES = [
   { name: 'verify-reflow-triggers', report: 'output/reflow-triggers.json', note: 'fonts, spacing overrides and metric transitions recompose (C7)' },
   { name: 'verify-visibility', report: 'output/visibility.json', note: 'hidden text keeps its composition and reveals composed (C8)' },
   { name: 'verify-print-resize', report: 'output/print-resize.json', note: 'no double-wrapped frame in print or while resizing (C9)' },
-  { name: 'verify-scheduler', report: 'output/scheduler.json', note: 'busy pages, visible-first work, deferred offscreen resizes (P2)' },
+  { name: 'verify-scheduler', report: 'output/scheduler.json', note: 'busy pages, visible-first work, deferred offscreen resizes (P2)', timeout: 360 },
   { name: 'verify-translation', report: 'output/translation.json', note: 'composition steps aside for machine translation (C10)' },
   { name: 'verify-options', report: 'output/options.json', note: 'clear errors and development option warnings (K11)' },
   { name: 'verify-react', report: 'output/react.json', note: 'React 18 and 19 adapters in three engines: recomposition, scheduling, lifecycle, API', timeout: 360 },
