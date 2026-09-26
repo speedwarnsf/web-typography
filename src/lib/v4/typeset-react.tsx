@@ -11,6 +11,7 @@ import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
 import { smartQuotes as educate } from './smart-quotes';
 import { linesExtent } from './layout-metrics';
+import { selectionBookmark } from './rich-text';
 export { TypesetRichText } from './typeset-rich-react';
 export type { TypesetRichTextProps, TypesetAdapterProps, TypesetTag, Priority } from './typeset-rich-react';
 
@@ -87,7 +88,15 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
         return true;
       },
       widest: () => widest,
-      stale() { restore(element); element.dataset.tsStale = ''; widest = 0; },
+      stale() {
+        // Native lines with the characters the composition showed: restore()
+        // puts the source's straight quotes back, and with smartQuotes the
+        // text is educated in every state, as on the server.
+        const shown = element.textContent;
+        restore(element);
+        if (element.textContent !== shown) { const reselect = selectionBookmark(element); element.textContent = shown; reselect(); }
+        element.dataset.tsStale = ''; widest = 0;
+      },
       translation(active) {
         // typeset() steps aside while a page is translated: it unwraps its
         // breaks by moving Text nodes and records native:translated.

@@ -189,6 +189,25 @@ function development(): boolean {
 // The same switch as the DOM renderer's break: print and stale mode set it to none.
 const breakStyle = { display: 'var(--ts-break-display, inline)' };
 
+/** `nodes` as written, with the text React renders from them educated: for a
+ * tree the adapter keeps native (a component child), quotes are curled in
+ * text children and in the children given to each element, the component's
+ * included. Children that are not text or elements (a render function) are
+ * passed on untouched. Offsets follow quoteSource, which reads the same
+ * children in the same order. */
+function educateNodes(nodes: ReactNode, educated: string, at: { offset: number }): ReactNode {
+  if (typeof nodes === 'string') { const text = educated.slice(at.offset, at.offset + nodes.length); at.offset += nodes.length; return text; }
+  if (typeof nodes === 'number') { at.offset += String(nodes).length; return nodes; }
+  if (Array.isArray(nodes)) return nodes.map(node => educateNodes(node, educated, at));
+  if (!isValidElement<{ children?: ReactNode }>(nodes)) return nodes;
+  const inner = nodes.props.children;
+  if (typeof inner !== 'string' && typeof inner !== 'number' && !Array.isArray(inner) && !isValidElement(inner)) { at.offset += quoteSource(inner).length; return nodes; }
+  const next = educateNodes(inner, educated, at);
+  // Spread, as JSX passes several children: React checks the keys of an
+  // array child, and these were never a list.
+  return next === inner ? nodes : Array.isArray(next) ? cloneElement(nodes, undefined, ...next) : cloneElement(nodes, undefined, next);
+}
+
 function supportedTree(children: ReactNode): boolean {
   let supported = true;
   Children.forEach(children, child => {
@@ -456,12 +475,16 @@ class RichText extends Component<RichProps, State> {
       // Education happens during render, where an ancestor's lang is invisible.
       console.warn('TypesetRichText: smartQuotes="en" needs lang="en" (or en-*) on the component itself; quotes are left as written.');
     }
-    return createElement(as, { ...attributes, ref: this.setHost, 'data-typeset-react-rich': '', 'data-typeset-done': plan ? '1' : undefined,
+    const props = { ...attributes, ref: this.setHost, 'data-typeset-react-rich': '', 'data-typeset-done': plan ? '1' : undefined,
       'data-ts-outcome': plan?.outcome, 'data-ts-stale': this.state.stale ? '' : undefined, 'data-ts-quotes': quotes ? educate ? 'enabled' : 'native:quotes-scope' : undefined,
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,
       'data-ts-spacing': _spacing === false ? 'off' : plan?.spacing?.outcome || 'native:spacing-uncomposed',
-      'data-ts-tracking': _tracking === false || _spacing === false ? 'off' : plan?.tracking?.outcome || 'native:tracking-uncomposed' },
-    supportedTree(children) ? renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate) : children);
+      'data-ts-tracking': _tracking === false || _spacing === false ? 'off' : plan?.tracking?.outcome || 'native:tracking-uncomposed' };
+    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate));
+    if (!educate) return createElement(as, props, children);
+    // Kept native (native:react-component), still with the quotes asked for.
+    const educated = educateNodes(children, smartQuotes(quoteSource(children)), { offset: 0 });
+    return Array.isArray(educated) ? createElement(as, props, ...educated) : createElement(as, props, educated);
   }
 }
 
