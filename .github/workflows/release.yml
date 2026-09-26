@@ -11,6 +11,12 @@ name: Release
 #      publishing (OIDC) and provenance, confirms the registry has the ledger's
 #      bytes and an attestation, and creates the GitHub Release with the notes
 #      from CHANGELOG.md and the evidence attached.
+# A version the maintainer account already published is not published again:
+# when npm serves it with the ledger's integrity (scripts/v4/registry-state.mjs)
+# the publish job skips npm, checks the registry against the ledger, and
+# creates the GitHub Release with notes that say it has no provenance. npm
+# serving the version with any other bytes stops the workflow. 4.2.0 and 4.3.0
+# were published that way, before trusted publishing was configured.
 # workflow_dispatch rehearses steps 1 and 2 on any tag, ending with
 # `npm publish --dry-run` (for a version npm already has, the expected
 # refusal counts as success); it never publishes or creates a release.
@@ -95,15 +101,22 @@ jobs:
       - name: Every suite against the committed release artifacts
         run: npm run test:release
 
-      - name: npm accepts the tarball (dry run)
+      # The maintainer account may have published the ledger's tarball already;
+      # npm's dry run refuses an existing version, so ask the registry first.
+      # Other bytes under this version on npm fail here, before any approval.
+      - name: npm accepts the tarball (dry run), or already serves exactly these bytes
         env:
           VERSION: ${{ steps.version.outputs.version }}
           DIST_TAG: ${{ steps.version.outputs.prerelease == 'true' && 'next' || 'latest' }}
+          EVENT: ${{ github.event_name }}
         run: |
+          STATE="$(node scripts/v4/registry-state.mjs --version "$VERSION")" || exit 1
+          if [ "$STATE" = published ]; then echo "typeset.us@$VERSION is on npm with the ledger's integrity; the publish job will not publish it again."; exit 0; fi
+          if [ "$STATE" != unpublished ]; then echo "Unexpected registry state '$STATE'"; exit 1; fi
           if npm publish "public/releases/$VERSION/typeset.us-$VERSION.tgz" --dry-run --access public --tag "$DIST_TAG" 2> output/npm-dry-run.log; then exit 0; fi
           cat output/npm-dry-run.log
           # A rehearsal on an already published tag ends here, as it should.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && grep -q "cannot publish over the previously published versions" output/npm-dry-run.log; then exit 0; fi
+          if [ "$EVENT" = "workflow_dispatch" ] && grep -q "cannot publish over the previously published versions" output/npm-dry-run.log; then exit 0; fi
           exit 1
 
       - name: Keep the evidence with the release
@@ -158,24 +171,57 @@ jobs:
           name: release-evidence
           path: output
 
-      - name: Publish exactly the ledger-recorded tarball
+      # Until trusted publishing is configured (docs/OWNER-ACTIONS.md) the
+      # maintainer account publishes the ledger-recorded tarball itself. A
+      # version npm already serves with the ledger's integrity is left alone
+      # and recorded as published by the maintainer; registry-state.mjs fails
+      # the job when npm serves the version with other bytes.
+      - name: Publish exactly the ledger-recorded tarball, unless the maintainer already did
+        id: publish
+        env:
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
+          STATE="$(node scripts/v4/registry-state.mjs --version "$VERSION")" || exit 1
+          if [ "$STATE" = published ]; then
+            echo "typeset.us@$VERSION is already on npm with the ledger's integrity, published by the maintainer account. Not publishing it again; it has no provenance attestation."
+            echo "by=maintainer" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$STATE" != unpublished ]; then echo "Unexpected registry state '$STATE'"; exit 1; fi
           DIST_TAG=latest
-          if [ "${{ needs.verify.outputs.prerelease }}" = "true" ]; then DIST_TAG=next; fi
+          if [ "$PRERELEASE" = "true" ]; then DIST_TAG=next; fi
           npm publish "public/releases/$VERSION/typeset.us-$VERSION.tgz" --provenance --access public --tag "$DIST_TAG"
+          echo "by=workflow" >> "$GITHUB_OUTPUT"
 
-      - name: The registry serves the ledger's bytes, with an attestation
+      # An attestation exists only when this workflow published; a version the
+      # maintainer published has none, so the check is skipped, not faked.
+      - name: The registry serves the ledger's bytes, with an attestation when this workflow published
+        env:
+          PUBLISHED_BY: ${{ steps.publish.outputs.by }}
         run: |
           node scripts/v4/verify-ledger.mjs --network
-          npm view "typeset.us@$VERSION" dist.attestations --json | tee output/npm-attestations.json
-          test -s output/npm-attestations.json
+          if [ "$PUBLISHED_BY" = workflow ]; then
+            npm view "typeset.us@$VERSION" dist.attestations --json | tee output/npm-attestations.json
+            test -s output/npm-attestations.json
+          elif [ "$PUBLISHED_BY" = maintainer ]; then
+            echo "typeset.us@$VERSION was published by the maintainer account: no provenance attestation exists, so none is checked."
+          else
+            echo "Unknown publisher '$PUBLISHED_BY'"; exit 1
+          fi
 
       - name: GitHub Release with notes and evidence
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISHED_BY: ${{ steps.publish.outputs.by }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
-          node scripts/v4/release-notes.mjs --version "$VERSION" --provenance --out output/release-notes.md
+          case "$PUBLISHED_BY" in
+            workflow) NOTES=--provenance ;;
+            maintainer) NOTES=--maintainer ;;
+            *) echo "Unknown publisher '$PUBLISHED_BY'"; exit 1 ;;
+          esac
+          node scripts/v4/release-notes.mjs --version "$VERSION" "$NOTES" --out output/release-notes.md
           FLAGS=""
-          if [ "${{ needs.verify.outputs.prerelease }}" = "true" ]; then FLAGS="--prerelease"; fi
+          if [ "$PRERELEASE" = "true" ]; then FLAGS="--prerelease"; fi
           gh release create "$TAG" --verify-tag --title "typeset.us $VERSION" --notes-file output/release-notes.md $FLAGS \
             output/*.json "public/releases/$VERSION/typeset.us-$VERSION.tgz"

@@ -102,6 +102,6 @@ Each release's own guide stays in its archive, unchanged:
 Moving from 3.x: typeset.us 3.0.0 to 3.4.0 and the go@3.3.2.js and
 go@3.4.0.js pins have a DOM XSS when a page calls `Typeset.auto()` on
 `[data-typeset-heading]` text an attacker can influence. Those files stay
-online unchanged, like every published file, and are deprecated on npm. Move
-to 4.3, or at least to 3.4.1. Details:
+online unchanged, like every published file. Move to 4.3, or at least to
+3.4.1. Details:
 https://github.com/speedwarnsf/web-typography/blob/master/SECURITY.md

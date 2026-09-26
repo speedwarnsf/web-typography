@@ -63,6 +63,11 @@ files locally and reads the same score.
 
 ## npm
 
+Until step 1 is done, the maintainer account publishes each release's
+ledger-recorded tarball by hand (4.2.0 and 4.3.0 were published that way;
+see [RELEASING.md](RELEASING.md)), and `release.yml` only creates the GitHub
+Release for it.
+
 1. typeset.us > Settings > Trusted publishing > add GitHub Actions:
    organization or user `speedwarnsf`, repository `web-typography`, workflow
    `release.yml`, environment `npm`. After the first provenance release,

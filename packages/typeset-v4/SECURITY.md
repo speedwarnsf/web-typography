@@ -16,8 +16,9 @@ problem privately, and what happens next.
 Published files are never changed, including vulnerable ones: npm versions,
 `/releases/<version>/` archives and `go@<version>.js` pins keep their bytes
 so that pinned integrity hashes keep working. A fix ships as a new version.
-Affected versions are deprecated on npm and listed under `advisories` in
-https://typeset.us/release.json.
+Affected versions are listed under `advisories` in
+https://typeset.us/release.json. npm does not mark the affected 3.x versions
+deprecated yet.
 
 ## Reporting a vulnerability
 
@@ -65,9 +66,13 @@ need a malicious browser extension or a compromised device.
 
 ## How releases are made
 
-Releases are cut by `scripts/release-cut.mjs`, verified in CI, and from 4.3.0
-published by the tag-triggered `release.yml` workflow with npm provenance.
-Every published file is recorded by hash in
-https://typeset.us/releases/published.json, and CI fails if any of them
-changes. The package has no runtime dependencies, no install scripts, and no
+Releases are cut by `scripts/release-cut.mjs` and verified in CI. 4.3.0,
+like 4.2.0, was published to npm by the maintainer account from the
+reproducible tarball the cut recorded in the ledger, and the registry's
+integrity is checked against the ledger; it has no npm provenance
+attestation. The tag-triggered `release.yml` workflow publishes with npm
+provenance once npm trusted publishing is configured for the package (see
+`docs/OWNER-ACTIONS.md` in the repository). Every published file is recorded
+by hash in https://typeset.us/releases/published.json, and CI fails if any
+of them changes. The package has no runtime dependencies, no install scripts, and no
 network access, storage or telemetry.

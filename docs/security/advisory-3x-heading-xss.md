@@ -73,9 +73,10 @@ trusted, or stop calling `Typeset.auto()`.
 
 typeset.us promises that published files never change, so that every pinned
 `integrity` hash keeps working. The vulnerable npm versions and pins remain
-downloadable; they are deprecated on npm, listed under `advisories` in
+downloadable; they are listed under `advisories` in
 https://typeset.us/release.json and https://typeset.us/sri.json, and named
-in SECURITY.md and the migration guide.
+in SECURITY.md and the migration guide. npm does not mark them deprecated
+yet.
 
 ## Timeline
 

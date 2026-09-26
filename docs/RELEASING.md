@@ -1,7 +1,15 @@
 # Releasing typeset.us
 
-A release is cut locally, reviewed and committed, then published by CI from
-a tag. Nothing is published from a laptop.
+A release is cut locally, reviewed and committed, and verified by CI. What
+goes to npm is always the tarball the cut recorded in the ledger,
+`public/releases/x.y.z/typeset.us-x.y.z.tgz`, never a fresh pack. Two
+paths publish it:
+
+- **The maintainer account**, until npm trusted publishing is configured
+  ([OWNER-ACTIONS.md](OWNER-ACTIONS.md)). 4.2.0 and 4.3.0 were published
+  this way; they have no npm provenance attestation.
+- **`.github/workflows/release.yml`**, with npm provenance, once trusted
+  publishing is configured.
 
 ## 1. Before the cut
 
@@ -56,6 +64,30 @@ that is only on the release branch (for 4.3.0: SECURITY.md, STABILITY.md,
 the advisory and advisories.json) is a 404 on npm, on the website and in
 the GitHub Release until `master` has it.
 
+### Until trusted publishing is configured: the maintainer publishes
+
+Publish before you push the tag, so the workflow finds the version on npm.
+On the cut commit, with an official Node build and npm logged in as the
+maintainer account:
+
+```sh
+node scripts/v4/verify-ledger.mjs --version x.y.z        # the tarball on disk is the ledger's
+node scripts/v4/release-check.mjs --version x.y.z --ref HEAD   # the cut commit rebuilds it byte for byte
+npm publish public/releases/x.y.z/typeset.us-x.y.z.tgz --access public --tag latest
+node scripts/v4/verify-ledger.mjs --network --version x.y.z   # npm serves the ledger's integrity
+git tag -s vx.y.z -m "typeset.us x.y.z"
+git push origin vx.y.z
+```
+
+`release.yml` runs steps 1 to 3 below. `scripts/v4/registry-state.mjs`
+finds the version on npm with the ledger's integrity, so step 5 does not
+publish it again and skips the attestation check (a hand-published version
+has no attestation), and step 6 creates the GitHub Release with notes that
+say the maintainer account published it and that it has no provenance. If
+npm serves the version with any other bytes, the workflow fails.
+
+### With trusted publishing: the workflow publishes
+
 ```sh
 git tag -s vx.y.z -m "typeset.us x.y.z"   # on the cut commit
 git push origin vx.y.z
@@ -73,15 +105,19 @@ git push origin vx.y.z
    longer names it;
 5. publishes exactly `public/releases/x.y.z/typeset.us-x.y.z.tgz` with npm
    trusted publishing and `--provenance`, checks that the registry's
-   integrity equals the ledger and that an attestation exists;
+   integrity equals the ledger and that an attestation exists (a version
+   npm already serves with the ledger's integrity is not published again,
+   and one it serves with other bytes stops the workflow);
 6. creates the GitHub Release from the CHANGELOG section
    (`scripts/v4/release-notes.mjs`, template in
    `.github/release-notes-template.md`) with the evidence JSON and the
    tarball attached, so the evidence does not expire with CI artifacts.
 
 The published package has no `gitHead`: its bytes are fixed by the cut,
-before the tag commit exists. The provenance attestation names the commit and
-the workflow run instead.
+before the tag commit exists. For a version the workflow published, the
+provenance attestation names the commit and the workflow run instead; for a
+maintainer-published version, the ledger and step 2's byte-for-byte rebuild
+from the tag tie the tarball to its sources.
 
 Rehearse steps 1 to 3 on any tag with Actions > Release > Run workflow; the
 rehearsal runs `npm publish --dry-run` and never publishes.

@@ -4,8 +4,13 @@
 // install lines with the pinned loader's integrity, the npm tarball's hashes
 // from the ledger, and the evidence files attached to the release.
 //
-//   node scripts/v4/release-notes.mjs --version 4.3.0 [--out output/release-notes.md] [--provenance]
+//   node scripts/v4/release-notes.mjs --version 4.3.0 [--out output/release-notes.md] [--provenance | --maintainer]
 //   node scripts/v4/release-notes.mjs --version 4.2.0 --backfill   (notes for an existing tag)
+//
+// --provenance: release.yml published the version with npm provenance.
+// --maintainer: the maintainer account published the ledger-recorded tarball
+// (4.2.0 and 4.3.0, before trusted publishing was configured); the notes say
+// it has no provenance attestation instead of claiming one.
 //
 // Fails when CHANGELOG.md has no "## <version>" section or the ledger does not
 // record the version, so a release cannot go out without both.
@@ -31,9 +36,10 @@ export function changelogSection(changelog, version) {
 }
 
 /**
- * @param {{ version: string, evidenceDir?: string, provenance?: boolean, backfill?: boolean, root?: string }} options
+ * @param {{ version: string, evidenceDir?: string, provenance?: boolean, maintainer?: boolean, backfill?: boolean, root?: string }} options
  */
-export async function releaseNotes({ version, evidenceDir = 'output', provenance = false, backfill = false, root = '.' }) {
+export async function releaseNotes({ version, evidenceDir = 'output', provenance = false, maintainer = false, backfill = false, root = '.' }) {
+  if (provenance && maintainer) throw new Error('Pass --provenance or --maintainer, not both: a version is published by the workflow or by the maintainer account.');
   const changelog = await readFile(resolve(root, 'CHANGELOG.md'), 'utf8');
   const section = changelogSection(changelog, version);
   if (!section) throw new Error(`CHANGELOG.md has no "## ${version}" section.`);
@@ -75,15 +81,16 @@ export async function releaseNotes({ version, evidenceDir = 'output', provenance
     .replaceAll('{{integrity}}', entry.tarball.integrity)
     .replaceAll('{{provenance}}', provenance
       ? '- Published from GitHub Actions with npm provenance: `npm view typeset.us@' + version + ' dist.attestations`.'
+      : maintainer ? '- Published to npm by the maintainer account, not by GitHub Actions, so it has no npm provenance attestation. The release workflow rebuilt this tarball from the tag byte for byte and checked that the registry serves the ledger\'s integrity.'
       : backfill ? '- Published by hand before provenance publishing existed.' : '')
     .replaceAll('{{evidence}}', evidence.join('\n'));
   return body.replace(/\n{3,}/g, '\n\n');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { values } = parseArgs({ options: { version: { type: 'string' }, out: { type: 'string' }, evidence: { type: 'string', default: 'output' }, provenance: { type: 'boolean', default: false }, backfill: { type: 'boolean', default: false } } });
+  const { values } = parseArgs({ options: { version: { type: 'string' }, out: { type: 'string' }, evidence: { type: 'string', default: 'output' }, provenance: { type: 'boolean', default: false }, maintainer: { type: 'boolean', default: false }, backfill: { type: 'boolean', default: false } } });
   if (!values.version) throw new Error('Pass --version x.y.z.');
-  const notes = await releaseNotes({ version: values.version, evidenceDir: values.evidence, provenance: values.provenance, backfill: values.backfill });
+  const notes = await releaseNotes({ version: values.version, evidenceDir: values.evidence, provenance: values.provenance, maintainer: values.maintainer, backfill: values.backfill });
   if (values.out) await writeFile(values.out, notes);
   else process.stdout.write(notes);
 }

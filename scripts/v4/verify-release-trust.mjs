@@ -2,16 +2,20 @@
 // The release pipeline and security policy people are asked to trust (K9):
 // workflows pinned by commit SHA with least-privilege permissions, a release
 // workflow that publishes only the ledger-recorded tarball with provenance
-// after release-check and test:release, Dependabot for npm and Actions,
-// SECURITY.md in the repository and the package, a machine-readable list of
-// advisories for published files, and release notes that build for every
-// published 4.x version.
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+// after release-check and test:release, and that leaves alone a version the
+// maintainer account already published with the ledger's bytes (claiming no
+// provenance for it) but stops on any other bytes, Dependabot for npm and
+// Actions, SECURITY.md in the repository and the package, a machine-readable
+// list of advisories for published files, and release notes that build for
+// every published 4.x version.
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { readLedger } from './ledger.mjs';
 import { packerReproduces } from './packer.mjs';
 import { releaseNotes } from './release-notes.mjs';
+import { classifyRegistry } from './registry-state.mjs';
 
 /** @type {{ label: string, pass: boolean, detail?: unknown }[]} */
 const checks = [];
@@ -36,6 +40,63 @@ function block(text, key) {
   }
   return out.join('\n');
 }
+
+/**
+ * The `run: |` script of the step whose name starts with `name`, in a job's
+ * block of release.yml; null when there is no such step.
+ * @param {string} job @param {string} name @returns {string | null}
+ */
+function stepScript(job, name) {
+  const lines = job.split('\n');
+  const start = lines.findIndex(line => /^\s*- name: /.test(line) && line.replace(/^\s*- name: /, '').startsWith(name));
+  if (start < 0) return null;
+  const stepIndent = lines[start].indexOf('-');
+  let at = start + 1;
+  for (; at < lines.length; at++) {
+    const line = lines[at];
+    if (line.trim() && line.length - line.trimStart().length <= stepIndent) return null;
+    if (/^\s*run: \|\s*$/.test(line)) break;
+  }
+  if (at >= lines.length) return null;
+  const runIndent = lines[at].length - lines[at].trimStart().length;
+  const body = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() && line.length - line.trimStart().length <= runIndent) break;
+    body.push(line);
+  }
+  const indent = Math.min(...body.filter(line => line.trim()).map(line => line.length - line.trimStart().length));
+  return body.map(line => line.slice(indent)).join('\n').trimEnd() + '\n';
+}
+
+/**
+ * A stand-in for npm (CommonJS, run from a temporary PATH entry): it logs
+ * every call, answers `npm view` from the ledger as FAKE_NPM says (ledger:
+ * the ledger's integrity; other: other bytes under FAKE_VERSION; absent: 404
+ * for FAKE_VERSION; offline: no registry) and pretends to publish.
+ */
+const FAKE_NPM = `#!/usr/bin/env node
+const { appendFileSync, readFileSync } = require('node:fs');
+const args = process.argv.slice(2);
+appendFileSync(process.env.FAKE_LOG, JSON.stringify(['npm', ...args]) + '\\n');
+if (args[0] === 'publish') process.exit(0);
+if (args[0] !== 'view') process.exit(0);
+const mode = process.env.FAKE_NPM;
+const version = args[1].slice(args[1].lastIndexOf('@') + 1);
+if (mode === 'offline') { process.stderr.write('npm error code ENOTFOUND\\nnpm error network request to https://registry.npmjs.org/ failed\\n'); process.exit(1); }
+if (mode === 'absent' && version === process.env.FAKE_VERSION) { process.stderr.write('npm error code E404\\nnpm error 404 No match found for version ' + version + '\\n'); process.exit(1); }
+const entry = JSON.parse(readFileSync('public/releases/published.json', 'utf8')).releases[version];
+if (!entry || !entry.npm) { process.stderr.write('npm error code E404\\n'); process.exit(1); }
+const dist = { integrity: entry.npm.integrity, shasum: entry.npm.shasum };
+if (mode === 'other' && version === process.env.FAKE_VERSION) dist.integrity = 'sha512-' + 'A'.repeat(86) + '==';
+if (args[2] === 'dist.integrity') process.stdout.write(dist.integrity + '\\n');
+else if (args[2] === 'dist') process.stdout.write(JSON.stringify(dist) + '\\n');
+else if (args[2] === 'dist.attestations') process.stdout.write(process.env.FAKE_ATTESTATIONS || '');
+`;
+
+/** A stand-in for gh that logs its arguments. */
+const FAKE_GH = `#!/usr/bin/env node
+require('node:fs').appendFileSync(process.env.FAKE_LOG, JSON.stringify(['gh', ...process.argv.slice(2)]) + '\\n');
+`;
 
 /** npm, then its tarball gzipped again at level 1: the same tar in other bytes. */
 const REGZIP = `import { execFileSync } from 'node:child_process';
@@ -77,8 +138,107 @@ try {
     && /git fetch --force --no-tags origin "refs\/tags\/\$TAG:refs\/tags\/\$TAG"/.test(publish) && /"\$NOW" != "\$VERIFIED"/.test(publish) && publish.indexOf('The tag still names the verified commit') < publish.indexOf('npm publish'));
   check('release.yml publish job may mint an OIDC token (trusted publishing)', /id-token: write/.test(publish));
   check('release.yml publishes exactly the committed tarball with provenance', /npm publish "public\/releases\/\$VERSION\/typeset\.us-\$VERSION\.tgz" --provenance/.test(publish) && !/npm publish(?! "public\/releases)/.test(publish.replace(/--dry-run/g, '')));
-  check('release.yml confirms registry integrity and an attestation after publishing', /verify-ledger\.mjs --network/.test(publish) && /dist\.attestations/.test(publish));
-  check('release.yml creates the GitHub Release with notes and evidence attached', /release-notes\.mjs --version "\$VERSION" --provenance/.test(publish) && /gh release create "\$TAG" --verify-tag/.test(publish) && /output\/\*\.json/.test(publish));
+  check('release.yml asks the registry (registry-state.mjs) before the dry run and before publishing', /registry-state\.mjs --version "\$VERSION"\)" \|\| exit 1/.test(verify) && verify.indexOf('registry-state.mjs') < verify.indexOf('npm publish')
+    && /registry-state\.mjs --version "\$VERSION"\)" \|\| exit 1/.test(publish) && publish.indexOf('registry-state.mjs') < publish.indexOf('npm publish'));
+  check('release.yml confirms registry integrity, and an attestation only for a version it published', /verify-ledger\.mjs --network/.test(publish)
+    && /PUBLISHED_BY: \$\{\{ steps\.publish\.outputs\.by \}\}/.test(publish) && /if \[ "\$PUBLISHED_BY" = workflow \]; then\n\s+npm view "typeset\.us@\$VERSION" dist\.attestations/.test(publish));
+  check('release.yml creates the GitHub Release with notes and evidence attached, claiming provenance only for a version it published', /workflow\) NOTES=--provenance ;;/.test(publish) && /maintainer\) NOTES=--maintainer ;;/.test(publish)
+    && /release-notes\.mjs --version "\$VERSION" "\$NOTES"/.test(publish) && /gh release create "\$TAG" --verify-tag/.test(publish) && /output\/\*\.json/.test(publish));
+
+  // The maintainer-published path, run: the publish job's scripts with npm and
+  // gh replaced by stand-ins, against the newest 4.x release in the ledger.
+  {
+    const ledger = await readLedger();
+    const version = Object.keys(ledger.releases).filter(v => /^4\.\d+\.\d+$/.test(v) && ledger.releases[v].npm && ledger.releases[v].tarball).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).at(-1) ?? '';
+    const integrity = ledger.releases[version]?.tarball?.integrity;
+    const other = 'sha512-' + 'A'.repeat(86) + '==';
+    const cases = /** @type {[string, Parameters<typeof classifyRegistry>[0]['view'], string][]} */ ([
+      ['the ledger\'s integrity', { status: 0, stdout: `${integrity}\n`, stderr: '' }, 'published'],
+      ['other bytes', { status: 0, stdout: `${other}\n`, stderr: '' }, 'conflict'],
+      ['a 404', { status: 1, stdout: '', stderr: 'npm error code E404\nnpm error 404 No match found for version\n' }, 'unpublished'],
+      ['no registry', { status: 1, stdout: '', stderr: 'npm warn config\nnpm error code ENOTFOUND\n' }, 'unknown'],
+      ['an empty answer', { status: 0, stdout: '\n', stderr: '' }, 'unknown'],
+    ]);
+    const classified = cases.map(([label, view, expected]) => ({ label, expected, actual: classifyRegistry({ version, ledgerIntegrity: integrity, view }).state }));
+    check(`registry-state classifies npm's answer for ${version}: ledger bytes published, other bytes a conflict, 404 unpublished, errors unknown`, !!integrity && classified.every(c => c.actual === c.expected)
+      && classifyRegistry({ version: '0.0.0', ledgerIntegrity: undefined, view: cases[0][1] }).state === 'unknown', classified);
+
+    const work = await mkdtemp(join(tmpdir(), 'typeset-trust-release-'));
+    try {
+      const bin = join(work, 'bin'), tree = join(work, 'tree');
+      await mkdir(bin); await mkdir(join(tree, 'output'), { recursive: true });
+      // The scripts are copied, not linked: a script run through a symlink
+      // does not see itself as the main module. The data they read is linked.
+      await cp('scripts/v4', join(tree, 'scripts/v4'), { recursive: true, filter: source => !source.includes('/node_modules') });
+      for (const path of ['public', 'docs', '.github', 'CHANGELOG.md']) await symlink(resolve(path), join(tree, path));
+      await writeFile(join(bin, 'npm'), FAKE_NPM); await writeFile(join(bin, 'gh'), FAKE_GH);
+      await chmod(join(bin, 'npm'), 0o755); await chmod(join(bin, 'gh'), 0o755);
+      const scripts = {
+        dryRun: stepScript(verify, 'npm accepts the tarball'),
+        publish: stepScript(publish, 'Publish exactly the ledger-recorded tarball'),
+        registry: stepScript(publish, "The registry serves the ledger's bytes"),
+        release: stepScript(publish, 'GitHub Release with notes and evidence'),
+      };
+      check('release.yml: the dry-run, publish, registry and GitHub Release steps have run scripts without ${{ }} expressions (they read env)', Object.values(scripts).every(text => text && !text.includes('${{')), Object.fromEntries(Object.entries(scripts).map(([k, v]) => [k, v === null ? null : v.includes('${{')])));
+      let run = 0;
+      /** @param {string | null} script @param {Record<string, string>} env */
+      const runStep = async (script, env) => {
+        const dir = join(work, `run-${++run}`);
+        await mkdir(dir);
+        const log = join(dir, 'calls.jsonl'), output = join(dir, 'github-output'), file = join(dir, 'step.sh');
+        await writeFile(log, ''); await writeFile(output, ''); await writeFile(file, script ?? 'exit 99\n');
+        await rm(join(tree, 'output'), { recursive: true, force: true }); await mkdir(join(tree, 'output'));
+        const base = { ...process.env };
+        delete base.GITHUB_ACTIONS; delete base.GITHUB_OUTPUT; delete base.npm_config_cache;
+        const result = spawnSync('bash', ['--noprofile', '--norc', '-e', file], { cwd: tree, encoding: 'utf8', timeout: 120000, env: { ...base, PATH: `${bin}:${process.env.PATH}`, VERSION: version, TAG: `v${version}`, GITHUB_OUTPUT: output, FAKE_LOG: log, FAKE_VERSION: version, PRERELEASE: 'false', DIST_TAG: 'latest', EVENT: 'push', ...env } });
+        const calls = (await readFile(log, 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line));
+        const notes = await readFile(join(tree, 'output/release-notes.md'), 'utf8').catch(() => '');
+        return { status: result.status, calls, output: (await readFile(output, 'utf8')).trim(), notes, tail: (result.stdout + result.stderr).trim().split('\n').slice(-3) };
+      };
+      /** @param {{ calls: string[][] }} r */
+      const published = r => r.calls.filter(call => call[0] === 'npm' && call[1] === 'publish');
+      const tarball = `public/releases/${version}/typeset.us-${version}.tgz`;
+
+      const dryPublished = await runStep(scripts.dryRun, { FAKE_NPM: 'ledger' });
+      const dryOther = await runStep(scripts.dryRun, { FAKE_NPM: 'other' });
+      const dryAbsent = await runStep(scripts.dryRun, { FAKE_NPM: 'absent' });
+      check(`verify job, ${version} already on npm with the ledger's integrity: passes without a dry-run publish`, dryPublished.status === 0 && published(dryPublished).length === 0, dryPublished);
+      check(`verify job, ${version} on npm with other bytes: fails before any publish`, dryOther.status !== 0 && published(dryOther).length === 0, dryOther);
+      check(`verify job, ${version} not on npm: runs the dry-run publish of the ledger's tarball`, dryAbsent.status === 0 && published(dryAbsent).length === 1 && published(dryAbsent)[0].includes('--dry-run') && published(dryAbsent)[0][2] === tarball, dryAbsent);
+
+      const byMaintainer = await runStep(scripts.publish, { FAKE_NPM: 'ledger' });
+      const byOther = await runStep(scripts.publish, { FAKE_NPM: 'other' });
+      const offline = await runStep(scripts.publish, { FAKE_NPM: 'offline' });
+      const byWorkflow = await runStep(scripts.publish, { FAKE_NPM: 'absent' });
+      check(`publish job, ${version} already on npm with the ledger's integrity: does not publish, records the maintainer as publisher`, byMaintainer.status === 0 && published(byMaintainer).length === 0 && byMaintainer.output === 'by=maintainer', byMaintainer);
+      check(`publish job, ${version} on npm with other bytes: fails loudly and publishes nothing`, byOther.status !== 0 && published(byOther).length === 0 && byOther.output === '' && byOther.tail.some(line => /conflict: .*not the cut's bytes/.test(line)), byOther);
+      check('publish job, registry unreachable: fails and publishes nothing', offline.status !== 0 && published(offline).length === 0 && offline.output === '', offline);
+      check(`publish job, ${version} not on npm: publishes exactly the ledger's tarball with provenance`, byWorkflow.status === 0 && published(byWorkflow).length === 1 && published(byWorkflow)[0].join(' ') === `npm publish ${tarball} --provenance --access public --tag latest` && byWorkflow.output === 'by=workflow', byWorkflow);
+
+      const attestations = (/** @type {{ calls: string[][] }} */ r) => r.calls.filter(call => call[0] === 'npm' && call.includes('dist.attestations'));
+      const registryMaintainer = await runStep(scripts.registry, { FAKE_NPM: 'ledger', PUBLISHED_BY: 'maintainer' });
+      const registryMissing = await runStep(scripts.registry, { FAKE_NPM: 'ledger', PUBLISHED_BY: 'workflow' });
+      const registryAttested = await runStep(scripts.registry, { FAKE_NPM: 'ledger', PUBLISHED_BY: 'workflow', FAKE_ATTESTATIONS: '{"url":"https://registry.npmjs.org/-/npm/v1/attestations/x","provenance":{"predicateType":"https://slsa.dev/provenance/v1"}}' });
+      const registryUnknown = await runStep(scripts.registry, { FAKE_NPM: 'ledger', PUBLISHED_BY: '' });
+      check('registry step, maintainer-published: checks the ledger against the registry and asks for no attestation', registryMaintainer.status === 0 && attestations(registryMaintainer).length === 0 && registryMaintainer.calls.some(call => call[1] === 'view' && call[2] === `typeset.us@${version}` && call[3] === 'dist'), registryMaintainer);
+      check('registry step, workflow-published: fails without an attestation and passes with one', registryMissing.status !== 0 && attestations(registryMissing).length === 1 && registryAttested.status === 0 && attestations(registryAttested).length === 1, { registryMissing, registryAttested });
+      check('registry step, publisher unknown: fails', registryUnknown.status !== 0, registryUnknown);
+
+      const releaseMaintainer = await runStep(scripts.release, { PUBLISHED_BY: 'maintainer' });
+      const releaseWorkflow = await runStep(scripts.release, { PUBLISHED_BY: 'workflow' });
+      const releaseUnknown = await runStep(scripts.release, { PUBLISHED_BY: '' });
+      const gh = (/** @type {{ calls: string[][] }} */ r) => r.calls.filter(call => call[0] === 'gh');
+      check(`GitHub Release, maintainer-published: notes say so and claim no provenance`, releaseMaintainer.status === 0 && gh(releaseMaintainer).length === 1 && gh(releaseMaintainer)[0].slice(1, 5).join(' ') === `release create v${version} --verify-tag`
+        && /published to npm by the maintainer account/i.test(releaseMaintainer.notes) && /no npm provenance attestation/.test(releaseMaintainer.notes) && !/with npm provenance|dist\.attestations/.test(releaseMaintainer.notes) && releaseMaintainer.notes.includes(ledger.releases[version].tarball.sha1), { ...releaseMaintainer, notes: undefined });
+      check('GitHub Release, workflow-published: notes name the provenance attestation', releaseWorkflow.status === 0 && gh(releaseWorkflow).length === 1 && /with npm provenance/.test(releaseWorkflow.notes) && releaseWorkflow.notes.includes(`npm view typeset.us@${version} dist.attestations`) && !/maintainer account/.test(releaseWorkflow.notes), { ...releaseWorkflow, notes: undefined });
+      check('GitHub Release, publisher unknown: fails and creates no release', releaseUnknown.status !== 0 && gh(releaseUnknown).length === 0, releaseUnknown);
+      let both = '';
+      try { await releaseNotes({ version, provenance: true, maintainer: true }); } catch (error) { both = String(/** @type {Error} */ (error).message); }
+      check('release notes refuse to say both "provenance" and "maintainer"', /not both/.test(both), both);
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  }
 
   const dependabot = await readFile('.github/dependabot.yml', 'utf8');
   check('Dependabot watches npm and GitHub Actions', /package-ecosystem: npm/.test(dependabot) && /package-ecosystem: github-actions/.test(dependabot));

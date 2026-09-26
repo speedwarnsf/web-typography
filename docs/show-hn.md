@@ -78,8 +78,10 @@ leave — the first two hours of answering comments decide the thread.
   tests, under the 0.1 "good" threshold. It waits for web fonts.
 - **"Why should I trust a script tag?"** Pinned files with integrity hashes
   that never change, an append-only ledger of every published file checked in
-  CI, npm provenance from 4.3, SECURITY.md, and STABILITY.md's promise about
-  what a minor release may change.
+  CI, an npm tarball that CI rebuilds from the release tag byte for byte,
+  SECURITY.md, and STABILITY.md's promise about what a minor release may
+  change. npm provenance comes once trusted publishing is configured; 4.3.0
+  is published by the maintainer account.
 - **"It doesn't really 'read.'"** Agreed, and the essay says so: it runs
   the compositors' checklist, priced and searched. Neither did the
   composing room "understand" paragraphs.

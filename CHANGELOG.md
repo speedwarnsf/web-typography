@@ -10,7 +10,7 @@ Hashes for every published version live in
 
 ---
 
-## 4.3.0 - Unreleased
+## 4.3.0 - 2026-09-26
 
 4.3.0 follows 4.2.0. It is a minor release: no public API was renamed or
 removed, nothing new is required, and new API is additive. Default rendering
@@ -730,17 +730,28 @@ SUPPORT.md lists both.
 
 ### Release trust
 
-- Releases are published by `.github/workflows/release.yml` from a `v*` tag,
-  only after CI passed on that commit, `scripts/v4/release-check.mjs` rebuilt
-  the ledger-recorded tarball from the tag byte for byte, and every suite
-  passed against the committed dist; the publish job checks out that
-  verified commit, not the tag by name, and stops if the tag was moved
-  during the approval wait. It publishes exactly
+- 4.3.0, like 4.2.0, is published to npm by the maintainer account from the
+  reproducible tarball the cut recorded in the ledger,
+  `public/releases/4.3.0/typeset.us-4.3.0.tgz`, and the registry's
+  integrity is checked against the ledger. It has no npm provenance
+  attestation: npm trusted publishing is not configured for the package yet.
+- `.github/workflows/release.yml` publishes from a `v*` tag, with npm
+  provenance, once trusted publishing is configured (docs/OWNER-ACTIONS.md).
+  It runs only after CI passed on the tagged commit,
+  `scripts/v4/release-check.mjs` rebuilt the ledger-recorded tarball from the
+  tag byte for byte, and every suite passed against the committed dist; the
+  publish job checks out that verified commit, not the tag by name, and
+  stops if the tag was moved during the approval wait. It publishes exactly
   `public/releases/<v>/typeset.us-<v>.tgz` with npm trusted publishing and
   provenance, checks the registry's integrity and attestation, and creates a
-  GitHub Release from the CHANGELOG section with the evidence attached.
-  docs/RELEASING.md describes the flow; docs/OWNER-ACTIONS.md lists the
-  GitHub, npm and Vercel settings only the owner can apply.
+  GitHub Release from the CHANGELOG section with the evidence attached. A
+  version the maintainer account already published with the ledger's
+  integrity (`scripts/v4/registry-state.mjs`) is not published again: the
+  workflow skips the attestation check and creates the GitHub Release with
+  notes that say it has no provenance. Other bytes under the version on npm
+  fail the workflow. docs/RELEASING.md describes both paths;
+  docs/OWNER-ACTIONS.md lists the GitHub, npm and Vercel settings only the
+  owner can apply.
 - CI and nightly run with `contents: read` only, every action is pinned to a
   commit SHA, and Dependabot watches npm and GitHub Actions.
 - SECURITY.md (also in the package): supported versions, private reporting,

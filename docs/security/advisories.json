@@ -1,5 +1,5 @@
 {
-  "note": "Known vulnerabilities in published typeset.us files. release-cut.mjs copies this list into public/release.json and public/sri.json at each cut. Published files are never changed; affected versions are deprecated on npm. Fill in id and url when the GitHub advisory is published.",
+  "note": "Known vulnerabilities in published typeset.us files. release-cut.mjs copies this list into public/release.json and public/sri.json at each cut. Published files are never changed; affected npm versions are to be deprecated with docs/security/deprecate-3x.sh (not run yet). Fill in id and url when the GitHub advisory is published.",
   "advisories": [
     {
       "id": null,

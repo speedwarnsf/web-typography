@@ -8,8 +8,10 @@ promise; STABILITY.md governs what a minor release may change.
 Accessible, stable, installable. Output that reads correctly in the
 accessibility trees of Chromium, WebKit and Firefox; correct composition
 through hidden panels, late fonts, printing and framework updates; React 18
-and 19, test runners and strict CSP; pinned-first installs, provenance
-publishing and documented outcomes. No new typographic features.
+and 19, test runners and strict CSP; pinned-first installs, a
+provenance-publishing release workflow (in use once npm trusted publishing
+is configured; 4.3.0 itself is published by the maintainer account) and
+documented outcomes. No new typographic features.
 
 ## 4.4
 
