@@ -267,24 +267,44 @@ for (const { name, engine, executablePath } of browsers) {
     if (name === 'chromium') {
       const cdp = await reactContext.newCDPSession(react);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-      for (const kind of ['slider', 'transition']) {
-        const result = await react.evaluate(async kind => {
-          const w = /** @type {any} */ (window);
-          const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
-          w.compositions = 0; w.longTasks.length = 0;
-          if (kind === 'slider') await w.frames(60, (/** @type {number} */ i) => { wrap.style.fontSize = (17 + i * 2 / 60).toFixed(2) + 'px'; });
-          else { wrap.classList.add('ease'); wrap.classList.add('big'); }
-          await new Promise(r => setTimeout(r, 2500));
-          const out = { compositions: w.compositions, longTasks: [...w.longTasks], intact: w.intact(), composed: w.composed(), stale: document.querySelectorAll('#app [data-ts-stale]').length };
-          wrap.classList.remove('ease', 'big'); wrap.style.fontSize = '';
-          await new Promise(r => setTimeout(r, 2500));
-          return out;
-        }, kind);
-        // Long tasks: the change's first composition and the final one (4.3
-        // before this check: 30 or more for the slider, 4 for the transition).
-        check(`React at 4x CPU: a ${kind === 'slider' ? 'text-size slider (60 frames)' : 'font-size transition'} recomposes each block a few times, not every frame, and ends composed`,
-          result.compositions <= 64 && result.longTasks.length <= (kind === 'slider' ? 6 : 2) && result.composed >= 14 && result.intact === result.composed && result.stale === 0, result);
-      }
+      const change = (/** @type {string} */ kind) => react.evaluate(async kind => {
+        const w = /** @type {any} */ (window);
+        const wrap = /** @type {HTMLElement} */ (document.getElementById('wrap'));
+        w.compositions = 0; w.longTasks.length = 0;
+        if (kind === 'slider') await w.frames(60, (/** @type {number} */ i) => { wrap.style.fontSize = (17 + i * 2 / 60).toFixed(2) + 'px'; });
+        else { wrap.classList.add('ease'); wrap.classList.add('big'); }
+        await new Promise(r => setTimeout(r, 2500));
+        const out = { hosts: w.hosts().length, compositions: w.compositions, longTasks: [...w.longTasks], intact: w.intact(), composed: w.composed(), stale: document.querySelectorAll('#app [data-ts-stale]').length };
+        wrap.classList.remove('ease', 'big'); wrap.style.fontSize = '';
+        await new Promise(r => setTimeout(r, 2500));
+        return out;
+      }, kind);
+      // The slider: at most 4 compositions a block and 6 long tasks (the
+      // change's first composition and the final one; 4.3 before this check:
+      // 466 compositions and 30 or more long tasks).
+      const slider = await change('slider');
+      check('React at 4x CPU: a text-size slider (60 frames) recomposes each block a few times, not every frame, and ends composed',
+        slider.compositions <= 4 * slider.hosts && slider.longTasks.length <= 6 && slider.composed >= 14 && slider.intact === slider.composed && slider.stale === 0, slider);
+      // The transition, three times; each must stay within 4 compositions a
+      // block and 4 long tasks and end composed. At 4x CPU the final
+      // composition of 16 blocks spans a few frames, and whether 0, 1, 2 or
+      // 3 of those tasks cross 50 ms is timing, so one run held to 2 long
+      // tasks was flaky: it failed 1 of 4 standalone runs at the gate-4 HEAD
+      // (4fd1f3f) and 2 of 4 at c8fe141, with 3 tasks of 50 to 75 ms each
+      // time. Calibration, Chromium at 4x on an M2 Pro, load 5 to 7, 10 runs
+      // of that one-run check per build: 0 to 3 long tasks (median 1; 3 in 2
+      // runs) and 37 to 41 compositions with the rolled-back near observer;
+      // 0 to 3 (median 1; 3 in 1 run) and 33 to 46 with the round-2
+      // candidate (44e4721). The build before per-frame settling (8bfedc1^)
+      // made 1 to 3 and 33 to 50, so no long-task limit separates it here;
+      // its slider does (463 to 468 compositions and 59 long tasks, against
+      // 26 to 49 and 2 to 5). 4 is the most seen, 3, plus one; a transition
+      // recomposed every frame would add a long task and a composition per
+      // block for each frame it ran.
+      const transitions = [];
+      for (let run = 0; run < 3; run++) transitions.push(await change('transition'));
+      check('React at 4x CPU: a font-size transition recomposes each block a few times, not every frame, and ends composed (3 runs)',
+        transitions.every(t => t.compositions <= 4 * t.hosts && t.longTasks.length <= 4 && t.composed >= 14 && t.intact === t.composed && t.stale === 0), transitions);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     }
     await reactContext.close();
