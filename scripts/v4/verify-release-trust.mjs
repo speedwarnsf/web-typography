@@ -6,8 +6,11 @@
 // SECURITY.md in the repository and the package, a machine-readable list of
 // advisories for published files, and release notes that build for every
 // published 4.x version.
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readLedger } from './ledger.mjs';
+import { packerReproduces } from './packer.mjs';
 import { releaseNotes } from './release-notes.mjs';
 
 /** @type {{ label: string, pass: boolean, detail?: unknown }[]} */
@@ -33,6 +36,20 @@ function block(text, key) {
   }
   return out.join('\n');
 }
+
+/** npm, then its tarball gzipped again at level 1: the same tar in other bytes. */
+const REGZIP = `import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import { join } from 'node:path';
+const args = process.argv.slice(2);
+const out = execFileSync('npm', args, { encoding: 'utf8' });
+if (args[0] === 'pack') {
+  const dest = args[args.indexOf('--pack-destination') + 1];
+  for (const { filename } of JSON.parse(out)) writeFileSync(join(dest, filename), gzipSync(gunzipSync(readFileSync(join(dest, filename))), { level: 1 }));
+}
+process.stdout.write(out);
+`;
 
 try {
   const workflows = (await readdir('.github/workflows')).filter(file => file.endsWith('.yml'));
@@ -67,12 +84,28 @@ try {
   check('Dependabot watches npm and GitHub Actions', /package-ecosystem: npm/.test(dependabot) && /package-ecosystem: github-actions/.test(dependabot));
   check('Dependabot leaves the pinned esbuild alone (reproducible builds)', /dependency-name: esbuild/.test(dependabot));
 
-  // The release process names what the workflows assume: the npm that
-  // packs the tarball (release-check rebuilds it with this one), and master
-  // holding the files the published docs link at blob/master.
+  // The release process names what the workflows assume: a node whose zlib
+  // packs the bytes release-check rebuilds (they follow the node build, not
+  // the npm version: 4.2.0's files repack identically with npm 11.6.0 and
+  // 11.8.0 on an official node, and differently with either on Homebrew's),
+  // and master holding the files the published docs link at blob/master.
   const releasing = await readFile('docs/RELEASING.md', 'utf8');
-  const pinnedNpm = [...new Set([...release.matchAll(/npm install -g (npm@\S+)/g)].map(m => m[1]))];
-  check('RELEASING.md says to cut with the npm the release workflow rebuilds with', pinnedNpm.length === 1 && releasing.includes(pinnedNpm[0]), { pinnedNpm });
+  check('RELEASING.md asks for an official Node build, whose bundled zlib packs the recorded bytes', /official Node build/.test(releasing) && /process\.versions\.zlib/.test(releasing));
+  check('no workflow or RELEASING.md says the npm version changes the tarball bytes', ![releasing, release, ci].some(text => /npm 11\.8\.0 packs/.test(text)));
+  const cut = await readFile('scripts/release-cut.mjs', 'utf8');
+  check('release-cut refuses to cut unless its npm repacks the previous release byte for byte', /packerReproduces\(\{ root: repo, cache: npmCache, before: version \}\)/.test(cut) && /precondition\(`the npm on PATH repacks/.test(cut));
+  const cache = await mkdtemp(join(tmpdir(), 'typeset-trust-npm-'));
+  try {
+    const here = await packerReproduces({ cache });
+    check(`release-cut's packer check passes here: this npm repacks typeset.us@${here.version} byte for byte`, here.pass, here);
+    // The same tar gzipped at another level, as a system zlib's deflate differs.
+    const shim = join(cache, 'regzip.mjs');
+    await writeFile(shim, REGZIP);
+    const other = await packerReproduces({ cache, npm: [process.execPath, shim] });
+    check("release-cut's packer check refuses an npm that gzips the same files into other bytes", here.pass && !other.pass && !!other.packed && other.packed !== here.packed, other);
+  } finally {
+    await rm(cache, { recursive: true, force: true });
+  }
   const linked = /** @type {string[]} */ ([]);
   for (const file of ['packages/typeset-v4/README.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/SECURITY.md', 'SECURITY.md', 'docs/security/advisories.json']) {
     for (const [, path] of (await readFile(file, 'utf8')).matchAll(/github\.com\/speedwarnsf\/web-typography\/blob\/master\/([\w./-]+?)\.?(?=[\s")\]]|$)/gm)) linked.push(path);

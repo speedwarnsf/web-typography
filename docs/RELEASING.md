@@ -11,11 +11,18 @@ a tag. Nothing is published from a laptop.
 - The docs in `packages/typeset-v4/` describe x.y.z: `npm run test:v4`
   includes `verify-docs`, which checks install lines, options and links.
 - CI is green on the commit you will cut from.
-- Your npm is 11.6.0 (`npm install -g npm@11.6.0`; `npm --version`). The
-  cut packs the tarball with the npm on your PATH, and CI's release-check
-  rebuilds it with npm 11.6.0 and compares bytes: npm 11.8.0 packs the same
-  files into different bytes, so a cut packed with another npm fails
-  release-check after you tag it.
+- The `node` first on your PATH is an official Node build (from
+  nodejs.org, nvm or fnm; CI uses setup-node's node 22), not one linked to
+  the system's zlib, such as Homebrew's: `node -p process.versions.zlib`
+  prints a bundled version such as `1.3.1-470d3a2`, not `1.2.12`. The cut
+  packs the tarball with the npm on your PATH, npm gzips it with the zlib
+  of the node it runs on, and CI's release-check repacks it and compares
+  bytes. Homebrew's node 25.5.0 packs 4.2.0's files into different bytes
+  (sha1 `3821bfa…` for the published `c24c7c0…`) with npm 11.6.0 and 11.8.0
+  alike, so a cut packed there would fail release-check after you tag it.
+  The npm version does not change the bytes. `release-cut.mjs` repacks the
+  previous release's files first and refuses to cut unless they come out
+  byte for byte as the ledger records them.
 
 ## 2. Cut
 

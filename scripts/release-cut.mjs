@@ -26,6 +26,7 @@ import { parseArgs } from 'node:util';
 import { buildPackageDist, emitDeclarations, writeManifest, buildSite, copyPackageFiles, compareVersions, sri, sha256, recipeFor, sriIndex, pinnedGlobal, EVERGREEN_MAJOR } from './build-recipe.mjs';
 import { readLedger, describeRelease, describePins, readTarball, LEDGER } from './v4/ledger.mjs';
 import { rootInstallBlock, replaceInstallBlock, currentInstallBlock } from './v4/docs-blocks.mjs';
+import { packerReproduces } from './v4/packer.mjs';
 
 const { values } = parseArgs({ options: {
   version: { type: 'string' }, 'dry-run': { type: 'boolean', default: false }, root: { type: 'string' },
@@ -60,6 +61,15 @@ const npmCache = await mkdtemp(join(tmpdir(), 'typeset-release-npm-'));
   const notFound = /E404|is not in this registry|No match found/.test(view.stderr + view.stdout);
   const published = view.status === 0 && view.stdout.trim() !== '';
   precondition(`typeset.us@${version} unused on npm`, notFound && !published, notFound ? undefined : (published ? 'already published' : (view.stderr || 'npm registry unreachable').split('\n')[0]));
+}
+if (!(await readLedger(repo).catch(() => null))?.releases?.[version]) {
+  // npm gzips the tarball with the zlib of the node it runs on, and CI's
+  // release-check repacks the cut with an official node 22 and compares
+  // bytes. A node linked to the system zlib (Homebrew's) packs the same files
+  // into different bytes with any npm version: it must not cut. (A dry run
+  // of a recorded version compares its own bytes with the ledger instead.)
+  const packer = await packerReproduces({ root: repo, cache: npmCache, before: version });
+  precondition(`the npm on PATH repacks typeset.us@${packer.version ?? '(none)'} into its recorded bytes (an official Node build, with its bundled zlib)`, packer.pass, packer);
 }
 {
   // Release notes come from CHANGELOG.md, so a release needs a dated section.

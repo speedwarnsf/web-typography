@@ -24,8 +24,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Tarball bytes depend on the npm that packs them: 4.2.0 was packed with
-      # npm 11.6.0, and npm 11.8.0 packs the same files into different bytes.
+      # Tarball bytes depend on the zlib of the node that runs npm pack, not on
+      # the npm version: setup-node's official builds bundle the zlib that
+      # packed 4.2.0 (a node linked to the system zlib packs different bytes).
+      # npm is pinned so that every job packs with the same npm.
       - name: The npm that packs release tarballs
         run: npm install -g npm@11.6.0
 
