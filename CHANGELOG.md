@@ -609,12 +609,15 @@ table.
   blocks scrolled in within about 0.5 to 1 s of a load or screen push
   (while animations kept frames pending) painted native lines and were
   rewrapped 2 to 5 frames later, which 4.2 did not do; now none within a
-  viewport height of the window or pane do, in three engines. `mount()`
-  measures nearness the same way. Two limits remain, both under Known
-  limitations: a wrapper that scrolls only horizontally counts as a scroll
-  container too, so offscreen blocks under an `overflow-x: hidden` app
-  root or in a carousel row count as near and can compose during a push;
-  and blocks further than a viewport height away still wait for idle time.
+  viewport height of the window or pane do in the verify-scheduler
+  fixtures, in three engines. `mount()` measures nearness the same way.
+  Three limits remain, all under Known limitations: a wrapper that scrolls
+  only horizontally counts as a scroll container too, so offscreen blocks
+  under an `overflow-x: hidden` app root or in a carousel row count as
+  near and can compose during a push; blocks further than a viewport
+  height away still wait for idle time; and in Chromium, text scrolled
+  into view during its first frames after it mounts can still paint native
+  lines for one frame.
 - React hosts under continuous change: a translation or fade written every
   frame on their container is no longer checked at all, as with `mount()`
   (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three
@@ -661,15 +664,25 @@ table.
   screen transition those blocks compose in animation frames instead of
   idle time: in verify-scheduler's fixture, 44 of 44 offscreen blocks
   under such an app root and 22 in 11 carousel rows composed during a
-  900 ms push in Chromium and Firefox. This costs frames on a slow device,
-  never correctness: every block paints what it reports, its composed
-  lines or native ones, never double-wrapped. On an app root,
+  900 ms push in Chromium and Firefox. This costs frames on a slow device.
+  In WebKit it can also cost the typesetting itself: when the cards in
+  such a carousel run a CSS entrance animation, about half of them decline
+  as `native:verification` and keep the browser's own line breaks (23 of
+  48 in verify-scheduler's fixture, where 4.2.0 composed 47). The text is
+  always correct: every block paints what it reports, its composed lines
+  or native ones, never double-wrapped. On an app root,
   `overflow-x: clip` clips the same way without making a scroll
   container. Four attempts in the 4.3 cycle to measure such text against
   the window each broke text that a real pane hides (rows a virtualized
   list places with a transform, a pane whose content grows above its
   text), so 4.3.0 keeps the round-2 release candidate's rule, and a fix is
   planned for 4.4.
+- **Text scrolled into view during its first frames, in Chromium.** A
+  block that a scroll brings on screen within its first frames after it
+  mounts (verify-scheduler's nested scroller scrolled 80 px a frame from
+  0 ms) can paint its native lines for one frame and rewrap in the next:
+  8 of 20 runs in Chromium, as in the round-2 release candidate, and 0 of
+  8 in Firefox and WebKit. 4.2.0 did not do this. Planned for 4.4.
 - **Prose far below an app shell's fold, on a jump soon after load.**
   Text more than one viewport or pane height below the fold composes in
   idle time, so a jump (a scrollbar drag, End, an anchor link, one large

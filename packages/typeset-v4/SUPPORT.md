@@ -354,10 +354,18 @@ changes only an isolated preview, never a deployed site.
   `auto`) or a horizontal carousel row is such an ancestor, so every block
   in it counts as near however far below the fold, and during a screen
   transition those blocks compose in animation frames rather than in idle
-  time, which can drop frames on a slow device. The text is always
+  time, which can drop frames on a slow device. In WebKit, when the cards
+  in such a carousel run a CSS entrance animation, about half of them
+  decline as `native:verification` and keep the browser's own line breaks
+  (23 of 48 in the test fixture; 4.2.0 composed 47). The text is always
   correct: each block paints its composed lines or native ones, never
   double-wrapped. On an app root, `overflow-x: clip` clips the same way
   without making a scroll container. Planned for 4.4.
+- **Text scrolled into view during its first frames, in Chromium.** A
+  block that a scroll brings on screen within its first frames after it
+  mounts can paint its native lines for one frame and rewrap in the next
+  (8 of 20 runs in the test fixture; Firefox and WebKit 0 of 8). 4.2.0 did
+  not do this. Planned for 4.4.
 - **A very long unbreakable run, in WebKit.** Measuring a paragraph reads
   each word's boxes, and a word the browser splits across lines is read one
   character at a time, so that each character counts on its own line.
