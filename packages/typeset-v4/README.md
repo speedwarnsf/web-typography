@@ -239,9 +239,11 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   For justified text use CSS `text-align: justify` with `hyphens: auto`.
 - **Indented paragraphs.** Any `text-indent`, including the book-style
   first-line indent (`p + p { text-indent: 1.5em }`) and a hanging indent,
-  keeps the browser's layout (`native:rich-whitespace`, or
-  `native:no-candidate` with `lineBreaks: 'legacy'`), so on a page set that
-  way every indented paragraph stays native.
+  keeps the browser's layout (`native:rich-whitespace`), so on a page set
+  that way every indented paragraph stays native. `lineBreaks: 'legacy'`
+  does not decline an indent, as in 4.2.0: it can compose an indented
+  paragraph or heading and repeat the indent on every line, so leave
+  indented text on the default line breaks.
 - **Right-to-left, vertical, and non-Latin scripts.** Arabic, Hebrew, CJK
   and other scripts keep the browser's layout (`native:script`,
   `native:direction`).
