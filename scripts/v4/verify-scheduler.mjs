@@ -15,9 +15,11 @@
 //   is within a viewport height of the pane, so blocks scrolled in soon after
 //   they mount (an entrance animation keeping frames pending) paint composed,
 //   never native lines rewrapped a few frames later; with TypesetText, and
-//   with mount() once its first pass could have run. A pane that overflows
-//   only after its hosts registered (FAQ answers in closed <details>) counts
-//   as their scrollport once it does.
+//   with mount() once its first pass could have run. A pane that hides text
+//   only after its hosts registered (FAQ answers in closed <details>)
+//   counts as their scrollport once it does; a transform that makes a
+//   wrapper overflow (a reveal library, a card entrance) hides nothing, so
+//   offscreen blocks under it are still measured against the window.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -61,7 +63,8 @@ const texts = ${JSON.stringify(corpus.slice(0, 48))};
 window.mountReact = () => { const root = createRoot(document.getElementById('app')); flushSync(() => root.render(h('div', null,
   texts.slice(0, 4).map((text, i) => h(TypesetText, { key: 'v' + i, text, className: 'r' })),
   h('div', { style: { height: '4000px' } }),
-  texts.slice(4).map((text, i) => h(TypesetText, { key: 'o' + i, text, className: 'r' }))))); };
+  texts.slice(4).map((text, i) => h(TypesetText, { key: 'o' + i, text, className: 'r' })),
+  h('footer', { className: 'reveal' }, 'Footer')))); };
 // The same 44 offscreen blocks in 11 horizontal carousel rows, 400 px apart.
 window.mountCarousels = () => { const root = createRoot(document.getElementById('app')); flushSync(() => root.render(h('div', null,
   texts.slice(0, 4).map((text, i) => h(TypesetText, { key: 'v' + i, text, className: 'r' })),
@@ -280,10 +283,16 @@ for (const { name, engine, executablePath } of browsers) {
     // so blocks thousands of pixels below the fold are not near and do not
     // compose in the animation frames of a screen push (P5). Taken as
     // scroll containers, every one of them was near.
-    for (const layout of ['overflow-x:hidden app root', 'carousel rows']) {
+    // A transform makes either overflow without hiding any text in it: a
+    // reveal library's translateY on the footer, set after the commit and
+    // cleared 150 ms later, or a CSS entrance animation on the cards from the
+    // frame after mounting. Placed again whenever the wrapper overflowed,
+    // the blocks were rooted there and every one of them was near: 44 of 44
+    // and 22 composed during the push in Chromium and Firefox (f0d01ac).
+    for (const [layout, effect] of [['overflow-x:hidden app root', ''], ['carousel rows', ''], ['overflow-x:hidden app root', 'a reveal transform after the commit'], ['carousel rows', 'a CSS entrance animation on the cards']]) {
       const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
       page.setDefaultTimeout(20000);
-      await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}#app{width:420px;padding:0 12px}#slide{position:fixed;top:0;left:0;width:40px;height:40px;background:#ccc}${layout === 'carousel rows' ? '.row{display:flex;gap:12px;overflow-x:auto;margin-bottom:400px}.row>.r{flex:0 0 200px;margin:0}' : '#app{overflow-x:hidden}'}</style></head><body><div id="slide"></div><div id="app"></div></body></html>`);
+      await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}#app{width:420px;padding:0 12px}#slide{position:fixed;top:0;left:0;width:40px;height:40px;background:#ccc}${layout === 'carousel rows' ? '.row{display:flex;gap:12px;overflow-x:auto;margin-bottom:400px}.row>.r{flex:0 0 200px;margin:0}.row.enter>.r{animation:up .6s ease-out both}@keyframes up{from{transform:translateY(30px);opacity:0}}' : '#app{overflow-x:hidden}'}</style></head><body><div id="slide"></div><div id="app"></div></body></html>`);
       await page.evaluate(() => {
         const w = /** @type {any} */ (window), Native = window.IntersectionObserver;
         w.rootedObservers = 0;
@@ -292,7 +301,7 @@ for (const { name, engine, executablePath } of browsers) {
         };
       });
       await page.addScriptTag({ content: reactFixture });
-      const result = await page.evaluate(async layout => {
+      const result = await page.evaluate(async ([layout, effect]) => {
         const w = /** @type {any} */ (window);
         await document.fonts.ready;
         const slide = /** @type {HTMLElement} */ (document.getElementById('slide'));
@@ -306,14 +315,21 @@ for (const { name, engine, executablePath } of browsers) {
         };
         requestAnimationFrame(animate);
         if (layout === 'carousel rows') w.mountCarousels(); else w.mountReact();
+        if (effect.startsWith('a reveal')) {
+          const footer = /** @type {HTMLElement} */ (document.querySelector('.reveal'));
+          footer.style.transform = 'translateY(60px)';
+          setTimeout(() => { footer.style.transform = ''; }, 150);
+        }
+        if (effect.startsWith('a CSS entrance')) requestAnimationFrame(() => { for (const row of document.querySelectorAll('.row')) row.classList.add('enter'); });
         const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
         while (performance.now() - t0 < 15000 && (during < 0 || !hosts.every(el => el.dataset.tsOutcome))) await new Promise(r => setTimeout(r, 50));
         return { hosts: hosts.length, far: far().length, composed: hosts.filter(el => el.dataset.tsOutcome).length, farComposedDuringSlide: during,
           rootedObservers: w.rootedObservers, idleCallbacks: typeof window.requestIdleCallback === 'function' };
-      }, layout);
-      check(`React adapters in ${layout}: no scroll-container observer, so offscreen blocks are measured against the window`, result.rootedObservers === 0 && result.far >= 40 && result.composed === result.hosts, result);
+      }, [layout, effect]);
+      const setting = effect ? `${layout} with ${effect}` : layout;
+      check(`React adapters in ${setting}: no scroll-container observer, so offscreen blocks are measured against the window`, result.rootedObservers === 0 && result.far >= 40 && result.composed === result.hosts, result);
       // Engines without idle callbacks compose offscreen work on a 50 ms timer.
-      if (result.idleCallbacks) check(`React adapters in ${layout}: no offscreen block composes during a 900 ms screen push`, result.farComposedDuringSlide === 0, result);
+      if (result.idleCallbacks) check(`React adapters in ${setting}: no offscreen block composes during a 900 ms screen push`, result.farComposedDuringSlide === 0, result);
       await page.close();
     }
     // A pane that overflows only after its hosts registered: FAQ answers in

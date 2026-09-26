@@ -604,12 +604,14 @@ table.
   candidate still composed in 41 of a 900 ms slide's short idle periods
   (Firefox 17). Engines without idle callbacks (WebKit) keep a 50 ms timer.
   Near means within a viewport height of the window or of the container
-  the text scrolls in vertically (one whose content overflows it, when the
-  text registers or later, as a pane of FAQ answers in closed `<details>`
-  does once they open; an `overflow-x: hidden` wrapper or a horizontal
-  carousel row is not one, or every block in it would be near): in an app
-  shell's `overflow: auto` pane, text below the pane's fold counted as far
-  until it was on screen, so
+  the text scrolls in vertically, once that container hides it: the text
+  lies wholly beyond the container's fold when it registers, or later (FAQ
+  answers in closed `<details>` once they open). An `overflow-x: hidden`
+  wrapper or a horizontal carousel row hides no text, even while a
+  transform (a reveal library, an entrance animation) makes it overflow,
+  so the blocks in it are measured against the window rather than all
+  counted as near. In an app shell's `overflow: auto` pane, text below the
+  pane's fold counted as far until it was on screen, so
   blocks scrolled in within about 0.5 to 1 s of a load or screen push
   (while animations kept frames pending) painted native lines and were
   rewrapped 2 to 5 frames later, which 4.2 did not do; now none within a
