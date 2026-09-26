@@ -106,7 +106,11 @@ single quotes are never turned into double quotes, or the reverse. From 4.3
 TypesetText curls them during render, so server HTML already has them;
 TypesetRichText does so only with lang="en" (or en-*) on the component itself,
 since render cannot see an ancestor's lang, and warns in development builds
-when it is missing. Optical hanging applies to
+when it is missing. Educated quotes stay in every state, not only in composed
+lines: text that declines, shows native wrapping while its width changes
+(`data-ts-stale`), waits offscreen or is kept native because a
+TypesetRichText child is a component (the text it passes to that component
+is educated too) shows curly quotes, and copies them. Optical hanging applies to
 eligible left-aligned leading glyphs, not indented/centered or justified contexts.
 Clipped containers are supported only when the full glyph's measured geometry
 fits the available clip, padding and scrollport. Rounded clips are conservative;
@@ -178,7 +182,16 @@ the size holds for text within about a viewport height of the screen, and for
 text further away (with `mount()` and the loaders) once it comes that near. That
 offscreen text is released to native in idle time meanwhile, so no engine
 marker is left beside a hidden break for assistive technology to join words
-at; its outcome is kept. Both hooks are supported; the engine installs their rules
+at; its outcome is kept. A width change a composition makes itself is not a
+resize: a block in a box sized by its content (a flex item without `flex: 1`
+or `min-width: 0`, `width: fit-content`, `inline-block`, a float, an auto
+table cell or grid track, an absolutely positioned box or dialog without a
+width) narrows that box to its composed lines and keeps them. The React
+adapters also keep a composed block whose lines still fit when another
+block's composition moves it (two auto grid tracks, two table cells). With `mount()`, the
+loaders and both React adapters, a page of these layouts makes no DOM change
+from 2 s after it loads or a resize ends, at 320, 375, 768 and 1280 px in
+Chromium, WebKit and Firefox (`scripts/v4/verify-settle.mjs`). Both hooks are supported; the engine installs their rules
 as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. A page that assigns `document.adoptedStyleSheets` (a theme
 switcher) drops that sheet; the engine adds it back as printing starts,

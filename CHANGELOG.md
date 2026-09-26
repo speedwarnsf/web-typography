@@ -493,6 +493,54 @@ Outside the changes below, 0 of these differ in any engine.
 - The React adapters keep their composition while hidden under the new
   per-document registry, instead of treating a width of 0 as a resize and
   showing native lines when revealed.
+- **Text in a box sized by its content settles (React adapters).** A
+  `TypesetText` or `TypesetRichText` block in a box that shrinks to fit its
+  content (a flex item without `flex: 1` or `min-width: 0`, `w-fit`,
+  `inline-block`, a float, an auto table cell) narrows that box to its
+  composed lines. The 4.3.0 release candidate counted that narrowing as a
+  resize, and measured a line that starts with an optically hung quote or
+  capital with the hang, which the narrowed box leaves no room for, so the
+  block showed native lines, widened, composed and narrowed again every
+  ~100 ms without end: on newworldadvertising.org/awards 7 of 8 widths in
+  Chromium, with up to 3,026 DOM mutations in 3 s per block. The adapters
+  now measure composed lines from the content box's edge, as `mount()` does,
+  record the size a composition leaves as their own rather than as a
+  resize, and keep a composed block whose lines still fit when only
+  compositions changed its size (its own, or a neighbour's in two auto grid
+  tracks or table cells, which took three rounds of a second each to settle
+  offscreen). `mount()` and the loaders were not affected. 4.2.0's
+  `TypesetRichText` also recomposed without end in Chromium in a
+  shrink-to-fit flex item and an inline-block at 768 and 1,280 px (27,360
+  to 71,520 DOM mutations in 3 s). The new `verify-settle` suite holds
+  `mount()`, go.js and both adapters to no DOM mutation or outcome change
+  from 2 s to 5 s after the page is ready and after a resize, on a page of
+  19 layouts (the /awards card, shrink-to-fit flex items, `w-fit`,
+  `inline-block`, auto table cells, auto and `min-content` grid tracks,
+  floats, absolutely positioned boxes, a centred flex column, nested
+  scrollers, `<details>` and `<dialog>`) at 320, 375, 768 and 1,280 px in
+  Chromium, WebKit and Firefox: the release candidate failed 21 of 24 of
+  these checks for `TypesetText` and 15 of 24 for `TypesetRichText`, in 12
+  and 9 layouts; 4.3.0 fails none of the 96. With its layout workaround
+  removed, no text block on the /awards page changes in 3 s after settling,
+  at 8 widths in three engines.
+- **Smart quotes stay curly when text falls back to native lines.** With
+  `smartQuotes="en"`, a `TypesetText` block showing native lines while its
+  width changed (`data-ts-stale`), or on a reveal whose composition changed
+  its height, showed the source's straight quotes, because releasing the
+  composition put them back: on newworldadvertising.org/team, with the
+  release candidate, up to 8 of 9 quote-bearing blocks did in 63 of 356
+  frames of a window resize in Chromium, 84 of 176 in WebKit and 355 of 357
+  in Firefox; 0 now. It keeps the characters its composition showed. A
+  `TypesetRichText` kept native because a child is a component
+  (`native:react-component`) rendered its text as written while it reported
+  quotes `enabled`; it now educates the text it renders and the text it
+  passes to that component (4.2.0 did not either). `verify-settle` checks
+  every animation frame of loading, resizing, stale, declined and
+  offscreen states: the release candidate showed a straight quote in 11 of
+  12 `TypesetText` and 12 of 12 `TypesetRichText` checks, 4.3.0 in none of
+  48, and `mount()` and the loaders in none before or after. Copying text
+  in any of these states copies the curly quotes, as copying composed text
+  does.
 
 ### Added
 
@@ -642,13 +690,13 @@ table.
   (`transitionend`, `animationend`, `contentvisibilityautostatechange`) and
   one more font listener, shared by every controller and adapter.
 - Download, gzip (esbuild bundles importing one entry point, tree-shaken):
-  `mount` only 37.7 to 49.8 KB, `TypesetText` only 38.0 to 49.7 KB,
-  `TypesetRichText` only 33.4 to 45.8 KB, `smartQuotes` only 11.7 to 1.5 KB
+  `mount` only 37.7 to 49.8 KB, `TypesetText` only 38.0 to 49.9 KB,
+  `TypesetRichText` only 33.4 to 46.2 KB, `smartQuotes` only 11.7 to 1.5 KB
   (the line-break tables now tree-shake away), `go.js` 42.3 to 55.9 KB and
   `typeset.global.js` 42.1 to 55.6 KB. A bundler that does not tree-shake
   (Metro, the Expo and React Native Web default) ships all of
   `typeset.us/react`, `dist/react.js` and its shared chunk: `TypesetText`
-  43.2 to 61.8 KB, a larger increase than any tree-shaken figure (an Expo
+  43.2 to 62.2 KB, a larger increase than any tree-shaken figure (an Expo
   web export of one app grew by 17.0 KB gzip, 434,777 to 451,735 bytes,
   with a 4.3.0 release candidate).
   The growth is the code the fixes above need, measured per group and
@@ -855,7 +903,7 @@ SUPPORT.md lists both.
   fixture bundles in `tests/frameworks/`), `verify-live-regions`,
   `verify-smart-quotes`, `verify-iframe-mount`, `verify-recompose-storms`,
   `verify-reflow-triggers`, `verify-visibility`, `verify-print-resize`,
-  `verify-scheduler`, `verify-translation`, `verify-options`, `verify-react`,
+  `verify-scheduler`, `verify-settle`, `verify-translation`, `verify-options`, `verify-react`,
   `verify-react-node`, `verify-recipe-reproduces`, `verify-site-index`,
   `verify-docs`, `verify-release-trust` and `verify-package-contents`. Each
   behaviour suite fails on the published 4.2.0 build. CI-only and nightly

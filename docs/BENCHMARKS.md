@@ -180,18 +180,18 @@ periods of 20 ms or more or one a second after waiting, are mostly still
 
 esbuild bundles (minified, tree-shaken) importing one entry point from the
 package, React external, and the shipped browser files; *no-tree-shaking* is
-what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the candidate after the near-observer rollback, the last change to the engine before the 4.3.0 cut (the timings above predate it).
+what a bundler that does not tree-shake (Metro) ships. Bytes, measured on the candidate with the settling and fallback-quote fixes, the last change to the engine before the 4.3.0 cut (the timings above predate it and the near-observer rollback).
 
 | What a consumer imports | Minified | gzip | brotli |
 |---|---|---|---|
-| mount-only | 126,544 | 49,801 | 43,881 |
-| TypesetText-only | 126,567 | 49,684 | 43,818 |
-| TypesetRichText-only | 112,344 | 45,826 | 40,572 |
+| mount-only | 126,544 | 49,802 | 43,916 |
+| TypesetText-only | 127,320 | 49,893 | 43,935 |
+| TypesetRichText-only | 113,636 | 46,180 | 40,802 |
 | smartQuotes-only | 2,831 | 1,544 | 1,415 |
-| react.js+shared | 137,737 | 53,098 | 46,768 |
-| TypesetText-no-tree-shaking | 162,177 | 61,801 | 53,866 |
-| go.js | 142,897 | 55,912 | 48,840 |
-| typeset.global.js | 141,989 | 55,572 | 48,559 |
+| react.js+shared | 139,072 | 53,471 | 47,183 |
+| TypesetText-no-tree-shaking | 163,518 | 62,192 | 54,179 |
+| go.js | 142,897 | 55,913 | 48,804 |
+| typeset.global.js | 141,989 | 55,573 | 48,462 |
 
 ## Reading the numbers
 

@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 49801,
-      "TypesetText-only": 49684,
-      "TypesetRichText-only": 45826,
+      "mount-only": 49802,
+      "TypesetText-only": 49893,
+      "TypesetRichText-only": 46180,
       "smartQuotes-only": 1544,
-      "react.js+shared": 53098,
-      "TypesetText-no-tree-shaking": 61801,
-      "go.js": 55912,
-      "typeset.global.js": 55572
+      "react.js+shared": 53471,
+      "TypesetText-no-tree-shaking": 62192,
+      "go.js": 55913,
+      "typeset.global.js": 55573
     },
     "raised": [
       {
@@ -184,6 +184,30 @@
           "TypesetText-no-tree-shaking": 62438,
           "go.js": 56552,
           "typeset.global.js": 56212
+        }
+      },
+      {
+        "by": "4.3.0 release-candidate fixes: settling and quotes in fallback states",
+        "reason": "Measured on the candidate with the release recipe: the React registry records the size a composition leaves as its own and keeps a composed host whose lines still fit when only compositions changed its size, both adapters measure composed lines from the content box's edge (linesExtent), TypesetText keeps its educated text when it goes stale, and TypesetRichText educates the text of a tree kept native by a component child. React entries +209 B (TypesetText-only) to +391 B (no tree shaking); mount-only, go.js and typeset.global.js +1 B; smartQuotes-only unchanged. Every budget passed its 2% tolerance; the budgets now hold the measured sizes.",
+        "before": {
+          "mount-only": 49801,
+          "TypesetText-only": 49684,
+          "TypesetRichText-only": 45826,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 53098,
+          "TypesetText-no-tree-shaking": 61801,
+          "go.js": 55912,
+          "typeset.global.js": 55572
+        },
+        "after": {
+          "mount-only": 49802,
+          "TypesetText-only": 49893,
+          "TypesetRichText-only": 46180,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 53471,
+          "TypesetText-no-tree-shaking": 62192,
+          "go.js": 55913,
+          "typeset.global.js": 55573
         }
       }
     ]
@@ -903,6 +927,56 @@
       ],
       "reason": "The P5 near observer is back to the round-2 release candidate (44e4721): the vertical-only scrollport (85d20d3), the re-placement of waiting elements (f0d01ac), the hides test with its translation read (b5532e1) and the waiting-pane recheck (6d8dd22) are gone. smartQuotes-only is unchanged.",
       "measured": "scripts/v4/bench-sizes.mjs on the candidate at bcfde3d (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-26",
+      "by": "4.3.0 release-candidate fixes: settling and quotes in fallback states",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 49801,
+          "to": 49802,
+          "reason": "linesExtent in layout-metrics (+1 B, tree-shaken)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 49684,
+          "to": 49893,
+          "reason": "registry baseline and own-size rule, linesExtent, educated text kept when stale (+209 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 45826,
+          "to": 46180,
+          "reason": "registry baseline and own-size rule, linesExtent, educated text in trees kept native (+354 B)"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 53098,
+          "to": 53471,
+          "reason": "both adapters' fixes (+373 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": 61801,
+          "to": 62192,
+          "reason": "both adapters' fixes (+391 B)"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 55912,
+          "to": 55913,
+          "reason": "as mount-only (+1 B)"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 55572,
+          "to": 55573,
+          "reason": "as mount-only (+1 B)"
+        }
+      ],
+      "reason": "Two release-candidate defects found integrating 4.3.0 on newworldadvertising.org: React hosts in a box sized by their content switched between composed and native lines without end, and TypesetText with smartQuotes showed straight quotes whenever it fell back to native lines (CHANGELOG, Fixed). Every raise is within the 2% tolerance; the budgets are set to the measured sizes so later growth is measured from here.",
+      "measured": "scripts/v4/bench-sizes.mjs on the candidate with the fixes (release recipe, Node 24 zlib)"
     }
   ]
 }
