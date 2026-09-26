@@ -63,7 +63,7 @@ export async function releaseNotes({ version, evidenceDir = 'output', provenance
       let line = `- \`${file}\``;
       try {
         const data = JSON.parse(await readFile(resolve(root, evidenceDir, file), 'utf8'));
-        if (file === 'test-v4-summary.json') line += `: ${data.suites} suites, ${data.passed} passed, ${data.knownFailing} known failing, ${data.failed} failed; ${data.checks} checks (${data.mode}).`;
+        if (file === 'test-v4-summary.json') line += `: ${data.suites} suites, ${data.passed} passed, ${data.knownFailing} known failing, ${data.slow ? `${data.slow} slow on the hosted runner (speed-calibrated checks reported, not enforced; see scripts/v4/speed-calibrated.json), ` : ''}${data.failed} failed; ${data.checks} checks (${data.mode}).`;
         else if (Array.isArray(data.checks)) line += `: ${data.checks.length} checks, ${data.checks.filter((/** @type {{ pass?: boolean }} */ c) => c.pass === false).length} failed.`;
       } catch {}
       evidence.push(line);

@@ -101,6 +101,10 @@ jobs:
         run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Every suite against the committed release artifacts
+        # Speed-calibrated checks are reported, not enforced, on this runner
+        # (scripts/v4/speed-calibrated.json); the cut enforced them.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
         run: npm run test:release
 
       # The maintainer account may have published the ledger's tarball already;

@@ -69,6 +69,11 @@ jobs:
         run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Every suite against the candidate built from src (craft, spacing, tracking, clipping, lifecycle, accessibility, loaders, CLI)
+        # Checks listed in scripts/v4/speed-calibrated.json follow the
+        # machine's speed; on this runner they are reported, not enforced.
+        # release-cut enforces them on the calibration machine.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
         run: npm run test:v4
 
       - name: Production website build
