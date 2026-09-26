@@ -81,7 +81,10 @@ try {
   // those of round 3 to 1.85 MB (the same copies of this round's fixes, and
   // the limits and outcome notes they document), and the gate 3 fixes to
   // 1.88 MB (1,875,240 B: the keep trie, linear quote education and pane
-  // re-placement in each copy, and SUPPORT.md's WebKit limitation).
+  // re-placement in each copy, and SUPPORT.md's WebKit limitation), and the
+  // gate 4 fixes to 1.89 MB (1,886,737 B: placing text only under a pane
+  // that hides it and rechecking panes as they come near, in each copy, and
+  // README's and SUPPORT.md's note on indents under legacy line breaks).
   check('unpacked package is under 1.9 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1900000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
