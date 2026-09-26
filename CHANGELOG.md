@@ -603,28 +603,18 @@ table.
   dropped about 8 frames per slide at 4x CPU in Chrome, and the first 4.3
   candidate still composed in 41 of a 900 ms slide's short idle periods
   (Firefox 17). Engines without idle callbacks (WebKit) keep a 50 ms timer.
-  Near means within a viewport height of the window or of the container
-  the text scrolls in vertically, once that container hides it: the text
-  lies wholly beyond the container's fold when it registers, or later (FAQ
-  answers in closed `<details>` once they open; text pushed down by
-  content that loaded above it, once its pane comes within a viewport
-  height). An `overflow-x: hidden` wrapper or a horizontal carousel row
-  hides no text, even while a transform (a reveal library, an entrance
-  animation) makes it overflow, so the blocks in it are measured against
-  the window rather than all counted as near. In an app shell's
-  `overflow: auto` pane, text below the pane's fold counted as far until
-  it was on screen, so
+  Near means within a viewport height of the window or of the scroll
+  container the text scrolls in: in an app shell's `overflow: auto` pane,
+  text below the pane's fold counted as far until it was on screen, so
   blocks scrolled in within about 0.5 to 1 s of a load or screen push
   (while animations kept frames pending) painted native lines and were
   rewrapped 2 to 5 frames later, which 4.2 did not do; now none within a
   viewport height of the window or pane do, in three engines. `mount()`
-  measures nearness the same way. Blocks further away still wait for idle
-  time, so a jump (a scrollbar drag, End, an anchor link, one large wheel
-  delta) that brings one on screen soon after a load, or while an
-  animation keeps frames pending, paints its native lines for one frame
-  and rewraps in the next (Wellth's home screen, 150 to 300 ms after its
-  prose rendered: 4 of 4 jumps at 1x, 2 of 4 at 4x; 4.2.0, which had
-  composed everything by then: 0); SUPPORT.md lists it.
+  measures nearness the same way. Two limits remain, both under Known
+  limitations: a wrapper that scrolls only horizontally counts as a scroll
+  container too, so offscreen blocks under an `overflow-x: hidden` app
+  root or in a carousel row count as near and can compose during a push;
+  and blocks further than a viewport height away still wait for idle time.
 - React hosts under continuous change: a translation or fade written every
   frame on their container is no longer checked at all, as with `mount()`
   (16 blocks, 60 frames: about 10,000 computed-style reads to 0 in three
@@ -660,6 +650,38 @@ table.
   with a 4.3.0 release candidate).
   The growth is the code the fixes above need, measured per group and
   recorded in scripts/v4/budgets.json.
+
+### Known limitations
+
+- **Offscreen text under a wrapper that scrolls horizontally counts as
+  near.** The nearest ancestor that scrolls on either axis is a text's
+  scrollport. An app root with `overflow-x: hidden` (its `overflow-y` then
+  computes to `auto`) or a horizontal carousel row is such an ancestor, so
+  every block in it is near however far below the fold, and during a
+  screen transition those blocks compose in animation frames instead of
+  idle time: in verify-scheduler's fixture, 44 of 44 offscreen blocks
+  under such an app root and 22 in 11 carousel rows composed during a
+  900 ms push in Chromium and Firefox. This costs frames on a slow device,
+  never correctness: every block paints what it reports, its composed
+  lines or native ones, never double-wrapped. On an app root,
+  `overflow-x: clip` clips the same way without making a scroll
+  container. Four attempts in the 4.3 cycle to measure such text against
+  the window each broke text that a real pane hides (rows a virtualized
+  list places with a transform, a pane whose content grows above its
+  text), so 4.3.0 keeps the round-2 release candidate's rule, and a fix is
+  planned for 4.4.
+- **Prose far below an app shell's fold, on a jump soon after load.**
+  Text more than one viewport or pane height below the fold composes in
+  idle time, so a jump (a scrollbar drag, End, an anchor link, one large
+  wheel delta) that brings it on screen soon after a load, or while an
+  animation keeps frames pending, paints its native lines for one frame
+  and rewraps in the next (Wellth's home screen, 150 to 300 ms after its
+  prose rendered: 4 of 4 jumps at 1x, 2 of 4 at 4x; 4.2.0, which had
+  composed everything by then: 0). With the React adapters,
+  `priority="sync"` composes a block in its commit instead. Planned for
+  4.4.
+
+SUPPORT.md lists both.
 
 ### Packaging, loaders and CDN
 
@@ -768,8 +790,9 @@ table.
   breaks and find-in-page, Text Fragments, `innerText` and selection; print;
   machine translation; CSP and Trusted Types; no hyphenation or
   justification; right-to-left text; the browser floor; framework-owned
-  text. MIGRATION.md covers 4.2 to 4.3 and links each older guide in its
-  archive.
+  text; far text brought on screen by a jump; offscreen text under a
+  wrapper that scrolls horizontally. MIGRATION.md covers 4.2 to 4.3 and
+  links each older guide in its archive.
 - The README, the agent contract and `typeset-audit --help` say that any
   uncaught error or unhandled rejection on the audited page fails the run
   (exit 1, listed under `errors`) even when every audit passes, as it has

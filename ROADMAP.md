@@ -39,6 +39,16 @@ publishing and documented outcomes. No new typographic features.
   `typeset.us/lists`) and line-break tables loaded after first paint.
 - **An optional pre-paint bootstrap** for above-the-fold text on
   server-rendered pages.
+- **Nearness that follows vertical scrolling only.** 4.3 measures a
+  text's nearness against the nearest ancestor that scrolls on either
+  axis, so offscreen text under an `overflow-x: hidden` app root or in a
+  horizontal carousel counts as near and composes during screen
+  transitions (frames only; the text is correct), and prose more than a
+  pane height below an app shell's fold can paint native lines for one
+  frame on a jump soon after load. Four 4.3 attempts each broke text a
+  real pane hides (virtualized rows, panes that grow), so the fix waits
+  for 4.4 and must pass verify-scheduler's virtualized-list, growing-pane
+  and app-shell checks as well as the horizontal-wrapper ones.
 - **The library in its own workspace**, separate from the website.
 
 ## 5.0

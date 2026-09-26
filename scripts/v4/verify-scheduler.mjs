@@ -15,12 +15,17 @@
 //   is within a viewport height of the pane, so blocks scrolled in soon after
 //   they mount (an entrance animation keeping frames pending) paint composed,
 //   never native lines rewrapped a few frames later; with TypesetText, and
-//   with mount() once its first pass could have run. A pane that hides text
-//   only after its hosts registered (FAQ answers in closed <details>, or
-//   content loaded above the text in a pane far down the page) counts as
-//   their scrollport once it does; a transform that makes a wrapper
-//   overflow (a reveal library, a card entrance) hides nothing, so offscreen
-//   blocks under it are still measured against the window.
+//   with mount() once its first pass could have run. The nearest container
+//   that scrolls is the text's scrollport from the time it registers, so
+//   FAQ answers in closed <details>, text pushed down by content loaded
+//   above it and the rows of a virtualized list placed with a transform
+//   are near once they are within a viewport height of the pane.
+//   Known limitation (CHANGELOG 4.3.0, SUPPORT.md; a 4.4 item): a container
+//   that scrolls only horizontally counts too, so under an overflow-x:hidden
+//   app root (its overflow-y computes to auto) or in a horizontal carousel
+//   row every block is near, and offscreen blocks there may compose during
+//   a screen push. Those checks assert what 4.3.0 guarantees there: every
+//   block gets an outcome and paints what it reports, never double-wrapped.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -80,6 +85,12 @@ window.mountFaq = () => { const root = createRoot(document.getElementById('pane'
 // Three blocks at the top of a pane, below content that has not loaded yet.
 const comments = ${JSON.stringify(corpus.filter((/** @type {string} */ text) => text.length > 200 && text.length < 400).slice(0, 3))};
 window.mountComments = () => { const root = createRoot(document.getElementById('list')); flushSync(() => root.render(comments.map((text, i) => h(TypesetText, { key: i, lang: 'en', text })))); };
+// Eight rows of a virtualized list, 200 px each, laid out as TanStack
+// Virtual lays them out: every row absolute at the top of the list and moved
+// to its offset with transform: translateY.
+const rows = ${JSON.stringify(corpus.filter((/** @type {string} */ text) => text.length > 250 && text.length < 450).slice(0, 8))};
+window.mountVirtual = () => { const root = createRoot(document.getElementById('inner')); flushSync(() => root.render(rows.map((text, i) => h('div', { key: i, className: 'row',
+  style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '200px', transform: 'translateY(' + i * 200 + 'px)' } }, h(TypesetText, { lang: 'en', text }))))); };
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
@@ -281,18 +292,20 @@ for (const { name, engine, executablePath } of browsers) {
       check(`${kind === 'typeset' ? 'TypesetText' : 'TypesetRichText'} at 4x CPU: a cold screen push paints every on-screen block composed in its first frame`, result.onScreen >= 12 && result.uncomposed === 0, result);
       await page.close();
     }
-    // Offscreen text in a wrapper that does not scroll vertically: an app
-    // root with overflow-x:hidden (its overflow-y computes to auto), or
-    // horizontal carousel rows. Neither is a container the text scrolls in,
-    // so blocks thousands of pixels below the fold are not near and do not
-    // compose in the animation frames of a screen push (P5). Taken as
-    // scroll containers, every one of them was near.
-    // A transform makes either overflow without hiding any text in it: a
-    // reveal library's translateY on the footer, set after the commit and
-    // cleared 150 ms later, or a CSS entrance animation on the cards from the
-    // frame after mounting. Placed again whenever the wrapper overflowed,
-    // the blocks were rooted there and every one of them was near: 44 of 44
-    // and 22 composed during the push in Chromium and Firefox (f0d01ac).
+    // Known limitation (4.4): offscreen text in a wrapper that scrolls only
+    // horizontally, an app root with overflow-x:hidden (its overflow-y
+    // computes to auto) or horizontal carousel rows, also with a reveal
+    // transform on the footer after the commit or a CSS entrance animation on
+    // the cards. The wrapper is taken as the text's scrollport, so blocks
+    // thousands of pixels below the fold count as near and compose in the
+    // animation frames of a screen push (44 of 44 under the app root and 22
+    // in the carousel rows in Chromium and Firefox; WebKit composes far text
+    // on its 50 ms timer either way). That costs frames, not correctness:
+    // every block gets an outcome and paints what it reports (its composed
+    // lines, or native lines), never double-wrapped. Four fixes that
+    // measured such text against the window (85d20d3, f0d01ac, b5532e1,
+    // 6d8dd22) each broke text that a real pane hides, so 4.3.0 keeps the
+    // round-2 rule and these checks hold it to that guarantee.
     for (const [layout, effect] of [['overflow-x:hidden app root', ''], ['carousel rows', ''], ['overflow-x:hidden app root', 'a reveal transform after the commit'], ['carousel rows', 'a CSS entrance animation on the cards']]) {
       const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
       page.setDefaultTimeout(20000);
@@ -326,24 +339,44 @@ for (const { name, engine, executablePath } of browsers) {
         }
         if (effect.startsWith('a CSS entrance')) requestAnimationFrame(() => { for (const row of document.querySelectorAll('.row')) row.classList.add('enter'); });
         const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
-        while (performance.now() - t0 < 15000 && (during < 0 || !hosts.every(el => el.dataset.tsOutcome))) await new Promise(r => setTimeout(r, 50));
-        return { hosts: hosts.length, far: far().length, composed: hosts.filter(el => el.dataset.tsOutcome).length, farComposedDuringSlide: during,
-          rootedObservers: w.rootedObservers, idleCallbacks: typeof window.requestIdleCallback === 'function' };
+        // Text declined under the cards' entrance transform (native:transformed)
+        // composes once the animation ends.
+        while (performance.now() - t0 < 15000 && (during < 0 || !hosts.every(el => el.dataset.tsOutcome && el.dataset.tsOutcome !== 'native:transformed'))) await new Promise(r => setTimeout(r, 50));
+        // A block paints what it reports: not stale, and a composed one shows
+        // one line per generated break plus one (never double-wrapped).
+        const paints = (/** @type {HTMLElement} */ el) => {
+          if (el.hasAttribute('data-ts-stale')) return false;
+          if (!el.dataset.tsOutcome?.startsWith('composed')) return true;
+          const range = document.createRange(); range.selectNodeContents(el);
+          const tops = new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top)));
+          return tops.size === el.querySelectorAll('br[data-ts-break]').length + 1;
+        };
+        return { hosts: hosts.length, far: far().length, composed: hosts.filter(el => el.dataset.tsOutcome).length, composedRich: hosts.filter(el => el.dataset.tsOutcome?.startsWith('composed')).length,
+          paintsComposition: hosts.filter(paints).length, outcomes: hosts.reduce((/** @type {Record<string, number>} */ n, el) => { const o = el.dataset.tsOutcome || '(none)'; n[o] = (n[o] || 0) + 1; return n; }, {}),
+          farComposedDuringSlide: during, rootedObservers: w.rootedObservers, idleCallbacks: typeof window.requestIdleCallback === 'function' };
       }, [layout, effect]);
       const setting = effect ? `${layout} with ${effect}` : layout;
-      check(`React adapters in ${setting}: no scroll-container observer, so offscreen blocks are measured against the window`, result.rootedObservers === 0 && result.far >= 40 && result.composed === result.hosts, result);
-      // Engines without idle callbacks compose offscreen work on a 50 ms timer.
-      if (result.idleCallbacks) check(`React adapters in ${setting}: no offscreen block composes during a 900 ms screen push`, result.farComposedDuringSlide === 0, result);
+      // farComposedDuringSlide records the limitation's cost; it is not
+      // asserted. rootedObservers > 0 pins the 4.3.0 rule, so a change to it
+      // has to update this check and the documented limitation together.
+      // composedRich is recorded, not asserted: WebKit, which composes far
+      // text on its timer while the cards' entrance animation runs, reports
+      // about half the cards native:verification (native lines) on every 4.3
+      // build, the round-2 candidate included.
+      check(`React adapters in ${setting} (known limitation: the wrapper counts as the scrollport, so offscreen blocks may compose during a screen push): every block gets an outcome and paints what it reports, never double-wrapped`,
+        result.rootedObservers > 0 && result.far >= 40 && result.composed === result.hosts && result.paintsComposition === result.hosts, result);
       await page.close();
     }
     // A pane that overflows only after its hosts registered: FAQ answers in
     // closed <details> in a 600 px overflow-y:auto pane, all opened, then
     // the pane scrolled one pane height while a frame loop keeps frames
-    // pending. The hosts' scrollport was found once, when the pane did not
-    // overflow, so they were measured against the window, which the pane
-    // clips: one of the two blocks brought on screen painted native lines
-    // ('unmeasurable') in the first frame after the jump, in 3 of 3 runs in
-    // Chromium and Firefox (the round-2 near observer, and 4.2.0: none).
+    // pending. The pane is the hosts' scrollport from the time they register,
+    // overflowing or not, so the answers below its fold are near once open.
+    // A build that took only an overflowing pane as the scrollport measured
+    // them against the window, which the pane clips: one of the two blocks
+    // brought on screen painted native lines ('unmeasurable') in the first
+    // frame after the jump, in 3 of 3 runs in Chromium and Firefox (4.2.0 and
+    // 4.3.0: none).
     for (let run = 0; run < 3; run++) {
       const page = await browser.newPage({ viewport: { width: 800, height: 900 } });
       page.setDefaultTimeout(20000);
@@ -377,10 +410,11 @@ for (const { name, engine, executablePath } of browsers) {
     // them then loads (900 px), so the pane hides them; nothing else
     // changes, so no host is observed again and none changes intersection.
     // The window is scrolled to the pane, and 8 frames later the pane to the
-    // text, while a frame loop keeps frames pending. Measured against the
-    // window, which the pane clips, the blocks were far until on screen:
-    // the jump's frame painted all 3 native in Chromium and Firefox (f0d01ac
-    // and the build before it). The pane is rechecked when it comes near.
+    // text, while a frame loop keeps frames pending. The pane is their
+    // scrollport from the time they register, so they stay near it. Builds
+    // that measured them against the window until the pane hid them painted
+    // all 3 native in the jump's frame in Chromium and Firefox (4.2.0 and
+    // 4.3.0: none).
     for (let run = 0; run < 3; run++) {
       const page = await browser.newPage({ viewport: { width: 800, height: 900 } });
       page.setDefaultTimeout(20000);
@@ -418,6 +452,94 @@ for (const { name, engine, executablePath } of browsers) {
       });
       check(`TypesetText in a pane far down the page that hides it only after it registers (content loaded above it), run ${run + 1}: scrolled to once the pane is on screen, every block paints composed in the jump's frame`,
         !result.overflowAtMount && result.onScreen === 3 && !!result.painted && result.painted.every(outcome => outcome.startsWith('composed')), result);
+      await page.close();
+    }
+    // The same pane inside an app shell (a 100vh overflow-y:auto root that
+    // clips it), brought to 300 px below the shell's fold after the content
+    // above the text loaded; 8 frames later one frame scrolls the shell to
+    // the pane and the pane to the text. A build that rechecked such panes
+    // only as they crossed the window's near line painted all 3 native in
+    // that frame in Chromium and Firefox, 3 of 3 runs (4.2.0 and 4.3.0: none).
+    for (let run = 0; run < 3; run++) {
+      const page = await browser.newPage({ viewport: { width: 800, height: 900 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:16px/1.4 Georgia,serif}p{margin:0 0 10px}#app{height:100vh;overflow-y:auto}</style></head><body><div id="app"><div style="height:2000px"></div><div id="pane" style="height:600px;overflow-y:auto;width:420px"><div id="pre"></div><div id="list"></div></div><div style="height:2000px"></div></div></body></html>');
+      await page.addScriptTag({ content: reactFixture });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+        let live = true;
+        (function loop() { if (live) requestAnimationFrame(loop); })();
+        await document.fonts.ready;
+        w.mountComments();
+        const shell = /** @type {HTMLElement} */ (document.getElementById('app'));
+        const pane = /** @type {HTMLElement} */ (document.getElementById('pane'));
+        const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-typeset-react]')]);
+        const overflowAtMount = pane.scrollHeight > pane.clientHeight + 1;
+        await new Promise(r => setTimeout(r, 150));
+        /** @type {HTMLElement} */ (document.getElementById('pre')).style.height = '900px';
+        await new Promise(r => setTimeout(r, 100));
+        const paneTop = () => pane.getBoundingClientRect().top - shell.getBoundingClientRect().top;
+        shell.scrollTop += paneTop() - shell.clientHeight - 300;
+        for (let i = 0; i < 8; i++) await frame();
+        const paneTopBefore = Math.round(paneTop());
+        /** @type {string[] | null} */
+        let painted = null;
+        const tick = document.createElement('div');
+        tick.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:1px;visibility:hidden';
+        document.body.append(tick);
+        new ResizeObserver(() => { if (tick.style.width === '2px' && !painted) painted = hosts.map(el => el.dataset.tsOutcome || '(none)'); }).observe(tick);
+        await frame();
+        shell.scrollTop += paneTop() - 100; pane.scrollTop = 900; tick.style.width = '2px';
+        await frame(); await frame();
+        live = false;
+        const box = pane.getBoundingClientRect();
+        return { overflowAtMount, paneTopBefore, fold: shell.clientHeight, onScreen: hosts.filter(el => { const r = el.getBoundingClientRect(); return r.top < box.bottom && r.bottom > box.top && r.top < innerHeight; }).length, painted };
+      });
+      check(`TypesetText in a pane in an app shell that hides it only after it registers (content loaded above it), run ${run + 1}: brought on screen from below the shell's fold by one jump, every block paints composed in the jump's frame`,
+        !result.overflowAtMount && result.paneTopBefore > result.fold && result.onScreen === 3 && !!result.painted && result.painted.every(outcome => outcome.startsWith('composed')), result);
+      await page.close();
+    }
+    // A virtualized list in a 600 px overflow-y:auto pane that nearly fills
+    // an 800 x 660 window: rows 0 to 2 on screen, rows 3 to 7 the overscan
+    // below the pane's fold, each placed with transform: translateY
+    // (TanStack Virtual's layout). 400 ms after mounting, with a frame loop keeping frames
+    // pending, one frame scrolls the pane one pane height. The rows within a
+    // pane height of its fold are near there and compose before the jump. A
+    // build that subtracted the rows' translation when deciding whether the
+    // pane hid them measured rows 4 to 6 against the window: 2 of the 3 rows
+    // brought on screen painted native in the jump's frame, 3 of 3 runs in
+    // Chromium and Firefox (4.2.0 and 4.3.0: none).
+    for (let run = 0; run < 3; run++) {
+      const page = await browser.newPage({ viewport: { width: 800, height: 660 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:18px/1.5 Georgia,serif}p{margin:0 0 12px}.row{overflow:hidden}#spin{width:20px;height:20px;background:#000;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div id="pane" style="height:600px;overflow-y:auto;width:420px;position:relative"><div id="inner" style="position:relative;height:20000px"></div></div><div id="spin"></div></body></html>');
+      await page.addScriptTag({ content: reactFixture });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+        let live = true;
+        (function loop() { if (live) requestAnimationFrame(loop); })();
+        await document.fonts.ready;
+        w.mountVirtual();
+        await new Promise(r => setTimeout(r, 400));
+        const pane = /** @type {HTMLElement} */ (document.getElementById('pane'));
+        const box = pane.getBoundingClientRect();
+        const band = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-typeset-react]')]).filter(el => { const top = el.getBoundingClientRect().top; return top >= box.bottom && top < box.bottom + pane.clientHeight; });
+        /** @type {string[] | null} */
+        let painted = null;
+        const tick = document.createElement('div');
+        tick.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:1px;visibility:hidden';
+        document.body.append(tick);
+        new ResizeObserver(() => { if (tick.style.width === '2px' && !painted) painted = band.map(el => el.dataset.tsOutcome || '(none)'); }).observe(tick);
+        await frame();
+        pane.scrollTop = pane.clientHeight; tick.style.width = '2px';
+        await frame(); await frame();
+        live = false;
+        return { band: band.length, painted };
+      });
+      check(`TypesetText in a virtualized list whose rows a transform places, run ${run + 1}: rows within a pane height below its fold paint composed in the frame of a jump that brings them on screen`,
+        result.band >= 2 && !!result.painted && result.painted.every(outcome => outcome.startsWith('composed')), result);
       await page.close();
     }
     // Text in an overflow:auto scroller, scrolled in soon after it mounts.

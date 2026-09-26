@@ -83,9 +83,11 @@ receives each composition's `Result`, as `typeset()` returns it.
 renders in the browser composes before its first paint and offscreen blocks
 follow in idle time (only on-screen work beyond about 120 ms in one frame,
 the page's one-time setup not counted, continues in the next frame, as on a
-very slow device). Server-rendered HTML (Next.js, Remix) first paints with
-the browser's own wrapping and is composed after hydration, rewrapping
-without adding a line (see the FAQ on layout shift).
+very slow device; under an `overflow-x: hidden` app root or in a
+horizontal carousel, offscreen blocks count as near and compose in frames,
+a known limitation SUPPORT.md describes). Server-rendered HTML (Next.js,
+Remix) first paints with the browser's own wrapping and is composed after
+hydration, rewrapping without adding a line (see the FAQ on layout shift).
 `TypesetRichText` children must be text and host elements (`a`, `strong`,
 `em`, `span` and the like): a component child, such as next/link's `<Link>`
 or a router link, keeps the whole paragraph native

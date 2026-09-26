@@ -109,145 +109,44 @@ export function rendered(element: Element): boolean {
 /** Watches whether elements are within a viewport height of what shows them. */
 export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
 /** IntersectionObservers that report an element within a viewport height of
- * what shows it: the window, or the nearest container it scrolls in
- * vertically that hides it (its box lies wholly above or below the
- * container's client area). An app shell's overflow:auto pane clips its
- * content, and a root margin on the window does not reach past that clip,
- * so text below the fold there was never near until it was on screen. One
- * observer per scrollport, held only while it observes something, so a
- * scroll container a route removed is not kept alive.
- * Null without IntersectionObserver. */
+ * what shows it: the window, or the nearest scroll container it scrolls in.
+ * An app shell's overflow:auto pane clips its content, and a root margin on
+ * the window does not reach past that clip, so text below the fold there
+ * was never near until it was on screen. One observer per scrollport, held
+ * only while it observes something, so a scroll container a route removed
+ * is not kept alive; an element's scrollport is found once. Null without
+ * IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
   const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
-  // Where each element is observed: its scrollport (null: the window), and
-  // the containers below that which could scroll it vertically but did not
-  // hide it when it was placed. Found once, and again only when one of
-  // those containers hides it.
-  const places = new WeakMap<Element, { root: Element | null; waiting: Element[] }>();
-  // The observed elements waiting on each such container.
-  const waiters = new Map<Element, Set<Element>>();
-  let queued = false;
-  // Only a container that scrolls vertically: nearness is a vertical
-  // distance. And only one that hides the text: an overflow-x:hidden
-  // wrapper (its overflow-y computes to auto) as tall as the page, or a
-  // horizontal carousel row, would make every block in it near, however far
-  // below the fold, and those compose in animation frames during a screen
-  // push. A transform makes either overflow (a reveal library's translateY,
-  // a card's entrance animation) without hiding any text in it. A pane that
-  // hides nothing yet (FAQ answers in closed <details>, a list still
-  // loading) may later, and the text is placed again when that is seen.
-  const scrolls = (node: Element) => /^(?:auto|scroll|overlay)$/u.test(view.getComputedStyle(node).overflowY);
-  // The pane's client area in viewport coordinates, or null when its
-  // content does not overflow it (so it hides nothing).
-  const area = (pane: Element) => {
-    if (pane.scrollHeight <= pane.clientHeight + 1) return null;
-    const frame = pane.getBoundingClientRect(), height = (pane as HTMLElement).offsetHeight;
-    const scale = height ? frame.height / height : 1, top = frame.top + pane.clientTop * scale;
-    return { top, bottom: top + pane.clientHeight * scale };
-  };
-  // The vertical translation an element's box carries relative to `pane`:
-  // transform or translate on it or an ancestor below the pane.
-  const lift = (element: Element, pane: Element) => {
-    let y = 0;
-    for (let node: Element | null = element; node && node !== pane; node = node.parentElement) {
-      const style = view.getComputedStyle(node);
-      const matrix = /^matrix(3d)?\(([^)]*)\)$/u.exec(style.transform);
-      if (matrix) y += parseFloat(matrix[2].split(',')[matrix[1] ? 13 : 5]) || 0;
-      const shift = (style.translate || '').split(/\s+/u)[1];
-      if (shift) y += shift.endsWith('%') ? parseFloat(shift) / 100 * ((node as HTMLElement).offsetHeight || 0) : parseFloat(shift) || 0;
-    }
-    return y;
-  };
-  // Whether the pane hides the element: its box, less any translation (which
-  // moves no line), lies wholly outside the pane's client area. An element
-  // with no box yet (in a closed <details>) is not hidden.
-  const hides = (pane: Element, bounds: { top: number; bottom: number }, element: Element) => {
-    const box = element.getBoundingClientRect();
-    if ((!box.width && !box.height) || (box.bottom > bounds.top + .5 && box.top < bounds.bottom - .5)) return false;
-    const y = lift(element, pane);
-    return box.bottom - y <= bounds.top + .5 || box.top - y >= bounds.bottom - .5;
-  };
-  const place = (element: Element) => {
-    const waiting: Element[] = [];
+  const roots = new WeakMap<Element, Element | null>();
+  const scrollport = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
-      if (!scrolls(node)) continue;
-      const bounds = area(node);
-      if (bounds && hides(node, bounds, element)) return { root: node, waiting };
-      waiting.push(node);
+      const cs = view.getComputedStyle(node);
+      if (/^(?:auto|scroll|overlay)$/u.test(cs.overflowY) || /^(?:auto|scroll|overlay)$/u.test(cs.overflowX)) return node;
     }
-    return { root: null, waiting };
+    return null;
   };
-  // One observer per root. Its callback passes on the entries of the
-  // elements it observes, then checks the panes: an intersection change is
-  // when text in a pane that just overflowed (content added above it) drops
-  // out of view. The window's also watches the containers elements wait on:
-  // text a pane far down the page grew past (content loaded above it) is
-  // scrolled to once the pane has come within a viewport height.
-  const observer = (root: Element | null) => {
-    let entry = observers.get(root);
-    if (!entry) {
-      const targets = new Set<Element>();
-      const io = new view.IntersectionObserver(list => {
-        const own = list.filter(item => targets.has(item.target) || !waiters.has(item.target));
-        if (own.length) callback(own);
-        later();
-      }, { root, rootMargin: '100% 0px' });
-      observers.set(root, entry = { observer: io, targets });
-    }
-    return entry;
-  };
-  const add = (element: Element) => {
-    const at = places.get(element)!;
-    const entry = observer(at.root);
-    entry.observer.observe(element);
-    entry.targets.add(element);
-    for (const pane of at.waiting) {
-      let set = waiters.get(pane);
-      if (!set) { waiters.set(pane, set = new Set()); observer(null).observer.observe(pane); }
-      set.add(element);
-    }
-  };
-  const release = (element: Element) => {
-    const at = places.get(element);
-    const entry = at && observers.get(at.root);
-    if (!at || !entry) return;
-    entry.targets.delete(element);
-    // A container elements wait on stays watched.
-    if (at.root || !waiters.has(element)) entry.observer.unobserve(element);
-    // The window's observer stays; a scroll container's goes with its last target.
-    if (at.root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(at.root); }
-    for (const pane of at.waiting) {
-      const set = waiters.get(pane);
-      set?.delete(element);
-      if (set && !set.size) { waiters.delete(pane); if (!observers.get(null)?.targets.has(pane)) observers.get(null)?.observer.unobserve(pane); }
-    }
-  };
-  // Whether a container observed elements wait on hides any of them now:
-  // reads only, all together after the calls that asked (a commit, a
-  // mutation batch, an intersection change), so no read follows a write;
-  // then the hidden ones are placed again.
-  const recheck = () => {
-    queued = false;
-    const moving = new Set<Element>();
-    for (const [pane, set] of waiters) {
-      const bounds = area(pane);
-      if (bounds) for (const element of set) if (!moving.has(element) && hides(pane, bounds, element)) moving.add(element);
-    }
-    for (const element of moving) { release(element); places.set(element, place(element)); add(element); }
-  };
-  const later = () => { if (!queued && waiters.size) { queued = true; queueMicrotask(recheck); } };
   return {
     observe(element) {
-      const placed = places.has(element);
-      if (!placed) places.set(element, place(element));
-      add(element);
-      // Observed again (a recheck, a reveal, new text): a pane it waits on may hide it now.
-      if (placed) later();
+      let root = roots.get(element);
+      if (root === undefined) { root = scrollport(element); roots.set(element, root); }
+      let entry = observers.get(root);
+      if (!entry) { entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      entry.observer.observe(element);
+      entry.targets.add(element);
     },
-    unobserve(element) { release(element); },
-    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); waiters.clear(); },
+    unobserve(element) {
+      const root = roots.get(element);
+      const entry = root === undefined ? undefined : observers.get(root);
+      if (!entry) return;
+      entry.observer.unobserve(element);
+      entry.targets.delete(element);
+      // The window's observer stays; a scroll container's goes with its last target.
+      if (root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(root); }
+    },
+    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); },
   };
 }
 

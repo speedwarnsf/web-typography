@@ -347,7 +347,17 @@ changes only an isolated preview, never a deployed site.
   End, an anchor link, one large wheel delta soon after a load, or while an
   animation keeps frames pending) paints its native lines for one frame and
   rewraps in the next. With the React adapters, `priority="sync"` composes a
-  block in its commit instead.
+  block in its commit instead. Planned for 4.4.
+- **Offscreen text under a wrapper that scrolls horizontally.** Nearness
+  is measured against the nearest ancestor that scrolls on either axis. An
+  app root with `overflow-x: hidden` (its `overflow-y` then computes to
+  `auto`) or a horizontal carousel row is such an ancestor, so every block
+  in it counts as near however far below the fold, and during a screen
+  transition those blocks compose in animation frames rather than in idle
+  time, which can drop frames on a slow device. The text is always
+  correct: each block paints its composed lines or native ones, never
+  double-wrapped. On an app root, `overflow-x: clip` clips the same way
+  without making a scroll container. Planned for 4.4.
 - **A very long unbreakable run, in WebKit.** Measuring a paragraph reads
   each word's boxes, and a word the browser splits across lines is read one
   character at a time, so that each character counts on its own line.
