@@ -27,8 +27,9 @@ const ENGINE_FREE = new Set(['verify-ledger', 'verify-immutable-4.2', 'verify-le
 // evidence was identical under the weak-end mutation). The canary must still
 // fail every one of them.
 // verify-alignment asserts outcomes and untouched markup for declined
-// (justified) text, which no break penalty reaches.
-const BEHAVIOUR = new Set(['verify-acceptance', 'verify-native-ax', 'verify-loaders', 'verify-controller', 'verify-mount-ownership', 'verify-wrap-ownership', 'verify-cli', 'verify-fixture-invariants', 'verify-alignment']);
+// (justified) text, which no break penalty reaches, and verify-settle that
+// pages go quiet, wherever the lines break.
+const BEHAVIOUR = new Set(['verify-acceptance', 'verify-native-ax', 'verify-loaders', 'verify-controller', 'verify-mount-ownership', 'verify-wrap-ownership', 'verify-cli', 'verify-fixture-invariants', 'verify-alignment', 'verify-settle']);
 const saved = values.recheck ? JSON.parse(await readFile('output/suite-sensitivity.json', 'utf8')) : null;
 const engineSuites = saved ? saved.suites : SUITES.map(s => s.name).filter(n => !ENGINE_FREE.has(n)).filter(n => !values.only || values.only.split(',').some(w => n.startsWith('verify-' + w) || n === w));
 

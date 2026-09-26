@@ -93,6 +93,15 @@
       "reason": "The committed 4.2.0 declarations reject as=\"div\", refs, onResult and priority, and inline @types/react 19.2 internals that fail with @types/react 18."
     },
     {
+      "script": "verify-settle",
+      "label": ".*",
+      "modes": [
+        "release"
+      ],
+      "awaiting": "the 4.3.0 release cut",
+      "reason": "test:release runs the committed 4.2.0 dist, which has no stale mode (so no fallback frame to check quotes in), leaves the straight quotes of a TypesetRichText kept native by a component child, and whose TypesetRichText recomposes without end in a shrink-to-fit flex item or inline-block in Chromium (27,360 to 71,520 DOM mutations in 3 s at 768 and 1280 px)."
+    },
+    {
       "script": "verify-site-index",
       "label": "^sri\\.json: typeset\\.(min|esm)\\.js is a ledger-listed immutable path$",
       "awaiting": "the 4.3.0 release cut",
