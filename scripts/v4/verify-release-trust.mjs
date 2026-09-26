@@ -228,9 +228,12 @@ try {
       const releaseWorkflow = await runStep(scripts.release, { PUBLISHED_BY: 'workflow' });
       const releaseUnknown = await runStep(scripts.release, { PUBLISHED_BY: '' });
       const gh = (/** @type {{ calls: string[][] }} */ r) => r.calls.filter(call => call[0] === 'gh');
+      // Who published is stated under "## Integrity"; the CHANGELOG section
+      // above it may describe the release process in general.
+      const integrityOf = (/** @type {string} */ notes) => notes.split('\n## Integrity\n')[1]?.split('\n## Evidence\n')[0] ?? '';
       check(`GitHub Release, maintainer-published: notes say so and claim no provenance`, releaseMaintainer.status === 0 && gh(releaseMaintainer).length === 1 && gh(releaseMaintainer)[0].slice(1, 5).join(' ') === `release create v${version} --verify-tag`
-        && /published to npm by the maintainer account/i.test(releaseMaintainer.notes) && /no npm provenance attestation/.test(releaseMaintainer.notes) && !/with npm provenance|dist\.attestations/.test(releaseMaintainer.notes) && releaseMaintainer.notes.includes(ledger.releases[version].tarball.sha1), { ...releaseMaintainer, notes: undefined });
-      check('GitHub Release, workflow-published: notes name the provenance attestation', releaseWorkflow.status === 0 && gh(releaseWorkflow).length === 1 && /with npm provenance/.test(releaseWorkflow.notes) && releaseWorkflow.notes.includes(`npm view typeset.us@${version} dist.attestations`) && !/maintainer account/.test(releaseWorkflow.notes), { ...releaseWorkflow, notes: undefined });
+        && /published to npm by the maintainer account/i.test(integrityOf(releaseMaintainer.notes)) && /no npm provenance attestation/.test(integrityOf(releaseMaintainer.notes)) && !/with npm provenance|dist\.attestations/.test(integrityOf(releaseMaintainer.notes)) && integrityOf(releaseMaintainer.notes).includes(ledger.releases[version].tarball.sha1), { ...releaseMaintainer, notes: integrityOf(releaseMaintainer.notes) });
+      check('GitHub Release, workflow-published: notes name the provenance attestation', releaseWorkflow.status === 0 && gh(releaseWorkflow).length === 1 && /with npm provenance/.test(integrityOf(releaseWorkflow.notes)) && integrityOf(releaseWorkflow.notes).includes(`npm view typeset.us@${version} dist.attestations`) && !/maintainer account/.test(integrityOf(releaseWorkflow.notes)), { ...releaseWorkflow, notes: integrityOf(releaseWorkflow.notes) });
       check('GitHub Release, publisher unknown: fails and creates no release', releaseUnknown.status !== 0 && gh(releaseUnknown).length === 0, releaseUnknown);
       let both = '';
       try { await releaseNotes({ version, provenance: true, maintainer: true }); } catch (error) { both = String(/** @type {Error} */ (error).message); }
