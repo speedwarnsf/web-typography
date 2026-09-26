@@ -186,12 +186,13 @@ at; its outcome is kept. A width change a composition makes itself is not a
 resize: a block in a box sized by its content (a flex item without `flex: 1`
 or `min-width: 0`, `width: fit-content`, `inline-block`, a float, an auto
 table cell or grid track, an absolutely positioned box or dialog without a
-width) narrows that box to its composed lines and keeps them. The React
-adapters also keep a composed block whose lines still fit when another
-block's composition moves it (two auto grid tracks, two table cells). With `mount()`, the
+width) narrows that box to its composed lines and keeps them. `mount()`, the
+loaders and the React adapters also keep a composed block whose lines still
+fit when only compositions moved it (another block's, in two auto grid tracks
+or two table cells). With `mount()`, the
 loaders and both React adapters, a page of these layouts makes no DOM change
-from 2 s after it loads or a resize ends, at 320, 375, 768 and 1280 px in
-Chromium, WebKit and Firefox (`scripts/v4/verify-settle.mjs`). Both hooks are supported; the engine installs their rules
+from 2 s after it loads or a resize ends, at 320, 375, 424, 492, 728, 768 and
+1280 px in Chromium, WebKit and Firefox (`scripts/v4/verify-settle.mjs`). Both hooks are supported; the engine installs their rules
 as a constructable stylesheet, and `dist/styles.css` carries them for engines
 without one. A page that assigns `document.adoptedStyleSheets` (a theme
 switcher) drops that sheet; the engine adds it back as printing starts,

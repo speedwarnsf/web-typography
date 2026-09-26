@@ -10,8 +10,8 @@
 // second, where 4.2.0 settled.
 //
 // For mount(), the typeset.us loader (go.js), TypesetText and
-// TypesetRichText, in Chromium, WebKit and Firefox, at 320, 375, 768 and
-// 1280 px and after a resize from each, on a page holding every layout of the
+// TypesetRichText, in Chromium, WebKit and Firefox, at 320, 375, 424, 492,
+// 728, 768 and 1280 px and after a resize from each, on a page holding every layout of the
 // matrix (the /awards card among them): 2 s after the page is ready (or the
 // resize ends) and every block has been scrolled near, no DOM mutation and no
 // outcome change for 3 s. With smartQuotes="en" every block shows educated
@@ -28,11 +28,13 @@ import { releaseIdentity } from './release-evidence.mjs';
 
 const { values } = parseArgs({ options: { only: { type: 'string' }, adapter: { type: 'string' }, width: { type: 'string' }, layout: { type: 'string' }, verbose: { type: 'boolean', default: false } } });
 const ADAPTERS = /** @type {const} */ (['mount', 'go', 'text', 'rich']).filter(a => !values.adapter || values.adapter.split(',').includes(a));
-const RESIZES = /** @type {[number, number][]} */ ([[320, 360], [375, 335], [768, 700], [1280, 1180]]).filter(([w]) => !values.width || values.width.split(',').includes(String(w)));
+// 424, 492 and 728 px: where two auto grid tracks traded room without end
+// under the 4.3.0 candidate's mount() and go.js (grid-auto-pair).
+const RESIZES = /** @type {[number, number][]} */ ([[320, 360], [375, 335], [424, 452], [492, 470], [728, 736], [768, 700], [1280, 1180]]).filter(([w]) => !values.width || values.width.split(',').includes(String(w)));
 const HEIGHT = 900;
 const WAIT_MS = 2000, QUIET_MS = 3000;
 
-/** Every text has straight quotes or apostrophes, so education shows in each. */
+/** Every text but `outreach` has straight quotes or apostrophes, so education shows in each. */
 const TEXTS = {
   award: 'The National Gay Media Association\'s Ad Pop Award recognizes advertising agencies for outstanding creative production and media planning in a campaign that reaches audiences across the country.',
   w3: 'The W3 Awards honor creative excellence on the web, and recognize the creative and marketing professionals behind the year\'s award winning sites, videos and marketing programs.',
@@ -41,6 +43,8 @@ const TEXTS = {
   title: 'American Public Health Association\'s "Best Campaign" Award',
   webby: 'The Webby Awards\' "People\'s Voice"',
   fits: 'It\'s "fine," she said.',
+  outreach: 'Community health workers visited more than four thousand households across the county last spring, answering questions about vaccines, screening, housing and food, and connecting families with clinics that could see them the same week.',
+  openness: '"Openness is a practice, not a policy," the director wrote. Our clinics stay open late on Thursdays so that people who work during the day can still be seen.',
 };
 /** @typedef {{ tag?: string, text?: keyof typeof TEXTS, mode?: string, cls?: string, decor?: string, component?: boolean }} HostSpec */
 
@@ -59,6 +63,11 @@ const LAYOUTS = /** @type {{ id: string, html: (hosts: (...specs: HostSpec[]) =>
   { id: 'table-cell', html: hosts => `<table><tr><td ${hosts({ text: 'award' })}></td><td>Short cell</td></tr></table>` },
   { id: 'table-two-cells', html: hosts => `<table><tr><td ${hosts({ text: 'rest' })}></td><td ${hosts({ text: 'habit' })}></td></tr></table>` },
   { id: 'grid-auto', html: hosts => `<div class="grid-auto"><div ${hosts({ text: 'rest' })}></div><div ${hosts({ text: 'w3' })}></div></div>` },
+  // Two auto tracks that each composition resizes: the 4.3.0 candidate's
+  // mount() and go.js traded 3 px between them every 110 ms without end at
+  // 424, 492 and 728 px (10,682 DOM mutations in 3 s at 728 in Chromium),
+  // with no resize or other outside change.
+  { id: 'grid-auto-pair', html: hosts => `<div class="grid-auto"><div ${hosts({ text: 'outreach' })}></div><div ${hosts({ text: 'openness' })}></div></div>` },
   { id: 'grid-min-content', html: hosts => `<div class="grid-min"><div ${hosts({ tag: 'h3', text: 'webby', mode: 'title' })}></div><div ${hosts({ text: 'habit' })}></div></div>` },
   { id: 'float', html: hosts => `<div class="float" ${hosts({ text: 'award' })}></div><div class="clear"></div>` },
   { id: 'absolute', html: hosts => `<div class="abs-wrap"><div class="abs" ${hosts({ text: 'rest' })}></div></div>` },

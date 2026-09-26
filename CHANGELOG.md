@@ -508,21 +508,42 @@ Outside the changes below, 0 of these differ in any engine.
   resize, and keep a composed block whose lines still fit when only
   compositions changed its size (its own, or a neighbour's in two auto grid
   tracks or table cells, which took three rounds of a second each to settle
-  offscreen). `mount()` and the loaders were not affected. 4.2.0's
+  offscreen). `mount()` and the loaders settled in these boxes, but not in
+  two auto grid tracks (next entry). 4.2.0's
   `TypesetRichText` also recomposed without end in Chromium in a
   shrink-to-fit flex item and an inline-block at 768 and 1,280 px (27,360
   to 71,520 DOM mutations in 3 s). The new `verify-settle` suite holds
   `mount()`, go.js and both adapters to no DOM mutation or outcome change
   from 2 s to 5 s after the page is ready and after a resize, on a page of
-  19 layouts (the /awards card, shrink-to-fit flex items, `w-fit`,
+  20 layouts (the /awards card, shrink-to-fit flex items, `w-fit`,
   `inline-block`, auto table cells, auto and `min-content` grid tracks,
   floats, absolutely positioned boxes, a centred flex column, nested
-  scrollers, `<details>` and `<dialog>`) at 320, 375, 768 and 1,280 px in
-  Chromium, WebKit and Firefox: the release candidate failed 21 of 24 of
-  these checks for `TypesetText` and 15 or 16 of 24 for `TypesetRichText`
-  (two runs), in 12 and 9 layouts; 4.3.0 fails none of the 96. With its layout workaround
+  scrollers, `<details>` and `<dialog>`) at 320, 375, 424, 492, 728, 768 and
+  1,280 px in Chromium, WebKit and Firefox: the release candidate failed 21
+  of 24 of these checks for `TypesetText` and 15 or 16 of 24 for
+  `TypesetRichText` (two runs, at the four widths the suite then had), in 12
+  and 9 layouts; 4.3.0 fails none of the 168 it now makes for the four
+  integrations. With its layout workaround
   removed, no text block on the /awards page changes in 3 s after settling,
   at 8 widths in three engines.
+- **Two auto grid tracks settle under `mount()` and the loaders.** Two
+  blocks side by side in `grid-template-columns: auto auto` each change the
+  other's width when they compose. The 4.3.0 release candidate's `mount()`
+  and go.js counted that as a resize, with no resize or other outside
+  change: the tracks traded about 3 px every 110 ms without end, and the
+  first block's height flipped between six and eight lines, moving
+  everything below it. From 15 s after loading, that was 10,366 to 13,572
+  DOM mutations in 3 s under `mount()` at 424, 492 and 728 px in Chromium
+  (9,472 at 728 px in WebKit), and 9,850 to 13,286 under go.js (4,771 in
+  WebKit); 4.2.0 made about 137,000. `mount()` now keeps a composed block
+  whose lines still fit when only its own compositions changed its width
+  since the last resize observation, as the React adapters do, and records
+  it as composed at that width: no DOM mutation from 2 s after loading at
+  those widths in Chromium, WebKit and Firefox, or after resizing across
+  640 to 740 px. A block whose lines no longer fit still shows native lines
+  and recomposes once the size holds. `verify-settle` holds this layout at
+  424, 492 and 728 px; the release candidate fails its `mount()` and go.js
+  checks at 492 and 728 px.
 - **Smart quotes stay curly when text falls back to native lines.** With
   `smartQuotes="en"`, a `TypesetText` block showing native lines while its
   width changed (`data-ts-stale`), or on a reveal whose composition changed

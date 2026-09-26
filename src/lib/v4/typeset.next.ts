@@ -909,6 +909,13 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   const shownNow = new Set<HTMLElement>();
   let shownFrame = 0;
   let windowWidth = view?.innerWidth ?? 0;
+  // Whether a composition wrote, and whether anything outside this controller
+  // that can move a line (an observed mutation other than a style change that
+  // only moves or fades a box, a window resize, a font, stylesheet, metric,
+  // visibility or translation signal, refresh()) happened, since the ResizeObserver last
+  // delivered: widths that changed with only the former are our own
+  // compositions' (see keeps).
+  let composedSince = false, triggeredSince = false;
   let stopped = false;
   let fontsReady = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1183,7 +1190,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     for (const record of records) {
       const target = isElement(record.target) ? record.target : record.target.parentElement;
       if (!target) continue;
-      if (record.type === 'attributes' && record.attributeName?.startsWith('_mst')) { markTranslated(doc); continue; }
+      if (record.type === 'attributes' && record.attributeName?.startsWith('_mst')) { triggeredSince = true; markTranslated(doc); continue; }
       if (record.type === 'childList' && !translationActive(doc) && [...record.addedNodes].some(node => node.nodeName === 'FONT')) {
         for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) if (owned.has(el)) { markTranslated(doc); break; }
       }
@@ -1192,11 +1199,13 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       // no longer eligible.
       if (record.type === 'attributes') {
         if (record.attributeName === 'style' && movedOnly(record.oldValue, target.getAttribute('style'))) continue;
+        triggeredSince = true;
         restyled.add(target);
         if (record.attributeName !== 'style') matching.add(target);
         if (record.attributeName === 'aria-live' || record.attributeName === 'role') for (const el of ownedWithin(target)) live.add(el);
         continue;
       }
+      triggeredSince = true;
       for (let el: HTMLElement | null = target; el && within(el); el = el.parentElement) {
         if (!owned.has(el)) continue;
         enqueue(el, CONTENT);
@@ -1252,11 +1261,29 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     }
     return { w: Math.max(0, w), h: Math.max(0, h) };
   };
+  /** A width changed by this controller's own compositions alone: a box sized
+   * by its content (an auto grid track, an auto table column, a shrink-to-fit
+   * flex item, w-fit, inline-block, a float) narrowed to a block's composed
+   * lines, or gave a neighbour's room to this block. A composed block whose
+   * lines still fit keeps them, and is recorded as composed for this layout,
+   * so a later key check does not recompose it either. Counted as a resize,
+   * each composition moved its neighbours and they it: two auto grid tracks
+   * traded 3 px every 110 ms without end, and the first block's height flipped
+   * between six and eight lines. Reads only (see the ResizeObserver). */
+  const keeps = (el: HTMLElement) => {
+    const state = states.get(el);
+    if (!state?.widest || !state.signature || !state.result.outcome.startsWith('composed') || el.hasAttribute('data-ts-stale')) return false;
+    if (state.widest > boxOf(el).w + .5) return false;
+    state.layout = layoutKey(el);
+    return true;
+  };
   const watched = new Map<Element, Set<HTMLElement>>();
   const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
     // Reads only. A write here that changed any observed size would make every
     // engine report "ResizeObserver loop completed with undelivered notifications".
     let widened = false;
+    const own = composedSince && !triggeredSince;
+    composedSince = triggeredSince = false;
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
       const previous = sizes.get(entry.target);
@@ -1275,7 +1302,10 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
           // paint alternating long and short lines this frame; from the next
           // it shows native wrapping until it is recomposed.
           if (!previous.w || hidden.has(el)) { revealed(el, VERIFY); shownNow.add(el); }
-          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) { resizeStarted(el); widened = true; }
+          else if (entry.target === el || (states.get(el)?.appliedStyles.inlineSize ?? '') !== (states.get(el)?.styles.inlineSize ?? '')) {
+            if (own && keeps(el)) continue;
+            resizeStarted(el); widened = true;
+          }
         }
       } else if (Math.abs(previous.h - height) > .5 && owned.has(entry.target as HTMLElement)) {
         // Same width, new height: a font, a text-spacing override, a browser
@@ -1346,7 +1376,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       return;
     }
     const result = typeset(el, options);
-    if (result.changed) stats.compositions++;
+    if (result.changed) { stats.compositions++; composedSince = true; }
     if (result.outcome === 'unmeasurable') hidden.add(el);
     // Declined while a transform animates (a dialog's @starting-style entry,
     // a scale-in, a drawer closing): check again once it ends, since neither
@@ -1399,6 +1429,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   }
   const refresh = () => {
     if (stopped) return;
+    triggeredSince = true;
     discover();
     for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
@@ -1408,6 +1439,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // resize can also change vw/vh sizes without resizing a box; those blocks
   // get a key recheck, which composes nothing unless it changed.
   const resized = () => {
+    triggeredSince = true;
     if (stopped || !fontsReady) return;
     // Hidden text is likely to be shown at another width once the window's
     // width changes: it shows native wrapping until then. Written now, inside
@@ -1430,6 +1462,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     schedule();
   };
   const fontsChanged = () => {
+    triggeredSince = true;
     if (stopped) return;
     discover();
     for (const el of owned) recheck(el, KEY | VERIFY);
@@ -1440,12 +1473,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // intermediate ones, so a recheck is enough (an animation on <body> must not
   // measure every block).
   const metricsChanged = (target: Element) => {
+    triggeredSince = true;
     if (stopped) return;
     for (const el of ownedWithin(target)) recheck(el, KEY);
     for (let el = target.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) recheck(el, KEY);
     schedule();
   };
   const stylesChanged = () => {
+    triggeredSince = true;
     if (stopped) return;
     for (const el of owned) recheck(el, KEY);
     schedule();
@@ -1453,6 +1488,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   // Translation started: step aside at once, before the translator fills the
   // Text nodes it holds. Ended ("show original"): compose the current DOM.
   const translationChanged = (active: boolean) => {
+    triggeredSince = true;
     if (stopped) return;
     if (active) {
       observer.disconnect();
@@ -1463,6 +1499,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   };
   // A content-visibility:auto section scrolled into range: its text can be measured now.
   const visibilityChanged = (target: Element) => {
+    triggeredSince = true;
     if (stopped) return;
     for (const el of ownedWithin(target)) recheck(el, KEY);
     schedule();
