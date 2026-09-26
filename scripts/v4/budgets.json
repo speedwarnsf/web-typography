@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 49987,
-      "TypesetText-only": 49897,
-      "TypesetRichText-only": 46026,
+      "mount-only": 50384,
+      "TypesetText-only": 50255,
+      "TypesetRichText-only": 46390,
       "smartQuotes-only": 1544,
-      "react.js+shared": 53303,
-      "TypesetText-no-tree-shaking": 62036,
-      "go.js": 56146,
-      "typeset.global.js": 55806
+      "react.js+shared": 53692,
+      "TypesetText-no-tree-shaking": 62438,
+      "go.js": 56552,
+      "typeset.global.js": 56212
     },
     "raised": [
       {
@@ -161,6 +161,30 @@
           "go.js": 56146,
           "typeset.global.js": 55806
         }
+      },
+      {
+        "by": "4.3 gate 4 fixes",
+        "reason": "Measured per fix with the release recipe on typeset.global.js (react.js+shared in parentheses): text placed under a pane only when the pane hides it, its translation subtracted, instead of whenever the pane overflows (a transform rooted an overflow-x:hidden app root or a carousel row, P5) +335 B (+297), and the panes text waits on watched by the window's observer and rechecked when they come near (a pane that hides its text only after content above it loaded) +71 B (+92). No budget passed its 2% tolerance.",
+        "before": {
+          "mount-only": 49987,
+          "TypesetText-only": 49897,
+          "TypesetRichText-only": 46026,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 53303,
+          "TypesetText-no-tree-shaking": 62036,
+          "go.js": 56146,
+          "typeset.global.js": 55806
+        },
+        "after": {
+          "mount-only": 50384,
+          "TypesetText-only": 50255,
+          "TypesetRichText-only": 46390,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 53692,
+          "TypesetText-no-tree-shaking": 62438,
+          "go.js": 56552,
+          "typeset.global.js": 56212
+        }
       }
     ]
   },
@@ -297,7 +321,7 @@
   "calibrated": {
     "size": {
       "date": "2026-09-25",
-      "dist": "output/candidate/dist (the gate 3 fixes candidate, c3e5dea)"
+      "dist": "output/candidate/dist (the gate 4 fixes candidate, 6cd6a63)"
     },
     "runtime": {
       "date": "2026-09-25",
@@ -777,6 +801,55 @@
           "from": 55224,
           "to": 55806,
           "reason": "as mount-only (+284, +72, +226 B)"
+        }
+      ],
+      "measured": "scripts/v4/bench-sizes.mjs on a candidate built after each fix (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 gate 4 fixes",
+      "raised": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 49987,
+          "to": 50384,
+          "reason": "text placed under a pane only when the pane hides it (+330 B), panes rechecked when they come near the window (+67 B) (see size.raised, gate 4)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 49897,
+          "to": 50255,
+          "reason": "as mount-only (+297, +61 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 46026,
+          "to": 46390,
+          "reason": "as mount-only (+295, +69 B)"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 53303,
+          "to": 53692,
+          "reason": "as mount-only (+297, +92 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": 62036,
+          "to": 62438,
+          "reason": "as mount-only (+331, +71 B)"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 56146,
+          "to": 56552,
+          "reason": "as mount-only (+335, +71 B)"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 55806,
+          "to": 56212,
+          "reason": "as mount-only (+335, +71 B)"
         }
       ],
       "measured": "scripts/v4/bench-sizes.mjs on a candidate built after each fix (release recipe, Node 24 zlib)"
