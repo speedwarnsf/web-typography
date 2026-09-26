@@ -85,6 +85,9 @@ try {
   // gate 4 fixes to 1.89 MB (1,886,737 B: placing text only under a pane
   // that hides it and rechecking panes as they come near, in each copy, and
   // README's and SUPPORT.md's note on indents under legacy line breaks).
+  // Rolling the near observer back to the round-2 rule took it to 1.87 MB
+  // (1,869,104 B: that pane code gone from each copy, less the known
+  // limitations README and SUPPORT.md now describe).
   check('unpacked package is under 1.9 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1900000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
