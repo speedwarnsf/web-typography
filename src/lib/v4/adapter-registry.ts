@@ -25,7 +25,10 @@
  * the size has held for RESIZE_SETTLE_MS; so does a host whose metrics change
  * again within RESIZE_SETTLE_MS of a check composing it (a font-size or
  * spacing transition, a text-size slider), unless a font face finished in
- * between, which composes. Hidden hosts keep their composition
+ * between, which composes. A size a composition changes itself (a box sized
+ * by its content narrowing to the composed lines, a grid track or table
+ * column passing room to a neighbour) is not a resize: a composed host whose
+ * lines still fit keeps them (see rebase and resized). Hidden hosts keep their composition
  * and are checked when shown; nothing composes while the page prints; and
  * while a translator rewrites the page every host steps aside (see
  * lifecycle.ts). */
@@ -78,12 +81,14 @@ const RESIZE_SETTLE_MS = 100;
 // reveal paints.
 const OBSERVED = ['class', 'style', 'lang', 'hidden', 'open', '_msttexthash', '_msthash'];
 
-/** A content-box height as a ResizeObserver reports it (NaN for an inline box). */
-function contentHeight(el: Element): number {
+/** A content-box size as a ResizeObserver reports it: layout, before any
+ * transform (NaN for an inline box). */
+function contentSize(el: Element): { w: number; h: number } {
   const cs = getComputedStyle(el);
-  const height = parseFloat(cs.height);
-  return cs.boxSizing === 'border-box' ? height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0')
-    - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0') : height;
+  const width = parseFloat(cs.width), height = parseFloat(cs.height);
+  if (cs.boxSizing !== 'border-box') return { w: width, h: height };
+  return { w: width - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - parseFloat(cs.borderLeftWidth || '0') - parseFloat(cs.borderRightWidth || '0'),
+    h: height - parseFloat(cs.paddingTop || '0') - parseFloat(cs.paddingBottom || '0') - parseFloat(cs.borderTopWidth || '0') - parseFloat(cs.borderBottomWidth || '0') };
 }
 
 interface Registry {
@@ -92,6 +97,9 @@ interface Registry {
   add(entry: AdapterEntry): void;
   remove(entry: AdapterEntry): void;
   request(entry: AdapterEntry, reason: Reason, inCommit: boolean): void;
+  /** A composition finished rendering outside run() (TypesetRichText's
+   * finishing commits): its size changes are its own. */
+  composed(entry: AdapterEntry): void;
   writing<T>(write: () => T): T;
 }
 const registries = new WeakMap<Document, Registry>();
@@ -134,6 +142,12 @@ function createRegistry(doc: Document): Registry {
   let settle: ReturnType<typeof setTimeout> | undefined;
   let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: NearObserver | null = null;
   let writingDepth = 0;
+  // Whether a composition, and whether anything outside the registry that can
+  // move a line (a DOM change outside the hosts' text, a window resize, a
+  // font, stylesheet, metric, visibility or translation signal), happened
+  // since the ResizeObserver last delivered: sizes that changed with only the
+  // former are our own compositions' (see resized).
+  let composedSince = false, triggeredSince = false;
   let started = false;
   let windowWidth = win?.innerWidth ?? 0;
   let unsubscribe: (() => void) | undefined;
@@ -155,21 +169,39 @@ function createRegistry(doc: Document): Registry {
     if (!entries.has(entry.element)) return 0;
     const begun = performance.now(), length = entry.element.textContent?.length || 1;
     writing(() => entry.compose(reason, inCommit));
+    composedSince = true;
     const took = performance.now() - begun;
     let setup = 0;
     if (!warm && entry.element.dataset.tsOutcome?.startsWith('composed')) { warm = true; setup = took; }
     // Learn this device's cost per character of composed text, so a budget
     // can decline a composition that would overrun it before starting it.
     else costPerChar = costPerChar ? costPerChar * .8 + took / length * .2 : took / length;
-    // Our own write may change the host's height; that is no reason to check
-    // it again. (In a commit the update renders after this returns.)
-    const size = sizes.get(entry.element);
-    if (size && !inCommit) { const height = contentHeight(entry.element); if (!Number.isNaN(height)) size.h = height; }
+    rebase(entry);
     // Declined while a transform animates (a dialog's @starting-style entry,
     // a scale-in, a drawer closing): compose again once it ends, since neither
     // a CSS transition nor a Web Animation ends with a mutation.
     if (entry.element.dataset.tsOutcome === 'native:transformed') awaitTransforms(entry);
     return setup;
+  }
+  /** The sizes of the host's box and its parent's as the host's own
+   * composition left them, recorded as what the ResizeObserver compares
+   * against. A box sized by its content (a flex item without flex-1 or
+   * min-w-0, w-fit, inline-block, a float, an auto table cell) narrows to its
+   * composed lines, and a composition can change the host's height: neither
+   * is a resize or a reason to check the host again. Counted as a resize,
+   * the narrowing made the host show native lines, widen, compose and narrow
+   * again every 100 ms without end. A hidden box keeps the size it was last
+   * seen at, so showing it is still seen as a reveal. (TypesetRichText, whose
+   * updates render after a commit's run() returns, calls this again once its
+   * composition has settled.) */
+  function rebase(entry: AdapterEntry): void {
+    for (const target of [entry.element, parents.get(entry)]) {
+      const size = target ? sizes.get(target) : undefined;
+      if (!target || !size?.w || !target.getClientRects().length) continue;
+      const box = contentSize(target);
+      if (!Number.isNaN(box.w) && box.w > 0) size.w = box.w;
+      if (!Number.isNaN(box.h)) size.h = box.h;
+    }
   }
   /** Hosts declined under each running animation, composed again when it
    * ends. One that never ends (infinite iterations) is not waited on, or its
@@ -305,6 +337,7 @@ function createRegistry(doc: Document): Registry {
 
   /** Mark hosts for a key check: those inside `target`, or all. */
   function check(target?: Element): void {
+    triggeredSince = true;
     for (const entry of entries.values()) {
       if (target && target !== entry.element && !target.contains(entry.element)) continue;
       if (!pending.has(entry)) enqueue(entry, 'check');
@@ -333,6 +366,7 @@ function createRegistry(doc: Document): Registry {
       // Inside a host: our own writes are excluded (see writing), and React's
       // commits of TypesetRichText leave its layout key unchanged.
       if (host) { if (!pending.has(host)) enqueue(host, 'check'); continue; }
+      triggeredSince = true;
       if (record.type === 'attributes') targets.add(target);
       // A stylesheet edit; a <title> tick or an injected <script> in <head>
       // changes no text metrics (see styleMutation).
@@ -365,6 +399,8 @@ function createRegistry(doc: Document): Registry {
   }
   function resized(observations: ResizeObserverEntry[]): void {
     const revealed = new Set<AdapterEntry>();
+    const own = composedSince && !triggeredSince;
+    composedSince = triggeredSince = false;
     for (const observation of observations) {
       const { width, height } = observation.contentRect;
       const previous = sizes.get(observation.target);
@@ -385,7 +421,16 @@ function createRegistry(doc: Document): Registry {
       for (const entry of watchers.get(observation.target) || []) {
         if (previous.w === 0 && entry.element.isConnected && visible(entry.element)) {
           if (!revealed.has(entry)) { revealed.add(entry); resizing.delete(entry); reveal(entry); }
-        } else if (!revealed.has(entry)) resizing.add(entry);
+        } else if (!revealed.has(entry)) {
+          // Changed by our own compositions alone: a box sized by its content
+          // narrowed to a block's composed lines, or an auto grid track or
+          // table column gave a neighbour's room to this block. A composed
+          // block whose lines still fit keeps them. Recomposing it would move
+          // its neighbours again, and them it: two auto grid tracks took three
+          // rounds, a second each offscreen, and nothing bounds the rounds.
+          if (own && entry.widest() && entry.widest() <= contentWidth(entry.element) + .5) continue;
+          resizing.add(entry);
+        }
       }
     }
     if (!resizing.size) return;
@@ -430,14 +475,17 @@ function createRegistry(doc: Document): Registry {
   const fontsChanged = () => check();
   // A transition or animation of text metrics ended on or around a host.
   const metricsEnded = (target: Element) => {
+    triggeredSince = true;
     for (const entry of entries.values()) if (target.contains(entry.element) || entry.element.contains(target)) if (!pending.has(entry)) enqueue(entry, 'check');
   };
   // Translation started: step aside at once, before the translator fills the
   // Text nodes it holds. Ended ("show original"): compose again.
   const translated = (active: boolean) => {
+    triggeredSince = true;
     for (const entry of [...entries.values()]) writing(() => entry.translation?.(active));
   };
   const windowResized = () => {
+    triggeredSince = true;
     for (const entry of entries.values()) resizing.add(entry);
     // Hidden text is likely to be shown at another width once the window's
     // width changes: native lines until then (see staleCheck). A height-only
@@ -485,6 +533,7 @@ function createRegistry(doc: Document): Registry {
 
   return {
     identity, entries, writing,
+    composed(entry) { if (entries.get(entry.element) === entry) { composedSince = true; rebase(entry); } },
     add(entry) {
       entries.set(entry.element, entry);
       // Observers start with the first host that can be composed, and a

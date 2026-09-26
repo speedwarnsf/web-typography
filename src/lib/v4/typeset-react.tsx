@@ -10,6 +10,7 @@ import { ENVIRONMENT_OUTCOME } from './environment';
 import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
 import { smartQuotes as educate } from './smart-quotes';
+import { linesExtent } from './layout-metrics';
 export { TypesetRichText } from './typeset-rich-react';
 export type { TypesetRichTextProps, TypesetAdapterProps, TypesetTag, Priority } from './typeset-rich-react';
 
@@ -64,7 +65,9 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
       element, priority,
       compose() {
         const result: Result = typeset(element, options.current);
-        widest = result.outcome.startsWith('composed') ? Math.max(0, ...result.after.lines.map(line => line.width)) : 0;
+        // Measured as the registry compares it with the content width: a
+        // hung first glyph is not part of what the box must hold.
+        widest = result.outcome.startsWith('composed') ? linesExtent(element, result.after.lines) : 0;
         delete element.dataset.tsStale;
         // No key for a decision made without measurement (a skipped
         // content-visibility subtree, a closed <details>): revealing one keeps

@@ -34,6 +34,19 @@ export function contentWidth(element: HTMLElement): number {
     - parseFloat(cs.borderRightWidth || '0'));
 }
 
+/** The inline size measured lines need from the content box: each line's
+ * right edge from the content box's left edge, less any part of the line
+ * that starts left of that edge. An optically hung quote or capital, or a
+ * negative text-indent, sits in the margin, and a box sized by its content (a
+ * shrink-to-fit flex item, w-fit, inline-block) leaves no room for it, so it
+ * is no reason to think the lines no longer fit. */
+export function linesExtent(element: HTMLElement, lines: readonly MeasuredLine[]): number {
+  if (!lines.length) return 0;
+  const cs = getComputedStyle(element);
+  const left = element.getBoundingClientRect().left + parseFloat(cs.borderLeftWidth || '0') + parseFloat(cs.paddingLeft || '0');
+  return Math.max(0, ...lines.map(line => line.right - Math.max(line.left, left)));
+}
+
 /** Read real line boxes, including native and fallback text. No DOM writes. */
 export function measureLayout(element: HTMLElement): LayoutMetrics {
   return measure(element, false);

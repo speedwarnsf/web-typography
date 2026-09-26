@@ -4,7 +4,7 @@ import { Children, Component, Fragment, cloneElement, createElement, forwardRef,
 import type { AllHTMLAttributes, ForwardedRef, HTMLAttributes, ReactElement, ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { BREAK_ATTRIBUTE, breakReplacesSpace, liveText, planRichText, preserveRichCopy, selectionBookmark, richFingerprint, richLayoutVerified } from './rich-text';
-import { measureLayout } from './layout-metrics';
+import { linesExtent, measureLayout } from './layout-metrics';
 import { assignRef, childrenKey, layoutKey, propsKey, transformOnly } from './adapter-keys';
 import { adapterRegistry } from './adapter-registry';
 import { ENVIRONMENT_OUTCOME } from './environment';
@@ -364,14 +364,20 @@ class RichText extends Component<RichProps, State> {
         this.setState({ plan: { ...plan, hangs: optical.hangs, hanging: optical.outcome, beforeHanging: after } });
         return;
       }
-      this.widest = Math.max(0, ...after.lines.map(line => line.width));
+      // As the registry compares it with the content width: a hung first
+      // glyph is not part of what the box must hold.
+      this.widest = linesExtent(el, after.lines);
     }
     if (!this.state.stale) {
       // No layout key where nothing can be measured (jsdom, happy-dom), and
       // none for a decision made while hidden: revealing a content-visibility
       // subtree or a <details> keeps the host's width and style, so an equal
       // key would leave it native.
-      if (plan?.outcome !== ENVIRONMENT_OUTCOME) this.layout = plan?.outcome !== 'unmeasurable' && rendered(el) ? layoutKey(el) : '';
+      if (plan?.outcome !== ENVIRONMENT_OUTCOME) {
+        this.layout = plan?.outcome !== 'unmeasurable' && rendered(el) ? layoutKey(el) : '';
+        // The box's size as this composition left it is not a resize.
+        if (this.entry) adapterRegistry(el.ownerDocument).composed(this.entry);
+      }
       if (this.reporting) this.report(el, plan);
     }
   }
