@@ -3,85 +3,45 @@ import type { LayoutMetrics } from './layout-metrics.js';
 import { planRichText } from './rich-text.js';
 import type { RichPlan } from './rich-text.js';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities.js';
-import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes.js';
-export declare const VERSION = "4.3.0";
+export declare const VERSION = "4.2.0";
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
-/**
- * Composition options. Defaults are those of the typeset.us package entry
- * points (typeset, typesetAll, mount, planRichText and the React adapters).
- * The same options are accepted by every entry point.
- */
 export interface Options {
-    /** Where lines may break. Default `'unicode'`: Unicode 17 line-break
-     * opportunities with English, French, German and Spanish preferences from
-     * the declared `lang`. `'legacy'` is the earlier English-only research path,
-     * kept for comparison; it is not identical to 3.x. */
+    /** Opt-in Unicode 17 break opportunities; default preserves the legacy path. */
     lineBreaks?: 'legacy' | 'unicode';
-    /** Default `false`. `'en'` converts straight quotes and apostrophes to curly
-     * ones in declared-English text (quotes only; same length, so offsets and
-     * copying stay aligned). Changes the copied text. */
+    /** Explicit English text transformation. Off unless requested. */
     smartQuotes?: 'en' | false;
-    /** Default `false`. `true` hangs opening punctuation and measured capitals
-     * into the left margin, reversibly, when the glyph fits inside any clip. */
+    /** Reversible leading punctuation/capital alignment. Off unless requested. */
     opticalHanging?: boolean;
-    /** Default `true`. Adjusts word spaces on composed, left-aligned body text
-     * within -20% to +33% of their natural width. `false` also turns off
-     * `tracking`. */
+    /** Full bounded word-space finish on composed body text. On by default. */
     spacing?: boolean;
-    /** Default `true` (while `spacing` is on). Adjusts letter spacing by at most
-     * 0.01em per line after word spacing. `false` keeps word spacing only. */
+    /** Bounded per-line tracking after word-space finishing. On with spacing. */
     tracking?: boolean;
-    /** Default `'finished'`: ranks candidates by their predicted rag after
-     * spacing. `'natural'` ranks by natural widths, the earlier ranking, kept
-     * for comparison. */
+    /** Re-rank the finished rag or retain the historical natural-width ranking. */
     contour?: 'natural' | 'finished';
-    /** Default `'body'`, or `'title'` inside h1-h6; also read from
-     * `data-typeset-mode`. `'title'` and `'heading'` balance short display text
-     * and never add a line; `'body'` composes paragraphs; `'ui'` never composes
-     * (outcome `native:ui`). */
     mode?: Mode;
-    /** Default none. Phrases whose words should stay on one line, such as
-     * `['New York']`. Matching ignores case, treats NBSP and runs of spaces as
-     * one space and ignores punctuation around the phrase. In body text a kept
-     * phrase that fits the measure is never split, a phrase the browser splits
-     * can earn one extra line (not with `density: 'compact'`), and a longer
-     * phrase is split as few times as possible. Titles and headings keep
-     * phrases within their minimum line count. The browser's lines are kept
-     * as they are only when they split no kept phrase. */
     keep?: readonly string[];
-    /** Default none. The most lines a composition may use; a result that needs
-     * more is declined with `native:line-budget`. */
     maxLines?: number;
-    /** Default (omitted): body text keeps the browser's line count, or uses one
-     * more line to repair a one-word last line or a stranded sentence or
-     * clause opener. `'compact'`: one more line only to repair a one-word last
-     * line. `'editorial'`: one more line allowed for better phrasing. */
+    /** Compact preserves native line count, except one extra line to fix an
+     * orphan. Editorial permits one additional line for prose phrasing.
+     * When omitted, a stranded sentence/clause opener can also earn one line. */
     density?: 'compact' | 'editorial';
-    /** Current author text. Framework adapters pass this on updates. */
+    /** Current author text. Framework adapters should pass this on updates. */
     text?: string;
 }
-/** What typeset() did to one element. `outcome` is also written to
- * `data-ts-outcome`; OUTCOMES.md explains every value. */
 export interface Result {
-    /** One of OUTCOMES; typed so that a future code still compiles. */
-    outcome: Outcome | (string & {});
+    outcome: string;
     mode: Mode;
-    /** Line boxes before and after, as measured in the browser. */
     before: LayoutMetrics;
     after: LayoutMetrics;
-    /** True when the DOM was changed (composed, or quotes converted). */
     changed: boolean;
     durationMs: number;
-    /** Why no candidate fitted, when outcome is `native:no-candidate`. */
     constraint?: RichPlan['constraint'];
-    /** Candidate-search evidence for rich composition. */
     search?: RichPlan['search'];
-    /** Finishing-feature statuses (also `data-ts-quotes`, `-hanging`, `-spacing`, `-tracking`). */
     features?: {
-        quotes: QuoteStatus | (string & {});
-        hanging: HangingStatus | (string & {});
-        spacing: SpacingStatus | (string & {});
-        tracking: TrackingStatus | (string & {});
+        quotes: string;
+        hanging: string;
+        spacing: string;
+        tracking: string;
     };
 }
 /** Release this engine's output. Original nodes, attributes, and listeners survive. */
@@ -133,9 +93,7 @@ export interface Controller {
         readonly overlappingTargets: number;
     };
 }
-/** One lifecycle owner per mount. Observers are disconnected during our writes.
- * mount('article p', options) is mount(document, 'article p', options). */
-export declare function mount(selector: string, options?: Options): Controller;
+/** One lifecycle owner per mount. Observers are disconnected during our writes. */
 export declare function mount(root?: ParentNode, selector?: string, options?: Options): Controller;
 export { measureLayout, contentWidth, planRichText };
 export type { RichPlan } from './rich-text.js';

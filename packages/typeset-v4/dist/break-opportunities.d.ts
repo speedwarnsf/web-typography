@@ -19,6 +19,5 @@ export declare function languageWeakEnding(word: string, language: string): bool
 export declare function analyzeBreaks(source: string, options?: {
     language?: string | null;
     hyphens?: string;
-    outcomeOnly?: boolean;
 }): BreakAnalysis;
 export declare function tokenForUnit(unit: BreakUnit, language: string): Token;

@@ -37,7 +37,7 @@ scripts/field/sweep-homepage.mjs reproduces it.)
 if it ever did.
 
 ```html
-<script src="https://typeset.us/go@4.3.0.js" integrity="sha384-RhWSNjiA92CpJlQJp32pe1emoWt5q3UzGXSIp5WA1EPOcIwDI1EfO00sXhUOxGeU" crossorigin="anonymous" defer></script>
+<script src="https://typeset.us/go@4.3.0.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
 ```
 
 It sets paragraphs, list items, headings, captions and table cells, with

@@ -1,6 +1,4 @@
-/** English quote education only. No whitespace, dash, ellipsis, or length
- * changes, and each quote keeps its kind: single quotes are never turned into
- * double quotes or the reverse. Idempotent. */
+/** English quote education only. No whitespace, dash, ellipsis, or length changes. */
 export declare function smartQuotes(text: string): string;
 export interface QuoteTransform {
     outcome: string;

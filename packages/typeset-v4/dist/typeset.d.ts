@@ -78,9 +78,6 @@ export interface ParagraphOptions {
     breakPenalty?: (end: number) => number;
     contourWidths?: (lines: ParagraphLine[]) => number[];
     onSearch?: (evidence: ParagraphSearchEvidence) => void;
-    /** Author phrases to keep on one line: never split where the phrase fits
-     * the measure, and split as little as possible where it cannot. */
-    keep?: readonly string[];
 }
 export interface ParagraphLine {
     tokens: Token[];
@@ -100,18 +97,10 @@ export interface ParagraphProblem {
     minRemaining: number[];
     options: ParagraphOptions;
     widthBetween: (start: number, end: number) => number;
-    /** Scores the line tokens.slice(end - lineTokens.length, end) at `fill`. */
     scoreLine: (tokens: Token[], fill: number, last: boolean, end: number) => number;
     scoreTransition: (lines: {
         fill: number;
     }[], last: boolean) => number;
-    /** What the search calls, with results identical to the above: scoreLine
-     * for the line [start, end) at its measured fill (computed once per line),
-     * the break penalty at `end`, and scoreTransition given the line count and
-     * the newest three fills. */
-    lineScore: (start: number, end: number) => number;
-    breakCost: (end: number) => number;
-    transition: (lines: number, fill: number, previousFill: number, earlierFill: number, last: boolean) => number;
 }
 /** Internal scoring model shared by the compositor and offline search tests. */
 export declare function createParagraphProblem(tokens: Token[], measurePx: number, measureCh: number, opts?: ParagraphOptions): ParagraphProblem | null;

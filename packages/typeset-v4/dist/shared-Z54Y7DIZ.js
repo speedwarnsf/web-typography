@@ -1,55 +1,3 @@
-"use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// src/lib/v4/typeset.release.ts
-var typeset_release_exports = {};
-__export(typeset_release_exports, {
-  UNICODE_VERSION: () => UNICODE_VERSION,
-  VERSION: () => VERSION,
-  analyzeBreaks: () => analyzeBreaks,
-  audit: () => audit,
-  auditJSON: () => auditJSON,
-  auditReport: () => auditReport,
-  composeParagraph: () => composeParagraph,
-  contentWidth: () => contentWidth,
-  finalValidate: () => finalValidate,
-  linesOverflow: () => linesOverflow,
-  linesStarved: () => linesStarved,
-  measureCh: () => measureCh,
-  measureLayout: () => measureLayout,
-  mount: () => mount2,
-  planRichText: () => planRichText2,
-  renderFrozenLines: () => renderFrozenLines,
-  restore: () => restore,
-  safeWrite: () => safeWrite,
-  shapeExactLines: () => shapeExactLines,
-  shouldIgnoreMutation: () => shouldIgnoreMutation,
-  smartQuotes: () => smartQuotes,
-  styleProseLists: () => styleProseLists,
-  tokenize: () => tokenize,
-  typeset: () => typeset2,
-  typesetAll: () => typesetAll2,
-  typesetHeading: () => typesetHeading,
-  typesetText: () => typesetText
-});
-module.exports = __toCommonJS(typeset_release_exports);
-
 // src/lib/v4/phrase-boundaries.ts
 var determiners = /* @__PURE__ */ new Set(["a", "an", "the", "my", "your", "our", "their", "his", "her", "its"]);
 var stops = /* @__PURE__ */ new Set(["a", "an", "the", "this", "that", "these", "those", "and", "or", "but", "nor", "so", "yet", "if", "as", "than", "of", "to", "in", "on", "at", "by", "for", "with", "from", "after", "before", "through", "into", "over", "under", "between", "without", "about", "around", "is", "are", "was", "were", "be", "been", "being", "has", "have", "had", "can", "could", "will", "would", "should", "may", "might", "must", "which", "who", "how", "we", "you", "they", "it"]);
@@ -1187,81 +1135,6 @@ var OPT_SHORT_BIND = new Set(
   "a an the of in to at by on or is it if no so as we do be".split(" ")
 );
 
-// src/lib/v4/title-layout.ts
-var weakEnds = /* @__PURE__ */ new Set(["a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "with", "from", "and", "or", "but"]);
-function composeTitle(tokens, width, measure, policy = {}) {
-  const words = tokens.filter((t) => t.kind !== "space");
-  if (!words.length || words.length > 64 || width <= 0) return null;
-  const n = words.length;
-  const widths = Array.from({ length: n }, () => []);
-  for (let start2 = 0; start2 < n; start2++) {
-    for (let end = start2 + 1; end <= n; end++) {
-      widths[start2][end] = policy.measureRange?.(start2, end) ?? measure(words.slice(start2, end).map((t) => t.text).join(" "));
-    }
-  }
-  const minLines = Array(n + 1).fill(Infinity);
-  minLines[n] = 0;
-  for (let start2 = n - 1; start2 >= 0; start2--) {
-    for (let end = start2 + 1; end <= n; end++) {
-      if (widths[start2][end] <= width + 0.25) minLines[start2] = Math.min(minLines[start2], 1 + minLines[end]);
-    }
-  }
-  const count = minLines[0];
-  if (!Number.isFinite(count) || policy.maxLines && count > policy.maxLines) return null;
-  const keepBreaks = /* @__PURE__ */ new Set();
-  for (const phrase of policy.keep || []) {
-    const parts = phrase.trim().split(/\s+/u);
-    for (let i2 = 0; i2 <= n - parts.length; i2++) {
-      if (parts.every((part, j2) => words[i2 + j2].text === part)) {
-        for (let j2 = 1; j2 < parts.length; j2++) keepBreaks.add(i2 + j2);
-      }
-    }
-  }
-  const target = widths[0][n] / (count * width);
-  const memo = /* @__PURE__ */ new Map();
-  const solve = (start2, left) => {
-    if (start2 === n) return left === 0 ? { cost: 0, breaks: [] } : null;
-    if (!left || minLines[start2] > left) return null;
-    const key = start2 + ":" + left;
-    if (memo.has(key)) return memo.get(key);
-    let best = null;
-    for (let end = start2 + 1; end <= n; end++) {
-      const lineWidth = widths[start2][end];
-      if (lineWidth > width + 0.25) continue;
-      const rest = solve(end, left - 1);
-      if (!rest) continue;
-      const last = end === n;
-      const wordCount = words.slice(start2, end).reduce((sum, t) => sum + t.text.split(/\s+/u).length, 0);
-      let cost = rest.cost + 1e3 * (lineWidth / width - target) ** 2;
-      if (count > 1 && wordCount === 1 && (start2 === 0 || last)) {
-        cost += last ? 500 : 900 * Math.max(0, 0.65 - lineWidth / width) / 0.65;
-      }
-      if (!last && (policy.weakEnding?.(words[end - 1].text) ?? weakEnds.has(words[end - 1].text.toLowerCase()))) cost += 240;
-      if (!last && keepBreaks.has(end)) cost += 1500;
-      if (!last) cost += policy.breakPenalty?.(end) || 0;
-      if (!last && (words[end - 1].stickyNext || words[end]?.stickyPrev)) cost += 1e4;
-      if (!best || cost < best.cost) best = { cost, breaks: [end, ...rest.breaks] };
-    }
-    memo.set(key, best);
-    return best;
-  };
-  const winner = solve(0, count);
-  if (!winner) return null;
-  let start = 0;
-  return winner.breaks.map((end) => {
-    const lineTokens = words.slice(start, end);
-    const lineWidth = widths[start][end];
-    start = end;
-    return {
-      tokens: lineTokens,
-      text: lineTokens.map((t) => t.text).join(" "),
-      width: lineWidth,
-      fill: lineWidth / width,
-      wordSpacingEm: 0
-    };
-  });
-}
-
 // src/lib/v4/inline-box.ts
 function inlineBoxInsets(style) {
   const values = [
@@ -1410,201 +1283,6 @@ function measureLayout(element) {
     firstSingleton: lines.length > 1 && lines[0].words === 1,
     lastSingleton: lines.length > 1 && lines[lines.length - 1].words === 1,
     rag: fills.reduce((sum, f) => sum + (f - mean) ** 2, 0) / Math.max(1, fills.length)
-  };
-}
-
-// src/lib/v4/space-policy.ts
-function finishTargets(widths, measure) {
-  const fills = widths.slice(0, -1).map((width) => width / measure).sort((a, b2) => a - b2);
-  const mid = Math.floor(fills.length / 2);
-  const median = fills.length % 2 ? fills[mid] : (fills[mid - 1] + fills[mid]) / 2;
-  return widths.map((width, index) => {
-    if (index === widths.length - 1) return width;
-    const neighbors = [widths[index - 1], index < widths.length - 2 ? widths[index + 1] : void 0].filter((value) => value !== void 0);
-    const local = neighbors.length ? neighbors.reduce((sum, value) => sum + value / measure, 0) / neighbors.length : median;
-    const target = Math.max(0.7, Math.min(0.965, 0.5 * local + 0.5 * median));
-    return measure * target;
-  });
-}
-function finishSpaceDeltas(widths, measure, spaces) {
-  const targets = finishTargets(widths, measure);
-  return widths.map((width, index) => {
-    const gaps = spaces[index] || [];
-    if (index === widths.length - 1 || !gaps.length) return gaps.map(() => 0);
-    const desired = (targets[index] - width) / gaps.length;
-    return gaps.map((natural) => Number.isFinite(natural) && natural > 0 && desired >= -0.4 * natural ? Math.max(-0.2 * natural, Math.min(0.33 * natural, desired)) : 0);
-  });
-}
-
-// src/lib/v4/spacing-finish.ts
-var fontProperties = [
-  "font-family",
-  "font-size",
-  "font-style",
-  "font-weight",
-  "font-stretch",
-  "font-variant",
-  "font-feature-settings",
-  "font-variation-settings",
-  "font-optical-sizing",
-  "font-kerning",
-  "font-size-adjust",
-  "font-synthesis",
-  "text-rendering",
-  "text-transform"
-];
-function naturalSpace(element, style, text, cache) {
-  const font = fontProperties.map((property) => style.getPropertyValue(property));
-  const key = JSON.stringify([font, text]);
-  const cached = cache.get(key);
-  if (cached !== void 0) return cached;
-  const probe = element.ownerDocument.createElement("span");
-  probe.dataset.tsProbe = "1";
-  probe.setAttribute("aria-hidden", "true");
-  const declarations = {
-    position: "fixed",
-    display: "inline-block",
-    width: "max-content",
-    "min-width": "0",
-    "max-width": "none",
-    height: "auto",
-    margin: "0",
-    padding: "0",
-    border: "0",
-    "white-space": "pre",
-    "word-spacing": "0",
-    "letter-spacing": "0",
-    visibility: "hidden",
-    transform: "none",
-    zoom: "1",
-    "text-indent": "0",
-    "text-size-adjust": "none"
-  };
-  for (const [property, value] of Object.entries(declarations)) probe.style.setProperty(property, value, "important");
-  fontProperties.forEach((property, index) => probe.style.setProperty(property, font[index], "important"));
-  probe.textContent = text.repeat(32);
-  element.ownerDocument.body.append(probe);
-  let width;
-  try {
-    width = probe.getBoundingClientRect().width / 32;
-  } finally {
-    probe.remove();
-  }
-  cache.set(key, width);
-  return width;
-}
-function planSpacingFinish(element, layout) {
-  const result = (outcome, adjustments2 = []) => ({ outcome, adjustments: adjustments2, before: layout });
-  const cs = getComputedStyle(element);
-  if (!["left", "start"].includes(cs.textAlign) || cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb") return result("native:spacing-layout");
-  if (layout.lines.length < 2 || !layout.width) return result("unchanged");
-  const source = element.textContent || "";
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const runs = [];
-  let node, offset = 0;
-  while (node = walker.nextNode()) {
-    const text = node;
-    runs.push({ node: text, start: offset, end: offset + text.length });
-    offset += text.length;
-  }
-  const point = (at2, end = false) => runs.find((run) => end ? run.start < at2 && run.end >= at2 : run.start <= at2 && run.end > at2);
-  const range = element.ownerDocument.createRange();
-  const measuredSpaces = /* @__PURE__ */ new Map();
-  const measured = [];
-  for (const line of layout.lines.slice(0, -1)) {
-    const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));
-    const gaps = [];
-    for (const space of spaces) {
-      const start = line.sourceStart + space.index, end = start + space[0].length;
-      const a = point(start), b2 = point(end, true);
-      if (!a || !b2 || !a.node.parentElement) return result("native:spacing-measurement");
-      range.setStart(a.node, start - a.start);
-      range.setEnd(b2.node, end - b2.start);
-      const style = getComputedStyle(a.node.parentElement);
-      const available = range.getBoundingClientRect().width;
-      const natural = naturalSpace(element, style, space[0].replace(/[\t\n\r ]+/g, " "), measuredSpaces);
-      if (!Number.isFinite(natural) || natural <= 0 || natural > parseFloat(style.fontSize) * space[0].length) return result("native:spacing-measurement");
-      gaps.push({ offset: end, naturalPx: natural, available });
-    }
-    measured.push(gaps);
-  }
-  const deltas = finishSpaceDeltas(layout.lines.map((line) => line.width), layout.width, measured.map((gaps) => gaps.map((gap) => gap.naturalPx)));
-  const adjustments = [];
-  for (const [line, gaps] of measured.entries()) for (const [index, gap] of gaps.entries()) {
-    const px = deltas[line][index];
-    if (gap.available + px <= 0) return result("native:spacing-measurement");
-    if (Math.abs(px) > 1e-3) adjustments.push({ offset: gap.offset, naturalPx: gap.naturalPx, px, line });
-  }
-  return result(adjustments.length ? "applied" : "unchanged", adjustments);
-}
-function spacingMarkerStyle(px) {
-  return {
-    display: "inline-block",
-    position: "static",
-    float: "none",
-    width: "0px",
-    height: "0px",
-    minWidth: "0px",
-    minHeight: "0px",
-    margin: "0px",
-    marginLeft: px + "px",
-    padding: "0px",
-    border: "0px",
-    boxShadow: "none",
-    outline: "none",
-    transform: "none",
-    fontSize: "0px",
-    lineHeight: "0",
-    verticalAlign: "baseline",
-    pointerEvents: "none"
-  };
-}
-function spacingVerified(element, plan, after) {
-  for (const marker of element.querySelectorAll("[data-ts-space]")) {
-    const box = marker.getBoundingClientRect();
-    if (box.width > 0.01 || box.height > 0.01) return false;
-    for (const pseudo of ["::before", "::after"]) {
-      const content = getComputedStyle(marker, pseudo).content;
-      if (content && !["none", "normal", '""'].includes(content)) return false;
-    }
-  }
-  if (after.lines.length !== plan.before.lines.length || Math.abs(after.width - plan.before.width) > 0.5 || after.overflow > Math.max(0.5, plan.before.overflow)) return false;
-  return after.lines.every((line, index) => {
-    const before = plan.before.lines[index];
-    const delta = plan.adjustments.filter((space) => space.line === index).reduce((sum, space) => sum + space.px, 0);
-    return line.sourceStart === before.sourceStart && line.sourceEnd === before.sourceEnd && Math.abs(line.top - after.lines[0].top - (before.top - plan.before.lines[0].top)) <= 0.75 && Math.abs(line.width - before.width - delta) <= 0.75;
-  });
-}
-
-// src/lib/v4/finished-contour.ts
-function finishedContour(element, words, measure) {
-  const source = element.textContent || "";
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const runs = [];
-  let node, offset = 0;
-  while (node = walker.nextNode()) {
-    const text = node;
-    runs.push({ start: offset, end: offset + text.length, node: text });
-    offset += text.length;
-  }
-  const cache = /* @__PURE__ */ new Map();
-  const spaces = Array.from(source.matchAll(/[\t\n\r \u00a0\u202f]+/gu), (match) => {
-    const run = runs.find((run2) => run2.start <= match.index && run2.end > match.index);
-    const parent = run?.node.parentElement;
-    const width = parent ? naturalSpace(element, getComputedStyle(parent), match[0].replace(/[\t\n\r ]+/g, " "), cache) : 0;
-    return { start: match.index, end: match.index + match[0].length, width };
-  });
-  return (lines) => {
-    let cursor = 0;
-    const gaps = lines.map((line) => {
-      const start = words[cursor].index;
-      cursor += line.tokens.length;
-      const last = words[cursor - 1], end = last.index + last.text.length;
-      return spaces.filter((space) => space.start >= start && space.end <= end).map((space) => space.width);
-    });
-    const widths = lines.map((line) => line.width);
-    const deltas = finishSpaceDeltas(widths, measure, gaps);
-    return widths.map((width, index) => (width + deltas[index].reduce((sum, delta) => sum + delta, 0)) / measure);
   };
 }
 
@@ -2481,6 +2159,276 @@ function tokenForUnit(unit, language) {
     bindOpener: language === "en" ? last.bindOpener : void 0,
     protectedCompound: unit.hyphen ? false : first.protectedCompound
   };
+}
+
+// src/lib/v4/space-policy.ts
+function finishTargets(widths, measure) {
+  const fills = widths.slice(0, -1).map((width) => width / measure).sort((a, b2) => a - b2);
+  const mid = Math.floor(fills.length / 2);
+  const median = fills.length % 2 ? fills[mid] : (fills[mid - 1] + fills[mid]) / 2;
+  return widths.map((width, index) => {
+    if (index === widths.length - 1) return width;
+    const neighbors = [widths[index - 1], index < widths.length - 2 ? widths[index + 1] : void 0].filter((value) => value !== void 0);
+    const local = neighbors.length ? neighbors.reduce((sum, value) => sum + value / measure, 0) / neighbors.length : median;
+    const target = Math.max(0.7, Math.min(0.965, 0.5 * local + 0.5 * median));
+    return measure * target;
+  });
+}
+function finishSpaceDeltas(widths, measure, spaces) {
+  const targets = finishTargets(widths, measure);
+  return widths.map((width, index) => {
+    const gaps = spaces[index] || [];
+    if (index === widths.length - 1 || !gaps.length) return gaps.map(() => 0);
+    const desired = (targets[index] - width) / gaps.length;
+    return gaps.map((natural) => Number.isFinite(natural) && natural > 0 && desired >= -0.4 * natural ? Math.max(-0.2 * natural, Math.min(0.33 * natural, desired)) : 0);
+  });
+}
+
+// src/lib/v4/spacing-finish.ts
+var fontProperties = [
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "font-stretch",
+  "font-variant",
+  "font-feature-settings",
+  "font-variation-settings",
+  "font-optical-sizing",
+  "font-kerning",
+  "font-size-adjust",
+  "font-synthesis",
+  "text-rendering",
+  "text-transform"
+];
+function naturalSpace(element, style, text, cache) {
+  const font = fontProperties.map((property) => style.getPropertyValue(property));
+  const key = JSON.stringify([font, text]);
+  const cached = cache.get(key);
+  if (cached !== void 0) return cached;
+  const probe = element.ownerDocument.createElement("span");
+  probe.dataset.tsProbe = "1";
+  probe.setAttribute("aria-hidden", "true");
+  const declarations = {
+    position: "fixed",
+    display: "inline-block",
+    width: "max-content",
+    "min-width": "0",
+    "max-width": "none",
+    height: "auto",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    "white-space": "pre",
+    "word-spacing": "0",
+    "letter-spacing": "0",
+    visibility: "hidden",
+    transform: "none",
+    zoom: "1",
+    "text-indent": "0",
+    "text-size-adjust": "none"
+  };
+  for (const [property, value] of Object.entries(declarations)) probe.style.setProperty(property, value, "important");
+  fontProperties.forEach((property, index) => probe.style.setProperty(property, font[index], "important"));
+  probe.textContent = text.repeat(32);
+  element.ownerDocument.body.append(probe);
+  let width;
+  try {
+    width = probe.getBoundingClientRect().width / 32;
+  } finally {
+    probe.remove();
+  }
+  cache.set(key, width);
+  return width;
+}
+function planSpacingFinish(element, layout) {
+  const result = (outcome, adjustments2 = []) => ({ outcome, adjustments: adjustments2, before: layout });
+  const cs = getComputedStyle(element);
+  if (!["left", "start"].includes(cs.textAlign) || cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb") return result("native:spacing-layout");
+  if (layout.lines.length < 2 || !layout.width) return result("unchanged");
+  const source = element.textContent || "";
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const runs = [];
+  let node, offset = 0;
+  while (node = walker.nextNode()) {
+    const text = node;
+    runs.push({ node: text, start: offset, end: offset + text.length });
+    offset += text.length;
+  }
+  const point = (at2, end = false) => runs.find((run) => end ? run.start < at2 && run.end >= at2 : run.start <= at2 && run.end > at2);
+  const range = element.ownerDocument.createRange();
+  const measuredSpaces = /* @__PURE__ */ new Map();
+  const measured = [];
+  for (const line of layout.lines.slice(0, -1)) {
+    const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));
+    const gaps = [];
+    for (const space of spaces) {
+      const start = line.sourceStart + space.index, end = start + space[0].length;
+      const a = point(start), b2 = point(end, true);
+      if (!a || !b2 || !a.node.parentElement) return result("native:spacing-measurement");
+      range.setStart(a.node, start - a.start);
+      range.setEnd(b2.node, end - b2.start);
+      const style = getComputedStyle(a.node.parentElement);
+      const available = range.getBoundingClientRect().width;
+      const natural = naturalSpace(element, style, space[0].replace(/[\t\n\r ]+/g, " "), measuredSpaces);
+      if (!Number.isFinite(natural) || natural <= 0 || natural > parseFloat(style.fontSize) * space[0].length) return result("native:spacing-measurement");
+      gaps.push({ offset: end, naturalPx: natural, available });
+    }
+    measured.push(gaps);
+  }
+  const deltas = finishSpaceDeltas(layout.lines.map((line) => line.width), layout.width, measured.map((gaps) => gaps.map((gap) => gap.naturalPx)));
+  const adjustments = [];
+  for (const [line, gaps] of measured.entries()) for (const [index, gap] of gaps.entries()) {
+    const px = deltas[line][index];
+    if (gap.available + px <= 0) return result("native:spacing-measurement");
+    if (Math.abs(px) > 1e-3) adjustments.push({ offset: gap.offset, naturalPx: gap.naturalPx, px, line });
+  }
+  return result(adjustments.length ? "applied" : "unchanged", adjustments);
+}
+function spacingMarkerStyle(px) {
+  return {
+    display: "inline-block",
+    position: "static",
+    float: "none",
+    width: "0px",
+    height: "0px",
+    minWidth: "0px",
+    minHeight: "0px",
+    margin: "0px",
+    marginLeft: px + "px",
+    padding: "0px",
+    border: "0px",
+    boxShadow: "none",
+    outline: "none",
+    transform: "none",
+    fontSize: "0px",
+    lineHeight: "0",
+    verticalAlign: "baseline",
+    pointerEvents: "none"
+  };
+}
+function spacingVerified(element, plan, after) {
+  for (const marker of element.querySelectorAll("[data-ts-space]")) {
+    const box = marker.getBoundingClientRect();
+    if (box.width > 0.01 || box.height > 0.01) return false;
+    for (const pseudo of ["::before", "::after"]) {
+      const content = getComputedStyle(marker, pseudo).content;
+      if (content && !["none", "normal", '""'].includes(content)) return false;
+    }
+  }
+  if (after.lines.length !== plan.before.lines.length || Math.abs(after.width - plan.before.width) > 0.5 || after.overflow > Math.max(0.5, plan.before.overflow)) return false;
+  return after.lines.every((line, index) => {
+    const before = plan.before.lines[index];
+    const delta = plan.adjustments.filter((space) => space.line === index).reduce((sum, space) => sum + space.px, 0);
+    return line.sourceStart === before.sourceStart && line.sourceEnd === before.sourceEnd && Math.abs(line.top - after.lines[0].top - (before.top - plan.before.lines[0].top)) <= 0.75 && Math.abs(line.width - before.width - delta) <= 0.75;
+  });
+}
+
+// src/lib/v4/finished-contour.ts
+function finishedContour(element, words, measure) {
+  const source = element.textContent || "";
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const runs = [];
+  let node, offset = 0;
+  while (node = walker.nextNode()) {
+    const text = node;
+    runs.push({ start: offset, end: offset + text.length, node: text });
+    offset += text.length;
+  }
+  const cache = /* @__PURE__ */ new Map();
+  const spaces = Array.from(source.matchAll(/[\t\n\r \u00a0\u202f]+/gu), (match) => {
+    const run = runs.find((run2) => run2.start <= match.index && run2.end > match.index);
+    const parent = run?.node.parentElement;
+    const width = parent ? naturalSpace(element, getComputedStyle(parent), match[0].replace(/[\t\n\r ]+/g, " "), cache) : 0;
+    return { start: match.index, end: match.index + match[0].length, width };
+  });
+  return (lines) => {
+    let cursor = 0;
+    const gaps = lines.map((line) => {
+      const start = words[cursor].index;
+      cursor += line.tokens.length;
+      const last = words[cursor - 1], end = last.index + last.text.length;
+      return spaces.filter((space) => space.start >= start && space.end <= end).map((space) => space.width);
+    });
+    const widths = lines.map((line) => line.width);
+    const deltas = finishSpaceDeltas(widths, measure, gaps);
+    return widths.map((width, index) => (width + deltas[index].reduce((sum, delta) => sum + delta, 0)) / measure);
+  };
+}
+
+// src/lib/v4/title-layout.ts
+var weakEnds = /* @__PURE__ */ new Set(["a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "with", "from", "and", "or", "but"]);
+function composeTitle(tokens, width, measure, policy = {}) {
+  const words = tokens.filter((t) => t.kind !== "space");
+  if (!words.length || words.length > 64 || width <= 0) return null;
+  const n = words.length;
+  const widths = Array.from({ length: n }, () => []);
+  for (let start2 = 0; start2 < n; start2++) {
+    for (let end = start2 + 1; end <= n; end++) {
+      widths[start2][end] = policy.measureRange?.(start2, end) ?? measure(words.slice(start2, end).map((t) => t.text).join(" "));
+    }
+  }
+  const minLines = Array(n + 1).fill(Infinity);
+  minLines[n] = 0;
+  for (let start2 = n - 1; start2 >= 0; start2--) {
+    for (let end = start2 + 1; end <= n; end++) {
+      if (widths[start2][end] <= width + 0.25) minLines[start2] = Math.min(minLines[start2], 1 + minLines[end]);
+    }
+  }
+  const count = minLines[0];
+  if (!Number.isFinite(count) || policy.maxLines && count > policy.maxLines) return null;
+  const keepBreaks = /* @__PURE__ */ new Set();
+  for (const phrase of policy.keep || []) {
+    const parts = phrase.trim().split(/\s+/u);
+    for (let i2 = 0; i2 <= n - parts.length; i2++) {
+      if (parts.every((part, j2) => words[i2 + j2].text === part)) {
+        for (let j2 = 1; j2 < parts.length; j2++) keepBreaks.add(i2 + j2);
+      }
+    }
+  }
+  const target = widths[0][n] / (count * width);
+  const memo = /* @__PURE__ */ new Map();
+  const solve = (start2, left) => {
+    if (start2 === n) return left === 0 ? { cost: 0, breaks: [] } : null;
+    if (!left || minLines[start2] > left) return null;
+    const key = start2 + ":" + left;
+    if (memo.has(key)) return memo.get(key);
+    let best = null;
+    for (let end = start2 + 1; end <= n; end++) {
+      const lineWidth = widths[start2][end];
+      if (lineWidth > width + 0.25) continue;
+      const rest = solve(end, left - 1);
+      if (!rest) continue;
+      const last = end === n;
+      const wordCount = words.slice(start2, end).reduce((sum, t) => sum + t.text.split(/\s+/u).length, 0);
+      let cost = rest.cost + 1e3 * (lineWidth / width - target) ** 2;
+      if (count > 1 && wordCount === 1 && (start2 === 0 || last)) {
+        cost += last ? 500 : 900 * Math.max(0, 0.65 - lineWidth / width) / 0.65;
+      }
+      if (!last && (policy.weakEnding?.(words[end - 1].text) ?? weakEnds.has(words[end - 1].text.toLowerCase()))) cost += 240;
+      if (!last && keepBreaks.has(end)) cost += 1500;
+      if (!last) cost += policy.breakPenalty?.(end) || 0;
+      if (!last && (words[end - 1].stickyNext || words[end]?.stickyPrev)) cost += 1e4;
+      if (!best || cost < best.cost) best = { cost, breaks: [end, ...rest.breaks] };
+    }
+    memo.set(key, best);
+    return best;
+  };
+  const winner = solve(0, count);
+  if (!winner) return null;
+  let start = 0;
+  return winner.breaks.map((end) => {
+    const lineTokens = words.slice(start, end);
+    const lineWidth = widths[start][end];
+    start = end;
+    return {
+      tokens: lineTokens,
+      text: lineTokens.map((t) => t.text).join(" "),
+      width: lineWidth,
+      fill: lineWidth / width,
+      wordSpacingEm: 0
+    };
+  });
 }
 
 // src/lib/v4/paragraph-rhythm.ts
@@ -4183,55 +4131,48 @@ function mount(root = document, selector = defaults, options = {}) {
   };
 }
 
-// src/lib/v4/prose-lists.ts
-var owners = /* @__PURE__ */ new WeakMap();
-function styleProseLists(root) {
-  const lists = [...root.querySelectorAll("ul")];
-  if (root instanceof HTMLUListElement) lists.unshift(root);
-  const owned = [];
-  let skipped = 0;
-  for (const list of lists) {
-    const cs = getComputedStyle(list);
-    const items = [...list.children];
-    if (list.closest('nav, [role="navigation"], [role="menu"], [role="menubar"], [role="tablist"], [data-no-typeset]') || cs.display !== "block" || cs.listStyleType === "none" || cs.listStyleImage !== "none" || !items.length || items.some((item) => !(item instanceof HTMLElement) || item.tagName !== "LI" || getComputedStyle(item).display !== "list-item")) {
-      skipped++;
-      continue;
-    }
-    const owner = owners.get(list) || { count: 0, hadClass: list.classList.contains("ts-styled"), hadAttribute: list.hasAttribute("class") };
-    owner.count++;
-    owners.set(list, owner);
-    list.classList.add("ts-styled");
-    owned.push(list);
-  }
-  let released = false;
-  return { styled: owned.length, skipped, restore() {
-    if (released) return;
-    released = true;
-    for (const list of owned) {
-      const owner = owners.get(list);
-      if (--owner.count === 0) {
-        if (!owner.hadClass) {
-          list.classList.remove("ts-styled");
-          if (!list.className && !owner.hadAttribute) list.removeAttribute("class");
-        }
-        owners.delete(list);
-      }
-    }
-  } };
-}
-
-// src/lib/v4/typeset.release.ts
-var defaults2 = (options) => ({ ...options, lineBreaks: options.lineBreaks ?? "unicode", contour: options.contour ?? "finished" });
-function typeset2(element, options = {}) {
-  return typeset(element, defaults2(options));
-}
-function typesetAll2(selector, options = {}) {
-  return typesetAll(selector, defaults2(options));
-}
-function mount2(root, selector, options = {}) {
-  return mount(root, selector, defaults2(options));
-}
-function planRichText2(element, options = {}) {
-  return planRichText(element, defaults2(options));
-}
-//# sourceMappingURL=index.cjs.map
+export {
+  safeWrite,
+  shouldIgnoreMutation,
+  tokenize,
+  composeParagraph,
+  shapeExactLines,
+  finalValidate,
+  renderFrozenLines,
+  typesetText,
+  typesetHeading,
+  measureCh,
+  linesOverflow,
+  linesStarved,
+  contentWidth,
+  measureLayout,
+  finishTargets,
+  planSpacingFinish,
+  spacingMarkerStyle,
+  spacingVerified,
+  UNICODE_VERSION,
+  analyzeBreaks,
+  planOpticalHanging,
+  opticalMarkerStyle,
+  opticalVerified,
+  BREAK_ATTRIBUTE,
+  richLayoutVerified,
+  selectionBookmark,
+  planRichText,
+  preserveRichCopy,
+  richFingerprint,
+  smartQuotes,
+  TRACK_ATTRIBUTE,
+  planTrackingFinish,
+  trackingStyle,
+  trackingVerified,
+  VERSION,
+  restore,
+  typeset,
+  typesetAll,
+  auditReport,
+  audit,
+  auditJSON,
+  mount
+};
+//# sourceMappingURL=shared-Z54Y7DIZ.js.map
