@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 50384,
-      "TypesetText-only": 50255,
-      "TypesetRichText-only": 46390,
+      "mount-only": 49801,
+      "TypesetText-only": 49684,
+      "TypesetRichText-only": 45826,
       "smartQuotes-only": 1544,
-      "react.js+shared": 53692,
-      "TypesetText-no-tree-shaking": 62438,
-      "go.js": 56552,
-      "typeset.global.js": 56212
+      "react.js+shared": 53098,
+      "TypesetText-no-tree-shaking": 61801,
+      "go.js": 55912,
+      "typeset.global.js": 55572
     },
     "raised": [
       {
@@ -321,7 +321,7 @@
   "calibrated": {
     "size": {
       "date": "2026-09-25",
-      "dist": "output/candidate/dist (the gate 4 fixes candidate, 6cd6a63)"
+      "dist": "output/candidate/dist (the near-observer rollback candidate, bcfde3d)"
     },
     "runtime": {
       "date": "2026-09-25",
@@ -853,6 +853,56 @@
         }
       ],
       "measured": "scripts/v4/bench-sizes.mjs on a candidate built after each fix (release recipe, Node 24 zlib)"
+    },
+    {
+      "date": "2026-09-25",
+      "by": "4.3 near-observer rollback",
+      "lowered": [
+        {
+          "budget": "size.gzip.mount-only",
+          "from": 50384,
+          "to": 49801,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-583 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-only",
+          "from": 50255,
+          "to": 49684,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-571 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetRichText-only",
+          "from": 46390,
+          "to": 45826,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-564 B)"
+        },
+        {
+          "budget": "size.gzip.react.js+shared",
+          "from": 53692,
+          "to": 53098,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-594 B)"
+        },
+        {
+          "budget": "size.gzip.TypesetText-no-tree-shaking",
+          "from": 62438,
+          "to": 61801,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-637 B)"
+        },
+        {
+          "budget": "size.gzip.go.js",
+          "from": 56552,
+          "to": 55912,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-640 B)"
+        },
+        {
+          "budget": "size.gzip.typeset.global.js",
+          "from": 56212,
+          "to": 55572,
+          "reason": "the P5 near observer rolled back to the round-2 rule (-640 B)"
+        }
+      ],
+      "reason": "The P5 near observer is back to the round-2 release candidate (44e4721): the vertical-only scrollport (85d20d3), the re-placement of waiting elements (f0d01ac), the hides test with its translation read (b5532e1) and the waiting-pane recheck (6d8dd22) are gone. smartQuotes-only is unchanged.",
+      "measured": "scripts/v4/bench-sizes.mjs on the candidate at bcfde3d (release recipe, Node 24 zlib)"
     }
   ]
 }
