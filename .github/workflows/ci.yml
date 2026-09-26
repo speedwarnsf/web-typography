@@ -11,7 +11,13 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # The browser suites are calibrated on macOS: their fixtures are set in
+    # Georgia at exact widths, and 4.3's accessibility, copy, visibility and
+    # scheduling suites were written against those layouts. Ubuntu has no
+    # Georgia, so 10 of 44 suites fail there on the fallback font's breaks
+    # and on slower 4x-CPU timing (run 36255458992). Until the fixtures
+    # carry their own fonts, CI runs where the suites are calibrated.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
