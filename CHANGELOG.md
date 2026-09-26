@@ -519,8 +519,8 @@ Outside the changes below, 0 of these differ in any engine.
   floats, absolutely positioned boxes, a centred flex column, nested
   scrollers, `<details>` and `<dialog>`) at 320, 375, 768 and 1,280 px in
   Chromium, WebKit and Firefox: the release candidate failed 21 of 24 of
-  these checks for `TypesetText` and 15 of 24 for `TypesetRichText`, in 12
-  and 9 layouts; 4.3.0 fails none of the 96. With its layout workaround
+  these checks for `TypesetText` and 15 or 16 of 24 for `TypesetRichText`
+  (two runs), in 12 and 9 layouts; 4.3.0 fails none of the 96. With its layout workaround
   removed, no text block on the /awards page changes in 3 s after settling,
   at 8 widths in three engines.
 - **Smart quotes stay curly when text falls back to native lines.** With
@@ -752,7 +752,7 @@ SUPPORT.md lists both.
   `bugs.url`. The `engines` field (`node >=22`) is removed: it made Yarn 1
   refuse installs of a browser library on older Node. The `typeset-audit`
   CLI needs Node 18.3 or later. `license` is `MIT AND Unicode-3.0`.
-- The unpacked package is 1.87 MB (87 files), down from 2.57 MB, 73% of
+- The unpacked package is 1.88 MB (87 files), down from 2.57 MB, 73% of
   which was source maps embedding every engine source. The ESM and CommonJS
   builds stay readable and unminified and ship without maps (your bundler
   minifies them; stack traces name real functions); `typeset.global.js` and

@@ -87,7 +87,10 @@ try {
   // README's and SUPPORT.md's note on indents under legacy line breaks).
   // Rolling the near observer back to the round-2 rule took it to 1.87 MB
   // (1,869,104 B: that pane code gone from each copy, less the known
-  // limitations README and SUPPORT.md now describe).
+  // limitations README and SUPPORT.md now describe). The settling and
+  // fallback-quote fixes took it to 1.88 MB (1,878,042 B: the registry's
+  // own-size rule, line extents and quote education in each copy of the
+  // React adapters, and SUPPORT.md's notes on both).
   check('unpacked package is under 1.9 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1900000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
