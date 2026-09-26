@@ -16,10 +16,11 @@
 //   they mount (an entrance animation keeping frames pending) paint composed,
 //   never native lines rewrapped a few frames later; with TypesetText, and
 //   with mount() once its first pass could have run. A pane that hides text
-//   only after its hosts registered (FAQ answers in closed <details>)
-//   counts as their scrollport once it does; a transform that makes a
-//   wrapper overflow (a reveal library, a card entrance) hides nothing, so
-//   offscreen blocks under it are still measured against the window.
+//   only after its hosts registered (FAQ answers in closed <details>, or
+//   content loaded above the text in a pane far down the page) counts as
+//   their scrollport once it does; a transform that makes a wrapper
+//   overflow (a reveal library, a card entrance) hides nothing, so offscreen
+//   blocks under it are still measured against the window.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -76,6 +77,9 @@ const answers = ${JSON.stringify(corpus.filter((/** @type {string} */ text) => t
 window.mountFaq = () => { const root = createRoot(document.getElementById('pane')); flushSync(() => root.render(h('div', null,
   Array.from({ length: 12 }, (_, i) => h('details', { key: i }, h('summary', null, 'Question ' + (i + 1)),
     h(TypesetText, { lang: 'en', text: answers[2 * i] }), h(TypesetText, { lang: 'en', text: answers[2 * i + 1] })))))); };
+// Three blocks at the top of a pane, below content that has not loaded yet.
+const comments = ${JSON.stringify(corpus.filter((/** @type {string} */ text) => text.length > 200 && text.length < 400).slice(0, 3))};
+window.mountComments = () => { const root = createRoot(document.getElementById('list')); flushSync(() => root.render(comments.map((text, i) => h(TypesetText, { key: i, lang: 'en', text })))); };
 `, resolveDir: process.cwd(), loader: 'js' },
   bundle: true, minify: true, write: false, format: 'iife', target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent',
 })).outputFiles[0].text;
@@ -366,6 +370,54 @@ for (const { name, engine, executablePath } of browsers) {
       });
       check(`TypesetText in a pane that overflows after it registers (FAQ answers in closed <details>), run ${run + 1}: every block scrolled in one pane height paints composed in the first frame`,
         !result.overflowBefore && result.overflowAfter && result.band >= 2 && result.firstFrame.every(outcome => outcome.startsWith('composed')), result);
+      await page.close();
+    }
+    // A pane 2000 px down a page that scrolls the window, with three blocks
+    // at its top that do not overflow it when they register. Content above
+    // them then loads (900 px), so the pane hides them; nothing else
+    // changes, so no host is observed again and none changes intersection.
+    // The window is scrolled to the pane, and 8 frames later the pane to the
+    // text, while a frame loop keeps frames pending. Measured against the
+    // window, which the pane clips, the blocks were far until on screen:
+    // the jump's frame painted all 3 native in Chromium and Firefox (f0d01ac
+    // and the build before it). The pane is rechecked when it comes near.
+    for (let run = 0; run < 3; run++) {
+      const page = await browser.newPage({ viewport: { width: 800, height: 900 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:16px/1.4 Georgia,serif}p{margin:0 0 10px}</style></head><body><div style="height:2000px"></div><div id="pane" style="height:600px;overflow-y:auto;width:420px"><div id="pre"></div><div id="list"></div></div><div style="height:2000px"></div></body></html>');
+      await page.addScriptTag({ content: reactFixture });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+        let live = true;
+        (function loop() { if (live) requestAnimationFrame(loop); })();
+        await document.fonts.ready;
+        w.mountComments();
+        const pane = /** @type {HTMLElement} */ (document.getElementById('pane'));
+        const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-typeset-react]')]);
+        const overflowAtMount = pane.scrollHeight > pane.clientHeight + 1;
+        await new Promise(r => setTimeout(r, 150));
+        /** @type {HTMLElement} */ (document.getElementById('pre')).style.height = '900px';
+        await new Promise(r => setTimeout(r, 100));
+        scrollTo(0, 1900);
+        for (let i = 0; i < 8; i++) await frame();
+        // What the jump's own frame paints: the observer reports after that
+        // frame's animation callbacks and layout, before it paints.
+        /** @type {string[] | null} */
+        let painted = null;
+        const tick = document.createElement('div');
+        tick.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:1px;visibility:hidden';
+        document.body.append(tick);
+        new ResizeObserver(() => { if (tick.style.width === '2px' && !painted) painted = hosts.map(el => el.dataset.tsOutcome || '(none)'); }).observe(tick);
+        await frame();
+        pane.scrollTop = 900; tick.style.width = '2px';
+        await frame(); await frame();
+        live = false;
+        const box = pane.getBoundingClientRect();
+        return { overflowAtMount, onScreen: hosts.filter(el => { const r = el.getBoundingClientRect(); return r.top < box.bottom && r.bottom > box.top; }).length, painted };
+      });
+      check(`TypesetText in a pane far down the page that hides it only after it registers (content loaded above it), run ${run + 1}: scrolled to once the pane is on screen, every block paints composed in the jump's frame`,
+        !result.overflowAtMount && result.onScreen === 3 && !!result.painted && result.painted.every(outcome => outcome.startsWith('composed')), result);
       await page.close();
     }
     // Text in an overflow:auto scroller, scrolled in soon after it mounts.

@@ -179,23 +179,50 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
     }
     return { root: null, waiting };
   };
+  // One observer per root. Its callback passes on the entries of the
+  // elements it observes, then checks the panes: an intersection change is
+  // when text in a pane that just overflowed (content added above it) drops
+  // out of view. The window's also watches the containers elements wait on:
+  // text a pane far down the page grew past (content loaded above it) is
+  // scrolled to once the pane has come within a viewport height.
+  const observer = (root: Element | null) => {
+    let entry = observers.get(root);
+    if (!entry) {
+      const targets = new Set<Element>();
+      const io = new view.IntersectionObserver(list => {
+        const own = list.filter(item => targets.has(item.target) || !waiters.has(item.target));
+        if (own.length) callback(own);
+        later();
+      }, { root, rootMargin: '100% 0px' });
+      observers.set(root, entry = { observer: io, targets });
+    }
+    return entry;
+  };
   const add = (element: Element) => {
     const at = places.get(element)!;
-    let entry = observers.get(at.root);
-    if (!entry) { entry = { observer: new view.IntersectionObserver(notify, { root: at.root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(at.root, entry); }
+    const entry = observer(at.root);
     entry.observer.observe(element);
     entry.targets.add(element);
-    for (const pane of at.waiting) { let set = waiters.get(pane); if (!set) waiters.set(pane, set = new Set()); set.add(element); }
+    for (const pane of at.waiting) {
+      let set = waiters.get(pane);
+      if (!set) { waiters.set(pane, set = new Set()); observer(null).observer.observe(pane); }
+      set.add(element);
+    }
   };
   const release = (element: Element) => {
     const at = places.get(element);
     const entry = at && observers.get(at.root);
     if (!at || !entry) return;
-    entry.observer.unobserve(element);
     entry.targets.delete(element);
+    // A container elements wait on stays watched.
+    if (at.root || !waiters.has(element)) entry.observer.unobserve(element);
     // The window's observer stays; a scroll container's goes with its last target.
     if (at.root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(at.root); }
-    for (const pane of at.waiting) { const set = waiters.get(pane); set?.delete(element); if (set && !set.size) waiters.delete(pane); }
+    for (const pane of at.waiting) {
+      const set = waiters.get(pane);
+      set?.delete(element);
+      if (set && !set.size) { waiters.delete(pane); if (!observers.get(null)?.targets.has(pane)) observers.get(null)?.observer.unobserve(pane); }
+    }
   };
   // Whether a container observed elements wait on hides any of them now:
   // reads only, all together after the calls that asked (a commit, a
@@ -211,9 +238,6 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
     for (const element of moving) { release(element); places.set(element, place(element)); add(element); }
   };
   const later = () => { if (!queued && waiters.size) { queued = true; queueMicrotask(recheck); } };
-  // An intersection change is when text in a pane that just overflowed
-  // (content added above it) drops out of view: check the panes then too.
-  function notify(entries: IntersectionObserverEntry[]) { callback(entries); later(); }
   return {
     observe(element) {
       const placed = places.has(element);

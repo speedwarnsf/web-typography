@@ -606,12 +606,14 @@ table.
   Near means within a viewport height of the window or of the container
   the text scrolls in vertically, once that container hides it: the text
   lies wholly beyond the container's fold when it registers, or later (FAQ
-  answers in closed `<details>` once they open). An `overflow-x: hidden`
-  wrapper or a horizontal carousel row hides no text, even while a
-  transform (a reveal library, an entrance animation) makes it overflow,
-  so the blocks in it are measured against the window rather than all
-  counted as near. In an app shell's `overflow: auto` pane, text below the
-  pane's fold counted as far until it was on screen, so
+  answers in closed `<details>` once they open; text pushed down by
+  content that loaded above it, once its pane comes within a viewport
+  height). An `overflow-x: hidden` wrapper or a horizontal carousel row
+  hides no text, even while a transform (a reveal library, an entrance
+  animation) makes it overflow, so the blocks in it are measured against
+  the window rather than all counted as near. In an app shell's
+  `overflow: auto` pane, text below the pane's fold counted as far until
+  it was on screen, so
   blocks scrolled in within about 0.5 to 1 s of a load or screen push
   (while animations kept frames pending) painted native lines and were
   rewrapped 2 to 5 frames later, which 4.2 did not do; now none within a
