@@ -21,6 +21,24 @@
       "browser": "webkit",
       "reason": "The audit samples each block 260 ms after the fifth update; on a hosted runner WebKit's first recomposition can take longer, so the sample catches it in progress (stale-layout, stale-output). Every later sample is clean.",
       "observed": "macos-15 run 36258432379: svelte, vue and solid under mount(), solid and lit under the website loader, errors at step 4 only. macos-15 run 36256876625: passed. M2 Pro: passes."
+    },
+    {
+      "script": "verify-scheduler",
+      "label": "^busy page: visible paragraphs composed within 500 ms$",
+      "reason": "A wall-clock bound on composing the nine visible paragraphs of a 60-block page; on a hosted runner the same passes take longer.",
+      "observed": "macos-15 run 36260012973: WebKit 509 ms. M2 Pro: passes."
+    },
+    {
+      "script": "verify-react",
+      "label": "^React \\d+: a pushed screen paints its first frame with every on-screen block composed$",
+      "reason": "The adapters compose on-screen blocks before the first paint unless that work exceeds VISIBLE_BUDGET_MS (120 ms), the engine safety valve for a slow device (src/lib/v4/adapter-registry.ts); the hosted runner crosses it, as in the verify-scheduler entry above.",
+      "observed": "macos-15 run 36260012973: React 19 in WebKit, on-screen blocks t4 to t6 and r4 to r6 uncomposed in the first frame. M2 Pro: 0."
+    },
+    {
+      "script": "verify-react",
+      "label": "^React \\d+: offscreen blocks wait for idle time and compose within 1\\.5 s$",
+      "reason": "A wall-clock bound on idle-time composition; a hosted runner gets fewer and shorter idle periods.",
+      "observed": "macos-15 run 36260012973: React 19 in WebKit settled in 1502 ms with 1 block pending. M2 Pro: passes."
     }
   ]
 }
