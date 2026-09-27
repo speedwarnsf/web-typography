@@ -120,8 +120,17 @@ for (const config of browsers) {
       await page.goto('http://breaks.test/page');
       await page.evaluate(async options => { const c = window.Typeset.mount(document, 'main p, main h2, #links p', options); await c.ready; }, options);
       // Polled on a timer: rAF polling keeps a frame pending, and offscreen
-      // React blocks compose only in idle periods with none pending.
-      await page.waitForFunction(() => [...document.querySelectorAll('#react p, #react-links p, #react-adjacent p')].every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome) && document.getElementById('r1')?.dataset.tsTracking !== 'native:tracking-uncomposed', undefined, { polling: 100 });
+      // React blocks compose only in idle periods with none pending. On
+      // GitHub's macos-15 runner this wait timed out at 20 s in Chromium in 2
+      // of 4 runs of the same engine (36260012973, 36283065383; 36256876625
+      // and 36258432379 passed), which does not reproduce here: at 12x CPU
+      // all 38 blocks settle within 120 ms. Wait up to 60 s, and if they do
+      // not settle, name the blocks still waiting and r1's tracking.
+      await page.waitForFunction(() => [...document.querySelectorAll('#react p, #react-links p, #react-adjacent p')].every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome) && document.getElementById('r1')?.dataset.tsTracking !== 'native:tracking-uncomposed', undefined, { polling: 100, timeout: 60000 })
+        .catch(async error => {
+          const waiting = await page.evaluate(() => ({ unsettled: [...document.querySelectorAll('#react p, #react-links p, #react-adjacent p')].filter(el => !(/** @type {HTMLElement} */ (el).dataset.tsOutcome)).map(el => el.id), r1: [document.getElementById('r1')?.dataset.tsOutcome, document.getElementById('r1')?.dataset.tsTracking], hidden: document.hidden }));
+          throw new Error(`${configName}: React blocks unsettled after 60 s ${JSON.stringify(waiting)} (${String(error.message).split('\n')[0]})`);
+        });
       await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       const facts = await page.evaluate(() => {
         const blocks = [...document.querySelectorAll('main p, main h2, #react p')].map(el => {
