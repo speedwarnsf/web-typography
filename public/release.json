@@ -1,16 +1,43 @@
 {
-  "version": "4.2.0",
-  "previous": "4.1.0",
-  "previousBrowserPin": "4.1.0",
-  "package": "typeset.us@4.2.0",
-  "download": "/releases/4.2.0/typeset.us-4.2.0.tgz",
-  "archive": "/releases/4.1.0/README.md",
-  "manifest": "/releases/4.2.0/manifest.json",
+  "version": "4.3.0",
+  "previous": "4.2.0",
+  "previousBrowserPin": "4.2.0",
+  "package": "typeset.us@4.3.0",
+  "download": "/releases/4.3.0/typeset.us-4.3.0.tgz",
+  "archive": "/releases/4.2.0/README.md",
+  "manifest": "/releases/4.3.0/manifest.json",
   "loader": {
-    "url": "/go@4.2.0.js",
-    "integrity": "sha384-KpyXtkC1KXixYXRIvrZCP7VPGJ2BcKJ07LeCuQpFXQms/QwY033ti1+QWU/XFD/a",
-    "bytes": 104600,
-    "gzipBytes": 42402
+    "url": "/go@4.3.0.js",
+    "integrity": "sha384-yHVZ46QyyOffm12e72GsBgkcZ96FcCaqK7POZ5/BGDkmfjEZ1dLV81vmBvCusTUX",
+    "bytes": 143160,
+    "gzipBytes": 56071,
+    "npm": "typeset.us@4.3.0/dist/auto.js"
   },
+  "aliases": {
+    "/go@4.js": "latest 4.x; no integrity hash",
+    "/go.js": "latest 4.x only; for trying Typeset out"
+  },
+  "advisories": [
+    {
+      "id": null,
+      "url": null,
+      "title": "DOM XSS in the 3.x Typeset.auto() heading branch",
+      "severity": "moderate",
+      "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N",
+      "cwe": "CWE-79",
+      "npm": {
+        "package": "typeset.us",
+        "affected": ">=3.0.0 <3.4.1",
+        "patched": "3.4.1"
+      },
+      "pins": [
+        "go@3.3.2.js",
+        "go@3.4.0.js"
+      ],
+      "condition": "the page calls Typeset.auto() and an element with data-typeset-heading contains attacker-influenced text",
+      "fixedIn4x": "no 4.x release contains this code",
+      "details": "https://github.com/speedwarnsf/web-typography/blob/master/docs/security/advisory-3x-heading-xss.md"
+    }
+  ],
   "validation": "See SUPPORT.md for verified coverage and outstanding device acceptance."
 }
