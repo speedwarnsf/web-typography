@@ -16,6 +16,13 @@
       "observed": "macos-15 run 36258432379: 1 flash frame (1 block) in 125 frames. M2 Pro: 0."
     },
     {
+      "script": "verify-recompose-storms",
+      "label": "^React at 4x CPU: a text-size slider \\(60 frames\\) recomposes each block a few times, not every frame, and ends composed$",
+      "browser": "chromium",
+      "reason": "A block is held off while its metrics change again within RESIZE_SETTLE_MS (100 ms) of a check composing it, a wall-clock window: at 4x CPU the hosted runner stretches the 60 slider frames over more time, so more of the gaps between steps outlast it and a block composes between them. The one-long-task-a-block limit, which a slider recomposed every frame fails, still held.",
+      "observed": "macos-15 run 36284847012: 65 compositions for 16 blocks (limit 64), 2 long tasks. M2 Pro: 25 to 29 at load 50 to 60 on this build and on 4865a2d, calibrated 26 to 49."
+    },
+    {
       "script": "verify-framework-text",
       "label": ": recomposes after updates with no audit error$",
       "browser": "webkit",
