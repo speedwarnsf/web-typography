@@ -25,9 +25,8 @@
     {
       "script": "verify-framework-text",
       "label": ": recomposes after updates with no audit error$",
-      "browser": "webkit",
-      "reason": "The audit samples each block 260 ms after the fifth update; on a hosted runner WebKit's first recomposition can take longer, so the sample catches it in progress (stale-layout, stale-output). Every later sample is clean.",
-      "observed": "macos-15 run 36258432379: svelte, vue and solid under mount(), solid and lit under the website loader, errors at step 4 only. macos-15 run 36256876625: passed. M2 Pro: passes."
+      "reason": "The audit samples each block 260 ms after the fifth update; on a hosted runner the first recomposition can take longer, so the sample catches it in progress (stale-layout, stale-output). Every later sample is clean.",
+      "observed": "macos-15 run 36258432379: svelte, vue and solid under mount(), solid and lit under the website loader, errors at step 4 only. macos-15 run 36256876625: passed. macos-15 run 36286416167: Firefox too, vanilla under mount(), errors at step 4 only. M2 Pro: passes."
     },
     {
       "script": "verify-scheduler",
