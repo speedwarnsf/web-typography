@@ -1,5 +1,5 @@
 {
-  "note": "Checks whose result follows the speed of the machine that runs them. Each was calibrated on the maintainer's machine (Apple M2 Pro), where it passes and where release-cut.mjs enforces it in the staged run of every cut. GitHub's hosted runners are slower and run the three browsers side by side on 3 CPUs, and these checks have failed there on speed alone. With TYPESET_HOSTED_RUNNER=1 (set by ci.yml and the release workflow's verify job) verify-release.mjs reports a failing check listed here as SLOW, with its detail, and does not fail the run; everywhere else, and with --strict, it is enforced like any other check. An entry needs the runs that show it failing on speed; label is a regular expression over check labels, and browser narrows an entry.",
+  "note": "Checks whose result follows the speed of the machine that runs them. Each was calibrated on the maintainer's machine (Apple M2 Pro), where it passes and where release-cut.mjs enforces it in the staged run of every cut. GitHub's hosted runners are slower and run the three browsers side by side on 3 CPUs, and these checks have failed there on speed alone. With TYPESET_HOSTED_RUNNER=1 (set by ci.yml, nightly.yml and the release workflow's verify job) verify-release.mjs reports a failing check listed here as SLOW, with its detail, and does not fail the run; everywhere else, and with --strict, it is enforced like any other check. An entry needs the runs that show it failing on speed; label is a regular expression over check labels, and browser narrows an entry.",
   "entries": [
     {
       "script": "verify-scheduler",
@@ -45,6 +45,13 @@
       "label": "^React \\d+: offscreen blocks wait for idle time and compose within 1\\.5 s$",
       "reason": "A wall-clock bound on idle-time composition; a hosted runner gets fewer and shorter idle periods.",
       "observed": "macos-15 run 36260012973: React 19 in WebKit settled in 1502 ms with 1 block pending. M2 Pro: passes."
+    },
+    {
+      "script": "verify-smart-quotes",
+      "label": "^education time in the browser: 120 KB of .+ \\([\\d,]+ characters\\) under 100 ms$",
+      "browser": "chromium",
+      "reason": "One performance.now() sample around a single smartQuotes() call, while the three browsers run side by side on the runner's 3 CPUs, so a pause or a descheduling during that one call counts as education time. The linear-time bound the check guards (the quadratic release candidate took 250 to 776 ms in Chromium) stays enforced on hosted runners by the Node checks on the same code (120 KB under 50 ms) and by the WebKit and Firefox browser checks.",
+      "observed": "macos-15 run 36296264634 (Dependabot PR #2, engine as 120f05c): 120 KB of \"it's \" in 225.6 ms. macos-15 run 36296312560 (Dependabot PR #7, engine as 120f05c): the \"x\" pairs in 102.1 ms. The other 106 hosted Chromium samples in 18 macos-15 runs from 989ff4e to 120f05c: median 18.4 ms, 90th percentile 50.7 ms; WebKit at most 27 ms, Firefox at most 69 ms, the Node twin at most 25.6 ms. M2 Pro (4.3.0 cut): 4.8 to 8 ms."
     }
   ]
 }

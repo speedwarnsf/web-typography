@@ -4,6 +4,8 @@
 //   node scripts/v4/verify-budgets.mjs              size budgets (every PR; part of test:v4)
 //   node scripts/v4/verify-budgets.mjs --runtime    also time, observer, listener and write
 //                                                   budgets in Chromium at 4x CPU (nightly, release cut)
+//   --record-times                                  with --runtime, away from the calibration
+//                                                   machine: record the times instead of failing
 //   --calibrate [--repeat 3]                        rewrite budgets.json from this measurement
 //
 // Sizes are gzip bytes of esbuild bundles importing one entry point (see
@@ -14,13 +16,17 @@
 // they were introduced and are lowered as performance work lands.
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { cpus } from 'node:os';
 import { parseArgs } from 'node:util';
 import { artifacts } from './candidate.mjs';
 import { measureSizes } from './bench-sizes.mjs';
 
 const FILE = 'scripts/v4/budgets.json';
 const PLATFORM = `${process.platform}-${process.arch}`;
-const { values } = parseArgs({ options: { runtime: { type: 'boolean', default: false }, calibrate: { type: 'boolean', default: false }, repeat: { type: 'string', default: '1' } } });
+const CPU = cpus()[0]?.model ?? 'unknown';
+// A GitHub-hosted runner (TYPESET_HOSTED_RUNNER=1, as in verify-release.mjs).
+const HOSTED = process.env.TYPESET_HOSTED_RUNNER === '1';
+const { values } = parseArgs({ options: { runtime: { type: 'boolean', default: false }, calibrate: { type: 'boolean', default: false }, repeat: { type: 'string', default: '1' }, 'record-times': { type: 'boolean', default: false } } });
 /** The runtime lane: scenario -> metrics held to a budget. */
 const RUNTIME = {
   lane: 'chromium@4x',
@@ -75,10 +81,20 @@ if (values.runtime) {
   }
   const median = (/** @type {number[]} */ list) => [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)];
   runtime = Object.fromEntries(Object.entries(samples).map(([scenario, metrics]) => [scenario, Object.fromEntries(Object.entries(metrics).map(([metric, list]) => [metric, median(list)]))]));
-  // Times depend on the machine, so they are enforced only on the platform the
-  // budgets were calibrated on; elsewhere they are recorded. Counts and DOM
-  // writes are deterministic and enforced everywhere.
-  const comparable = budgets.calibrated?.runtime?.platform === PLATFORM;
+  // Times depend on the machine, so they are enforced only on the machine the
+  // budgets were calibrated on: its platform and CPU. A GitHub-hosted macos-15
+  // runner is darwin-arm64 too, but a slower virtual machine, so a hosted run
+  // never enforces them. Counts and DOM writes are deterministic and enforced
+  // everywhere.
+  const on = budgets.calibrated?.runtime ?? {};
+  const comparable = !HOSTED && on.platform === PLATFORM && (!on.cpu || on.cpu === CPU);
+  const where = `${on.platform}${on.cpu ? ' ' + on.cpu : ''}; this run ${PLATFORM} ${CPU}${HOSTED ? ', hosted runner' : ''}`;
+  // Where the times cannot be enforced they are recorded, and the run fails
+  // unless --record-times asked for that (the nightly does). Otherwise a cut
+  // on another Mac, or with TYPESET_HOSTED_RUNNER leaking into its
+  // environment, would report the runtime budgets met without holding a
+  // single time to its budget.
+  if (!comparable && !values['record-times'] && !values.calibrate) checks.push({ label: `runtime: times are enforced on this machine (budgets calibrated on ${where}; --record-times records them instead)`, pass: false, detail: { calibrated: { platform: on.platform ?? null, cpu: on.cpu ?? null }, platform: PLATFORM, cpu: CPU, hosted: HOSTED } });
   for (const [scenario, metrics] of Object.entries(RUNTIME.scenarios)) {
     const measured = runtime[scenario], budget = budgets.runtime?.scenarios?.[scenario];
     if (!measured) { checks.push({ label: `runtime: ${RUNTIME.lane} ${scenario} measured`, pass: false }); continue; }
@@ -86,7 +102,7 @@ if (values.runtime) {
     for (const metric of metrics) {
       const allowed = Math.max(budget[metric] * budgets.runtime.timeTolerance, budget[metric] + budgets.runtime.timeFloorMs);
       if (comparable || metric === 'passes') hold(`runtime: ${RUNTIME.lane} ${scenario} ${metric}`, measured[metric], budget[metric], allowed);
-      else checks.push({ label: `runtime: ${RUNTIME.lane} ${scenario} ${metric} (recorded; budgets calibrated on ${budgets.calibrated?.runtime?.platform})`, pass: true, detail: { actual: measured[metric], budget: budget[metric] } });
+      else checks.push({ label: `runtime: ${RUNTIME.lane} ${scenario} ${metric} (recorded; budgets calibrated on ${where})`, pass: true, detail: { actual: measured[metric], budget: budget[metric] } });
     }
     for (const count of COUNTS) hold(`runtime: ${RUNTIME.lane} ${scenario} ${count}`, measured[count], budget[count], budget[count]);
     for (const call of CALLS) hold(`runtime: ${RUNTIME.lane} ${scenario} ${call} calls`, measured[call], budget[call], budget[call] * budgets.runtime.callTolerance);
@@ -97,7 +113,7 @@ if (values.runtime) {
 if (values.calibrate) {
   budgets.size.gzip = Object.fromEntries(Object.entries(sizes).map(([name, s]) => [name, s.gzip]));
   if (runtime) budgets.runtime.scenarios = runtime;
-  budgets.calibrated = { ...budgets.calibrated, size: { date: new Date().toISOString().slice(0, 10), dist: artifacts.dist.replace(process.cwd() + '/', '') }, ...(runtime ? { runtime: { date: new Date().toISOString().slice(0, 10), dist: artifacts.dist.replace(process.cwd() + '/', ''), repeat: Number(values.repeat), platform: PLATFORM } } : {}) };
+  budgets.calibrated = { ...budgets.calibrated, size: { date: new Date().toISOString().slice(0, 10), dist: artifacts.dist.replace(process.cwd() + '/', '') }, ...(runtime ? { runtime: { date: new Date().toISOString().slice(0, 10), dist: artifacts.dist.replace(process.cwd() + '/', ''), repeat: Number(values.repeat), platform: PLATFORM, cpu: CPU } } : {}) };
   await writeFile(FILE, JSON.stringify(budgets, null, 2) + '\n');
   console.log(`Calibrated ${FILE}.`);
 }

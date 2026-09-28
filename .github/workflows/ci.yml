@@ -18,6 +18,9 @@ jobs:
     # and on slower 4x-CPU timing (run 36255458992). Until the fixtures
     # carry their own fonts, CI runs where the suites are calibrated.
     runs-on: macos-15
+    # About 33 minutes (run 36294621257); a hang should not hold a macOS
+    # runner for the 360-minute default.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

@@ -11,6 +11,16 @@ updates:
     open-pull-requests-limit: 5
     ignore:
       - dependency-name: esbuild
+      # tsc writes the .d.ts files in the published tarball (build-recipe's
+      # emitDeclarations, run with this checkout's node_modules), and
+      # verify-recipe-reproduces and release-check rebuild published releases
+      # byte for byte with it. A TypeScript major can change how declarations
+      # are written, so it is taken by hand, with a recorded reason and
+      # rebuilds of 4.2.0 and 4.3.0 (TypeScript 7, in PR #6, also failed the
+      # scripts' type check with TS2554). Minor and patch updates still come
+      # in the tooling group, where CI's 4.2.0 rebuild checks them.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       website:
         patterns: ['next', 'react', 'react-dom', '@types/react', '@types/react-dom', 'tailwindcss', '@tailwindcss/*']

@@ -35,7 +35,9 @@ const { values } = parseArgs({ options: {
   bind: { type: 'string' },
 } });
 const started = performance.now();
-const watchdog = setTimeout(() => { console.error('verify-golden: watchdog after 170 s'); process.exit(3); }, 170_000);
+// Under its 300 s suite timeout (suites.mjs), so it reports itself first;
+// hosted macos-15 runs have taken up to 158 s.
+const watchdog = setTimeout(() => { console.error('verify-golden: watchdog after 290 s'); process.exit(3); }, 290_000);
 watchdog.unref();
 
 const corpus = JSON.parse(await readFile('tests/v4-corpus.json', 'utf8')).paragraphs;

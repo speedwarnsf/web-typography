@@ -246,6 +246,7 @@ try {
   const dependabot = await readFile('.github/dependabot.yml', 'utf8');
   check('Dependabot watches npm and GitHub Actions', /package-ecosystem: npm/.test(dependabot) && /package-ecosystem: github-actions/.test(dependabot));
   check('Dependabot leaves the pinned esbuild alone (reproducible builds)', /dependency-name: esbuild/.test(dependabot));
+  check('Dependabot does not propose TypeScript majors (tsc writes the published .d.ts)', /- dependency-name: typescript\n\s+update-types: \['version-update:semver-major'\]/.test(dependabot));
 
   // The release process names what the workflows assume: a node whose zlib
   // packs the bytes release-check rebuilds (they follow the node build, not
@@ -257,6 +258,11 @@ try {
   check('no workflow or RELEASING.md says the npm version changes the tarball bytes', ![releasing, release, ci].some(text => /npm 11\.8\.0 packs/.test(text)));
   const cut = await readFile('scripts/release-cut.mjs', 'utf8');
   check('release-cut refuses to cut unless its npm repacks the previous release byte for byte', /packerReproduces\(\{ root: repo, cache: npmCache, before: version \}\)/.test(cut) && /precondition\(`the npm on PATH repacks/.test(cut));
+  // The hosted-runner flag relaxes speed-calibrated checks and runtime times;
+  // the cut must enforce both, and budgets that cannot hold times must fail.
+  const budgetScript = await readFile('scripts/v4/verify-budgets.mjs', 'utf8');
+  check('release-cut refuses to run its suites with TYPESET_HOSTED_RUNNER set', /if \(\(!dryRun \|\| values\.verify\) && process\.env\.TYPESET_HOSTED_RUNNER\) throw/.test(cut));
+  check('verify-budgets --runtime fails where it cannot enforce times, unless --record-times asks it to record them', /if \(!comparable && !values\['record-times'\] && !values\.calibrate\) checks\.push\(\{[^\n]*pass: false/.test(budgetScript));
   const cache = await mkdtemp(join(tmpdir(), 'typeset-trust-npm-'));
   try {
     const here = await packerReproduces({ cache });

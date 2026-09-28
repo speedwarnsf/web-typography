@@ -46,6 +46,8 @@ jobs:
     # macOS, like CI: test:release runs the browser suites, which are
     # calibrated on macOS's Georgia (see ci.yml).
     runs-on: macos-15
+    # test:release alone takes about 28 minutes (run 36296406776).
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read

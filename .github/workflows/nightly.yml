@@ -14,7 +14,17 @@ permissions:
 
 jobs:
   nightly:
-    runs-on: ubuntu-latest
+    # macOS, like CI and the release workflow's verify job: the browser
+    # fixtures are set in Georgia at exact widths, and Ubuntu has no Georgia.
+    # On ubuntu-latest, nightly runs 36326937149 and 36459907359 failed the
+    # same 10 suites as CI run 36255458992, mostly on the fallback font's
+    # breaks; verify-copy-privacy's 8 WebKit failures were Linux WebKit's
+    # empty clipboard (the uncomposed control copied nothing either), not
+    # the font. Those checks pass on macos-15 at the same commit (120f05c).
+    runs-on: macos-15
+    # About an hour on macos-15 (test:release alone takes about 28 minutes);
+    # a hang should not hold a macOS runner for the 360-minute default.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -31,41 +41,103 @@ jobs:
         run: npm install -g npm@11.6.0
 
       - name: Install dependencies
+        id: deps
         run: npm ci
 
       - name: Install Playwright browsers
+        id: browsers
         run: npx playwright install --with-deps chromium webkit firefox
 
-      - name: Published artifacts match the npm registry
-        run: node scripts/v4/verify-ledger.mjs --network
+      # Built first, in a step of its own: the steps that measure the
+      # candidate need it, and a failure elsewhere must not skip it (the
+      # benchmark used to fail with ENOENT after test:release failed).
+      - name: Candidate build from the engine sources
+        id: candidate
+        run: npm run build:candidate
 
+      # The steps below run after an earlier check has failed, but not after
+      # a failed install: `!cancelled()` alone would start test:release
+      # without dependencies or browsers and spend its hour on noise. The
+      # browsers step runs only after npm ci succeeded, and the candidate
+      # step only after both.
       - name: Every suite against the committed release artifacts
+        id: release
+        if: ${{ !cancelled() && steps.browsers.outcome == 'success' }}
+        timeout-minutes: 60
+        # Checks listed in scripts/v4/speed-calibrated.json follow the
+        # machine's speed; on this runner they are reported, not enforced.
+        # release-cut enforces them on the calibration machine.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
         run: npm run test:release
 
-      - name: README links resolve, and the React/Playwright install matrix
+      # test:release's evidence is one set: output/test-v4-summary.json and
+      # the suite reports it names. The later steps write some of the same
+      # files for other targets (native-ax.json for the candidate with Gecko,
+      # docs-verification.json with --network, budget-verification.json with
+      # --runtime, and ledger-verification.json against the registry), so the
+      # set moves to output/release/ first, and output/*.json then holds only
+      # those later steps' reports, each written once.
+      - name: Keep test:release's reports together
+        if: ${{ !cancelled() && steps.release.outcome != 'skipped' }}
         run: |
-          node scripts/v4/verify-docs.mjs --network
-          npm run build:candidate
-          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-react-matrix.mjs
+          mkdir -p output/release
+          find output -maxdepth 1 -name '*.json' -exec mv {} output/release/ \;
 
+      - name: Published artifacts match the npm registry
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: node scripts/v4/verify-ledger.mjs --network
+
+      - name: README links resolve
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        timeout-minutes: 10
+        run: node scripts/v4/verify-docs.mjs --network
+
+      - name: React 18.2 to latest, Playwright and @types/react installs beside the packed candidate
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 20
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-react-matrix.mjs
+
+      # Run directly, not through verify-release.mjs, which would write a
+      # second output/test-v4-summary.json for this one suite. Its own
+      # watchdog is 540 s.
       - name: Engine accessibility trees, including Gecko through Marionette
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 15
         env:
           TYPESET_AX_FIREFOX: '1'
-        run: node scripts/v4/verify-release.mjs --only native-ax --timeout 600
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-native-ax.mjs
 
-      - name: Runtime budgets (Chromium, 4x CPU; times enforced only on the calibration platform)
-        run: |
-          npm run build:candidate
-          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-budgets.mjs --runtime --repeat 3
+      - name: Runtime budgets (Chromium, 4x CPU; counts enforced, times enforced only on the calibration machine)
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 45
+        # This runner is darwin-arm64 like the calibration machine, but not as
+        # fast. --record-times has verify-budgets record its times here;
+        # without it, a run that cannot enforce them fails.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-budgets.mjs --runtime --repeat 3 --record-times
 
       - name: Full benchmark
-        if: always()
-        run: TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/bench-v4.mjs --out output/bench-v4.json
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 25
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/bench-v4.mjs --out output/bench-v4.json
 
       - name: Retain evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: typeset-nightly
-          path: output/*.json
+          # release/: test:release's summary and suite reports. The top
+          # level: the registry ledger, network docs, React matrix, candidate
+          # accessibility (with Gecko), runtime budget and benchmark reports.
+          path: |
+            output/*.json
+            output/release/*.json
           retention-days: 30
