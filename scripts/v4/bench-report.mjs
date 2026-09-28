@@ -80,7 +80,7 @@ const reading = [];
   if (wkFont && !wkFont.error) reading.push(wkFont.staleAfterFont ? `WebKit does not recompose after a web font that CSS applies late: ${wkFont.staleAfterFont} of ${wkFont.composed} composed paragraphs were left with breaks measured for the old font.` : 'After a late web font, every composed paragraph was recomposed in each engine.');
   const storm = get('chromium@1x', 'storm');
   if (storm && !storm.error) reading.push(`Toggling a class on an ancestor 30 times re-ran composition ${n(storm.compositions)} times over 200 paragraphs whose layout the class does not change.`);
-  reading.push('Budgets in `scripts/v4/budgets.json` hold the size, count and time values last calibrated, with the reason for every raise (sizes on every change; time, observer and write counts nightly and at release cut).');
+  reading.push('Budgets in `scripts/v4/budgets.json` hold the size, count and time values last calibrated, with the reason for every raise (sizes on every change; observer, listener and write counts nightly and at release cut; times at release cut, on the calibration machine, and recorded nightly).');
 }
 /** Headline numbers against the baseline run, one row per metric. */
 const compared = [];

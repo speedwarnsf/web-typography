@@ -4,6 +4,8 @@
 //   node scripts/v4/verify-budgets.mjs              size budgets (every PR; part of test:v4)
 //   node scripts/v4/verify-budgets.mjs --runtime    also time, observer, listener and write
 //                                                   budgets in Chromium at 4x CPU (nightly, release cut)
+//   --record-times                                  with --runtime, away from the calibration
+//                                                   machine: record the times instead of failing
 //   --calibrate [--repeat 3]                        rewrite budgets.json from this measurement
 //
 // Sizes are gzip bytes of esbuild bundles importing one entry point (see
@@ -24,7 +26,7 @@ const PLATFORM = `${process.platform}-${process.arch}`;
 const CPU = cpus()[0]?.model ?? 'unknown';
 // A GitHub-hosted runner (TYPESET_HOSTED_RUNNER=1, as in verify-release.mjs).
 const HOSTED = process.env.TYPESET_HOSTED_RUNNER === '1';
-const { values } = parseArgs({ options: { runtime: { type: 'boolean', default: false }, calibrate: { type: 'boolean', default: false }, repeat: { type: 'string', default: '1' } } });
+const { values } = parseArgs({ options: { runtime: { type: 'boolean', default: false }, calibrate: { type: 'boolean', default: false }, repeat: { type: 'string', default: '1' }, 'record-times': { type: 'boolean', default: false } } });
 /** The runtime lane: scenario -> metrics held to a budget. */
 const RUNTIME = {
   lane: 'chromium@4x',
@@ -82,11 +84,17 @@ if (values.runtime) {
   // Times depend on the machine, so they are enforced only on the machine the
   // budgets were calibrated on: its platform and CPU. A GitHub-hosted macos-15
   // runner is darwin-arm64 too, but a slower virtual machine, so a hosted run
-  // records times whatever it reports. Counts and DOM writes are
-  // deterministic and enforced everywhere.
+  // never enforces them. Counts and DOM writes are deterministic and enforced
+  // everywhere.
   const on = budgets.calibrated?.runtime ?? {};
   const comparable = !HOSTED && on.platform === PLATFORM && (!on.cpu || on.cpu === CPU);
   const where = `${on.platform}${on.cpu ? ' ' + on.cpu : ''}; this run ${PLATFORM} ${CPU}${HOSTED ? ', hosted runner' : ''}`;
+  // Where the times cannot be enforced they are recorded, and the run fails
+  // unless --record-times asked for that (the nightly does). Otherwise a cut
+  // on another Mac, or with TYPESET_HOSTED_RUNNER leaking into its
+  // environment, would report the runtime budgets met without holding a
+  // single time to its budget.
+  if (!comparable && !values['record-times'] && !values.calibrate) checks.push({ label: `runtime: times are enforced on this machine (budgets calibrated on ${where}; --record-times records them instead)`, pass: false, detail: { calibrated: { platform: on.platform ?? null, cpu: on.cpu ?? null }, platform: PLATFORM, cpu: CPU, hosted: HOSTED } });
   for (const [scenario, metrics] of Object.entries(RUNTIME.scenarios)) {
     const measured = runtime[scenario], budget = budgets.runtime?.scenarios?.[scenario];
     if (!measured) { checks.push({ label: `runtime: ${RUNTIME.lane} ${scenario} measured`, pass: false }); continue; }

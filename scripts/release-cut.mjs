@@ -36,6 +36,14 @@ const version = values.version ?? '';
 const dryRun = values['dry-run'];
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) throw new Error('Pass --version x.y.z.');
 if (!dryRun && !values.summary) throw new Error('Pass --summary with one sentence for public/releases/' + version + '/index.html.');
+// TYPESET_HOSTED_RUNNER, meant for GitHub's hosted runners, has
+// verify-release.mjs report speed-calibrated checks without enforcing them
+// and verify-budgets.mjs leave runtime times unenforced. The staged run below
+// must enforce every check, so a cut that verifies refuses the flag rather
+// than let one left in a shell pass the cut unenforced. A dry run without
+// --verify runs no suite; verify-recipe-reproduces runs it that way inside
+// test:v4 and test:release, where hosted runners set the flag.
+if ((!dryRun || values.verify) && process.env.TYPESET_HOSTED_RUNNER) throw new Error('release-cut: TYPESET_HOSTED_RUNNER is set, which would report speed-calibrated checks and runtime times without enforcing them. Unset it and cut on the calibration machine.');
 const repo = process.cwd();
 /** The integrity placeholder in pre-release docs; see verify-docs.mjs. */
 const SRI_PLACEHOLDER = 'sha384-FILLED-BY-RELEASE-CUT';

@@ -115,11 +115,12 @@ jobs:
         if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
         timeout-minutes: 45
         # This runner is darwin-arm64 like the calibration machine, but not as
-        # fast: verify-budgets records its times instead of enforcing them.
+        # fast. --record-times has verify-budgets record its times here;
+        # without it, a run that cannot enforce them fails.
         env:
           TYPESET_HOSTED_RUNNER: '1'
           TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
-        run: node scripts/v4/verify-budgets.mjs --runtime --repeat 3
+        run: node scripts/v4/verify-budgets.mjs --runtime --repeat 3 --record-times
 
       - name: Full benchmark
         if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
