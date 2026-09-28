@@ -246,6 +246,7 @@ try {
   const dependabot = await readFile('.github/dependabot.yml', 'utf8');
   check('Dependabot watches npm and GitHub Actions', /package-ecosystem: npm/.test(dependabot) && /package-ecosystem: github-actions/.test(dependabot));
   check('Dependabot leaves the pinned esbuild alone (reproducible builds)', /dependency-name: esbuild/.test(dependabot));
+  check('Dependabot does not propose TypeScript majors (tsc writes the published .d.ts)', /- dependency-name: typescript\n\s+update-types: \['version-update:semver-major'\]/.test(dependabot));
 
   // The release process names what the workflows assume: a node whose zlib
   // packs the bytes release-check rebuilds (they follow the node build, not
