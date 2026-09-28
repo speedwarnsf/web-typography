@@ -42,7 +42,7 @@ export const SUITES = [
   { name: 'verify-tracking-clipping', report: 'output/tracking-clipping.json' },
   { name: 'verify-loaders', report: 'output/loaders.json' },
   { name: 'verify-fixture-invariants', report: 'output/fixture-invariants.json' },
-  { name: 'verify-cli', report: 'output/cli-verification.json' },
+  { name: 'verify-cli', report: 'output/cli-verification.json', timeout: 240 },
   { name: 'verify-site-index', report: 'output/site-index.json', note: 'sri.json lists only immutable pins; cache headers; firewall bypass' },
   { name: 'verify-docs', report: 'output/docs-verification.json', note: 'docs match the code and the release (outcomes, options, install lines, links)' },
   { name: 'verify-release-trust', report: 'output/release-trust.json', note: 'pinned workflows, provenance publishing and the maintainer-published path, SECURITY.md, advisories, release notes' },
