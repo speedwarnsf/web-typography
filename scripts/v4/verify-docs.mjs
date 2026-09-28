@@ -171,10 +171,13 @@ try {
   }
   check('readme', 'links to typeset.us, the release archive, the repository and jsDelivr resolve to real files and routes', unresolved.length === 0, unresolved);
   if (process.argv.includes('--network')) {
-    const external = urls.filter(url => !url.includes(`/releases/${target}/`) && !url.includes(`typeset.us@${target}`) && !url.startsWith('https://typeset.us/go@'));
+    // A loopback address in a command example (npx typeset-audit --url
+    // http://localhost:3000) names the reader's own server, not a link.
+    const loopback = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/;
+    const external = urls.filter(url => !url.includes(`/releases/${target}/`) && !url.includes(`typeset.us@${target}`) && !url.startsWith('https://typeset.us/go@') && !loopback.test(url));
     /** @type {string[]} */
     const failed = [];
-    for (const url of external) { const r = await fetch(url, { redirect: 'follow' }).catch(() => null); if (!r || r.status !== 200) failed.push(`${url} ${r?.status}`); }
+    for (const url of external) { const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20000) }).catch(() => null); if (!r || r.status !== 200) failed.push(`${url} ${r?.status}`); }
     check('readme', 'external README links return 200 (unreleased-version links excepted)', failed.length === 0, failed);
   }
   check('readme', 'the before/after image exists and the release archive carries it', await exists('packages/typeset-v4/before-after.png') && archived.has('before-after.png') && !pkg.files.includes('before-after.png'));
