@@ -27,17 +27,17 @@ Planned as 4.3.1. Not published.
   and the same blocks recomposed in every frame. Both windows now leave out
   the adapters' own work, during which no text metric can change. A 1.2 s
   font-size transition over 16 blocks in Chromium at 4x CPU
-  (`scripts/v4/verify-recompose-storms.mjs`): 4.3.0 failed the check in 4
-  of 6 staged release-cut runs on the maintainer's M2 Pro (66 to 76
-  compositions, 9 to 14 long tasks, most of 100 to 135 ms) and in 4 of 11
-  runs on GitHub's macos-15 runners (up to 88 compositions and 17 long
-  tasks); 4.3.1 made 32 to 44 compositions and 0 to 2 long tasks in 36
-  transitions on the M2 Pro. With the CPU throttled further, where 4.3.0
-  storms in most runs (6x: 30 to 68 compositions and 6 to 11 long tasks;
-  8x: 45 to 55 and 11 to 13), 4.3.1 composes each block about twice (6x:
-  31 to 32 compositions and 2 to 3 long tasks; 8x: 29 to 33 and 2 to 5;
-  12x and 16x: 28 to 33). This changes when blocks compose, not what they
-  compose.
+  (`scripts/v4/verify-recompose-storms.mjs`): 4.3.0 failed the check in 4 of
+  6 staged release-cut runs on the maintainer's M2 Pro (66 to 76
+  compositions, 9 to 14 long tasks of up to 135 ms, half of them over
+  100 ms) and in 4 of 11 runs on GitHub's macos-15 runners (up to 88
+  compositions and 17 long tasks); 4.3.1 made 32 to 44 compositions and 0 to
+  2 long tasks in 36 transitions on the M2 Pro. With the CPU throttled
+  further, where 4.3.0 storms in most runs (6x: 30 to 68 compositions and 6
+  to 11 long tasks; 8x: 45 to 55 and 11 to 13), 4.3.1 composes each block
+  about twice (6x: 31 to 32 compositions and 2 to 3 long tasks; 8x: 29 to 33
+  and 2 to 5; 12x and 16x: 28 to 33). This changes when blocks compose, not
+  what they compose.
 
 ### Development
 
