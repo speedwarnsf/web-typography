@@ -43,9 +43,11 @@ npm run release:cut -- --version x.y.z --summary "One sentence for the archive p
 pin, or on npm. Run the cut on the calibration machine: its staged run
 enforces every check, including the speed-calibrated ones in
 `scripts/v4/speed-calibrated.json`, which GitHub's slower hosted runners
-report without enforcing (`TYPESET_HOSTED_RUNNER=1` in `ci.yml` and
-`release.yml`). It builds, packs and runs every suite and the runtime budgets
-in a staging directory, then writes `packages/typeset-v4/dist`,
+report without enforcing (`TYPESET_HOSTED_RUNNER=1` in `ci.yml`,
+`nightly.yml` and `release.yml`; there verify-budgets also records runtime
+times instead of enforcing them, since `scripts/v4/budgets.json` names this
+machine's platform and CPU). It builds, packs and runs every suite and the
+runtime budgets in a staging directory, then writes `packages/typeset-v4/dist`,
 `public/releases/x.y.z/`, the pins `go@x.y.z.js`, `typeset@x.y.z.min.js` and
 `typeset@x.y.z.esm.js`, the aliases (`go@<major>.js`; `go.js` and the other
 unversioned files only for 4.x), `sri.json`, `release.json`, and appends the

@@ -14,7 +14,15 @@ permissions:
 
 jobs:
   nightly:
-    runs-on: ubuntu-latest
+    # macOS, like CI and the release workflow's verify job: the browser
+    # fixtures are set in Georgia at exact widths, and Ubuntu has no Georgia.
+    # On ubuntu-latest, nightly runs 36326937149 and 36459907359 failed the
+    # same 10 suites as CI run 36255458992 on the fallback font's breaks;
+    # those checks pass on macos-15 at the same commit (120f05c).
+    runs-on: macos-15
+    # About an hour on macos-15 (test:release alone takes about 28 minutes);
+    # a hang should not hold a macOS runner for the 360-minute default.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -36,31 +44,65 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit firefox
 
+      # Built first, in a step of its own: the steps that measure the
+      # candidate need it, and a failure elsewhere must not skip it (the
+      # benchmark used to fail with ENOENT after test:release failed).
+      - name: Candidate build from the engine sources
+        id: candidate
+        run: npm run build:candidate
+
       - name: Published artifacts match the npm registry
+        if: ${{ !cancelled() }}
         run: node scripts/v4/verify-ledger.mjs --network
 
       - name: Every suite against the committed release artifacts
+        if: ${{ !cancelled() }}
+        timeout-minutes: 60
+        # Checks listed in scripts/v4/speed-calibrated.json follow the
+        # machine's speed; on this runner they are reported, not enforced.
+        # release-cut enforces them on the calibration machine.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
         run: npm run test:release
 
-      - name: README links resolve, and the React/Playwright install matrix
-        run: |
-          node scripts/v4/verify-docs.mjs --network
-          npm run build:candidate
-          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-react-matrix.mjs
+      - name: README links resolve
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: node scripts/v4/verify-docs.mjs --network
 
+      - name: React 18.2 to latest, Playwright and @types/react installs beside the packed candidate
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 20
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-react-matrix.mjs
+
+      # Run directly: through verify-release.mjs it would overwrite
+      # test:release's output/test-v4-summary.json. Its own watchdog is 540 s.
       - name: Engine accessibility trees, including Gecko through Marionette
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 15
         env:
           TYPESET_AX_FIREFOX: '1'
-        run: node scripts/v4/verify-release.mjs --only native-ax --timeout 600
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-native-ax.mjs
 
-      - name: Runtime budgets (Chromium, 4x CPU; times enforced only on the calibration platform)
-        run: |
-          npm run build:candidate
-          TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/verify-budgets.mjs --runtime --repeat 3
+      - name: Runtime budgets (Chromium, 4x CPU; counts enforced, times enforced only on the calibration machine)
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 45
+        # This runner is darwin-arm64 like the calibration machine, but not as
+        # fast: verify-budgets records its times instead of enforcing them.
+        env:
+          TYPESET_HOSTED_RUNNER: '1'
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/verify-budgets.mjs --runtime --repeat 3
 
       - name: Full benchmark
-        if: always()
-        run: TYPESET_DIST="$PWD/output/candidate/dist" node scripts/v4/bench-v4.mjs --out output/bench-v4.json
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
+        timeout-minutes: 25
+        env:
+          TYPESET_DIST: ${{ github.workspace }}/output/candidate/dist
+        run: node scripts/v4/bench-v4.mjs --out output/bench-v4.json
 
       - name: Retain evidence
         if: always()
