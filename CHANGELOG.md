@@ -39,6 +39,15 @@ Planned as 4.3.1. Not published.
   12x and 16x: 28 to 33). This changes when blocks compose, not what they
   compose.
 
+### Development
+
+- The storm check's 60-frame text-size slider is enforced on GitHub's
+  hosted runners again. Its speed-calibrated entry, added after 65
+  compositions against a limit of 64 in macos-15 run 36284847012, blamed
+  the wall-clock hold-off window fixed above. On the M2 Pro the slider made
+  26 to 32 compositions and 2 long tasks in 12 runs, and 25 or 26
+  compositions at 6x to 16x CPU.
+
 ## 4.3.0 - 2026-09-26
 
 4.3.0 follows 4.2.0. It is a minor release: no public API was renamed or
