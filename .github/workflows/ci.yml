@@ -1,9 +1,18 @@
 name: CI
 
+# A branch with a pull request is tested once, by the pull_request run: pushes
+# to other branches do not start a second, identical macOS run. A newer push
+# to the same pull request cancels the run it supersedes. release.yml's
+# "CI passed on the tagged commit" accepts the pull request's run, whose
+# head_sha is the branch commit that gets tagged.
 on:
   push:
-    branches: [master, 'codex/release-*', 'release/**']
+    branches: [master]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 # Least privilege: CI reads the repository and uploads artifacts, nothing else.
 permissions:

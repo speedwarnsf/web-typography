@@ -221,11 +221,11 @@ export default function AboutPage() {
             Back to Tools
           </a>
           <a
-            href="/support"
+            href="/sponsor"
             className="font-mono text-sm uppercase tracking-[0.25em] text-neutral-400 hover:text-neutral-200 transition-colors border-b border-neutral-700 hover:border-neutral-400 pb-1"
             style={{ borderRadius: 0 }}
           >
-            Support Typeset
+            Sponsor Typeset
           </a>
         </nav>
       </article>

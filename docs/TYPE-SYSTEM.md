@@ -44,7 +44,7 @@ display sizes). Body: normal. No fifth value exists;
 
 ## Craft details
 
-- Prices: superior currency symbol (`$` at 55%, cap-aligned) — see /support.
+- Prices: superior currency symbol (`$` at 55%, cap-aligned) — see /sponsor.
 - List markers hang in the gutter and share the line box (never nudged with
   margins) — the Silver Bullet pattern, used by the site itself.
 - Every paragraph is composed by the engine through ONE path: `typeset()`.

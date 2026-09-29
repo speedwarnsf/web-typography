@@ -5,7 +5,9 @@
 //   node scripts/site/verify-site.mjs [--only security,content] [--audit]
 //
 // security (K10): every page carries a nonce CSP, nosniff and frame
-//   protection, and loads with no CSP violation or page error; an attacker
+//   protection, and loads with no CSP violation or page error in any of the
+//   three engines; pages contact only the hosts /privacy names; security.txt
+//   is served; an attacker
 //   page run through /audit and /dna executes nothing and cannot restyle the
 //   site; a hostile /pairing-cards link inserts nothing into the card it
 //   generates; /api/fetch-url refuses loopback, metadata and private addresses and
@@ -43,8 +45,7 @@ let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 
-const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
-const KEY_ROUTES = ['/', '/audit', '/dna', '/proof', '/fix', '/essay', '/install'];
+const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/docs', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/help', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/sponsor', '/utility', '/v2', '/variable-fonts'];
 const ATTACK = `<!doctype html><html><head>
 <base href="https://attacker.invalid/">
 <meta http-equiv="refresh" content="0;url=https://attacker.invalid/">
@@ -94,20 +95,20 @@ try {
       check('security', `/api/fetch-url refuses ${target}`, (r.status === 403 || r.status === 400) && !body.html, { status: r.status, body });
     }
 
+    /** @type {Record<string, Set<string>>} */
+    const contactedBy = {};
     for (const config of browsers) {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-        // The site's visitor alert (NtfyTracker) posts to ntfy.sh in production
-        // builds. Never let a test send the owner a notification.
-        await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
-        for (const route of config.name === 'chromium' ? ROUTES : KEY_ROUTES) {
+        for (const route of ROUTES) {
           const page = await context.newPage();
           page.setDefaultTimeout(20000);
           /** @type {string[]} */
           const problems = [];
-          // The aborted visitor alert surfaces as a fetch error in WebKit; it is not a page defect.
-          page.on('pageerror', error => { if (!/ntfy\.sh/.test(error.message)) problems.push('pageerror: ' + error.message.slice(0, 200)); });
+          // Every request this page makes to another origin, by host.
+          page.on('request', request => { const url = new URL(request.url()); if (/^https?:$/.test(url.protocol) && url.origin !== base) (contactedBy[url.host] ??= new Set()).add(`${config.name} ${route}`); });
+          page.on('pageerror', error => { problems.push('pageerror: ' + error.message.slice(0, 200)); });
           page.on('console', message => { if (message.type() === 'error' && /Content Security Policy|CSP|Refused to/.test(message.text())) problems.push('console: ' + message.text().slice(0, 200)); });
           await page.addInitScript(() => { document.addEventListener('securitypolicyviolation', e => { (/** @type {any} */ (window).__violations ??= []).push(`${e.violatedDirective} ${e.blockedURI}`); }); });
           try {
@@ -198,6 +199,22 @@ try {
       } finally { await browser.close(); }
     }
 
+    // The site sets no trackers: pages contact no origin but their own and
+    // the hosts /privacy names (data-host), and /privacy names no host that
+    // no page contacts.
+    const privacy = await (await fetch(base + '/privacy')).text();
+    const listed = [...new Set([...privacy.matchAll(/data-host="([^"]+)"/g)].map(m => m[1]))].sort();
+    const contacted = Object.keys(contactedBy).sort();
+    check('security', 'pages contact no origin but their own and the hosts /privacy lists, and /privacy lists only hosts pages contact', listed.length > 0 && JSON.stringify(listed) === JSON.stringify(contacted), { listed, contacted: Object.fromEntries(Object.entries(contactedBy).map(([host, where]) => [host, [...where].slice(0, 6)])) });
+    const connect = /connect-src ([^;]*)/.exec(csp)?.[1] ?? '';
+    check('security', "the page CSP lets scripts connect only to the site itself (connect-src 'self' data:)", connect.trim() === "'self' data:", connect);
+
+    // security.txt (RFC 9116): contact, a policy and an expiry under a year.
+    const securityTxt = await fetch(base + '/.well-known/security.txt');
+    const fields = Object.fromEntries([...(await securityTxt.text()).matchAll(/^([\w-]+): (.+)$/gm)].map(m => [m[1], m[2].trim()]));
+    const expires = Date.parse(fields.Expires ?? '');
+    check('security', '/.well-known/security.txt: text/plain with Contact, Expires (under a year away), Policy, Preferred-Languages and Canonical', securityTxt.status === 200 && /^text\/plain/.test(securityTxt.headers.get('content-type') ?? '') && /^mailto:/.test(fields.Contact ?? '') && expires > Date.now() && expires - Date.now() < 365 * 864e5 && /SECURITY\.md$/.test(fields.Policy ?? '') && fields['Preferred-Languages'] === 'en' && fields.Canonical === 'https://typeset.us/.well-known/security.txt', { status: securityTxt.status, type: securityTxt.headers.get('content-type'), fields });
+
     // Rate limit last: it spends this client's budget.
     const statuses = [];
     for (let n = 0; n < 14; n++) statuses.push((await fetch(`${base}/api/fetch-url?url=${encodeURIComponent('http://127.0.0.1/')}`, { headers: { 'x-forwarded-for': '203.0.113.9' } })).status);
@@ -211,8 +228,8 @@ try {
   }
   if (sections.has('content')) {
     // D4: every install line the site renders is the pinned loader with the
-    // integrity hash from public/sri.json; the evergreen go.js appears only
-    // with its label.
+    // integrity hash from public/sri.json, or the same file from jsDelivr
+    // with the same hash; the unpinned go.js and go@4.js are never offered.
     const sri = JSON.parse(await readFile('public/sri.json', 'utf8'));
     // React separates adjacent text with <!-- --> in server HTML.
     const decode = (/** @type {string} */ html) => html.replace(/<!-- -->/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
@@ -222,15 +239,34 @@ try {
       const response = await fetch(base + route);
       const html = decode(await response.text());
       const snippets = [...html.matchAll(/<script src="https:\/\/typeset\.us\/(go(?:@[\d.]+)?\.js|typeset(?:@[\d.]+\.min)?\.min\.js|typeset@[\d.]+\.min\.js)"([^>]*)>/g)];
-      const bad = snippets.filter(([, file, attributes]) => {
-        if (/@/.test(file)) return /integrity="([^"]+)"/.exec(attributes)?.[1] !== sri.files[file] || !/crossorigin="anonymous"/.test(attributes);
-        return !/never move to 5\.0/.test(html);
-      }).map(m => m[0]);
-      check('content', `${route}: install lines are pinned with sri.json's integrity (go.js only with its label)`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+      const bad = snippets.filter(([, file, attributes]) => /integrity="([^"]+)"/.exec(attributes)?.[1] !== sri.files[file] || !/crossorigin="anonymous"/.test(attributes)).map(m => m[0]);
+      check('content', `${route}: install lines are pinned with sri.json's integrity, never the unpinned go.js or go@4.js`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+      if (['/', '/install', '/utility'].includes(route)) {
+        const cdn = [...html.matchAll(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/typeset\.us@([\d.]+)\/dist\/auto\.js"([^>]*)>/g)];
+        check('content', `${route}: offers the jsDelivr line with the pinned loader's own hash`, cdn.length > 0 && cdn.every(([, version, attributes]) => version === sri.version && /integrity="([^"]+)"/.exec(attributes)?.[1] === sri.files[`go@${sri.version}.js`] && /crossorigin="anonymous"/.test(attributes)), cdn.map(m => m[0]));
+      }
     }
 
+    // /fix names a page's Typeset tag, and flags one that can change under
+    // the page: go.js or go@4.js, or a hosted file without its hash.
+    const { build } = await import('esbuild');
+    const bundle = await build({ entryPoints: ['src/lib/install-detect.ts'], bundle: true, format: 'esm', write: false, platform: 'neutral', logLevel: 'silent' });
+    const { detectInstall } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+    const tag = (/** @type {string} */ src, integrity = '') => `<!doctype html><html><head><script src="${src}"${integrity ? ` integrity="${integrity}" crossorigin="anonymous"` : ''} defer></script></head><body><p>Text.</p></body></html>`;
+    const pinnedHash = sri.files[`go@${sri.version}.js`];
+    const samples = [
+      ['go.js', tag('https://typeset.us/go.js'), 'moving'],
+      ['go@4.js', tag('https://typeset.us/go@4.js'), 'moving'],
+      ['the pinned line', sri.snippet, null],
+      ['the jsDelivr line', tag(`https://cdn.jsdelivr.net/npm/typeset.us@${sri.version}/dist/auto.js`, pinnedHash), null],
+      ['a pinned file without its hash', tag(`https://typeset.us/go@${sri.version}.js`), 'no-integrity'],
+      ['a self-hosted dist/auto.js', tag('/vendor/typeset/dist/auto.js'), null],
+    ];
+    const graded = samples.map(([label, html, expected]) => ({ label, expected, ...detectInstall(html) }));
+    check('content', '/fix detects typeset.us, jsDelivr, unpkg and self-hosted loaders, and flags only go.js, go@4.js and hosted files without a hash', graded.every(g => g.installed && g.unpinned === g.expected) && !detectInstall(tag('https://example.com/app.js')).installed, graded);
+
     // D5: titles, descriptions and unfurl images.
-    for (const route of ['/', '/support', '/library', '/install/frameworks']) {
+    for (const route of ['/', '/sponsor', '/library', '/install/frameworks']) {
       const html = decode(await (await fetch(base + route)).text());
       const meta = (/** @type {string} */ key) => new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
       const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
@@ -239,15 +275,29 @@ try {
       if (image) { const r = await fetch(image.replace(/^https?:\/\/[^/]+/, base)); imageOK = r.status === 200 && /image\/png/.test(r.headers.get('content-type') ?? ''); }
       check('content', `${route}: own title, description and an og:image that renders`, !!title && !!meta('description') && !!meta('og:title') && imageOK, { title, description: meta('description'), image, imageOK });
     }
-    check('content', '/ and /support have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/support')).text()).includes('<title>Support Typeset'));
+    check('content', '/privacy has its own title', decode(await (await fetch(base + '/privacy')).text()).includes('<title>Privacy: what typeset.us collects</title>'));
+    check('content', '/ and /sponsor have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/sponsor')).text()).includes('<title>Sponsor Typeset'));
+    // The Stripe page moved from /support; published 3.x manifests still link there.
+    const moved = await fetch(base + '/support', { redirect: 'manual' });
+    check('content', '/support redirects permanently (308) to /sponsor', moved.status === 308 && new URL(moved.headers.get('location') ?? '', base).pathname === '/sponsor', { status: moved.status, location: moved.headers.get('location') });
+    // Help pages, and menu labels: "Help" and "Sponsor", never "Support".
+    const help = decode(await (await fetch(base + '/help')).text());
+    check('content', '/help has its own title and links the FAQ, docs, both issue forms, the security policy and Sponsor', help.includes('<title>Help: questions, bad breaks and security reports</title>') && ['href="/faq"', 'href="/docs"', 'template=bad-break.yml', 'template=integration-question.yml', '/SECURITY.md"', 'href="/sponsor"'].every(link => help.includes(link)));
+    const menu = await readFile('src/lib/sitemap.ts', 'utf8');
+    check('content', 'the menu and command palette name Help and Sponsor, and no page "Support"', /name: "Help"/.test(menu) && /name: "Sponsor"/.test(menu) && !/name: "Support"/.test(menu));
 
     // D5: the homepage names its baseline by engine and claims only what that
     // engine does; the developer band links to GitHub, npm and the docs.
     const developer = decode(await (await fetch(base + '/')).text());
-    for (const [label, href] of [['GitHub', 'https://github.com/speedwarnsf/web-typography'], ['npm', 'https://www.npmjs.com/package/typeset.us'], ['framework recipes', '/install/frameworks']]) {
+    for (const [label, href] of [['GitHub', 'https://github.com/speedwarnsf/web-typography'], ['npm', 'https://www.npmjs.com/package/typeset.us'], ['framework recipes', '/install/frameworks'], ['the docs page', '/docs']]) {
       check('content', `homepage links to ${label}`, developer.includes(`href="${href}"`));
     }
     check('content', 'homepage states a measured loader size, not "38 KB", and no "--" dash', !/38(&nbsp;|\s)KB/.test(developer) && !developer.includes('doing -- visible') && /\d+\.\d(&nbsp;|\s)KB gzipped/.test(developer));
+    // Framer and Wix render React on the server; their pages warn about
+    // hydration errors, and the other platforms' pages do not.
+    const warned = [];
+    for (const route of platforms) if (/hydration error/.test(decode(await (await fetch(base + route)).text()))) warned.push(route);
+    check('content', '/install/framer and /install/wix, and no other platform page, warn about React hydration errors', JSON.stringify(warned.sort()) === JSON.stringify(['/install/framer', '/install/wix']), { platforms, warned });
     const frameworks = await (await fetch(base + '/install/frameworks')).text();
     check('content', '/install/frameworks has Next.js, Vite, Astro, SvelteKit and Vue recipes', ['Next.js (App Router)', 'Vite + React', 'Astro', 'SvelteKit', 'Vue and Nuxt'].every(t => frameworks.includes(t)));
     // New SvelteKit projects compile every file in runes mode, where
@@ -261,7 +311,6 @@ try {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
-        await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
         const page = await context.newPage();
         page.setDefaultTimeout(20000);
         await page.goto(base + '/', { waitUntil: 'load' });
@@ -285,12 +334,29 @@ try {
         await context.close();
       } finally { await browser.close(); }
     }
+    // /docs and /help: every link on this site resolves.
+    for (const route of ['/docs', '/help']) {
+      const html = await (await fetch(base + route)).text();
+      const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+      const local = [...new Set([...main.matchAll(/href="(\/[^"#]*)"/g)].map(m => m[1]))];
+      const broken = [];
+      for (const path of local) { const r = await fetch(base + path); if (r.status !== 200) broken.push(`${path} ${r.status}`); }
+      check('content', `${route}: every link to this site resolves`, local.length > 0 && broken.length === 0, { local, broken });
+    }
     if (values.network) {
       // npmjs.com answers scripts with 403, so the npm link is checked through
       // the registry, which serves the same package.
       for (const [label, url] of [['GitHub link', 'https://github.com/speedwarnsf/web-typography'], ['npm link (registry)', 'https://registry.npmjs.org/typeset.us']]) {
         const r = await fetch(url, { method: 'GET', redirect: 'follow' }).catch(() => null);
         check('content', `${label} resolves: ${url}`, r?.status === 200, r?.status);
+      }
+      // The repository documents /docs and /help link, at the pinned tag.
+      for (const route of ['/docs', '/help']) {
+        const html = decode(await (await fetch(base + route)).text());
+        const remote = [...new Set([...html.matchAll(/href="(https:\/\/github\.com\/speedwarnsf\/web-typography\/blob\/[^"]+)"/g)].map(m => m[1]))];
+        const broken = [];
+        for (const url of remote) { const r = await fetch(url, { method: 'GET', redirect: 'follow' }).catch(() => null); if (r?.status !== 200) broken.push(`${url} ${r?.status}`); }
+        check('content', `${route}: every repository document it links resolves on GitHub`, remote.length > 0 && broken.length === 0, { remote: remote.length, broken });
       }
     }
   }

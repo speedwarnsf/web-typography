@@ -22,6 +22,11 @@ const SECURITY = [
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  // The Stripe page was /support; the published 3.x manifests' npm "funding"
+  // field (packages/typeset.us/package.json) still points there.
+  async redirects() {
+    return [{ source: '/support', destination: '/sponsor', permanent: true }];
+  },
   async rewrites() {
     return [{ source: '/releases/:version', destination: '/releases/:version/index.html' }];
   },
