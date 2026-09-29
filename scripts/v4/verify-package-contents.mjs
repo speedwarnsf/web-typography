@@ -41,7 +41,7 @@ try {
   // K8: people can find the package on npm and follow its links.
   const KEYWORDS = ['typography', 'line-breaking', 'line-break', 'text-wrap', 'text-wrap-pretty', 'orphans', 'widows', 'rag', 'knuth-plass', 'hanging-punctuation', 'smart-quotes', 'react', 'paragraph'];
   check('keywords cover the terms people search for', KEYWORDS.every(k => pkg.keywords?.includes(k)), { missing: KEYWORDS.filter(k => !pkg.keywords?.includes(k)) });
-  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.', pkg.description);
+  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, tested in Chromium, WebKit and Firefox.', pkg.description);
   check('repository.directory points npm and GitHub at packages/typeset-v4', pkg.repository?.directory === 'packages/typeset-v4' && /github\.com\/speedwarnsf\/web-typography/.test(pkg.repository?.url), pkg.repository);
   check('bugs.url is the issue tracker', pkg.bugs?.url === 'https://github.com/speedwarnsf/web-typography/issues', pkg.bugs);
   check('no engines field that would make Yarn refuse a browser library', !pkg.engines, pkg.engines);

@@ -1,7 +1,7 @@
 # typeset.us
 
 Better line breaks for web text: no stranded short words or one-word last
-lines, links and styling intact, verified in Chrome, Safari and Firefox.
+lines, links and styling intact, tested in Chromium, WebKit and Firefox.
 
 ![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.3.1/before-after.png)
 
