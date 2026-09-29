@@ -340,7 +340,13 @@ function createRegistry(doc: Document): Registry {
     const height = win?.innerHeight ?? 0, width = win?.innerWidth ?? 0;
     const onScreen = queued.filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width)
       .sort((a, b) => a.rect.top - b.rect.top).map(({ entry }) => entry);
-    const soon = [...onScreen, ...queued.map(({ entry }) => entry).filter(entry => near.has(entry) && !onScreen.includes(entry))];
+    // Near as the near observer reported, or, before its first report on a
+    // host, as the host's box is now. That report comes in a task after the
+    // next rendering update, and a page's own animation frame can scroll the
+    // host in first: an app shell's pane scrolled in the frame after its
+    // screen mounted painted the block below its fold native and rewrapped it
+    // a frame or two later.
+    const soon = [...onScreen, ...queued.filter(({ entry, rect }) => !onScreen.includes(entry) && (near.has(entry) || !!viewport?.nearBeforeReport(entry.element, rect))).map(({ entry }) => entry)];
     let composed = 0;
     for (const entry of soon) {
       // At least one per frame, so a slow device still makes progress.

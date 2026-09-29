@@ -107,20 +107,35 @@ export function rendered(element: Element): boolean {
 }
 
 /** Watches whether elements are within a viewport height of what shows them. */
-export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
+export interface NearObserver {
+  observe(element: Element): void; unobserve(element: Element): void; disconnect(): void;
+  /** Until the observer first reports on an observed element, whether its
+   * box (read by the caller, before any write) is within a viewport height of
+   * what shows it; false once it has reported, or if it has no box. */
+  nearBeforeReport(element: Element, box: DOMRectReadOnly): boolean;
+}
 /** IntersectionObservers that report an element within a viewport height of
  * what shows it: the window, or the nearest scroll container it scrolls in.
  * An app shell's overflow:auto pane clips its content, and a root margin on
  * the window does not reach past that clip, so text below the fold there
  * was never near until it was on screen. One observer per scrollport, held
  * only while it observes something, so a scroll container a route removed
- * is not kept alive; an element's scrollport is found once. Null without
+ * is not kept alive; an element's scrollport is found once. The first report
+ * on an element comes in a task after the next rendering update, and a
+ * page's own animation frame can scroll the element in before it, so until
+ * then nearBeforeReport answers from the element's box. Null without
  * IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
   const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
   const roots = new WeakMap<Element, Element | null>();
+  // Observed elements not reported on yet.
+  const unreported = new Set<Element>();
+  const reported = (entries: IntersectionObserverEntry[]) => {
+    for (const entry of entries) unreported.delete(entry.target);
+    callback(entries);
+  };
   const scrollport = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
       const cs = view.getComputedStyle(node);
@@ -133,11 +148,13 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
       let root = roots.get(element);
       if (root === undefined) { root = scrollport(element); roots.set(element, root); }
       let entry = observers.get(root);
-      if (!entry) { entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      if (!entry) { entry = { observer: new view.IntersectionObserver(reported, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      if (!entry.targets.has(element)) unreported.add(element);
       entry.observer.observe(element);
       entry.targets.add(element);
     },
     unobserve(element) {
+      unreported.delete(element);
       const root = roots.get(element);
       const entry = root === undefined ? undefined : observers.get(root);
       if (!entry) return;
@@ -146,7 +163,16 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
       // The window's observer stays; a scroll container's goes with its last target.
       if (root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(root); }
     },
-    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); },
+    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); unreported.clear(); },
+    nearBeforeReport(element, box) {
+      if (!unreported.has(element) || !(box.width > 0 && box.height > 0)) return false;
+      // As the observer computes it: the scrollport's box, or the window's,
+      // grown by its own height above and below ('100% 0px').
+      const root = roots.get(element);
+      const port = root ? root.getBoundingClientRect() : { top: 0, bottom: view.innerHeight, left: 0, right: view.innerWidth };
+      const margin = port.bottom - port.top;
+      return box.bottom >= port.top - margin && box.top <= port.bottom + margin && box.right >= port.left && box.left <= port.right;
+    },
   };
 }
 

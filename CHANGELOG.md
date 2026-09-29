@@ -60,6 +60,32 @@ Planned as 4.3.1. Not published.
   block by its style attribute and by a stylesheet from the page's
   `requestAnimationFrame`, failed 4.3.0 in every run there (60 of 60 and
   30 of 30).
+- **A React block just below the fold of a scroll pane no longer paints
+  native lines for a frame when the page scrolls right after mounting.**
+  `TypesetText` and `TypesetRichText` compose the blocks within a viewport
+  height of the screen, or of the scroll container they scroll in, before
+  they come on screen. They learned which blocks those were from an
+  IntersectionObserver, whose first report comes in a task after the next
+  rendering update. A page that scrolled from its own
+  `requestAnimationFrame` in the first frame or two after mounting (an app
+  shell's `overflow:auto` pane, restored or flicked as the screen appears)
+  brought the first block below the fold on screen before that report, and
+  the block painted native lines and was rewrapped a frame later. Until the
+  observer first reports on a block, the adapters now judge its nearness
+  from its box, which they read each frame anyway, as the observer would:
+  against the scroll container's box, or the window's, grown by its height.
+  `verify-scheduler`'s "TypesetText in an overflow:auto scroller, scrolled
+  in 0 ms after mounting" failed with this flash in every WebKit run on
+  GitHub's macos-15 runners (19 of 19, always one frame of block 1), in 2 of
+  6 staged 4.3.0 release-cut runs on the maintainer's M2 Pro in Chromium,
+  and in 4 of 20 Chromium runs of the same page there before this fix.
+  Scrolled from the first frame after mounting, 4.3.0 flashed the block in
+  every run in all three engines (15 of 15). With the fix, none flashed in
+  56 probe runs of that page (scrolled in the first frame or after a 0 ms
+  timer, 8 of them at 4x CPU) or in 11 full `verify-scheduler` runs.
+  Blocks that 4.3.0 composed in the second frame after mounting, once the
+  observer reported them near, may now compose in the first, within the
+  same 12 ms frame budget; what they compose is unchanged.
 
 ### Development
 
@@ -78,6 +104,9 @@ Planned as 4.3.1. Not published.
   attribute and by a stylesheet, from the page's `requestAnimationFrame` in
   the frame after a composition, where WebKit delivers the record after
   layout; Chromium and Firefox deliver it first and pass either way.
+- `verify-scheduler`'s scroll-pane check also scrolls from the frame after
+  mounting, where 4.3.0 painted the block below the fold native in every
+  run in the three engines, and reports which frames flashed.
 
 ## 4.3.0 - 2026-09-26
 
