@@ -192,6 +192,20 @@ installs them itself.
 `typeset.us/auto` (`dist/auto.js`, the typeset.us loader) sets all prose.
 Both log a console note if nothing matches.
 
+**What each install method does by default.** Word spacing and tracking
+apply to composed left-aligned body text; headings are set as titles, which
+balance and never add a line. The copy column is the `copy` option: copying
+composed text gives the source text.
+
+| Install | Sets | Smart quotes | Hanging punctuation | Spacing, tracking | Headings | Copy |
+| --- | --- | --- | --- | --- | --- | --- |
+| Script tag, or `typeset.us/auto` | `p`, `li`, `blockquote`, `figcaption`, `h1` to `h6`, `td`, `th`, `dd`, `dt` | English, in English and untagged text | on | on | yes | on |
+| `typeset.us/go` | `[data-typeset]` | off | off | on | only if marked | on |
+| `mount(root, selector)` | your selector; without one, `[data-typeset]`, `p`, `blockquote`, `figcaption`, `h1` to `h6` | off | off | on | when matched | on |
+| `typeset(element)` | the element given | off | off | on | the element given, as a title inside h1 to h6 | on |
+| `TypesetText` | its own element (`as`) | off | off | on | `as="h1"` to `"h6"` | on |
+| `TypesetRichText` | its own element (`as`) | off; `"en"` needs `lang="en"` on the component | off | on | `as="h1"` to `"h6"` | on |
+
 ## What happened to my paragraph?
 
 Every element Typeset composes or declines gets an outcome in
@@ -262,14 +276,33 @@ Composition runs in the browser, on the main thread.
   change nothing write nothing.
 - Download, gzip: 56.5 KB for `go@4.3.1.js` or `auto.js`; with esbuild,
   Rollup, webpack or Vite, which tree-shake, 50.4 KB for a bundle that
-  imports only `mount` and 50.5 KB for `TypesetText`. A bundler that does
-  not tree-shake, such as Metro (Expo, React Native Web), ships all of
-  `typeset.us/react`: 63.2 KB for `TypesetText` (4.2.0: 43.2 KB). No
-  runtime dependencies.
+  imports only `mount`, 50.5 KB for `TypesetText`, 46.8 KB for
+  `TypesetRichText` and 44.3 KB for `typeset()` alone. The helpers that
+  compose nothing are smaller: 14.5 KB for `analyzeBreaks()` and 1.5 KB for
+  `smartQuotes()`. A bundler that does not tree-shake, such as Metro (Expo,
+  React Native Web), ships all of `typeset.us/react`: 63.2 KB for
+  `TypesetText` (4.2.0: 43.2 KB). No runtime dependencies.
 
-The download sizes are 4.3.1's; the times are 4.3.0 figures from `npm run
-bench`, measured beside 4.2.0 on the same machine. Full tables, the method
-and the comparison:
+To keep the download off the critical path, load the package once the page
+is idle and compose then:
+
+```ts
+const whenIdle = (run: () => void) =>
+  'requestIdleCallback' in window ? requestIdleCallback(run) : setTimeout(run, 1);
+
+whenIdle(async () => {
+  const { mount } = await import('typeset.us');
+  mount(document, 'article p, article h2');
+});
+```
+
+The text paints with the browser's wrapping and rewraps when it is
+composed. This moves the download, not the main-thread work, which is the
+same whenever it runs.
+
+The download sizes are 4.3.1's, minified by esbuild and compressed with
+gzip -9; the times are 4.3.0 figures from `npm run bench`, measured beside
+4.2.0 on the same machine. Full tables, the method and the comparison:
 https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
 
 ## What it won't do
@@ -422,7 +455,8 @@ not detected and have not been tested. See SUPPORT.md.
 **When does it run, and can I defer it?** The script tag runs after the page
 is parsed (`defer`) and waits for web fonts. To start later, load the npm
 package and call `mount()` when you choose, for example after
-`requestIdleCallback`.
+`requestIdleCallback` (the recipe is under
+[What it costs](#what-it-costs)).
 
 ## Stability
 
