@@ -127,6 +127,11 @@ text composes is unchanged.
 
 ### Development
 
+- `verify-package-contents` allows 1.91 MB unpacked instead of 1.9 MB. The
+  fixes above take the package from 1.88 MB (4.3.0) to 1.90 MB (1,902,907
+  bytes, 87 files): the iframe record handling in every copy of `mount()`,
+  the React registry's hold-off rules in both React builds, and the notes
+  on them in SUPPORT.md and MIGRATION.md.
 - The storm check's 60-frame text-size slider is enforced on GitHub's
   hosted runners again. Its speed-calibrated entry, added after 65
   compositions against a limit of 64 in macos-15 run 36284847012, blamed
