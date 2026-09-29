@@ -66,7 +66,7 @@ export default function Privacy() {
           The address you enter is part of your request to typeset.us, so it
           appears in the host&rsquo;s request log. To limit abuse, the server
           keeps each client&rsquo;s IP address and request times in memory for
-          one minute. Audit and Font DNA then show the page with its own
+          one to two minutes after its last request. Audit and Font DNA then show the page with its own
           stylesheets, fonts and images, which your browser loads from wherever
           that page keeps them.
         </p>

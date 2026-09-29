@@ -63,7 +63,11 @@ entries in `scripts/v4/known-failures.json` that were waiting for this cut
 (for example the 4.2.0 `sri.json` keys), so the tagged commit's
 `test:release` does not report them as XPASS.
 
-Review the diff, commit it, push, and wait for CI.
+Review the diff, commit it, and push the release branch with its pull
+request open against `master`: CI runs on pull requests and on `master`,
+not on other branch pushes, and release.yml's "CI passed on the tagged
+commit" accepts the pull request's run for the commit you tag. Wait for it
+to pass.
 
 ## 3. Tag and publish
 
