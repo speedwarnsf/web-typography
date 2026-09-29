@@ -301,6 +301,30 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   are when the text is composed; one set through `ElementInternals`, in a
   closed shadow root, or by a component defined after the text composed
   is not seen in time, so mark that text `data-no-typeset`.
+- **Find-in-page and Text Fragment links across a line end.** Each
+  generated break is a real `<br>`, so find-in-page (Ctrl+F) and Text
+  Fragment links (`#:~:text=`, which Google uses to highlight the passage a
+  search result quotes) miss a phrase that spans one. Measured with
+  `window.find` in each of Chromium, WebKit and Firefox: 43 of 60 five-word
+  phrases found at 375 px, 52 of 60 at 768 px, against 60 of 60 in the same
+  text uncomposed. Single-word searches are unaffected. `innerText` and
+  `selection.toString()` also contain a newline at each break. For
+  documentation and reference pages, where readers search and link to
+  passages, mark the content `data-no-typeset`.
+- **Clean reader views.** Firefox's Reader View, and read-later tools built
+  on its Readability library, keep each generated break inside their own
+  wider column: 35 of 40 test paragraphs composed at 375 px came out as
+  alternating long and short lines (4.2.0: 0). The text is complete. Safari
+  Reader, Chrome's Reading mode and Edge's Immersive Reader have not been
+  measured.
+- **Machine translation without side effects.** While Google Translate,
+  Chrome or Edge translates a page, Typeset removes its breaks, but the
+  translator still receives each composed paragraph as many Text nodes: in
+  a live English to Spanish check, 3 of 9 test paragraphs got a stray space
+  before punctuation ("dijo ,"), in all three engines; uncomposed, none did.
+  `TypesetRichText` keeps its breaks at the source's line positions while
+  translated. Safari's and Firefox's translators are not detected, and
+  composed text has not been tested with them.
 
 ## Browsers
 
@@ -366,9 +390,15 @@ paint is a small layout shift: about half of our test loads at 320 and
 375 px recorded one, at most 0.05, under the 0.1 "good" threshold. `mount()`
 also waits for web fonts before composing.
 
-**Is it bad for SEO?** No. The HTML your server sends is unchanged; Typeset
-only adds line-break elements in the browser, and search engines index the
-same text.
+**Is it bad for SEO?** Not for indexing or ranking. The HTML your server
+sends is unchanged; Typeset only adds line-break elements in the browser, and
+search engines index the same text. It does affect readers who arrive from a
+search: a Text Fragment link (`#:~:text=`), which Google uses to scroll to
+and highlight the passage a result quotes, misses a phrase that spans a
+generated break, and so does find-in-page (43 of 60 five-word phrases found
+at 375 px, 52 of 60 at 768 px). For documentation and reference pages, mark
+the content `data-no-typeset`. See [What it won't do](#what-it-wont-do) for
+reader views and translation.
 
 **Copy and paste?** Copying composed text gives the original text, without
 the generated line breaks, in plain text and HTML, and leaves out hidden
@@ -383,7 +413,8 @@ without touching the text the translator fills, reports
 `native:translated`, and composes again when the page is shown in the
 original language. `TypesetRichText` only pauses. A translation can show a
 stray space before punctuation where composition split a paragraph into
-many Text nodes; no text is lost. See SUPPORT.md.
+many Text nodes; no text is lost. Safari's and Firefox's translators are
+not detected and have not been tested. See SUPPORT.md.
 
 **Without JavaScript?** Readers get your CSS, including the
 `text-wrap: pretty` above.

@@ -448,7 +448,12 @@ changes only an isolated preview, never a deployed site.
   so while text is released a link or heading name there can read two words
   as one where a line wraps at a former break.
   No network smoke test against a live translator runs in the suite; the
-  offline suite simulates each translator's marks.
+  offline suite simulates each translator's marks. Safari's and Firefox's
+  built-in translators are not among those detected, and composed text has
+  not been tested with them. WebKit's text
+  manipulation API, which Safari's translation is believed to use, treats
+  a `<br>` as the end of an item, so a composed paragraph may reach it as
+  one item per line.
 - **Content Security Policy and Trusted Types.** The 4.x composition path
   (`mount`, `typeset`, the loaders and the React adapters) assigns no HTML
   strings, uses no `eval`, injects no `<style>` elements and writes styles
