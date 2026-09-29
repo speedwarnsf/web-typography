@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "output", "tests", "packages/typeset-v4/declarations", "scripts/v4/page-globals.d.ts"]
+  "exclude": ["node_modules", "output", "tests", "packages/typeset-v4/declarations", "packages/typeset-v4/dist", "public/releases", "scripts/v4/page-globals.d.ts"]
 }
