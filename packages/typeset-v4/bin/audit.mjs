@@ -12,7 +12,7 @@ try {
     'optical-hanging': { type: 'boolean', default: false }, timeout: { type: 'string', default: '30' },
   } });
   if (values.help) {
-    console.log('Usage: typeset-audit --url http://localhost:3000 --selector "article p" [--widths 320,390] [--browser chromium|webkit|firefox] [--apply] [--mode body|title] [--smart-quotes] [--optical-hanging] [--timeout 30]\nRead-only by default: it waits for the page\'s own composition to finish (window.TypesetReady from a loader, or every element in scope reporting an outcome), up to --timeout seconds per width. --apply changes only the isolated browser preview. No report is uploaded.\nInstall the optional runner: npm install -D playwright; npx playwright install chromium\nReview items (line ends worth a look, text clipped on purpose with an ellipsis or a line clamp) never fail the gate.\nExit codes: 0 = safety/coverage pass (not aesthetic approval), 1 = failed gate (a failed audit at any width, or any uncaught error or unhandled rejection on the page, listed under "errors"), 2 = invalid invocation/runtime failure.');
+    console.log('Usage: typeset-audit --url http://localhost:3000 --selector "article p" [--widths 320,390] [--browser chromium|webkit|firefox] [--apply] [--mode body|title] [--smart-quotes] [--optical-hanging] [--timeout 30]\nRead-only by default: it waits for the page\'s own composition to finish (window.TypesetReady from a loader, or every element in scope reporting an outcome), up to --timeout seconds per width. --apply changes only the isolated browser preview. No report is uploaded.\nInstall the optional runner: npm install -D playwright; npx playwright install chromium\nReview items (line ends worth a look, text clipped on purpose with an ellipsis or a line clamp, composed text without a lang, nothing in scope composed) never fail the gate; when nothing in scope was composed, one warning line goes to stderr.\nExit codes: 0 = safety/coverage pass (not aesthetic approval), 1 = failed gate (a failed audit at any width, or any uncaught error or unhandled rejection on the page, listed under "errors"), 2 = invalid invocation/runtime failure.');
   } else {
     if (!values.url) throw new Error('--url is required.');
     const target = new URL(values.url);
@@ -88,6 +88,10 @@ try {
     } finally { await browser.close(); }
     const pass = reports.length > 0 && reports.every(report => report.pass) && errors.length === 0;
     console.log(JSON.stringify({ schemaVersion: 1, browser: values.browser, previewApplied: values.apply, pass, reports, errors }, null, 2));
+    // One line on stderr when nothing in scope was composed (review item
+    // "uncomposed"); the exit code does not change.
+    const uncomposed = reports.filter(report => report.issues?.some(issue => issue.type === 'uncomposed'));
+    if (uncomposed.length) console.error('typeset-audit: warning: nothing in scope was composed at ' + uncomposed.map(report => report.width + ' px').join(', ') + '; ' + uncomposed[0].issues.find(issue => issue.type === 'uncomposed').detail);
     if (!pass) process.exitCode = 1;
   }
 } catch (error) {

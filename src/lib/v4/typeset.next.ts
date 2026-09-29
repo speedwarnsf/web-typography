@@ -21,6 +21,7 @@ import { describe } from './validate';
 import { mountOwners, mountWaiters } from './ownership';
 import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
+import { commonest, NOTHING_TO_IMPROVE } from './loader-notes';
 
 export const VERSION = '4.3.1';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
@@ -762,6 +763,10 @@ function lineReview(layout: LayoutMetrics, language: string, english: boolean): 
 
 export function auditReport(selector = defaults): AuditReport {
   const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
+  // For the scope's own review items (4.4): elements with an engine outcome,
+  // how many were composed, and composed ones set without a language.
+  const decided: HTMLElement[] = [], untagged: HTMLElement[] = [];
+  let composedCount = 0;
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
     if (element.closest('[data-ts-generated], [data-ts-probe]')) continue;
     report.examined++;
@@ -820,6 +825,8 @@ export function auditReport(selector = defaults): AuditReport {
     const state = states.get(element);
     const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
     const english = language === 'en' || (language === 'und' && !!state?.english);
+    if (element.dataset.tsOutcome) decided.push(element);
+    if (outcome.startsWith('composed')) { composedCount++; if (language === 'und' && !english) untagged.push(element); }
     const review = lineReview(layout, language, english);
     for (const item of review) add(item.type, 'review', item.detail);
     const current = !!state && state.output === element.textContent;
@@ -840,6 +847,21 @@ export function auditReport(selector = defaults): AuditReport {
     }
     if (!layout.lines.length && (element.textContent || '').trim()) add('unmeasurable', 'review', 'No visible line boxes');
     if (outcome === 'unprocessed') add('unprocessed', 'review', 'No engine decision recorded');
+  }
+  // Composed text that declares no language gets neutral preferences: no
+  // English weak-word or phrase preferences. One item, on the first such element.
+  if (untagged.length) {
+    report.issues.push({ element: untagged[0], type: 'untagged', severity: 'review', detail: untagged.length + ' composed element' + (untagged.length === 1 ? ' declares' : 's declare')
+      + ' no language, so English line-end preferences are off; add lang="en" to <html> if the text is English' });
+  }
+  // Nothing in scope composed, for a reason other than nothing to improve
+  // (a language, markup, jsdom's native:environment): one item, with the
+  // most common reason. 4.3 passed such a page with no word.
+  const declined = decided.filter(element => !NOTHING_TO_IMPROVE.has(element.dataset.tsOutcome!));
+  if (!composedCount && declined.length) {
+    const [outcome, count] = commonest(declined);
+    report.issues.push({ element: declined[0], type: 'uncomposed', severity: 'review', detail: 'None of the ' + decided.length + ' element' + (decided.length === 1 ? '' : 's')
+      + ' with an outcome was composed; most common: ' + outcome + ' \u00d7' + count + ' (OUTCOMES.md says why)' });
   }
   return report;
 }

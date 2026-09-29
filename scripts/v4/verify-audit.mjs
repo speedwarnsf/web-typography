@@ -14,6 +14,8 @@
 //    word (’n’, ’90s) is not line-initial punctuation.
 //  - The JSON shape and schemaVersion stay those of 4.2.0.
 //  - Text clipped on purpose (ellipsis, line clamp) is a review item (4.4).
+//  - Composed text without a lang, and a scope where nothing composed, are
+//    one review item each: untagged and uncomposed (4.4).
 // (regressed-vs-native is checked against every golden cell by verify-golden.)
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
@@ -147,9 +149,40 @@ for (const { name, engine, executablePath } of browsers) {
       const summary = (/** @type {string} */ selector) => { const json = window.Typeset.auditJSON(selector); return { pass: json.pass, errors: json.errors, issues: json.issues.map((/** @type {any} */ issue) => issue.severity + ' ' + issue.type) }; };
       return { ellip: summary('#ellip'), clamp: summary('#clamp'), real: summary('#o1'), detail: window.Typeset.auditJSON('#ellip').issues.map((/** @type {any} */ issue) => issue.detail) };
     });
-    check('an ellipsis clipped on purpose (nowrap, hidden, ellipsis) passes with one clipped review item', clipped.ellip.pass && clipped.ellip.errors === 0 && JSON.stringify(clipped.ellip.issues) === '["review clipped"]', clipped);
+    // (Declined as native:clamped, the lone paragraph is also an uncomposed scope.)
+    check('an ellipsis clipped on purpose (nowrap, hidden, ellipsis) passes with one clipped review item', clipped.ellip.pass && clipped.ellip.errors === 0 && JSON.stringify(clipped.ellip.issues) === '["review clipped","review uncomposed"]', clipped);
     check('a line clamp clipping a long word is a clipped review item, not an overflow error', clipped.clamp.issues.includes('review clipped') && !clipped.clamp.issues.includes('error overflow'), clipped);
     check('overflow without clipping is still an error', clipped.real.issues.includes('error overflow') && !clipped.real.pass, clipped);
+
+    // The scope's own review items (4.4): composed text that declares no
+    // language (English line-end preferences off), and a scope where nothing
+    // was composed for a reason other than nothing to improve. One item each,
+    // never an error; pass does not change. 4.3 said nothing in either case.
+    const scoped = async (/** @type {string} */ lang, /** @type {string} */ body, /** @type {Record<string, unknown>} */ options = {}, /** @type {string | null} */ outcome = null) => {
+      await tab.setContent(page(body, lang).replace(/<html lang="">/, '<html>'));
+      await tab.addScriptTag({ content: subject });
+      return tab.evaluate(({ options, outcome }) => {
+        for (const el of document.querySelectorAll('p')) { if (outcome) /** @type {HTMLElement} */ (el).dataset.tsOutcome = outcome; else window.Typeset.typeset(/** @type {HTMLElement} */ (el), options); }
+        const json = window.Typeset.auditJSON('p');
+        return { pass: json.pass, errors: json.errors, outcomes: json.outcomes, items: json.issues.filter((/** @type {any} */ issue) => ['untagged', 'uncomposed'].includes(issue.type)).map((/** @type {any} */ issue) => ({ type: issue.type, severity: issue.severity, target: issue.target, detail: issue.detail })) };
+      }, { options, outcome });
+    };
+    const two = `<p id="a">${corpus[0]}</p><p id="b">${corpus[1]}</p>`;
+    const untaggedPage = await scoped('', two);
+    check('untagged: composed text with no lang gets one untagged review item, and pass is unchanged', untaggedPage.pass && untaggedPage.items.length === 1 && untaggedPage.items[0].type === 'untagged' && untaggedPage.items[0].severity === 'review'
+      && ['#a', '#b'].includes(untaggedPage.items[0].target) && (untaggedPage.outcomes['composed:rich'] ?? 0) > 0
+      && untaggedPage.items[0].detail.startsWith(`${untaggedPage.outcomes['composed:rich']} composed element`) && /declares? no language/.test(untaggedPage.items[0].detail), untaggedPage);
+    const englishPage = await scoped('en', two);
+    check('untagged: lang="en" composes with no such item', englishPage.pass && englishPage.items.length === 0 && (englishPage.outcomes['composed:rich'] ?? 0) === 2, englishPage);
+    const legacyPage = await scoped('', two, { lineBreaks: 'legacy' });
+    check('untagged: the legacy path, which applies English preferences to untagged text, gets no such item', legacyPage.items.length === 0, legacyPage);
+    const declinedPage = await scoped('ja', two);
+    check('uncomposed: a scope where every block declines gets one uncomposed review item with the commonest reason, and still passes', declinedPage.pass && declinedPage.items.length === 1 && declinedPage.items[0].type === 'uncomposed'
+      && declinedPage.items[0].severity === 'review' && /None of the 2 elements with an outcome was composed; most common: native:language \u00d72/.test(declinedPage.items[0].detail), declinedPage);
+    const fitsPage = await scoped('en', '<p id="s1">A short line.</p><p id="s2">Another one.</p>');
+    check('uncomposed: a scope with nothing to improve (every block fits) gets no such item', fitsPage.items.length === 0 && (fitsPage.outcomes['native:fits'] ?? 0) === 2, fitsPage);
+    const environment = await scoped('en', two, {}, 'native:environment');
+    check('uncomposed: blocks left native:environment (jsdom, happy-dom) get the uncomposed item', environment.items.length === 1 && environment.items[0].type === 'uncomposed' && /native:environment \u00d72/.test(environment.items[0].detail), environment);
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack) }); }
   finally { await browser.close(); }
 }

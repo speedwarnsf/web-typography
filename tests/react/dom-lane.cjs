@@ -60,7 +60,10 @@ console.error = (...args) => { out.consoleErrors.push(args.map(String).join(' ')
     await controller.ready;
     controller.disconnect();
     out.mount = direct.dataset.tsOutcome;
-    out.audit = typeof core.auditJSON().pass;
+    const audit = core.auditJSON();
+    out.audit = typeof audit.pass;
+    // 4.4: nothing composed under the emulation is a review item, not silence.
+    out.auditUncomposed = audit.issues.some(issue => issue.type === 'uncomposed' && issue.severity === 'review' && /native:environment/.test(issue.detail));
     await React.act(async () => { root.unmount(); });
     out.unmounted = document.getElementById('root').children.length === 0;
   } catch (error) {

@@ -101,6 +101,7 @@ for (const major of ['18', '19']) {
       && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'text' && r[1] === 'native:environment') && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'rich' && r[1] === 'native:environment'), { rendered: seen.rendered, results: seen.results });
     check(`${lane}: refs resolve to the host elements`, seen.refs?.text && seen.refs?.rich, seen.refs);
     check(`${lane}: typeset(), mount() and auditJSON() report native:environment and do not throw`, seen.typeset === 'native:environment' && seen.mount === 'native:environment' && seen.audit === 'boolean', seen);
+    check(`${lane}: auditJSON() adds an uncomposed review item naming native:environment (4.4)`, seen.auditUncomposed === true, seen.auditUncomposed);
     check(`${lane}: no console errors`, !seen.consoleErrors.length, seen.consoleErrors.slice(0, 4));
   }
 }

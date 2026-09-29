@@ -62,6 +62,8 @@ const server = http.createServer((req, res) => {
   if (req.url === '/long-loader') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/go.js" data-typeset-selector="article p" defer></script>')); return; }
   if (req.url === '/long-mount') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/typeset.js"></script><script>Typeset.mount(document, "article p");</script>')); return; }
   if (req.url === '/style.css') { res.writeHead(200, { 'content-type': 'text/css' }); res.end(css); return; }
+  // A page whose only prose declines (a language 4.4 still leaves native).
+  if (req.url === '/uncomposed') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!doctype html><html lang="ja"><head><style>${css}</style></head><body><p data-typeset>${corpus[3].replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p><script src="/go.js" defer></script></body></html>`); return; }
   if (req.url === '/ellipsis') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(plain + `<p id="ellip" data-typeset style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${corpus[15].replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p><script src="/go.js" defer></script></body></html>`); return; }
   const managed = req.url?.endsWith('managed') ? '<script src="/go.js" data-typeset-smart-quotes="en" data-typeset-optical-hanging="true" defer></script>' : '';
   if (req.url?.startsWith('/strict')) { res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': STRICT }); res.end(strict + managed + '</body></html>'); return; }
@@ -125,6 +127,23 @@ try {
     const issues = output?.reports?.[0]?.issues ?? [];
     const pass = result.code === 0 && output?.pass === true && issues.some(issue => issue.type === 'clipped' && issue.severity === 'review' && issue.target === '#ellip') && !issues.some(issue => issue.type === 'overflow');
     checks.push({ label: 'a paragraph clipped with an ellipsis is a clipped review item, and the audit passes', pass, exitCode: result.code, ...(pass ? {} : { detail: { issues, stderr: result.stderr.slice(0, 300) } }) });
+  }
+  // Nothing in scope composed: an uncomposed review item and one warning line
+  // on stderr, with the exit code unchanged (4.4; 4.3 said nothing). A page
+  // that composes gets neither.
+  {
+    const result = await invoke(['--url', `${base}/uncomposed`, '--widths', '320,390']);
+    let output = null;
+    try { output = JSON.parse(result.stdout); } catch {}
+    const reports = output?.reports ?? [];
+    const warnings = result.stderr.split('\n').filter(line => line.startsWith('typeset-audit: warning:'));
+    const pass = result.code === 0 && output?.pass === true && reports.length === 2
+      && reports.every((/** @type {{ issues: { type: string, severity: string }[] }} */ r) => r.issues.some(issue => issue.type === 'uncomposed' && issue.severity === 'review'))
+      && warnings.length === 1 && /320 px, 390 px/.test(warnings[0]) && /native:language/.test(warnings[0]);
+    checks.push({ label: 'nothing composed: an uncomposed review item at each width, one warning line on stderr, exit 0', pass, exitCode: result.code, ...(pass ? {} : { detail: { issues: reports.map((/** @type {any} */ r) => r.issues), stderr: result.stderr.slice(0, 400) } }) });
+    const composedPage = await invoke(['--url', `${base}/managed`, '--widths', '320']);
+    const quiet = composedPage.code === 0 && !/typeset-audit: warning/.test(composedPage.stderr) && !composedPage.stdout.includes('"uncomposed"');
+    checks.push({ label: 'a composed page gets no uncomposed item and no warning line', pass: quiet, exitCode: composedPage.code, ...(quiet ? {} : { detail: composedPage.stderr.slice(0, 300) }) });
   }
 } catch (error) {
   errors.push({ error: String(/** @type {Error} */ (error).stack || error) });

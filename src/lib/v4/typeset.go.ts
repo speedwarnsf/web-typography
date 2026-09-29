@@ -1,5 +1,6 @@
 import * as api from './typeset.release';
 import type { Controller } from './typeset.next';
+import { loaderNotes } from './loader-notes';
 declare global { interface Window { Typeset: typeof api; TypesetReady: Promise<Controller> } }
 // A script-tag build; imported where there is no document (server
 // rendering), it does nothing rather than throw.
@@ -18,6 +19,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     // This loader composes only explicit targets. Say so once when there are
     // none, rather than silently doing nothing.
     if (!document.querySelector(selector)) console.info('typeset.us go.js: no element matches ' + requested + ', so nothing was composed. Mark the text to set with data-typeset, pass data-typeset-selector on this script, or use typeset.us/auto (dist/auto.js) to set all prose. New matches are composed as they appear.');
+    else loaderNotes('typeset.us go.js', selector);
     return controller;
   });
 }

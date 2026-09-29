@@ -1,4 +1,5 @@
 import * as api from './typeset.release';
+import { loaderNotes } from './loader-notes';
 
 // The automatic website loader: typeset.us/go@<v>.js and, byte for byte, the
 // npm package's dist/auto.js (typeset.us/auto). The npm /go entry stays scoped.
@@ -27,6 +28,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const controller = api.mount(document, selector, options);
     await controller.ready;
     if (!document.querySelector(selector)) console.info('typeset.us auto loader: no element matches ' + requested + ', so nothing was composed. New matches are composed as they appear.');
+    else loaderNotes('typeset.us auto loader', selector);
     return controller;
   });
 }
