@@ -11,6 +11,9 @@
 //   React adapters during an animation (a screen push): offscreen blocks
 //   compose in idle callbacks, but never in the short idle periods left in
 //   animation frames, where a composition on a slow device drops frames.
+//   Once the browser stops giving idle periods (frames stopped, every idle
+//   callback fires on its timeout), their container resized, they still
+//   catch up within seconds.
 //   An app shell's overflow:auto pane: text below its fold is near when it
 //   is within a viewport height of the pane, so blocks scrolled in soon after
 //   they mount (an entrance animation keeping frames pending) paint composed,
@@ -256,6 +259,59 @@ for (const { name, engine, executablePath } of browsers) {
       await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       check('React adapters: every offscreen block composes after the animation', result.composed === result.hosts, result);
       if (result.idleCallbacks) check('React adapters: no composition in an idle period shorter than 20 ms (the rest of an animation frame)', result.shortIdleCompositions === 0, result);
+      await page.close();
+    }
+    // React adapters once the browser stops giving idle periods. Chromium can
+    // give a page none at all for seconds after its frames stop (a production
+    // site after a stepped window resize: one idle callback, or none, in the
+    // 3.4 s after its frames stopped, where it usually gets 65 to 73), and
+    // every idle callback then fires on its timeout. Here frames run for
+    // 600 ms after the blocks' container narrows, then stop, and so do idle
+    // periods. 4.3.0 and 4.3.1 composed one block per timed-out callback and
+    // waited 1 s for the next, so the offscreen blocks stayed native for
+    // most of a minute (44 of them took 44 s in Chromium). (WebKit has no idle
+    // callbacks: the registry uses a timer there.)
+    if (name !== 'webkit') {
+      const page = await browser.newPage({ viewport: { width: 900, height: 800 } });
+      page.setDefaultTimeout(20000);
+      await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:0;font:17px/1.45 Georgia,serif}#app{width:420px;padding:0 12px}</style></head><body><div id="app"></div></body></html>');
+      await page.evaluate(() => {
+        const w = /** @type {any} */ (window);
+        const request = window.requestIdleCallback.bind(window);
+        w.starve = false; w.timeouts = 0;
+        // Once w.starve is set, every callback fires on its timeout, including
+        // those requested before.
+        window.requestIdleCallback = (callback, options) => {
+          const due = performance.now() + (options?.timeout ?? 1);
+          const timedOut = () => window.setTimeout(() => { w.timeouts++; callback({ didTimeout: true, timeRemaining: () => 0 }); }, Math.max(0, due - performance.now()));
+          return w.starve ? timedOut() : request(deadline => { if (w.starve) timedOut(); else callback(deadline); }, options);
+        };
+      });
+      await page.addScriptTag({ content: reactFixture });
+      const result = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        await document.fonts.ready;
+        w.mountReact();
+        const hosts = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
+        const wait = async (/** @type {() => boolean} */ done, /** @type {number} */ ms) => { const t = performance.now(); while (!done() && performance.now() - t < ms) await new Promise(r => setTimeout(r, 20)); return done(); };
+        await wait(() => hosts.every(el => el.dataset.tsOutcome), 10000);
+        await new Promise(r => setTimeout(r, 300));
+        const stale = () => hosts.filter(el => el.hasAttribute('data-ts-stale'));
+        const offscreen = (/** @type {HTMLElement} */ el) => el.getBoundingClientRect().top > innerHeight;
+        let running = true;
+        const loop = () => { if (running) requestAnimationFrame(loop); };
+        requestAnimationFrame(loop);
+        const t0 = performance.now();
+        /** @type {HTMLElement} */ (document.getElementById('app')).style.width = '380px';
+        await wait(() => stale().length > 0, 2000);
+        await new Promise(r => setTimeout(r, Math.max(0, 600 - (performance.now() - t0))));
+        const staleOffscreen = stale().filter(offscreen).length;
+        running = false; w.starve = true;
+        const t1 = performance.now();
+        const caughtUp = await wait(() => !stale().length, 5000);
+        return { hosts: hosts.length, staleOffscreen, caughtUp, ms: Math.round(performance.now() - t1), stillStale: stale().length, idleTimeouts: w.timeouts };
+      });
+      check('React adapters, frames and then idle periods stopping: every offscreen block left native composes again within 5 s', result.staleOffscreen >= 10 && result.caughtUp, result);
       await page.close();
     }
     // A cold screen push at 4x CPU (a mid-range phone): the document's first
