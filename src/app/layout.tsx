@@ -1,4 +1,3 @@
-import NtfyTracker from '@/components/NtfyTracker';
 import type { Metadata } from "next";
 import {
   Playfair_Display,
@@ -98,7 +97,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" style={{ backgroundColor: '#050505' }}>
       <body className={`${fontVars} antialiased bg-transparent text-neutral-200`} style={{ backgroundColor: 'transparent' }}>
-        <NtfyTracker />
         {/* The new-era chrome: glyph-field texture drawn from the engine's
             own alphabet (replaces the letterpress photo), gold reading
             hairline, and the bloom menu — on every page. */}

@@ -98,16 +98,12 @@ try {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-        // The site's visitor alert (NtfyTracker) posts to ntfy.sh in production
-        // builds. Never let a test send the owner a notification.
-        await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
         for (const route of config.name === 'chromium' ? ROUTES : KEY_ROUTES) {
           const page = await context.newPage();
           page.setDefaultTimeout(20000);
           /** @type {string[]} */
           const problems = [];
-          // The aborted visitor alert surfaces as a fetch error in WebKit; it is not a page defect.
-          page.on('pageerror', error => { if (!/ntfy\.sh/.test(error.message)) problems.push('pageerror: ' + error.message.slice(0, 200)); });
+          page.on('pageerror', error => { problems.push('pageerror: ' + error.message.slice(0, 200)); });
           page.on('console', message => { if (message.type() === 'error' && /Content Security Policy|CSP|Refused to/.test(message.text())) problems.push('console: ' + message.text().slice(0, 200)); });
           await page.addInitScript(() => { document.addEventListener('securitypolicyviolation', e => { (/** @type {any} */ (window).__violations ??= []).push(`${e.violatedDirective} ${e.blockedURI}`); }); });
           try {
@@ -261,7 +257,6 @@ try {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
-        await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
         const page = await context.newPage();
         page.setDefaultTimeout(20000);
         await page.goto(base + '/', { waitUntil: 'load' });
