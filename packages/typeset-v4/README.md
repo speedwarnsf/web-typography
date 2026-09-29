@@ -125,6 +125,7 @@ attributes (last table).
 | `tracking` | `true` | Adjusts letter spacing by at most 0.01em per line after word spacing. |
 | `contour` | `'finished'` | Ranks candidates by their shape after spacing. `'natural'` is the earlier ranking. |
 | `copy` | `true` | Copying composed text gives the source text, without the generated line breaks. `false` leaves copying to the browser, whose copied text then has a line break at every composed line end. |
+| `headings` | `true` | `false` makes `mount()`, `typesetAll()` and the loaders leave h1 to h6 and `role="heading"` untouched, with no outcome written. `typeset()` composes the element it is given. |
 | `text` | | For framework adapters: the current author text. |
 
 In development builds an invalid option value, an unknown option or a
@@ -150,6 +151,7 @@ installs them itself.
 | `data-typeset-spacing` | on | `"false"` turns off word spacing and tracking. |
 | `data-typeset-tracking` | on | `"false"` turns off tracking only. |
 | `data-typeset-copy` | on | `"false"` leaves copying to the browser (the `copy` option). |
+| `data-typeset-headings` | on | `"false"` leaves headings untouched (the `headings` option). |
 
 `typeset.us/go` (`dist/go.js`) sets only elements marked `data-typeset`;
 `typeset.us/auto` (`dist/auto.js`, the typeset.us loader) sets all prose.

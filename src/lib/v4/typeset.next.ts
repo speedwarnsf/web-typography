@@ -79,6 +79,13 @@ export interface Options {
    * clause opener. `'compact'`: one more line only to repair a one-word last
    * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
+  /** Default `true`. `false` makes mount(), typesetAll() and the loaders
+   * (`data-typeset-headings="false"`) leave h1 to h6, `role="heading"` and
+   * anything inside them untouched, with no outcome written: a composed
+   * heading that wraps has a line break inside it, which a screen reader may
+   * read as two items (not yet checked by ear). typeset() composes the
+   * element it is given. */
+  headings?: boolean;
   /** Default `true`: a document copy handler puts the source text on the
    * clipboard, without the generated line breaks (and, for rich text, the
    * markup without engine markers). `false` leaves this element's copying to
@@ -717,8 +724,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
 
 const isElement = (node: unknown): node is HTMLElement => (node as Node | null)?.nodeType === 1;
 
+/** Headings, and anything inside one, that headings: false leaves alone. */
+const headingScope = 'h1, h2, h3, h4, h5, h6, [role="heading" i]';
+const skipped = (el: Element, options: Options) => options.headings === false && !!el.closest(headingScope);
+
 export function typesetAll(selector = defaults, options: Options = {}): Result[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(selector), el => typeset(el, options));
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => !skipped(el, options)).map(el => typeset(el, options));
 }
 
 export interface AuditIssue { element: HTMLElement; type: string; severity: 'error' | 'review'; detail: string }
@@ -933,7 +944,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   if (!canMaintain(doc)) {
     const scope = Array.from(root.querySelectorAll<HTMLElement>(selector));
     if (isElement(root) && root.matches(selector)) scope.unshift(root);
-    for (const el of scope) if (!el.closest(excluded)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    for (const el of scope) if (!el.closest(excluded) && !skipped(el, options)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
     return { ready: Promise.resolve(), refresh() {}, disconnect() {}, stats: { passes: 0, compositions: 0, maxBatchMs: 0, overlappingTargets: 0 } };
   }
   const identity = Symbol('typeset-mount');
@@ -971,7 +982,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
   const within = (el: Node) => el === root || root.contains(el);
-  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !liveText(el);
+  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !skipped(el, options) && !liveText(el);
   const stopWaiting = (el: HTMLElement) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -1012,7 +1023,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (isElement(root) && (scope as Node).contains(root as Node)) scope = root;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
     if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
+    return elements.filter(el => within(el) && !el.closest(excluded) && !skipped(el, options) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
   };
   // Within a viewport height of the window, or of the scroll container a
   // block scrolls in (see nearObserver).

@@ -19,6 +19,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     spacing: script?.dataset.typesetSpacing !== 'false',
     tracking: script?.dataset.typesetTracking !== 'false',
     copy: script?.dataset.typesetCopy !== 'false',
+    headings: script?.dataset.typesetHeadings !== 'false',
   };
   window.Typeset = api;
   window.TypesetReady = new Promise<void>(resolve => {
