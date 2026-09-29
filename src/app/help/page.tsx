@@ -44,7 +44,7 @@ export default function Help() {
           installed:
         </p>
         <div className="in-snippet" data-no-typeset>
-          <pre style={{ margin: 0, flex: 1, overflowX: 'auto' }}><code style={{ whiteSpace: 'pre' }}>{AUDIT}</code></pre>
+          <code style={{ whiteSpace: 'pre' }}>{AUDIT}</code>
         </div>
         <p className="in-fine">
           It is read-only, uploads nothing, and exits 0 on a pass. For a live
