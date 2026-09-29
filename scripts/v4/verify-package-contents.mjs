@@ -105,8 +105,16 @@ try {
   // react.js (+0.9 KB) and both source maps (+2.2 KB each), their
   // declarations (lifecycle.d.ts and .d.cts +1.8 KB each), the marker rules
   // in dist/styles.css (+958 B), and capabilities.json, OUTCOMES.md and
-  // README.md (+2.3 KB together).
-  check('unpacked package is under 1.94 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1940000, packed.unpackedSize);
+  // README.md (+2.3 KB together). E2 took it to 2.01 MB (2,003,354 B, 95
+  // files, +66,903 B over E1): language tags, Greek and Cyrillic letters,
+  // hidden inline text, sup and sub, the en-declared quotes, the audit items
+  // and loader notes, and the coverage and headings options in each engine
+  // bundle (+4.0 to +7.1 KB each) and both source maps (+6.5 and +7.4 KB),
+  // eight new declaration files (coverage, language, loader-notes and
+  // hidden-inline, .d.ts and .d.cts, 7.0 KB), the options' JSDoc in the
+  // other declarations, and capabilities.json, OUTCOMES.md and README.md
+  // (about +4 KB together).
+  check('unpacked package is under 2.01 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2010000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];
