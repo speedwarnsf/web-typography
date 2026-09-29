@@ -9,9 +9,14 @@ problem privately, and what happens next.
 | Version | Supported |
 | --- | --- |
 | 4.3.x | Yes: bug and security fixes |
-| 4.2.x | Security fixes only |
+| 4.2.x | Security fixes only, until 2026-11-26. It also has the screen-reader defect 4.3 fixed (words joined in the accessibility tree); upgrade to 4.3 |
 | 4.0.x, 4.1.x | No. Upgrade to 4.3 |
 | 3.x | No. 3.0.0 to 3.4.0 have a known DOM XSS (see below) |
+
+The 4.x line gets bug and security fixes until at least 2027-09-30,
+whenever 5.0 ships. When a minor release ships, the minor before it gets
+security fixes for 60 days after that release date, then none (4.2.x: 60
+days after 4.3.0 reached npm on 2026-09-27).
 
 Published files are never changed, including vulnerable ones: npm versions,
 `/releases/<version>/` archives and `go@<version>.js` pins keep their bytes
@@ -24,9 +29,10 @@ deprecated yet.
 
 Please do not open a public issue.
 
-- Preferred: GitHub private vulnerability reporting, at
+- Email dyork@typeset.us with "typeset.us security" in the subject.
+- Or use GitHub private vulnerability reporting, when the repository has it
+  switched on:
   https://github.com/speedwarnsf/web-typography/security/advisories/new
-- Or email dyork@typeset.us with "typeset.us security" in the subject.
 
 Include the version (`Typeset.VERSION`, or the loader URL), the browser, and
 the smallest page or steps that show the problem. If the page is public, its
@@ -66,13 +72,14 @@ need a malicious browser extension or a compromised device.
 
 ## How releases are made
 
-Releases are cut by `scripts/release-cut.mjs` and verified in CI. 4.3.0,
-like 4.2.0, was published to npm by the maintainer account from the
-reproducible tarball the cut recorded in the ledger, and the registry's
-integrity is checked against the ledger; it has no npm provenance
-attestation. The tag-triggered `release.yml` workflow publishes with npm
-provenance once npm trusted publishing is configured for the package (see
-`docs/OWNER-ACTIONS.md` in the repository). Every published file is recorded
+Releases are cut by `scripts/release-cut.mjs` and verified in CI. From
+4.3.1, the tag-triggered `release.yml` workflow publishes the tarball the
+cut recorded in the ledger to npm with provenance:
+`npm view typeset.us@4.3.1 dist.attestations` shows its SLSA provenance
+attestation. 4.2.0 and 4.3.0 were published by the maintainer account from
+the reproducible tarball the cut recorded, and the registry's integrity is
+checked against the ledger; they, like 4.0.0 and 4.1.0, have no npm
+provenance attestation. Every published file is recorded
 by hash in https://typeset.us/releases/published.json, and CI fails if any
 of them changes. The package has no runtime dependencies, no install scripts, and no
 network access, storage or telemetry.

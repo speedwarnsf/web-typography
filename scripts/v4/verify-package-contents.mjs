@@ -41,7 +41,7 @@ try {
   // K8: people can find the package on npm and follow its links.
   const KEYWORDS = ['typography', 'line-breaking', 'line-break', 'text-wrap', 'text-wrap-pretty', 'orphans', 'widows', 'rag', 'knuth-plass', 'hanging-punctuation', 'smart-quotes', 'react', 'paragraph'];
   check('keywords cover the terms people search for', KEYWORDS.every(k => pkg.keywords?.includes(k)), { missing: KEYWORDS.filter(k => !pkg.keywords?.includes(k)) });
-  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.', pkg.description);
+  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, tested in Chromium, WebKit and Firefox.', pkg.description);
   check('repository.directory points npm and GitHub at packages/typeset-v4', pkg.repository?.directory === 'packages/typeset-v4' && /github\.com\/speedwarnsf\/web-typography/.test(pkg.repository?.url), pkg.repository);
   check('bugs.url is the issue tracker', pkg.bugs?.url === 'https://github.com/speedwarnsf/web-typography/issues', pkg.bugs);
   check('no engines field that would make Yarn refuse a browser library', !pkg.engines, pkg.engines);
@@ -125,8 +125,13 @@ try {
   // work tracking in index.cjs, react.cjs and the ESM chunk (+1.7 KB each),
   // typeset.global.js (+0.8 KB) and its map (+1.5 KB), settled.d.ts and
   // .d.cts (+0.8 KB each), and capabilities.json's whenSettled, hydration and
-  // entry-point facts (+2.1 KB).
-  check('unpacked package is under 2.03 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2030000, packed.unpackedSize);
+  // entry-point facts (+2.1 KB). The 4.4 adoption docs added 8,046 B on E1
+  // (measured alone): README.md's install warnings (user-generated text,
+  // server-rendered React, lang), its defaults table, idle-load recipe and
+  // find-in-page, reader-view and translation limits (+6,919 B), SUPPORT.md's
+  // run-budget timings and translator notes (+672 B) and SECURITY.md's dated
+  // support window (+455 B).
+  check('unpacked package is under 2.04 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2040000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];

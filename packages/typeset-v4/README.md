@@ -1,7 +1,7 @@
 # typeset.us
 
 Better line breaks for web text: no stranded short words or one-word last
-lines, links and styling intact, verified in Chrome, Safari and Firefox.
+lines, links and styling intact, tested in Chromium, WebKit and Firefox.
 
 ![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.3.1/before-after.png)
 
@@ -23,6 +23,7 @@ Start with CSS. Add Typeset where CSS stops.
 | Links, emphasis and React-rendered text kept exactly as authored | Typeset |
 | A result your CI can check (`auditJSON()`, `npx typeset-audit`) | Typeset |
 | Justified text with hyphenation | Not Typeset: CSS `text-align: justify` with `hyphens: auto`, or a TeX-style justifier |
+| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared English, French, German or Spanish; anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
 
 On the typeset.us homepage demo, across 96 widths from 250 to 345 px, short
 words left hanging at line ends went from 215 to 38 against Chromium's
@@ -45,6 +46,37 @@ English smart quotes and hanging punctuation. The same file is on npm as
 `typeset.us/auto`, so jsDelivr serves it with the same hash:
 `https://cdn.jsdelivr.net/npm/typeset.us@4.3.1/dist/auto.js`.
 Exclude an element and everything in it with `data-no-typeset`.
+
+Declare the page's language: `<html lang="en">`. Typeset keeps "a", "the"
+and "of" off line ends only in text declared English, and applies French,
+German and Spanish preferences the same way. Untagged text is composed with
+neutral preferences, which fix far fewer line ends: on 42 test paragraphs at
+375 px in Chromium, lines ending in a stranded short word went from 59 to 7
+with `lang="en"`, and only to 36 untagged.
+
+**Comments and other user-generated text.** The script tag sets every
+matching element on the page, including comments, reviews and profiles.
+Keep it to text you publish: mark those areas `data-no-typeset`, or give the
+script a narrower selector, such as `data-typeset-selector="article p"`, and
+set `overflow-wrap: break-word` on containers of user-generated text. In 4.3,
+a paragraph with a run of thousands of characters and no break opportunity,
+which prose never has, could freeze a Safari tab for tens of seconds. From
+4.4, a paragraph with more than 500 characters between two break
+opportunities keeps the browser's layout (`native:run-budget`) before
+anything is measured.
+
+**Server-rendered React (Next.js, Gatsby, Remix, Framer, Wix).** If the
+script tag composes text before React hydrates it, React finds markup it did
+not render, reports hydration errors (#418; React 18 also #425 and #423),
+throws the server HTML away and renders the page again in the browser.
+Typeset composes the new text, so the page ends up correct, but the extra
+render costs main-thread time, and error monitors such as Sentry report it.
+In a test page, delaying hydration by 300 ms was enough to cause it. 4.4
+makes the script tag wait for hydration before its first composition on
+pages that carry a server-rendering framework's markers, such as those of
+Next.js and Gatsby. For text React renders, the adapters below, or `mount()`
+called in a `useEffect`, which runs after hydration, avoid the race with any
+version.
 
 **npm, for pages you script yourself:**
 
@@ -88,15 +120,20 @@ horizontal carousel, offscreen blocks count as near and compose in frames,
 and in WebKit some animated carousel cards keep native lines, known
 limitations SUPPORT.md describes). Server-rendered HTML (Next.js,
 Remix) first paints with the browser's own wrapping and is composed after
-hydration, rewrapping without adding a line (see the FAQ on layout shift).
+hydration, so it rewraps after the first paint, and on phones that often
+adds a line (see the FAQ on layout shift).
 `TypesetRichText` children must be text and host elements (`a`, `strong`,
 `em`, `span` and the like): a component child, such as next/link's `<Link>`
 or a router link, keeps the whole paragraph native
 (`native:react-component`, with a console warning in development builds).
-Use `<a>` there, or compose the rendered HTML with `mount()`.
+Use `<a>` there, or compose the rendered HTML with `mount()`: for MDX,
+next/link, router links and i18n `<Trans>` content, the `SetArticle` recipe
+on https://typeset.us/install/frameworks is a client component that calls
+`mount()` on the rendered article after hydration.
 Under jsdom or happy-dom (Jest, Vitest) nothing can be measured, so both
 adapters render the text unchanged, report `native:environment` and never
-throw. Both take the options below as props.
+throw. Both take the options below as props. The adapters are for React DOM
+on the web; React Native's native views are not supported.
 
 Give each piece of text one owner: the adapter, `mount()` or a script tag.
 `mount()` and the loaders keep text that Svelte, Vue, Solid, Lit or React
@@ -158,6 +195,20 @@ installs them itself.
 `typeset.us/go` (`dist/go.js`) sets only elements marked `data-typeset`;
 `typeset.us/auto` (`dist/auto.js`, the typeset.us loader) sets all prose.
 Both log a console note if nothing matches.
+
+**What each install method does by default.** Word spacing and tracking
+apply to composed left-aligned body text; headings are set as titles, which
+balance and never add a line. The copy column is the `copy` option: copying
+composed text gives the source text.
+
+| Install | Sets | Smart quotes | Hanging punctuation | Spacing, tracking | Headings | Copy |
+| --- | --- | --- | --- | --- | --- | --- |
+| Script tag, or `typeset.us/auto` | `p`, `li`, `blockquote`, `figcaption`, `h1` to `h6`, `td`, `th`, `dd`, `dt` | English, in English and untagged text | on | on | yes | on |
+| `typeset.us/go` | `[data-typeset]` | off | off | on | only if marked | on |
+| `mount(root, selector)` | your selector; without one, `[data-typeset]`, `p`, `blockquote`, `figcaption`, `h1` to `h6` | off | off | on | when matched | on |
+| `typeset(element)` | the element given | off | off | on | the element given, as a title inside h1 to h6 | on |
+| `TypesetText` | its own element (`as`) | off | off | on | `as="h1"` to `"h6"` | on |
+| `TypesetRichText` | its own element (`as`) | off; `"en"` needs `lang="en"` on the component | off | on | `as="h1"` to `"h6"` | on |
 
 ## What happened to my paragraph?
 
@@ -229,14 +280,33 @@ Composition runs in the browser, on the main thread.
   change nothing write nothing.
 - Download, gzip: 56.5 KB for `go@4.3.1.js` or `auto.js`; with esbuild,
   Rollup, webpack or Vite, which tree-shake, 50.4 KB for a bundle that
-  imports only `mount` and 50.5 KB for `TypesetText`. A bundler that does
-  not tree-shake, such as Metro (Expo, React Native Web), ships all of
-  `typeset.us/react`: 63.2 KB for `TypesetText` (4.2.0: 43.2 KB). No
-  runtime dependencies.
+  imports only `mount`, 50.5 KB for `TypesetText`, 46.8 KB for
+  `TypesetRichText` and 44.3 KB for `typeset()` alone. The helpers that
+  compose nothing are smaller: 14.5 KB for `analyzeBreaks()` and 1.5 KB for
+  `smartQuotes()`. A bundler that does not tree-shake, such as Metro (Expo,
+  React Native Web), ships all of `typeset.us/react`: 63.2 KB for
+  `TypesetText` (4.2.0: 43.2 KB). No runtime dependencies.
 
-The download sizes are 4.3.1's; the times are 4.3.0 figures from `npm run
-bench`, measured beside 4.2.0 on the same machine. Full tables, the method
-and the comparison:
+To keep the download off the critical path, load the package once the page
+is idle and compose then:
+
+```ts
+const whenIdle = (run: () => void) =>
+  'requestIdleCallback' in window ? requestIdleCallback(run) : setTimeout(run, 1);
+
+whenIdle(async () => {
+  const { mount } = await import('typeset.us');
+  mount(document, 'article p, article h2');
+});
+```
+
+The text paints with the browser's wrapping and rewraps when it is
+composed. This moves the download, not the main-thread work, which is the
+same whenever it runs.
+
+The download sizes are 4.3.1's, minified by esbuild and compressed with
+gzip -9; the times are 4.3.0 figures from `npm run bench`, measured beside
+4.2.0 on the same machine. Full tables, the method and the comparison:
 https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
 
 ## What it won't do
@@ -268,6 +338,30 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   are when the text is composed; one set through `ElementInternals`, in a
   closed shadow root, or by a component defined after the text composed
   is not seen in time, so mark that text `data-no-typeset`.
+- **Find-in-page and Text Fragment links across a line end.** Each
+  generated break is a real `<br>`, so find-in-page (Ctrl+F) and Text
+  Fragment links (`#:~:text=`, which Google uses to highlight the passage a
+  search result quotes) miss a phrase that spans one. Measured with
+  `window.find` in each of Chromium, WebKit and Firefox: 43 of 60 five-word
+  phrases found at 375 px, 52 of 60 at 768 px, against 60 of 60 in the same
+  text uncomposed. Single-word searches are unaffected. `innerText` and
+  `selection.toString()` also contain a newline at each break. For
+  documentation and reference pages, where readers search and link to
+  passages, mark the content `data-no-typeset`.
+- **Clean reader views.** Firefox's Reader View, and read-later tools built
+  on its Readability library, keep each generated break inside their own
+  wider column: 35 of 40 test paragraphs composed at 375 px came out as
+  alternating long and short lines (4.2.0: 0). The text is complete. Safari
+  Reader, Chrome's Reading mode and Edge's Immersive Reader have not been
+  measured.
+- **Machine translation without side effects.** While Google Translate,
+  Chrome or Edge translates a page, Typeset removes its breaks, but the
+  translator still receives each composed paragraph as many Text nodes: in
+  a live English to Spanish check, 3 of 9 test paragraphs got a stray space
+  before punctuation ("dijo ,"), in all three engines; uncomposed, none did.
+  `TypesetRichText` keeps its breaks at the source's line positions while
+  translated. Safari's and Firefox's translators are not detected, and
+  composed text has not been tested with them.
 
 ## Browsers
 
@@ -333,9 +427,15 @@ paint is a small layout shift: about half of our test loads at 320 and
 375 px recorded one, at most 0.05, under the 0.1 "good" threshold. `mount()`
 also waits for web fonts before composing.
 
-**Is it bad for SEO?** No. The HTML your server sends is unchanged; Typeset
-only adds line-break elements in the browser, and search engines index the
-same text.
+**Is it bad for SEO?** Not for indexing or ranking. The HTML your server
+sends is unchanged; Typeset only adds line-break elements in the browser, and
+search engines index the same text. It does affect readers who arrive from a
+search: a Text Fragment link (`#:~:text=`), which Google uses to scroll to
+and highlight the passage a result quotes, misses a phrase that spans a
+generated break, and so does find-in-page (43 of 60 five-word phrases found
+at 375 px, 52 of 60 at 768 px). For documentation and reference pages, mark
+the content `data-no-typeset`. See [What it won't do](#what-it-wont-do) for
+reader views and translation.
 
 **Copy and paste?** Copying composed text gives the original text, without
 the generated line breaks, in plain text and HTML, and leaves out hidden
@@ -350,7 +450,8 @@ without touching the text the translator fills, reports
 `native:translated`, and composes again when the page is shown in the
 original language. `TypesetRichText` only pauses. A translation can show a
 stray space before punctuation where composition split a paragraph into
-many Text nodes; no text is lost. See SUPPORT.md.
+many Text nodes; no text is lost. Safari's and Firefox's translators are
+not detected and have not been tested. See SUPPORT.md.
 
 **Without JavaScript?** Readers get your CSS, including the
 `text-wrap: pretty` above.
@@ -358,7 +459,8 @@ many Text nodes; no text is lost. See SUPPORT.md.
 **When does it run, and can I defer it?** The script tag runs after the page
 is parsed (`defer`) and waits for web fonts. To start later, load the npm
 package and call `mount()` when you choose, for example after
-`requestIdleCallback`.
+`requestIdleCallback` (the recipe is under
+[What it costs](#what-it-costs)).
 
 ## Stability
 
@@ -366,7 +468,10 @@ Semver covers API names, `auditJSON` `schemaVersion`, outcome codes, CLI
 exit codes and default rendering. A minor release changes default rendering
 only to fix a verified defect, and lists each change in the CHANGELOG under
 "Rendering changes". Published files never change. `go.js` is for trying
-Typeset out: it follows 4.x and will never move to 5.0. Details:
+Typeset out: it follows 4.x and will never move to 5.0. 4.x gets bug and
+security fixes until at least 2027-09-30, whenever 5.0 ships, and when a
+minor release ships, the one before it gets security fixes for 60 more
+days. Details:
 https://github.com/speedwarnsf/web-typography/blob/master/STABILITY.md
 
 ## Glossary
