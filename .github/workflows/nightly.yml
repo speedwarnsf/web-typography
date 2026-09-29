@@ -5,7 +5,9 @@ name: Nightly
 # Marionette, runtime budgets, and the ledger's registry cross-check.
 on:
   schedule:
-    - cron: '17 9 * * *'
+    # Weekly (Mondays): it re-runs the committed release artifacts, which
+    # change only when a release is cut.
+    - cron: '17 9 * * 1'
   workflow_dispatch:
 
 # Least privilege: CI reads the repository and uploads artifacts, nothing else.
