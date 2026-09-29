@@ -2,9 +2,9 @@
 
 4.4.0 follows 4.3. It is a minor release: no public API was renamed or
 removed, and nothing new is required. It guards against a freeze that
-user-generated text could cause, reads more `lang` spellings, composes more
-languages and inline markup, curls quotes only where they can be quotation
-marks, waits for a server-rendered page to hydrate before composing it, and
+user-generated text could cause, reads more `lang` spellings, can compose
+more languages and inline markup if you opt in (`coverage: 'extended'`),
+curls quotes only where they can be quotation marks, waits for a server-rendered page to hydrate before composing it, and
 adds `whenSettled()` for visual tests. It also carries 4.3.2's fix for
 off-screen React blocks. Each change to default rendering is listed under
 "Rendering changes" in the CHANGELOG with the number of test paragraphs it
@@ -36,17 +36,18 @@ directly.
    asks. Under every value, a double quote with white space or the text's
    edge on both sides (French spaced quotes), or with no open quotation to
    close (`width="100"`), now stays straight.
-4. **Coverage.** The default, `coverage: 'extended'`, also composes
-   paragraphs 4.3.1 left native: text declared in any Latin-script language
-   (pt, it, nl, pl, sv, tr, vi and so on, with neutral line-end preferences,
-   as for untagged text), a paragraph with a descendant in another
-   Latin-script language (`<span lang="es">`), `time`, `dfn`, `kbd` and
-   `ins`, `sup` and `sub` (also `vertical-align: super` and `sub`),
-   visually hidden text (the sr-only pattern) and `aria-hidden` elements
-   with no width. A paragraph 4.3.1 composed is not changed by coverage. To
-   keep 4.3.1's coverage, set `coverage: 'core'`, `data-typeset-coverage="core"`
-   on the script tag, or `coverage="core"` on the React adapters. Under both
-   values, `lang` spellings such as `en_US`, `en_US.UTF-8` and `english` are
+4. **Coverage.** Nothing to do to keep 4.3.1's coverage: the default,
+   `coverage: 'core'`, composes what 4.3.1 composed. The new value
+   `'extended'` opts in to composing paragraphs 4.3.1 left native: text
+   declared in any Latin-script language (pt, it, nl, pl, sv, tr, vi and so
+   on, with neutral line-end preferences, as for untagged text), a paragraph
+   with a descendant in another Latin-script language (`<span lang="es">`),
+   `time`, `dfn`, `kbd` and `ins`, `sup` and `sub` (also
+   `vertical-align: super` and `sub`), visually hidden text (the sr-only
+   pattern) and `aria-hidden` elements with no width. Set
+   `coverage: 'extended'`, `data-typeset-coverage="extended"` on the script
+   tag, or `coverage="extended"` on the React adapters. A paragraph 4.3.1
+   composed is not changed by either value. Under both values, `lang` spellings such as `en_US`, `en_US.UTF-8` and `english` are
    read as the language they name, and up to three Greek or Cyrillic letters
    in a row inside Latin text ("5 μg", "α-synuclein") no longer leave the
    paragraph native. Languages written in other scripts (Arabic, Hebrew,

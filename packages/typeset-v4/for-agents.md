@@ -20,13 +20,14 @@ line to repair a stranded sentence/clause opener. Explicit compact density
 and maxLines constraints remain respected.
 Languages depend on the coverage option. Line-end preferences exist for
 en, fr, de and es only; untagged text gets neutral preferences; no language
-is inferred. With coverage: 'extended' (the default), text declared in any
-other Latin-script language (pt, it, nl, pl, sv, tr, vi, ...) composes with
-neutral preferences, and a descendant in another Latin-script language
-(<span lang="es"> in English text) is set with the block's preferences.
-With coverage: 'core' (data-typeset-coverage="core", the coverage prop),
-only en, fr, de, es and untagged text compose, and any descendant in a
-different language leaves the block native:mixed-language, as in 4.3.1.
+is inferred. With coverage: 'core' (the default), only en, fr, de, es and
+untagged text compose, and any descendant in a different language leaves
+the block native:mixed-language, as in 4.3.1. With coverage: 'extended'
+(opt-in: data-typeset-coverage="extended", the coverage prop), text
+declared in any other Latin-script language (pt, it, nl, pl, sv, tr, vi,
+...) composes with neutral preferences, and a descendant in another
+Latin-script language (<span lang="es"> in English text) is set with the
+block's preferences.
 Under both: lang spellings such as en_US, en_US.UTF-8 and english read as
 the language they name; up to three Greek or Cyrillic letters in a row in
 Latin text (5 μg, α-synuclein) compose; languages in other scripts (ar, he,
@@ -34,7 +35,8 @@ ja, zh, ko, th, hi, el, Cyrillic sr) and a block with a phrase in one stay
 native (native:language, native:mixed-language, native:script).
 coverage: 'extended' also composes time, dfn, kbd, ins, sup, sub
 (vertical-align super/sub, measured in place), visually hidden sr-only text
-and zero-width aria-hidden elements; 'core' leaves blocks with them native.
+and zero-width aria-hidden elements; 'core', the default, leaves blocks with
+them native.
 Unsupported: automatic hyphenation; soft hyphens;
 RTL and vertical text; editable text; inline widgets; br, img, svg, q, bdi,
 visible aria-hidden icons and ::after link icons inside a block; unsupported

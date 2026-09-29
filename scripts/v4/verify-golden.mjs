@@ -29,10 +29,12 @@
 // identical to that release unless its case names the outcome this build
 // must report (expect) or a change this build makes (coverageChanges below);
 // report.counts.<engine> coverage says how many cells each build composed.
-// --subject-options '{"coverage":"core"}' composes every cell of the build
-// under test with those options; the coverage additions (class C cases) must
-// then equal 4.3.1 too, and the coverage corpus is composed once more with
-// the build's defaults (report.counts.<engine> coverage-default).
+// The coverage additions (class C cases) are changes only in a pass composed
+// with coverage: 'extended'; under 'core', the default (COVERAGE_DEFAULT in
+// src/lib/v4/coverage.ts), they must equal 4.3.1 too.
+// --subject-options '{"coverage":"extended"}' composes every cell of the
+// build under test with those options, and the coverage corpus once more
+// with the build's defaults (report.counts.<engine> coverage-default).
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { browsers } from './browsers.mjs';
@@ -47,8 +49,9 @@ const { values } = parseArgs({ options: {
   'coverage-baseline': { type: 'string', default: 'public/releases/4.3.1/typeset.global.js' },
   dump: { type: 'string' },
   // Options merged into every cell's options for the build under test only,
-  // e.g. '{"coverage":"core"}': with it, coverage additions (class C cases)
-  // must leave the coverage corpus as the coverage baseline had it.
+  // e.g. '{"coverage":"extended"}': with it, coverage additions (class C
+  // cases) may change the coverage corpus; under 'core' they must leave it as
+  // the coverage baseline had it.
   'subject-options': { type: 'string' },
   // Sweep bind weights (typeset.ts bindWeights), e.g. '{"pair":1.5}'. Release
   // builds compile the override out, so the subject is then a research build
@@ -75,7 +78,11 @@ const subject = values.bind
 const stride = Math.max(1, Number(values.stride) || 1);
 /** @type {Record<string, unknown>} */
 const subjectOptions = values['subject-options'] ? JSON.parse(values['subject-options']) : {};
-const coreRun = subjectOptions.coverage === 'core';
+/** The engine's default coverage, which the coverage-default pass and a run
+ * without a coverage subject option compose with. */
+const coverageDefault = /COVERAGE_DEFAULT: Coverage = '(\w+)'/.exec(await readFile('src/lib/v4/coverage.ts', 'utf8'))?.[1] ?? 'core';
+/** The coverage a pass over the coverage corpus composes with. @param {string} variant */
+const passCoverage = variant => variant === 'coverage-default' ? coverageDefault : String(subjectOptions.coverage ?? coverageDefault);
 const report = { ...await releaseIdentity(), baseline: values.baseline, coverageBaseline: values['coverage-baseline'], subjectOptions, baselineVersions: /** @type {Record<string, string>} */ ({}), stride, checks: /** @type {any[]} */ ([]), errors: /** @type {any[]} */ ([]), browsers: /** @type {Record<string, string>} */ ({}), counts: /** @type {Record<string, any>} */ ({}), changed: /** @type {any[]} */ ([]) };
 
 const texts = corpus.filter((/** @type {string} */ _, /** @type {number} */ i) => i % stride === 0);
@@ -125,8 +132,9 @@ for (const { id, text } of adversarial) for (const width of widths) for (const f
 // Coverage cells are composed at every width and font, like the corpus, with
 // the case's options, lang and style. A run with --subject-options composes
 // them a second time with the build's defaults (the coverage-default
-// variant), so one run with '{"coverage":"core"}' shows both that 'core'
-// leaves the coverage additions as 4.3.1 had them and what the default adds.
+// variant), so one run with '{"coverage":"extended"}' shows both what
+// 'extended' adds and that the default leaves the coverage additions as
+// 4.3.1 had them.
 for (const variant of Object.keys(subjectOptions).length ? ['coverage', 'coverage-default'] : ['coverage']) {
   for (const item of coverage) for (const width of widths) for (const font of fonts) {
     cells.push({ id: `${variant} ${item.id}@${width}/${font}`, variant, tag: 'p', html: item.html, width, font, options: item.options ?? {},
@@ -138,9 +146,9 @@ const isCoverage = (/** @type {string} */ variant) => variant === 'coverage' || 
 /**
  * Coverage cases this build changes on purpose, by case id, with the change.
  * A cell whose case names an `expect` outcome is checked against it instead.
- * Every other coverage cell must be identical to the coverage baseline. With
- * --subject-options '{"coverage":"core"}' the coverage additions (class C
- * cases) are not changes this build makes: they too must be identical.
+ * Every other coverage cell must be identical to the coverage baseline. In a
+ * pass composed with coverage: 'core' the coverage additions (class C cases)
+ * are not changes this build makes: they too must be identical.
  * @type {Record<string, string>}
  */
 const coverageChanges = {
@@ -361,7 +369,7 @@ const tradeOffs = {
   // composes as English does. At 320 px in Georgia its layout ends lines on
   // "was" and "and" where native ended one on "the".
   'script-delta@320/Georgia': 'two weak line ends for one in newly composed English (ΔG, 4.4)',
-  // With the default coverage a footnote sup no longer keeps the paragraph
+  // With coverage: 'extended' a footnote sup no longer keeps the paragraph
   // native. At 240 px its lines are those of the same paragraph without the
   // sup (lang-en_US@240/Georgia, which 4.3.1 sets the same way as en-US).
   'inline-sup-footnote@240/Georgia': 'English composition as 4.3.1 sets the paragraph without the footnote (4.4 coverage)',
@@ -423,7 +431,7 @@ const differs = (c, b) => c.outcome !== b.outcome || neutral(c.moved) !== neutra
 const styleMovedOnly = (c, b) => !differs(c, b) && neutral(c.markup) !== neutral(b.markup);
 const total = (/** @type {Record<string, number>} */ counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
 /** A coverage cell this build changes on purpose. @param {Cell} cell */
-const coverageChanged = cell => !!cell.expect || (!!cell.case && cell.case in coverageChanges && !(coreRun && cell.class === 'C' && cell.variant === 'coverage'));
+const coverageChanged = cell => !!cell.expect || (!!cell.case && cell.case in coverageChanges && !(cell.class === 'C' && passCoverage(cell.variant) === 'core'));
 for (const { name, base, cand } of runs) {
   const variants = [...new Set(cells.map(cell => cell.variant))].filter(variant => !isCoverage(variant));
   for (const variant of variants) {
@@ -485,6 +493,9 @@ for (const { name, base, cand } of runs) {
   // The trade-offs are against 4.2.0: against a later baseline they are not
   // changes at all.
   if (/^4\.2\./.test(report.baselineVersions[name] ?? '')) for (const key of Object.keys(tradeOffs)) {
+    // A trade-off in a coverage addition occurs only in a pass with
+    // coverage: 'extended'.
+    if (cells.some(cell => cell.class === 'C' && cell.id.endsWith(' ' + key)) && !cells.some(cell => cell.id.endsWith(' ' + key) && isCoverage(cell.variant) && passCoverage(cell.variant) === 'extended')) continue;
     const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (attributeNeutral(c.moved) !== attributeNeutral(base[i].moved) || c.outcome !== base[i].outcome));
     check(name, `recorded trade-off still occurs: ${key}`, occurs);
   }

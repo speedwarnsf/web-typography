@@ -14,8 +14,8 @@
 //             heading names. Optional (--firefox, or TYPESET_AX_FIREFOX=1),
 //             run in the nightly lane.
 // Fixtures: the acceptance page, the promise corpus with links, emphasis and
-// headings, TypesetText/TypesetRichText blocks, and the markup 4.4 newly
-// composes (sup, sub, time, dfn, kbd, ins, visually hidden link text, a
+// headings, TypesetText/TypesetRichText blocks, and the markup 4.4 composes
+// with coverage: 'extended' (sup, sub, time, dfn, kbd, ins, visually hidden link text, a
 // Spanish phrase, Greek letters), at 320, 375 and 768 px. The coverage
 // blocks' words are compared with the Chromium tree's words before
 // composition, which joins words at visually hidden text natively too.
@@ -96,9 +96,11 @@ function corpusHTML() {
 <script src="/typeset.js"></script><script>window.composeAll=()=>{const c=Typeset.mount(document,'main p, main h2',{smartQuotes:'en'});return c.ready;};</script></body></html>`;
 }
 
-/** Markup 4.4 composes by default (coverage: 'extended') that 4.3 left
+/** Markup 4.4 composes with coverage: 'extended' (opt-in) that 4.3 left
  * native: sup and sub, time, dfn, kbd, ins, visually hidden link text, a
- * phrase in another language, and Greek letters in English. */
+ * phrase in another language, and Greek letters in English (which compose
+ * under the default too). The fixture passes coverage: 'extended'; 4.2.0,
+ * the negative control, ignores the option. */
 function coverageHTML() {
   const sr = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0';
   const blocks = [
@@ -113,7 +115,7 @@ function coverageHTML() {
     'The usual starting dose is 5 μg/mL, given once a day with food, and the pharmacist will check the label with you before the first dose.',
   ];
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia;color:#111}p{margin:0 0 14px;text-wrap:wrap}</style></head><body><main>${blocks.map((html, i) => `<p id="v${i}">${html}</p>`).join('')}</main>
-<script src="/typeset.js"></script><script>window.composeAll=()=>{const c=Typeset.mount(document,'main p');return c.ready;};</script></body></html>`;
+<script src="/typeset.js"></script><script>window.composeAll=()=>{const c=Typeset.mount(document,'main p',{coverage:'extended'});return c.ready;};</script></body></html>`;
 }
 
 const acceptance = await acceptanceFixture();

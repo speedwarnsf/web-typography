@@ -13,8 +13,9 @@ auditJSON reports errors, reviews, coverage, native retention and feature
 outcomes; every outcome is explained in
 https://typeset.us/releases/4.4.0/OUTCOMES.md. A passing safety audit is not
 a claim of perfect aesthetics. Line-end preferences: en/fr/de/es; untagged
-text and other Latin-script languages have neutral preferences (coverage:
-'core' keeps the latter native). No hyphenation, justification or RTL.
+text has neutral preferences, and so do other Latin-script languages with
+coverage: 'extended' (opt-in; the default keeps them native). No
+hyphenation, justification or RTL.
 
 ## Docs
 

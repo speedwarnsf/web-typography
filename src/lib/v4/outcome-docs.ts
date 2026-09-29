@@ -9,9 +9,15 @@ import type { Outcome, FEATURE_STATUSES } from './outcomes';
 import { COVERAGE_DEFAULT } from './coverage';
 
 /** How rows name extended coverage. It follows COVERAGE_DEFAULT, so if that
- * default changes (decision O1 for 4.4.0), npm run docs:outcomes regenerates
+ * default changes, npm run docs:outcomes regenerates
  * OUTCOMES.md without editing these rows. */
 const EXTENDED = COVERAGE_DEFAULT === 'extended' ? "with coverage: 'extended' (the default)" : "with coverage: 'extended'";
+const LANGUAGE = COVERAGE_DEFAULT === 'core'
+  ? "The declared language is not English, French, German or Spanish (with lineBreaks: legacy, not English). With coverage: 'extended', only a language written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic) is left native. A lang such as en_US, en_US.UTF-8 or english is read as the language it names."
+  : "The declared language is written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic). With coverage: 'core', also any language but English, French, German and Spanish; with lineBreaks: legacy, any language but English. A lang such as en_US, en_US.UTF-8 or english is read as the language it names.";
+const MIXED_LANGUAGE = COVERAGE_DEFAULT === 'core'
+  ? "Part of the block declares a different language (a Spanish phrase in English), or, with coverage: 'extended', a language written in another script (a Japanese phrase in English)."
+  : "Part of the block declares a language written in another script (a Japanese phrase in English), or, with coverage: 'core', any different language.";
 
 export type OutcomeGroup = 'composed' | 'nothing to improve' | 'unsupported content' | "couldn't improve safely" | 'not processed';
 export interface OutcomeRow {
@@ -41,8 +47,8 @@ export const OUTCOME_DOCS = {
   'native:sentence-aligned': { group: 'nothing to improve', expected: true, meaning: "The browser's lines already end at sentence or clause boundaries, so they were kept.", action: 'None.' },
   'native:paragraph-rhythm': { group: 'nothing to improve', expected: true, meaning: "The browser's rag was as good as the best candidate, so it was kept.", action: "None. density: 'editorial' lets Typeset use one more line for phrasing." },
 
-  'native:language': { group: 'unsupported content', expected: true, meaning: 'The declared language is written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic). With coverage: \'core\', also any language but English, French, German and Spanish; with lineBreaks: legacy, any language but English. A lang such as en_US, en_US.UTF-8 or english is read as the language it names.', action: 'None; set lang correctly. Other scripts are left to the browser.' },
-  'native:mixed-language': { group: 'unsupported content', expected: true, meaning: 'Part of the block declares a language written in another script (a Japanese phrase in English), or, with coverage: \'core\', any different language.', action: 'None, or split the block by language.' },
+  'native:language': { group: 'unsupported content', expected: true, meaning: LANGUAGE, action: COVERAGE_DEFAULT === 'core' ? 'None; set lang correctly. coverage: \'extended\' composes other Latin-script languages; other scripts are left to the browser.' : 'None; set lang correctly. Other scripts are left to the browser.' },
+  'native:mixed-language': { group: 'unsupported content', expected: true, meaning: MIXED_LANGUAGE, action: 'None, or split the block by language.' },
   'native:script': { group: 'unsupported content', expected: true, meaning: 'The text contains non-Latin script or bidirectional controls. Greek and Cyrillic letters in runs of up to three inside Latin text (5 μg, α-synuclein, ΔG) are allowed.', action: 'None. Typeset composes Latin-script text only.' },
   'native:direction': { group: 'unsupported content', expected: true, meaning: 'The element is right-to-left or vertical.', action: 'None. RTL and vertical text are not supported.' },
   'native:transformed': { group: 'unsupported content', expected: true, meaning: 'The element or an ancestor is scaled, rotated, skewed or zoomed, so measured widths would not match what is drawn. A composition made before an ancestor transform is kept (lines do not move); this outcome is for text first composed while one applied.', action: 'None while it animates: mount() and the React adapters compose the text when the transition or animation ends. For a lasting transform, remove it or leave the text native.' },

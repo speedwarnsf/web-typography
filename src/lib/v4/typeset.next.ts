@@ -81,12 +81,12 @@ export interface Options {
    * clause opener. `'compact'`: one more line only to repair a one-word last
    * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
-  /** Default `'extended'`. What composes beyond what 4.3 composed:
-   * `'extended'` also composes text declared in any Latin-script language
+  /** Default `'core'`, which composes what 4.3.1 composed. `'extended'`
+   * opts in to composing more: text declared in any Latin-script language
    * (neutral line-end preferences, as for untagged text), paragraphs with a
    * descendant declared in another Latin-script language, `time`, `dfn`,
-   * `kbd`, `ins`, visually hidden text, and `sup` and `sub`. `'core'` leaves
-   * those native, as 4.3.1 did. Also `data-typeset-coverage`. */
+   * `kbd`, `ins`, visually hidden text, and `sup` and `sub`, which `'core'`
+   * leaves native. Also `data-typeset-coverage`. */
   coverage?: Coverage;
   /** Default `true`. `false` makes mount(), typesetAll() and the loaders
    * (`data-typeset-headings="false"`) leave h1 to h6, `role="heading"` and

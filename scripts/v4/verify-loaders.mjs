@@ -129,12 +129,13 @@ for (const config of browsers) {
       const english = await load(browser, `<html lang="en"><style>body{width:340px;font:19px/1.5 Georgia}</style><p>"Hello," she said, and the nurse at the front desk looked up from the schedule to ask whether she had an appointment.</p></html>`, auto);
       check('auto.js curls quotes in declared English by default', english.state.find(el => el.tag === 'P')?.text?.startsWith('\u201cHello,\u201d she said'), english.state.find(el => el.tag === 'P'));
       await english.page.close();
-      // Coverage (4.4): a Portuguese page composes; data-typeset-coverage="core" leaves it native as 4.3.1 did.
+      // Coverage (4.4): a Portuguese page stays native as 4.3.1 left it, by
+      // default and with data-typeset-coverage="core"; "extended" composes it.
       const PORTUGUESE = '<html lang="pt"><style>body{width:340px;font:19px/1.5 Georgia}</style><p>A clínica oferece testes gratuitos aos sábados, e os resultados chegam por mensagem de texto em até dois dias. Traga um documento com foto e chegue alguns minutos antes da consulta.</p></html>';
-      const extended = await load(browser, PORTUGUESE, auto), core = await load(browser, PORTUGUESE, auto, { typesetCoverage: 'core' });
+      const byDefault = await load(browser, PORTUGUESE, auto), extended = await load(browser, PORTUGUESE, auto, { typesetCoverage: 'extended' }), core = await load(browser, PORTUGUESE, auto, { typesetCoverage: 'core' });
       const ptOutcome = (/** @type {{ state: { tag: string, outcome: string | null }[] }} */ run) => run.state.find(el => el.tag === 'P')?.outcome;
-      check('auto.js composes a lang="pt" paragraph by default and leaves it native:language with data-typeset-coverage="core"', /^composed/.test(String(ptOutcome(extended))) && ptOutcome(core) === 'native:language', { extended: ptOutcome(extended), core: ptOutcome(core) });
-      await extended.page.close(); await core.page.close();
+      check('auto.js leaves a lang="pt" paragraph native:language by default and with data-typeset-coverage="core", and composes it with data-typeset-coverage="extended"', ptOutcome(byDefault) === 'native:language' && ptOutcome(core) === 'native:language' && /^composed/.test(String(ptOutcome(extended))), { default: ptOutcome(byDefault), extended: ptOutcome(extended), core: ptOutcome(core) });
+      await byDefault.page.close(); await extended.page.close(); await core.page.close();
       // Headings (4.4): data-typeset-headings="false" leaves every heading
       // exactly as authored, with no outcome; paragraphs still compose.
       const withHeadings = await load(browser, PROSE, auto), noHeadings = await load(browser, PROSE, auto, { typesetHeadings: 'false' });

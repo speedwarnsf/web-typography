@@ -23,7 +23,7 @@ Start with CSS. Add Typeset where CSS stops.
 | Links, emphasis and React-rendered text kept exactly as authored | Typeset |
 | A result your CI can check (`auditJSON()`, `npx typeset-audit`) | Typeset |
 | Justified text with hyphenation | Not Typeset: CSS `text-align: justify` with `hyphens: auto`, or a TeX-style justifier |
-| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared in a Latin-script language (with line-end preferences for English, French, German and Spanish); anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
+| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared English, French, German or Spanish (with `coverage: 'extended'`, any Latin-script language, with neutral line-end preferences); anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
 
 On the typeset.us homepage demo, across 96 widths from 250 to 345 px, short
 words left hanging at line ends went from 215 to 38 against Chromium's
@@ -161,9 +161,7 @@ renders is best set with the adapters. For Vue, Svelte, Astro and plain
 HTML, see https://typeset.us/install/frameworks.
 
 `-E` saves the exact version. A minor release changes default rendering only
-to fix a verified defect, or, as 4.4 does with `coverage: 'extended'`, to
-compose paragraphs the previous minor left native, which `coverage: 'core'`
-turns off (see [Stability](#stability)).
+to fix a verified defect (see [Stability](#stability)).
 
 ## Options
 
@@ -183,7 +181,7 @@ attributes (last table).
 | `tracking` | `true` | Adjusts letter spacing by at most 0.01em per line after word spacing. |
 | `contour` | `'finished'` | Ranks candidates by their shape after spacing. `'natural'` is the earlier ranking. |
 | `copy` | `true` | Copying composed text gives the source text, without the generated line breaks. `false` leaves copying to the browser, whose copied text then has a line break at every composed line end. |
-| `coverage` | `'extended'` | Also composes what 4.3 left native: text declared in any Latin-script language (neutral line-end preferences, as for untagged text), a descendant in another Latin-script language, `time`, `dfn`, `kbd`, `ins`, visually hidden text, `sup` and `sub`. `'core'` leaves those native, as 4.3.1 did. |
+| `coverage` | `'core'` | Composes what 4.3.1 composed. `'extended'` opts in to composing what 4.3 left native: text declared in any Latin-script language (neutral line-end preferences, as for untagged text), a descendant in another Latin-script language, `time`, `dfn`, `kbd`, `ins`, visually hidden text, `sup` and `sub`. |
 | `headings` | `true` | `false` makes `mount()`, `typesetAll()` and the loaders leave h1 to h6 and `role="heading"` untouched, with no outcome written. `typeset()` composes the element it is given. |
 | `text` | | For framework adapters: the current author text. |
 
@@ -211,7 +209,7 @@ installs them itself.
 | `data-typeset-tracking` | on | `"false"` turns off tracking only. |
 | `data-typeset-copy` | on | `"false"` leaves copying to the browser (the `copy` option). |
 | `data-typeset-headings` | on | `"false"` leaves headings untouched (the `headings` option). |
-| `data-typeset-coverage` | the `coverage` default | `"core"` leaves native what 4.3.1 left native; `"extended"` composes the additions (the `coverage` option). |
+| `data-typeset-coverage` | `"core"` | `"extended"` also composes what 4.3.1 left native: other Latin-script languages and more inline markup (the `coverage` option). |
 | `data-typeset-defer` | waits for hydration where it finds a server-rendering framework's markers | `"hydration"` waits even without markers; `"none"` composes at DOMContentLoaded, as 4.3 did. |
 
 `typeset.us/opt-in` (`dist/go.js`; `typeset.us/go` is the same file, kept
@@ -391,9 +389,9 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
   and other scripts keep the browser's layout (`native:script`,
   `native:direction`).
 - **Line-end preferences beyond English, French, German and Spanish.**
-  Text declared in another Latin-script language is composed with neutral
-  preferences, as untagged text is (`coverage: 'core'` keeps it native, as
-  4.3 did); other declared languages keep the browser's layout.
+  Other declared languages keep the browser's layout. With
+  `coverage: 'extended'`, text declared in another Latin-script language is
+  composed with neutral preferences, as untagged text is.
 - **Editable text and live regions.** Editable content keeps the browser's
   layout, and so does text inside an `aria-live` region or a `status`,
   `alert`, `log`, `marquee` or `timer` role, or text that contains one, such
@@ -531,11 +529,8 @@ package and call `mount()` when you choose, for example after
 
 Semver covers API names, `auditJSON` `schemaVersion`, outcome codes, CLI
 exit codes and default rendering. A minor release changes default rendering
-only to fix a verified defect, or to compose paragraphs the previous minor
-left native (as 4.4 does with `coverage: 'extended'`; `coverage: 'core'`
-turns that off, and no paragraph the previous minor composed changes), and
-lists each change in the CHANGELOG under "Rendering changes". Published
-files never change. `go.js` is for trying
+only to fix a verified defect, and lists each change in the CHANGELOG under
+"Rendering changes". Published files never change. `go.js` is for trying
 Typeset out: it follows 4.x and will never move to 5.0. 4.x gets bug and
 security fixes until at least 2027-09-30, whenever 5.0 ships, and when a
 minor release ships, the one before it gets security fixes for 60 more

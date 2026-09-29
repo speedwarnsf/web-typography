@@ -8,13 +8,13 @@ in the repository. What changed from 4.3: MIGRATION.md.
 
 - Horizontal LTR Latin prose/titles. Line-end preferences for declared
   English, French, German and Spanish; untagged Latin uses neutral
-  preferences, and no language is inferred. With `coverage: 'extended'`
-  (the default), text declared in any other language whose likely script is
-  Latin (pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and so on)
-  also composes, with neutral preferences, and an unreadable tag
-  (`{{ page.lang }}`) counts as untagged. With `coverage: 'core'`, other
-  declared languages keep the browser's layout (`native:language`), as in
-  4.3.1. Under both, a `lang` spelled with an underscore or as a language
+  preferences, and no language is inferred. Under the default,
+  `coverage: 'core'`, other declared languages keep the browser's layout
+  (`native:language`), as in 4.3.1. With `coverage: 'extended'` (opt-in),
+  text declared in any other language whose likely script is Latin (pt,
+  pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and so on) also
+  composes, with neutral preferences, and an unreadable tag
+  (`{{ page.lang }}`) counts as untagged. Under both, a `lang` spelled with an underscore or as a language
   name (`en_US`, `en_US.UTF-8`, `EN_us`, `english`, `Deutsch`, `francais`,
   `español`, and the unambiguous names for pt, it and nl) is read as the
   language it names; languages written in other scripts (ar, he, ja, zh, ko,
@@ -22,14 +22,15 @@ in the repository. What changed from 4.3: MIGRATION.md.
   browser's layout.
 - Ordinary inline links, bold, italics and supported semantic spans. Author
   elements are not cloned/reparented by the imperative rich renderer. With
-  `coverage: 'extended'` also `time`, `dfn`, `kbd` and `ins`; `sup` and
+  `coverage: 'extended'` (opt-in) also `time`, `dfn`, `kbd` and `ins`; `sup` and
   `sub`, `vertical-align: super` and `sub`, and a `sup` raised with
   `position: relative` (normalize.css, Tailwind preflight), measured in
   place and verified against the rendered lines; visually hidden text (the
   sr-only pattern, clip-path variants included) and `aria-hidden` elements
   with no width, as zero-width atoms that no generated break falls inside
-  and that measurement, spacing and tracking leave out. `'core'` leaves a
-  block with any of them native, as 4.3.1 did. Still native under both:
+  and that measurement, spacing and tracking leave out. `'core'`, the
+  default, leaves a block with any of them native, as 4.3.1 did. Still
+  native under both:
   `br`, `img`, `svg`, `q`, `bdi`, a visible `aria-hidden` icon, `::after`
   link icons and `vertical-align: top`.
 - Up to three Greek or Cyrillic letters in a row inside Latin text ("5 μg/mL",
@@ -86,9 +87,10 @@ Unsupported CSS/scripts, automatic/soft hyphens and editable content remain
 native. So does a block with a descendant in a language written in another
 script (a Japanese phrase in English text: `native:mixed-language`); a
 descendant in another Latin-script language (`<span lang="es">`,
-`lang="en-GB"` inside untagged text) is part of the paragraph and set with
-the block's preferences under `coverage: 'extended'`, and leaves the block
-`native:mixed-language` under `'core'`. Native text may have authored
+`lang="en-GB"` inside untagged text) leaves the block
+`native:mixed-language` under the default, `'core'`, and is part of the
+paragraph and set with the block's preferences under
+`coverage: 'extended'`. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 
 Justified text remains native and reports `native:justify`: a generated break
@@ -595,8 +597,9 @@ changes only an isolated preview, never a deployed site.
   or heading can be composed with the indent repeated on every line.
 - **Right-to-left, vertical and non-Latin text** keeps the browser's layout
   (up to three Greek or Cyrillic letters in a row inside Latin text
-  compose). With `coverage: 'core'`, so does text declared in a Latin-script
-  language other than English, French, German and Spanish.
+  compose). Under the default, `coverage: 'core'`, so does text declared in
+  a Latin-script language other than English, French, German and Spanish;
+  `coverage: 'extended'` composes it.
 - **Browser floor.** Composes where `Intl.Segmenter`, `ResizeObserver` and
   `MutationObserver` exist; the supported browsers also have CSS
   `text-wrap`: Chrome and Edge 114, Safari 17.4 and Firefox 125, or later. Elsewhere, and in DOM emulations such as jsdom and

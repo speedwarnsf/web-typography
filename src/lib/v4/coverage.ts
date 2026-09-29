@@ -11,10 +11,10 @@
 export type Coverage = 'extended' | 'core';
 
 /** The default of the coverage option, for every entry point. STABILITY.md
- * lets a minor release compose more by default only if the owner accepts
- * the "Default rendering" addition (decision O1 for 4.4.0); otherwise this
- * one constant becomes 'core'. */
-export const COVERAGE_DEFAULT: Coverage = 'extended';
+ * changes default rendering in a minor release only to fix a verified
+ * defect, so 4.4 keeps 4.3.1's coverage by default and 'extended' is opt-in
+ * (the owner declined decision O1 for 4.4.0). */
+export const COVERAGE_DEFAULT: Coverage = 'core';
 
 /** Whether options ask for extended coverage, the default applied. */
 export const extendedCoverage = (coverage: Coverage | undefined): boolean => (coverage ?? COVERAGE_DEFAULT) === 'extended';

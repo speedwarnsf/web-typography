@@ -1,15 +1,16 @@
 // @ts-check
 // What composes (the 4.4 adoption fixes), in Chromium, WebKit and Firefox,
 // against the published 4.3.1 in the same page. Each case is composed at
-// 320 px in 18px Georgia by 4.3.1, by the candidate with its default
-// coverage ('extended') and by the candidate with coverage: 'core', and text
-// identity is checked after each.
+// 320 px in 18px Georgia by 4.3.1, by the candidate with coverage:
+// 'extended' (opt-in) and by the candidate with coverage: 'core' (the
+// default; the language and inline cases are also composed with no coverage
+// option and must match 'core'), and text identity is checked after each.
 //  - Language tags in other spellings (B): en_US, en_US.UTF-8 (CMS and PHP
 //    templates), "english" and "Deutsch" compose exactly as the tag they spell.
 //    4.3.1 left every such block native:language.
 //  - Declared languages (C): pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht,
-//    sr-Latn and an unreadable tag compose with neutral preferences by
-//    default and stay native:language under coverage: 'core'; ar, he, ja,
+//    sr-Latn and an unreadable tag compose with neutral preferences under
+//    'extended' and stay native:language under coverage: 'core'; ar, he, ja,
 //    zh, th, hi, ko, el and sr (Cyrillic) stay native:language under both.
 //  - Descendants in another Latin-script language (C) are part of their
 //    paragraph; a Japanese phrase still leaves it native:mixed-language.
@@ -18,7 +19,7 @@
 //    together; a Greek sentence or a longer Greek or Cyrillic word does not.
 //  - Inline markup (C): a matrix of the markup the adoption review found in
 //    real paragraphs. Under 'core' every case's outcome and markup equal
-//    4.3.1's; by default time, dfn, kbd, ins, sup, sub, raised text and
+//    4.3.1's; under 'extended' time, dfn, kbd, ins, sup, sub, raised text and
 //    visually hidden text compose, with no break inside hidden text, and
 //    everything else (br, img, svg, a visible aria-hidden icon, ::after
 //    icons, q, bdi, soft hyphens) is left as 4.3.1 left it.
@@ -44,7 +45,7 @@ const CLIP_PATH = 'border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow
 
 /** Spellings of a declared language, and the tag each must compose like. */
 const SPELLINGS = [['en_US', 'en-US'], ['EN_us', 'en-US'], ['en_US.UTF-8', 'en-US'], ['english', 'en'], ['English', 'en'], ['english_UK', 'en-GB'], ['en_GB', 'en-GB'], ['Deutsch', 'de'], ['francais', 'fr'], ['español', 'es']];
-/** Declared languages: [tag, text, composes by default]. */
+/** Declared languages: [tag, text, composes under coverage: 'extended']. */
 const LANGUAGES = /** @type {[string, string, boolean][]} */ ([
   ['pt', 'A clínica oferece testes gratuitos aos sábados, e os resultados chegam por mensagem de texto em até dois dias. Traga um documento com foto e chegue alguns minutos antes da consulta.', true],
   ['pt-BR', 'O posto de saúde oferece vacinas gratuitas para toda a família durante a semana, e não é preciso marcar horário. Leve a carteira de vacinação e um documento com foto.', true],
@@ -71,8 +72,8 @@ const LANGUAGES = /** @type {[string, string, boolean][]} */ ([
   // The same Latin prose under a non-Latin tag: the tag decides, not the text.
   ['ja', PROSE, false],
 ]);
-/** Descendants in another language: [id, host lang, html, composes by
- * default, composes under core]. An en_US phrase in English is English
+/** Descendants in another language: [id, host lang, html, composes under
+ * coverage: 'extended', composes under core]. An en_US phrase in English is English
  * under both (a tag spelling, class B); the other phrases are coverage
  * additions (class C). */
 const DESCENDANTS = /** @type {[string, string, string, boolean, boolean][]} */ ([
@@ -93,7 +94,7 @@ const SCRIPTS = /** @type {[string, string, string, boolean][]} */ ([
   ['a Cyrillic word', 'en', 'The label on the box read Здравствуйте in large letters, and the pharmacist explained that it was a greeting printed for the families who read Russian.', false],
   ['four Greek letters in a row', 'en', 'The word αβγδ was printed on the label of every sample the clinic sent in, and the results arrived by text message within two days of the visit.', false],
 ]);
-/** Inline markup: [id, html, composes by default]. Hidden text is marked with data-hidden-text for the break check. */
+/** Inline markup: [id, html, composes under coverage: 'extended']. Hidden text is marked with data-hidden-text for the break check. */
 const INLINE = /** @type {[string, string, boolean][]} */ ([
   ['plain', PROSE, true],
   ['a', `${HEAD}. <a href="#x">Read the full guide</a> before your appointment so the front desk can check you in.`, true],
@@ -176,10 +177,15 @@ for (const { name, engine, executablePath } of browsers) {
     await page.addScriptTag({ content: subject });
     /** @param {any[]} cases */
     const run = async cases => ({
-      extended: await page.evaluate(compose, { cases, build: 'Typeset', options: {} }),
+      extended: await page.evaluate(compose, { cases, build: 'Typeset', options: { coverage: 'extended' } }),
       core: await page.evaluate(compose, { cases, build: 'Typeset', options: { coverage: 'core' } }),
       published: await page.evaluate(compose, { cases, build: 'Published', options: {} }),
     });
+    /** Cases composed with no coverage option whose outcome or breaks differ
+     * from coverage: 'core', the default. @param {any[]} cases @param {Awaited<ReturnType<typeof run>>} got */
+    const notCore = async (cases, got) => (await page.evaluate(compose, { cases, build: 'Typeset', options: {} }))
+      .filter((record, i) => record.outcome !== got.core[i].outcome || record.breaks.join() !== got.core[i].breaks.join())
+      .map(record => ({ id: record.id, outcome: record.outcome }));
     /** Records of every build whose text or restore failed. @param {Awaited<ReturnType<typeof run>>} got */
     const damaged = got => [...got.extended, ...got.core, ...got.published].filter(record => !record.textIntact || !record.restored || /^threw/.test(record.outcome));
 
@@ -203,7 +209,9 @@ for (const { name, engine, executablePath } of browsers) {
       const table = LANGUAGES.map(([tag, , expected], i) => ({ tag, expected, extended: got.extended[i].outcome, core: got.core[i].outcome, published: got.published[i].outcome }));
       report.tables[name + ' languages'] = table;
       const wrong = table.filter(row => row.expected ? !composes(row.extended) || row.core !== 'native:language' : row.extended !== 'native:language' || row.core !== 'native:language');
-      check('languages: pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and an unreadable tag compose by default and stay native:language under coverage: core; ar, he, ja, zh, th, hi, ko, el and sr stay native:language', !wrong.length, wrong.length ? wrong : table);
+      check('languages: pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and an unreadable tag compose under coverage: extended and stay native:language under coverage: core; ar, he, ja, zh, th, hi, ko, el and sr stay native:language', !wrong.length, wrong.length ? wrong : table);
+      const byDefault = await notCore(cases, got);
+      check('languages: with no coverage option every case composes as under coverage: core (the default)', !byDefault.length, byDefault);
       check('languages: 4.3.1 left every one of them native:language (negative control)', table.every(row => row.published === 'native:language'), table.filter(row => row.published !== 'native:language'));
       check('languages: text intact and restored', damaged(got).length === 0, damaged(got));
     }
@@ -217,7 +225,7 @@ for (const { name, engine, executablePath } of browsers) {
       const wrong = table.filter(row => row.expected
         ? !composes(row.extended) || (row.expectedCore ? !composes(row.core) : row.core !== row.published)
         : !row.extended.startsWith('native:') || row.extended !== row.published || row.core !== row.published);
-      check('descendants: a Latin-script phrase in another language is part of its paragraph by default and left as 4.3.1 left it under core (an en_US phrase in English composes under both); a Japanese phrase stays native', !wrong.length, table);
+      check('descendants: a Latin-script phrase in another language is part of its paragraph under coverage: extended and left as 4.3.1 left it under core (an en_US phrase in English composes under both); a Japanese phrase stays native', !wrong.length, table);
       check('descendants: text intact and restored', damaged(got).length === 0, damaged(got));
     }
 
@@ -263,9 +271,11 @@ for (const { name, engine, executablePath } of browsers) {
       const table = INLINE.map(([id, , expected], i) => ({ id, expected, extended: got.extended[i].outcome, core: got.core[i].outcome, published: got.published[i].outcome }));
       report.tables[name + ' inline'] = table;
       const wrong = table.filter(row => row.expected ? !composes(row.extended) : row.extended !== row.published);
-      check(`inline: ${INLINE.filter(([, , c]) => c).length} cases compose by default, and the ${INLINE.filter(([, , c]) => !c).length} others are left as 4.3.1 left them`, !wrong.length, wrong.length ? wrong : table);
+      check(`inline: ${INLINE.filter(([, , c]) => c).length} cases compose under coverage: extended, and the ${INLINE.filter(([, , c]) => !c).length} others are left as 4.3.1 left them`, !wrong.length, wrong.length ? wrong : table);
       const coreDiffers = table.filter((row, i) => row.core !== row.published || got.core[i].breaks.join() !== got.published[i].breaks.join());
       check('inline: under coverage: core every case has 4.3.1\'s outcome and breaks', !coreDiffers.length, coreDiffers);
+      const byDefault = await notCore(cases, got);
+      check('inline: with no coverage option every case composes as under coverage: core (the default)', !byDefault.length, byDefault);
       const newlyComposed = got.extended.filter((record, i) => INLINE[i][2] && record.outcome.startsWith('composed'));
       const unsafe = newlyComposed.filter(record => record.overflow > .5 || record.lines !== record.breaks.length + 1 || record.breakInHidden);
       check('inline: every composed case renders its composed lines, without overflow, and no break falls inside hidden text', newlyComposed.length >= 10 && !unsafe.length, { composed: newlyComposed.length, unsafe: unsafe.map(record => ({ id: record.id, overflow: record.overflow, lines: record.lines, breaks: record.breaks, breakInHidden: record.breakInHidden })) });

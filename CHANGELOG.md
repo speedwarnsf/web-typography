@@ -13,9 +13,9 @@ Hashes for every published version live in
 ## 4.4.0 - Unreleased
 
 4.4.0 is a minor release of 4.3: the adoption fixes. It guards against a
-freeze that user-generated text could cause, reads more `lang` spellings and
-Latin-script languages, curls quotes only where they can be quotation marks,
-waits for a server-rendered page to hydrate before composing it, and adds
+freeze that user-generated text could cause, reads more `lang` spellings,
+curls quotes only where they can be quotation marks, waits for a
+server-rendered page to hydrate before composing it, and adds
 `whenSettled()` for visual tests. New options `copy`, `coverage` and
 `headings`, a `smartQuotes` value `'en-declared'`, the loader attributes that
 go with them and `data-typeset-defer`, the export `typeset.us/opt-in`, one
@@ -23,64 +23,37 @@ outcome code (`native:run-budget`, 43 in all) and three audit review items
 (`clipped`, `untagged`, `uncomposed`). It also carries 4.3.2's fix for
 off-screen React blocks (see 4.3.2 below). Nothing is removed.
 
-**Default coverage, to be settled before the cut.** This build composes the
-coverage additions below by default (`coverage: 'extended'`, one constant,
-`COVERAGE_DEFAULT` in `src/lib/v4/coverage.ts`). STABILITY.md as 4.3 wrote
-it lets a minor release add them only behind an option that is off by
-default, so the maintainer decides at the cut: keep `'extended'` together
-with the STABILITY.md sentence that allows it (commit b913c19, separate so
-it can be reverted), or decline it. `'core'` composes exactly what 4.3.1
-composed (counts below). Declining takes, in one commit:
-
-- `git revert b913c19` (the STABILITY.md sentence);
-- `src/lib/v4/coverage.ts`: `COVERAGE_DEFAULT` to `'core'`, and its comment;
-- `src/lib/v4/typeset.next.ts`: the `coverage` option's JSDoc, which gives
-  the default as `'extended'` (the adapters' `coverage` prop and the loaders
-  defer to it);
-- `npm run docs:outcomes`: OUTCOMES.md and docs/outcomes.md name the default
-  from `COVERAGE_DEFAULT`, so they follow without an edit;
-- `packages/typeset-v4/README.md`: the "Do I need it?" languages row, the
-  sentence after the npm install line and the Stability section (a minor
-  release then changes default rendering only to fix a verified defect),
-  the options table's `coverage` row (default `'core'`; `'extended'` opts
-  in) and "What it won't do", line-end preferences;
-- `packages/typeset-v4/capabilities.json`: `defaults.coverage`,
-  `coverage.default` and `otherLatinLanguages`;
-- `packages/typeset-v4/SUPPORT.md`: the first bullet (other Latin-script
-  languages compose only with `coverage: 'extended'`);
-- `packages/typeset-v4/MIGRATION.md`: step 4 under "From 4.3" (the additions
-  become opt-in; nothing to do to keep 4.3.1's coverage);
-- `packages/typeset-v4/for-agents.md`: the languages paragraph, which names
-  `'extended'` as the default;
-- `public/llms.txt`: the line-end preferences sentence;
-- this section: the note above, the "Coverage additions" heading and the
-  `coverage` entry under Added, listed as opt-in;
-- tests that expect the additions by default (`verify-coverage`, the
-  coverage fixture in `verify-native-ax`) pass `coverage: 'extended'`.
+**The coverage additions are opt-in.** The default is `coverage: 'core'`,
+which composes what 4.3.1 composed, so an existing site keeps 4.3's output
+apart from the defect fixes under "Rendering changes". Other Latin-script
+languages and more inline markup compose only with `coverage: 'extended'`,
+`data-typeset-coverage="extended"` on the loaders or the adapters'
+`coverage` prop (see Added). STABILITY.md keeps 4.3's rule, that a minor
+release changes default rendering only to fix a verified defect, so
+composing the additions by default was declined for 4.4.0.
 
 ### Rendering changes
 
-`scripts/v4/verify-golden.mjs` against the published 4.3.1 build, on
-`coverage: 'core'`, with the new coverage corpus (`tests/v4-corpus-4.4.json`,
-47 cases at the same four widths and two fonts, 376 cells per engine)
-composed once more with the build's defaults. Chromium 149, WebKit 26.5,
-Firefox 151:
+`scripts/v4/verify-golden.mjs` against the published 4.3.1 build, with
+4.4.0's defaults, with the new coverage corpus (`tests/v4-corpus-4.4.json`,
+47 cases at the same four widths and two fonts, 376 cells per engine).
+Chromium 149, WebKit 26.5, Firefox 151:
 
-| Engine | Existing cells changed (core) | Coverage cells changed, core | Coverage cells changed, default | Coverage cells composed, 4.3.1 / core / default |
-| --- | --- | --- | --- | --- |
-| Chromium | 0 of 3,932 | 104 of 376 | 280 of 376 | 55 / 103 / 278 |
-| WebKit | 0 of 3,932 | 104 of 376 | 280 of 376 | 54 / 102 / 276 |
-| Firefox | 0 of 3,932 | 104 of 376 | 280 of 376 | 63 / 111 / 286 |
+| Engine | Existing cells changed | Coverage cells changed | Coverage cells composed, 4.3.1 / 4.4.0 |
+| --- | --- | --- | --- |
+| Chromium | 0 of 3,932 | 104 of 376 | 55 / 103 |
+| WebKit | 0 of 3,932 | 104 of 376 | 54 / 102 |
+| Firefox | 0 of 3,932 | 104 of 376 | 63 / 111 |
 
-Every changed cell is one of the changes below; none is unexplained. The
-104 under `'core'` are the defect fixes, which apply under both settings:
+Every changed cell is one of the defect fixes below; none is unexplained:
 long runs 40, language spellings 24, Greek letters 24, quotes 16. Every
 coverage-addition cell (13 language and 9 inline cases, 176 cells per
-engine) is identical to 4.3.1 under `'core'`. In the existing corpus, 2,117,
-2,104 and 2,119 cells per engine differ only in marker style attributes,
-with identical line boxes and marker geometry (the stylesheet change below).
+engine) is identical to 4.3.1 under the default. In the existing corpus,
+2,117, 2,104 and 2,119 cells per engine differ only in marker style
+attributes, with identical line boxes and marker geometry (the stylesheet
+change below).
 
-Defect fixes, on under both `coverage` settings:
+Defect fixes, on by default and under both `coverage` values:
 
 - **A paragraph with more than 500 code points between two break
   opportunities keeps the browser's layout before anything is measured**
@@ -121,34 +94,6 @@ Defect fixes, on under both `coverage` settings:
   untagged text counts as English; an explicit npm `smartQuotes: 'en'` keeps
   its meaning.
 
-Coverage additions (`coverage: 'extended'`; `'core'` leaves them native):
-
-- **Other Latin-script languages compose.** Any `lang` whose likely script
-  is Latin (pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and so
-  on) composes with neutral line-end preferences, as untagged text does; an
-  unreadable tag (`{{ page.lang }}`) counts as untagged. ar, he, ja, zh, th,
-  hi, ko, el and Cyrillic sr still decline, and so does Latin text under a
-  non-Latin tag. A descendant in another Latin-script language
-  (`<span lang="es">`, `lang="en-GB"` inside untagged text) is part of the
-  paragraph and set with the block's preferences; a Japanese phrase still
-  leaves it `native:mixed-language`. 128 language cells per engine change
-  under the default.
-- **More inline markup composes.** `time`, `dfn`, `kbd` and `ins`; `sup` and
-  `sub`, `vertical-align: super` and `sub`, and a `sup` raised with
-  `position: relative` (normalize.css, Tailwind preflight), measured in
-  place with the rendered lines verifying the plan; visually hidden text
-  (the sr-only pattern, clip-path variants included) and `aria-hidden`
-  elements with no width, as zero-width atoms that no generated break falls
-  inside and that measurement, spacing and tracking leave out. A word space
-  beside such text keeps its natural width, so Chromium's accessibility
-  tree reads the words on either side as it does natively. 71, 70 and 71 of
-  the 72 inline cells per engine compose (Chromium, WebKit, Firefox). Still
-  native: `br`, `img`, `svg`, `q`, `bdi`, a visible `aria-hidden` icon,
-  `::after` link icons, soft hyphens, `hyphens: auto` and
-  `vertical-align: top`. One recorded trade-off: a footnote `sup` at 240 px
-  in Georgia composes with the lines 4.3.1 gives the same paragraph without
-  it (4 weak line ends against native's 3).
-
 Markup only, no change to layout:
 
 - **Marker styles move to the engine's stylesheet.** Spacing and hanging
@@ -182,8 +127,37 @@ Markup only, no change to layout:
   line end; the document copy handler is installed only when some composed
   element has copy on. `data-typeset-copy="false"` on the loaders,
   `copy={false}` on the adapters.
-- **`coverage` option** (`'extended'` or `'core'`), `data-typeset-coverage`,
-  the adapters' `coverage` prop. See the note at the top of this section.
+- **`coverage` option** (`'core'`, the default, or `'extended'`),
+  `data-typeset-coverage` on the loaders, the adapters' `coverage` prop.
+  `'core'` composes what 4.3.1 composed. `'extended'` opts in to the two
+  additions below, paragraphs 4.3.1 left native: on the coverage corpus it
+  changes 280 of 376 cells per engine from 4.3.1, and composes 278, 276 and
+  286 of them in Chromium, WebKit and Firefox (4.3.1: 55, 54 and 63).
+- **Other Latin-script languages, opt-in** (`coverage: 'extended'`). Any
+  `lang` whose likely script is Latin (pt, pt-BR, it, nl, pl, sv, tr, vi,
+  fil, sw, ht, sr-Latn and so on) composes with neutral line-end
+  preferences, as untagged text does; an unreadable tag (`{{ page.lang }}`) counts as untagged. ar, he, ja, zh, th,
+  hi, ko, el and Cyrillic sr still decline, and so does Latin text under a
+  non-Latin tag. A descendant in another Latin-script language
+  (`<span lang="es">`, `lang="en-GB"` inside untagged text) is part of the
+  paragraph and set with the block's preferences; a Japanese phrase still
+  leaves it `native:mixed-language`. 128 language cells per engine change
+  with it.
+- **More inline markup, opt-in** (`coverage: 'extended'`). `time`, `dfn`,
+  `kbd` and `ins`; `sup` and `sub`, `vertical-align: super` and `sub`, and a
+  `sup` raised with `position: relative` (normalize.css, Tailwind
+  preflight), measured in place with the rendered lines verifying the plan; visually hidden text
+  (the sr-only pattern, clip-path variants included) and `aria-hidden`
+  elements with no width, as zero-width atoms that no generated break falls
+  inside and that measurement, spacing and tracking leave out. A word space
+  beside such text keeps its natural width, so Chromium's accessibility
+  tree reads the words on either side as it does natively. 71, 70 and 71 of
+  the 72 inline cells per engine compose (Chromium, WebKit, Firefox). Still
+  native: `br`, `img`, `svg`, `q`, `bdi`, a visible `aria-hidden` icon,
+  `::after` link icons, soft hyphens, `hyphens: auto` and
+  `vertical-align: top`. One recorded trade-off: a footnote `sup` at 240 px
+  in Georgia composes with the lines 4.3.1 gives the same paragraph without
+  it (4 weak line ends against native's 3).
 - **`headings` option** (default `true`). `headings: false` and
   `data-typeset-headings="false"` make `mount()`, `typesetAll()` and the
   loaders leave `h1` to `h6`, `[role=heading]` and anything inside them
@@ -240,8 +214,8 @@ Markup only, no change to layout:
   `websiteLoader.cdnDefault` (`dist/auto.js`).
 - OUTCOMES.md: `native:language`, `native:mixed-language`,
   `native:rich-element`, `native:rich-excluded` and `native:rich-layout`
-  say what composes under the default coverage and what `'core'` keeps
-  native.
+  say what composes under the default, `coverage: 'core'`, and what
+  `'extended'` adds.
 - The site's `tsconfig.json` leaves `packages/typeset-v4/dist` and
   `public/releases` out of its type check.
 
@@ -283,7 +257,8 @@ Markup only, no change to layout:
 - `whenSettled()` does not wait for hosts React has not mounted yet (a
   pending Suspense boundary), for a finite CSS animation to end, or for
   off-screen blocks a resize left until they are scrolled near.
-- `::after` link icons still leave their paragraph native.
+- `::after` link icons still leave their paragraph native, under both
+  `coverage` values.
 - 4.3's other known limitations stand; SUPPORT.md lists them.
 
 ### Size
@@ -367,13 +342,16 @@ I need it?" list has a languages row.
   the run it supersedes; the nightly run of the committed release artifacts
   moves to Mondays, and Dependabot opens its updates monthly.
 - `verify-golden` reports the coverage corpus apart (`coverage`, and with
-  `--subject-options '{"coverage":"core"}'` a `coverage-default` pass) and
-  counts marker-style-only cells as `styleMoved`; the corpus has a
+  `--subject-options '{"coverage":"extended"}'` a `coverage-default` pass),
+  holds the coverage additions to 4.3.1's output in any pass on `'core'`,
+  and counts marker-style-only cells as `styleMoved`; the corpus has a
   `reference` field for tag spellings.
 - New suite `verify-coverage`: tag spellings, 23 declared languages,
   descendants, scripts, a 30-case inline matrix, quotes and headings, each
-  against the published 4.3.1 and under `'core'`, in three engines.
-  `verify-native-ax` gains a coverage fixture.
+  against the published 4.3.1, under `coverage: 'extended'` and under
+  `'core'`, which the default must match, in three engines.
+  `verify-native-ax` gains a coverage fixture, composed with
+  `coverage: 'extended'`.
 - Size budgets and the unpacked-package cap are raised to the measured
   figures, with the reasons recorded.
 
