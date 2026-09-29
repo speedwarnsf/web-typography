@@ -8,6 +8,8 @@ import { loaderNotes } from './loader-notes';
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const script = document.currentScript as HTMLScriptElement | null;
   const requested = script?.dataset.typesetSelector || 'p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6, td, th, dd, dt';
+  // 'core' leaves native what 4.3.1 left native; absent, the engine's default.
+  const coverage = script?.dataset.typesetCoverage === 'core' ? 'core' as const : script?.dataset.typesetCoverage === 'extended' ? 'extended' as const : undefined;
   // Only the React adapters' own hosts are left out; authors exclude content
   // with data-no-typeset.
   const selector = ':is(' + requested + '):not([data-typeset-react], [data-typeset-react] *, [data-typeset-react-rich], [data-typeset-react-rich] *)';
@@ -20,6 +22,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     tracking: script?.dataset.typesetTracking !== 'false',
     copy: script?.dataset.typesetCopy !== 'false',
     headings: script?.dataset.typesetHeadings !== 'false',
+    coverage,
   };
   window.Typeset = api;
   window.TypesetReady = new Promise<void>(resolve => {

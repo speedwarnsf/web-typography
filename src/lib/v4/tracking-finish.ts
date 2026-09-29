@@ -2,6 +2,7 @@ import type { LayoutMetrics } from './layout-metrics';
 import { afterComment, engineText, positional, preserveRichCopy, reactOwned, rejoinSplits, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
 import type { RichOutput, SplitRecord } from './rich-text';
 import { markerRules } from './lifecycle';
+import { hiddenInline, withinHidden } from './hidden-inline';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
 export const MAX_TRACKING_EM = .01;
@@ -32,6 +33,8 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
   if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb' || !['left', 'start'].includes(style.textAlign)) return result('native:tracking-layout');
   const source = element.textContent || '', texts = textRuns(element);
   const segmenter = graphemes();
+  // Visually hidden text takes no room: tracking it would change no line.
+  const hidden = element.firstElementChild ? hiddenInline(element) : [];
   const runs: TrackingRun[] = [];
   let unsupported = false, held = false;
   for (const [line, box] of layout.lines.slice(0, -1).entries()) {
@@ -48,7 +51,7 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
     const pieces: (TrackingRun & { last: Text; count: number })[] = [];
     for (const text of texts) {
       const start = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
-      if (end <= start || text.node.parentElement?.closest('code, kbd, samp')) continue;
+      if (end <= start || text.node.parentElement?.closest('code, kbd, samp') || (hidden.length && withinHidden(text.node, hidden))) continue;
       const parent = text.node.parentElement;
       if (!parent) continue;
       const cs = getComputedStyle(parent), fontSize = parseFloat(cs.fontSize);

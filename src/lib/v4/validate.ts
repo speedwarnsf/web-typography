@@ -26,6 +26,7 @@ const choices: Record<string, readonly unknown[]> = {
   contour: ['finished', 'natural'],
   mode: ['body', 'heading', 'title', 'ui'],
   density: ['compact', 'editorial'],
+  coverage: ['extended', 'core'],
 };
 const booleans = ['opticalHanging', 'spacing', 'tracking', 'copy', 'headings'];
 const list = (values: readonly unknown[]) => values.map(value => typeof value === 'string' ? JSON.stringify(value) : String(value)).join(' or ').replace(/ or (?=.* or )/g, ', ');

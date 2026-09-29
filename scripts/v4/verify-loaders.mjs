@@ -18,19 +18,19 @@ const PROSE = '<html lang="en"><style>body{width:340px;font:19px/1.5 Georgia}</s
   + '<blockquote>It fills each line until the words run out, and calls that typography, which it is not.</blockquote>'
   + '<p data-no-typeset>Excluded text stays untouched, whatever the loader is asked to do with it.</p>'
   + '<p><a href="#x">A linked phrase</a> inside a paragraph keeps its link and its focus when the paragraph is composed.</p></html>';
-/** @param {import('playwright').Browser} browser @param {string} html @param {string} content */
-async function load(browser, html, content) {
+/** @param {import('playwright').Browser} browser @param {string} html @param {string} content @param {Record<string, string>} [attributes] script data attributes */
+async function load(browser, html, content, attributes = {}) {
   const page = await browser.newPage();
   page.setDefaultTimeout(20000);
   /** @type {string[]} */
-  const info = [];
-  page.on('console', message => { if (message.type() === 'info') info.push(message.text()); });
+  const info = [], warnings = [];
+  page.on('console', message => { if (message.type() === 'info') info.push(message.text()); if (['warning', 'error'].includes(message.type())) warnings.push(message.text()); });
   await page.setContent(html);
-  await page.evaluate(content => { const script = document.createElement('script'); script.textContent = content; document.head.append(script); }, content);
+  await page.evaluate(({ content, attributes }) => { const script = document.createElement('script'); Object.assign(script.dataset, attributes); script.textContent = content; document.head.append(script); }, { content, attributes });
   await page.evaluate(() => /** @type {any} */ (window).TypesetReady);
   await page.waitForTimeout(50);
-  const state = await page.evaluate(() => [...document.body.querySelectorAll('*')].map(el => ({ tag: el.tagName, outcome: el.getAttribute('data-ts-outcome'), text: el.textContent })));
-  return { page, info, state };
+  const state = await page.evaluate(() => [...document.body.querySelectorAll('*')].map(el => ({ tag: el.tagName, outcome: el.getAttribute('data-ts-outcome'), text: el.textContent, html: el.outerHTML })));
+  return { page, info, warnings, state };
 }
 for (const config of browsers) {
   const browser = await config.engine.launch({ executablePath: config.executablePath });
@@ -113,6 +113,47 @@ for (const config of browsers) {
       check('auto.js composes prose inside .demo and [data-no-smooth]', demo.state.filter(el => el.tag === 'P' && el.outcome === 'composed:rich').length === 2 && demo.info.length === 0, { state: demo.state.filter(el => el.tag === 'P'), info: demo.info });
       await demo.page.close();
     }
+    if (hasAuto) {
+      const auto = await readFile(artifacts.auto, 'utf8');
+      // Quotes (4.4): the auto loader curls quotes only where English is
+      // declared; data-typeset-smart-quotes="en" also curls untagged text, as
+      // 4.3's default did. 4.3 curled untagged German and French.
+      const GERMAN = 'Er sagte: "Hallo Welt" und dann begann der Kurs über gesunde Ernährung, der jeden Dienstag im großen Saal der Klinik stattfindet.';
+      const german = await load(browser, `<html><style>body{width:340px;font:19px/1.5 Georgia}</style><p>${GERMAN}</p></html>`, auto);
+      const germanP = german.state.find(el => el.tag === 'P');
+      check('auto.js leaves the quotes of an untagged German paragraph straight (smartQuotes en-declared)', germanP?.text === GERMAN, germanP);
+      await german.page.close();
+      const germanEn = await load(browser, `<html><style>body{width:340px;font:19px/1.5 Georgia}</style><p>${GERMAN}</p></html>`, auto, { typesetSmartQuotes: 'en' });
+      check('auto.js with data-typeset-smart-quotes="en" curls the untagged paragraph as 4.3 did', germanEn.state.find(el => el.tag === 'P')?.text === GERMAN.replace('"Hallo Welt"', '\u201cHallo Welt\u201d'), germanEn.state.find(el => el.tag === 'P'));
+      await germanEn.page.close();
+      const english = await load(browser, `<html lang="en"><style>body{width:340px;font:19px/1.5 Georgia}</style><p>"Hello," she said, and the nurse at the front desk looked up from the schedule to ask whether she had an appointment.</p></html>`, auto);
+      check('auto.js curls quotes in declared English by default', english.state.find(el => el.tag === 'P')?.text?.startsWith('\u201cHello,\u201d she said'), english.state.find(el => el.tag === 'P'));
+      await english.page.close();
+      // Coverage (4.4): a Portuguese page composes; data-typeset-coverage="core" leaves it native as 4.3.1 did.
+      const PORTUGUESE = '<html lang="pt"><style>body{width:340px;font:19px/1.5 Georgia}</style><p>A clínica oferece testes gratuitos aos sábados, e os resultados chegam por mensagem de texto em até dois dias. Traga um documento com foto e chegue alguns minutos antes da consulta.</p></html>';
+      const extended = await load(browser, PORTUGUESE, auto), core = await load(browser, PORTUGUESE, auto, { typesetCoverage: 'core' });
+      const ptOutcome = (/** @type {{ state: { tag: string, outcome: string | null }[] }} */ run) => run.state.find(el => el.tag === 'P')?.outcome;
+      check('auto.js composes a lang="pt" paragraph by default and leaves it native:language with data-typeset-coverage="core"', /^composed/.test(String(ptOutcome(extended))) && ptOutcome(core) === 'native:language', { extended: ptOutcome(extended), core: ptOutcome(core) });
+      await extended.page.close(); await core.page.close();
+      // Headings (4.4): data-typeset-headings="false" leaves every heading
+      // exactly as authored, with no outcome; paragraphs still compose.
+      const withHeadings = await load(browser, PROSE, auto), noHeadings = await load(browser, PROSE, auto, { typesetHeadings: 'false' });
+      const heading = (/** @type {{ state: { tag: string, outcome: string | null, html: string }[] }} */ run) => run.state.find(el => el.tag === 'H2');
+      const authored = PROSE.match(/<h2>.*?<\/h2>/)?.[0];
+      check('auto.js with data-typeset-headings="false" leaves the h2 untouched, with no outcome, and composes the paragraphs', heading(noHeadings)?.outcome === null && heading(noHeadings)?.html === authored
+        && noHeadings.state.filter(el => el.tag === 'P' && /^composed/.test(String(el.outcome))).length >= 2 && heading(withHeadings)?.outcome !== null, { withHeadings: heading(withHeadings), noHeadings: heading(noHeadings) });
+      await withHeadings.page.close(); await noHeadings.page.close();
+      // Notes (4.4): at most two console.info lines, never a warning. Composed
+      // text without a lang gets one; a page where nothing composed gets one
+      // with the commonest reason. 4.3 said nothing.
+      const untagged = await load(browser, PROSE.replace('<html lang="en">', '<html>'), auto);
+      check('auto.js on untagged prose logs one console.info: no lang attribute, English line-end preferences are off', untagged.info.length === 1 && /no lang attribute, so English line-end preferences are off; add lang="en" to <html>/.test(untagged.info[0]) && !untagged.warnings.length, untagged.info);
+      await untagged.page.close();
+      const declined = await load(browser, PROSE.replace('<html lang="en">', '<html lang="ja">'), auto);
+      const matched = declined.state.filter(el => el.outcome).length;
+      check('auto.js where every block declines logs one console.info naming the commonest outcome', declined.info.length === 1 && new RegExp(`none of the ${matched} matched blocks was composed; most common: native:language \u00d7\\d+; see https://typeset\\.us/docs`).test(declined.info[0]) && !declined.warnings.length, declined.info);
+      await declined.page.close();
+    }
     const unmarked = await load(browser, PROSE, packageGo);
     check('package go.js without [data-typeset] targets logs one console.info that names [data-typeset] and auto.js', unmarked.info.length === 1 && /no element matches \[data-typeset\]/.test(unmarked.info[0]) && /auto/.test(unmarked.info[0]), unmarked.info);
     check('package go.js without targets composes nothing', unmarked.state.every(el => !el.outcome), unmarked.state.filter(el => el.outcome));
@@ -120,6 +161,9 @@ for (const config of browsers) {
     const marked = await load(browser, PROSE.replace('<p>Your', '<p data-typeset>Your'), packageGo);
     check('package go.js with a [data-typeset] target logs nothing', marked.info.length === 0, marked.info);
     await marked.page.close();
+    const markedDeclined = await load(browser, PROSE.replace('<p>Your', '<p data-typeset>Your').replace('<html lang="en">', '<html lang="ja">'), packageGo);
+    check('package go.js whose one target declines logs one console.info naming native:language', markedDeclined.info.length === 1 && /typeset\.us go\.js: none of the 1 matched blocks was composed; most common: native:language \u00d71/.test(markedDeclined.info[0]), markedDeclined.info);
+    await markedDeclined.page.close();
   } catch (error) {
     errors.push({ browser: config.name, error: 'auto/notice: ' + String(/** @type {Error} */ (error).stack || error) });
   } finally { await browser.close(); }

@@ -1,5 +1,5 @@
 {
- "note": "Constructions the 4.4 adoption fixes change, composed by verify-golden at every corpus width and font and reported apart from the 4.2/4.3 corpus (the \"coverage\" variant), against the release 4.4 is measured against (4.3.1). class: A, no change to default output expected; B, a verified-defect fix on by default; C, a coverage addition (paragraphs 4.3 left native). expect: the outcome this build must report, where one is required. lang: the element's lang (\"\" is untagged; absent means the page's lang=\"en\"). Long runs stay short enough that the 4.3.1 baseline measures them in about a second in WebKit. E1 added the corpus with the long-run cases; E2 adds its cases and expectations.",
+ "note": "Constructions the 4.4 adoption fixes change, composed by verify-golden at every corpus width and font and reported apart from the 4.2/4.3 corpus (the \"coverage\" variant), against the release 4.4 is measured against (4.3.1). class: A, no change to default output expected; B, a verified-defect fix on by default; C, a coverage addition (paragraphs 4.3 left native). expect: the outcome this build must report, where one is required. lang: the element's lang (\"\" is untagged; absent means the page's lang=\"en\"). reference: for a lang in another spelling, the tag it spells; the coverage baseline also composes the case under it, and the build must match that composition. Long runs stay short enough that the 4.3.1 baseline measures them in about a second in WebKit. E1 added the corpus with the long-run cases; E2 added the language, script, inline and quote cases after them.",
  "cases": [
   {
    "id": "run-499-letters",
@@ -53,6 +53,7 @@
    "group": "lang",
    "class": "B",
    "lang": "en_US",
+   "reference": "en-US",
    "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
   },
   {
@@ -60,6 +61,7 @@
    "group": "lang",
    "class": "B",
    "lang": "english",
+   "reference": "en",
    "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
   },
   {
@@ -119,6 +121,70 @@
    "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Staff greet every visitor with <span lang=\"es\">bienvenidos a la clínica</span> and a printed guide in both languages."
   },
   {
+   "id": "lang-en_US-posix",
+   "group": "lang",
+   "class": "B",
+   "lang": "en_US.UTF-8",
+   "reference": "en-US",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-pl",
+   "group": "lang",
+   "class": "C",
+   "lang": "pl",
+   "html": "Przychodnia oferuje bezpłatne badania w soboty, a wyniki przychodzą wiadomością tekstową w ciągu dwóch dni. Zabierz dokument ze zdjęciem i przyjdź kilka minut przed wizytą, aby recepcja mogła cię zarejestrować."
+  },
+  {
+   "id": "lang-sw",
+   "group": "lang",
+   "class": "C",
+   "lang": "sw",
+   "html": "Kliniki inatoa vipimo vya bure kila Jumamosi, na majibu hufika kwa ujumbe mfupi ndani ya siku mbili. Leta kitambulisho chenye picha na ufike dakika chache kabla ya miadi yako ili mapokezi wakusajili."
+  },
+  {
+   "id": "lang-ht",
+   "group": "lang",
+   "class": "C",
+   "lang": "ht",
+   "html": "Klinik la ofri tès gratis chak samdi, epi rezilta yo rive pa mesaj nan de jou. Pote yon pyès idantite ak foto epi vini kèk minit anvan randevou ou pou resepsyon an ka enskri ou."
+  },
+  {
+   "id": "lang-fil",
+   "group": "lang",
+   "class": "C",
+   "lang": "fil",
+   "html": "Nag-aalok ang klinika ng libreng pagsusuri tuwing Sabado, at dumarating ang resulta sa text message sa loob ng dalawang araw. Magdala ng ID na may larawan at dumating nang ilang minuto bago ang iyong appointment."
+  },
+  {
+   "id": "lang-invalid",
+   "group": "lang",
+   "class": "C",
+   "lang": "{{ page.lang }}",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-sr-Cyrl",
+   "group": "lang",
+   "class": "A",
+   "lang": "sr",
+   "html": "Клиника нуди бесплатно тестирање суботом, а резултати стижу поруком у року од два дана. Понесите личну карту и дођите неколико минута пре заказаног термина."
+  },
+  {
+   "id": "lang-en-GB-descendant-untagged",
+   "group": "lang",
+   "class": "C",
+   "lang": "",
+   "html": "The guide says the clinic will <span lang=\"en-GB\">organise the queue by colour</span> on busy mornings, and staff hand out numbered cards at the door a few minutes before it opens."
+  },
+  {
+   "id": "lang-ja-descendant",
+   "group": "lang",
+   "class": "A",
+   "lang": "en",
+   "html": "The welcome sign at the clinic door reads <span lang=\"ja\">ようこそ</span> beside the English and Spanish greetings, and the front desk keeps a printed guide in each language."
+  },
+  {
    "id": "script-microgram",
    "group": "script",
    "class": "B",
@@ -131,6 +197,20 @@
    "class": "B",
    "lang": "en",
    "html": "Researchers measured α-synuclein in the samples from every clinic in the study and found the same pattern across the three sites they visited last spring."
+  },
+  {
+   "id": "script-delta",
+   "group": "script",
+   "class": "B",
+   "lang": "en",
+   "html": "The free energy change ΔG was negative for every reaction the students measured in the lab this week, and the report explains why in plain terms."
+  },
+  {
+   "id": "script-cyrillic-word",
+   "group": "script",
+   "class": "A",
+   "lang": "en",
+   "html": "The label on the box read Здравствуйте in large letters, and the pharmacist explained that it was a greeting printed for the families who read Russian."
   },
   {
    "id": "script-greek-sentence",
@@ -152,6 +232,13 @@
    "class": "C",
    "lang": "en",
    "html": "Drink water through the day; plain H<sub>2</sub>O is the best choice for most people, and the nurse can suggest how much to aim for in hot weather."
+  },
+  {
+   "id": "inline-sup-normalize",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<sup style=\"font-size:75%;line-height:0;position:relative;vertical-align:baseline;top:-0.5em\">2</sup> Bring a photo ID and arrive a few minutes before your appointment."
   },
   {
    "id": "inline-time",
@@ -182,11 +269,26 @@
    "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. <a href=\"#hours\">Read more<span style=\"position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0\"> about testing hours</span></a> on the clinic page."
   },
   {
-   "id": "inline-hidden-icon",
+   "id": "inline-sr-only-clip-path",
    "group": "inline",
    "class": "C",
    "lang": "en",
-   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. <a href=\"#map\"><span aria-hidden=\"true\">→</span> See the map</a> for parking and the bus stops nearest the entrance."
+   "html": "Every visit is free, and the nurse will explain your results in person or by phone, whichever you prefer. <a href=\"#faq\">Questions<span style=\"border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;white-space:nowrap\"> about results</span></a> are answered on the help page."
+  },
+  {
+   "id": "inline-aria-hidden-empty",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<span aria-hidden=\"true\"></span> Bring a photo ID and arrive a few minutes before your appointment."
+  },
+  {
+   "id": "inline-hidden-icon",
+   "group": "inline",
+   "class": "A",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. <a href=\"#map\"><span aria-hidden=\"true\">→</span> See the map</a> for parking and the bus stops nearest the entrance.",
+   "note": "A visible aria-hidden glyph stays native: 4.4 composes only hidden elements that take no room."
   },
   {
    "id": "quotes-attribute-value",

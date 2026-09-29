@@ -39,9 +39,9 @@ Left as the browser set it, because the content or its CSS is outside what Types
 
 | Outcome | What happened | Expected | What to do |
 | --- | --- | --- | --- |
-| `native:language` | The declared language is not English, French, German or Spanish (or, with lineBreaks: legacy, not English). | Yes | None; set lang correctly. Other languages are left to the browser. |
-| `native:mixed-language` | Part of the block declares a different language. | Yes | None, or split the block by language. |
-| `native:script` | The text contains non-Latin script or bidirectional controls. | Yes | None. Typeset composes Latin-script text only. |
+| `native:language` | The declared language is written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic). With coverage: 'core', also any language but English, French, German and Spanish; with lineBreaks: legacy, any language but English. A lang such as en_US, en_US.UTF-8 or english is read as the language it names. | Yes | None; set lang correctly. Other scripts are left to the browser. |
+| `native:mixed-language` | Part of the block declares a language written in another script (a Japanese phrase in English), or, with coverage: 'core', any different language. | Yes | None, or split the block by language. |
+| `native:script` | The text contains non-Latin script or bidirectional controls. Greek and Cyrillic letters in runs of up to three inside Latin text (5 μg, α-synuclein, ΔG) are allowed. | Yes | None. Typeset composes Latin-script text only. |
 | `native:direction` | The element is right-to-left or vertical. | Yes | None. RTL and vertical text are not supported. |
 | `native:transformed` | The element or an ancestor is scaled, rotated, skewed or zoomed, so measured widths would not match what is drawn. A composition made before an ancestor transform is kept (lines do not move); this outcome is for text first composed while one applied. | Yes | None while it animates: mount() and the React adapters compose the text when the transition or animation ends. For a lasting transform, remove it or leave the text native. |
 | `native:decorated` | The element has ::before or ::after content that shares its lines. | Yes | Move the decoration outside the text box, or leave it native. |
@@ -55,11 +55,11 @@ Left as the browser set it, because the content or its CSS is outside what Types
 | `native:ui` | mode: 'ui' (or data-typeset-mode="ui") marks interface text, which is never composed. | Yes | None. |
 | `native:justify` | The text is justified (text-align: justify or justify-all), or its text-align-last differs from text-align, and it runs to more than one line. A generated break ends its line, so every composed line would take the last-line alignment. | Yes | None; justified text is left to the browser. Set text-align: start (with the default text-align-last) to have it composed. |
 | `native:live-region` | The element is inside a live region, or contains one (a result count or a "saved" status inside a paragraph): the nearest region has an aria-live value other than "off" (an empty one counts as absent), or role status, alert, log, marquee or timer, or is an <output>, without aria-live="off". Screen readers announce every change there, so Typeset never measures, breaks or rewrites it. Regions in open shadow roots count, such as a toast that wraps a <slot> in role="status". | Yes | None. If the element is not really a live region, remove the role or set aria-live="off". A role set through ElementInternals or in a closed shadow root cannot be seen: mark that text data-no-typeset. |
-| `native:rich-element` | The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code), such as an image, button or nested block. | Yes | None, or compose the text blocks inside it separately. |
-| `native:rich-excluded` | The block contains hidden, aria-hidden, editable or data-no-typeset content. | Yes | None. |
+| `native:rich-element` | The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code, and with the default coverage time, dfn, kbd, ins, sup and sub), such as an image, a line break, button or nested block. | Yes | None, or compose the text blocks inside it separately. |
+| `native:rich-excluded` | The block contains hidden, aria-hidden, editable or data-no-typeset content. With the default coverage, visually hidden text (the sr-only pattern) and aria-hidden elements with no width take no room and are composed around. | Yes | None. |
 | `native:rich-direction` | An inline element changes direction, bidi or writing mode, or is not visible. | Yes | None. |
 | `native:rich-whitespace` | The block or its inline markup is indented (any text-indent, including a first-line indent such as p + p { text-indent: 1.5em } and a hanging indent), preserves whitespace, or changes text advances (a transform). | Yes | None; indented paragraphs keep the browser's layout. |
-| `native:rich-layout` | An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). | Yes | None. |
+| `native:rich-layout` | An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). With the default coverage, raised text is measured in place: vertical-align super or sub, and sup or sub raised with position: relative and a top offset (normalize.css). | Yes | None. |
 | `native:rich-box` | An inline element has negative padding, borders or margins, or box-decoration-break: clone. | Yes | None. |
 | `native:rich-decorated` | An inline element has ::before or ::after content. | Yes | None. |
 | `native:rich-tokens` | The words could not be matched to text positions in the markup. | No | Report it with auditJSON output; this should be rare. |
@@ -106,7 +106,7 @@ composed breaks stay.
 | `enabled` | TypesetRichText converts quotes during render (React reports this before layout). |
 | `applied` | Straight quotes were converted to curly quotes. |
 | `unchanged` | There were no straight quotes to convert. |
-| `native:quotes-scope` | Quotes were left alone: the block or part of it declares a language other than English, or it contains code, pre, kbd, samp, form fields, or excluded or editable content. |
+| `native:quotes-scope` | Quotes were left alone: the block or part of it declares a language other than English, or, with smartQuotes: 'en-declared' (the auto loader's default), declares none; or it contains code, pre, kbd, samp, form fields, or excluded or editable content. |
 
 ### hanging
 

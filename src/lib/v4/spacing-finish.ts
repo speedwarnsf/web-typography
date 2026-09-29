@@ -1,5 +1,6 @@
 import type { LayoutMetrics } from './layout-metrics';
 import { finishSpaceDeltas } from './space-policy';
+import { hiddenInline, withinHidden } from './hidden-inline';
 
 export interface SpaceAdjustment { offset: number; px: number; naturalPx: number; line: number }
 export interface SpacingPlan {
@@ -52,6 +53,16 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
   }
   const point = (at: number, end = false) => runs.find(run => end ? run.start < at && run.end >= at : run.start <= at && run.end > at);
   const range = element.ownerDocument.createRange();
+  // A space in visually hidden text takes no room on its line. A space right
+  // before or after hidden text keeps its natural width too: a marker there
+  // leaves a white-space-only text node beside the hidden (out-of-flow) box,
+  // which Chromium drops from its accessibility tree ("hours on" read as
+  // "hourson").
+  const hidden = element.firstElementChild ? hiddenInline(element) : [];
+  const edges = hidden.flatMap(atom => {
+    const inside = runs.filter(run => atom.contains(run.node));
+    return inside.length ? [inside[0].start, inside[inside.length - 1].end] : [];
+  });
   const measured: { offset: number; naturalPx: number; available: number }[][] = [];
   for (const line of layout.lines.slice(0, -1)) {
     const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));
@@ -60,6 +71,7 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
       const start = line.sourceStart + space.index!, end = start + space[0].length;
       const a = point(start), b = point(end, true);
       if (!a || !b || !a.node.parentElement) return result('native:spacing-measurement');
+      if (hidden.length && (withinHidden(a.node, hidden) || edges.includes(start) || edges.includes(end))) continue;
       range.setStart(a.node, start - a.start); range.setEnd(b.node, end - b.start);
       const style = getComputedStyle(a.node.parentElement);
       const available = range.getBoundingClientRect().width;

@@ -21,6 +21,7 @@ import { describe } from './validate';
 import { mountOwners, mountWaiters } from './ownership';
 import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
+import type { Coverage } from './coverage';
 import { commonest, NOTHING_TO_IMPROVE } from './loader-notes';
 
 export const VERSION = '4.3.1';
@@ -79,6 +80,13 @@ export interface Options {
    * clause opener. `'compact'`: one more line only to repair a one-word last
    * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
+  /** Default `'extended'`. What composes beyond what 4.3 composed:
+   * `'extended'` also composes text declared in any Latin-script language
+   * (neutral line-end preferences, as for untagged text), paragraphs with a
+   * descendant declared in another Latin-script language, `time`, `dfn`,
+   * `kbd`, `ins`, visually hidden text, and `sup` and `sub`. `'core'` leaves
+   * those native, as 4.3.1 did. Also `data-typeset-coverage`. */
+  coverage?: Coverage;
   /** Default `true`. `false` makes mount(), typesetAll() and the loaders
    * (`data-typeset-headings="false"`) leave h1 to h6, `role="heading"` and
    * anything inside them untouched, with no outcome written: a composed
@@ -251,7 +259,7 @@ function transformOnly(a: string, b: string): boolean {
   return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
 }
 function optionsKey(options: Options): string {
-  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour, options.copy]);
+  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour, options.copy, options.coverage]);
 }
 function signature(el: HTMLElement, options: Options, layout = layoutKey(el)): string {
   return el.innerHTML + '\u0000' + layout + '\u0000' + optionsKey(options);

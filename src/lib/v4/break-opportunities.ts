@@ -1,6 +1,10 @@
 import { Rules } from '../../vendor/unicode-linebreak.js';
 import { tokenize, isWeakEnding } from './typeset';
 import type { Token } from './typeset';
+import { languageOf, latinTag } from './language';
+import { extendedCoverage } from './coverage';
+import type { Coverage } from './coverage';
+export { languageOf };
 
 export const UNICODE_VERSION = '17.0.0';
 const profiles: Record<string, ReadonlySet<string>> = {
@@ -22,13 +26,6 @@ export interface BreakAnalysis {
   outcome: 'supported' | 'native:language' | 'native:script' | 'native:soft-hyphen' | 'native:author-breaks';
   units: BreakUnit[];
   opportunities: number[];
-}
-export function languageOf(tag: string | null | undefined): string {
-  if (!tag?.trim()) return 'und';
-  try {
-    const locale = new Intl.Locale(tag);
-    return locale.script && locale.script !== 'Latn' ? 'unsupported' : locale.language || 'und';
-  } catch { return 'invalid'; }
 }
 /**
  * The most code points (collapsible white space aside) a paragraph may hold
@@ -72,13 +69,38 @@ export function languageWeakEnding(word: string, language: string): boolean {
   return profiles[language]?.has(normalized) ?? false;
 }
 
+const latinOrShared = /[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
+const borrowed = /[\p{Script=Greek}\p{Script=Cyrillic}]/u;
+/** Latin-script text: every character Latin, shared (digits, punctuation,
+ * spaces) or a combining mark, except that Greek and Cyrillic letters may
+ * appear in runs of at most three in text with Latin letters: a unit (5 μg),
+ * a variant (α-synuclein), a constant (Δ). A Greek or Cyrillic word or
+ * sentence still leaves the block native (native:script); 4.3 declined the
+ * block for a single such letter. */
+function latinText(source: string): boolean {
+  let run = 0, any = false;
+  for (const char of source) {
+    if (borrowed.test(char)) {
+      if (/\p{L}/u.test(char) && ++run > 3) return false;
+      any = true;
+    } else if (!latinOrShared.test(char)) return false;
+    else if (!/\p{M}/u.test(char)) run = 0;
+  }
+  return !any || /\p{Script=Latin}/u.test(source);
+}
+
 /** Unicode opportunities, conservatively tailored to horizontal Latin-script CSS.
  * This never inserts hyphens or treats a word boundary as a legal line break. */
-export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string; outcomeOnly?: boolean } = {}): BreakAnalysis {
-  const language = languageOf(options.language);
+export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string; outcomeOnly?: boolean; coverage?: Coverage } = {}): BreakAnalysis {
+  const declared = languageOf(options.language);
+  // English, French, German and Spanish have preferences; untagged text is
+  // neutral. With extended coverage, any other language written in Latin
+  // script is neutral too, and an unreadable tag counts as none.
+  const extended = extendedCoverage(options.coverage);
+  const language = extended && declared === 'invalid' ? 'und' : declared;
   const result: BreakAnalysis = { unicode: UNICODE_VERSION, language, outcome: 'supported', units: [], opportunities: [] };
-  if (!['und', 'en', 'fr', 'de', 'es'].includes(language)) { result.outcome = 'native:language'; return result; }
-  if ([...source].some(c => !/[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u.test(c)) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
+  if (!['und', 'en', 'fr', 'de', 'es'].includes(language) && !(extended && latinTag(options.language))) { result.outcome = 'native:language'; return result; }
+  if (!latinText(source) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
     result.outcome = 'native:script'; return result;
   }
   if (source.includes('\u00ad')) { result.outcome = 'native:soft-hyphen'; return result; }

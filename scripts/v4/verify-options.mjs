@@ -82,6 +82,19 @@ for (const { name, engine, executablePath } of browsers) {
     await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); });
     await page.waitForTimeout(20);
     record(name, 'typeset(el, { copy: "no" }) warns once: copy must be true or false', warnings.length === 1 && warnings[0] === '[typeset] copy must be true or false (received "no")', [...warnings]);
+    // 4.4's options: coverage ('extended' or 'core'), headings (a boolean)
+    // and smartQuotes 'en-declared' compose without a warning; other values
+    // warn once each.
+    warnings.length = 0;
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); for (const options of [{ coverage: 'core' }, { coverage: 'extended' }, { headings: false }, { headings: true }, { smartQuotes: 'en-declared' }]) { window.Typeset.typeset(el, options); window.Typeset.restore(el); } });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { coverage: "core" | "extended" }), { headings: true | false } and { smartQuotes: "en-declared" } log no warning', warnings.length === 0, [...warnings]);
+    for (const [options, expected] of [['{ coverage: "full" }', '[typeset] coverage must be "extended" or "core" (received "full")'], ['{ headings: "no" }', '[typeset] headings must be true or false (received "no")']]) {
+      warnings.length = 0;
+      await page.evaluate(options => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); const value = (0, eval)('(' + options + ')'); for (let i = 0; i < 2; i++) { window.Typeset.typeset(el, value); window.Typeset.restore(el); } }, options);
+      await page.waitForTimeout(20);
+      record(name, `typeset(el, ${options}) warns once: ${expected}`, warnings.length === 1 && warnings[0] === expected, [...warnings]);
+    }
     // Keys named like Object.prototype members (an options object parsed
     // from JSON) warn like any unknown key and stop no later warning.
     warnings.length = 0;

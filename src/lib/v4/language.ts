@@ -32,3 +32,15 @@ export function languageOf(tag: string | null | undefined): string {
     return locale.script && locale.script !== 'Latn' ? 'unsupported' : locale.language || 'und';
   } catch { return 'invalid'; }
 }
+
+/** Whether a declared language is written in the Latin script: its tag names
+ * Latn, or names no script and Latin is the language's likely one
+ * (Intl.Locale's maximize(): pt, vi, sw and sr-Latn are; sr, el and ja are
+ * not). An undeclared or unreadable tag counts as Latin: the check on the
+ * text's own script decides. */
+export function latinTag(tag: string | null | undefined): boolean {
+  const text = normalized(tag);
+  if (!text) return true;
+  try { return new Intl.Locale(text).maximize().script === 'Latn'; }
+  catch { return true; }
+}

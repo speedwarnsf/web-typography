@@ -43,6 +43,10 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
   spacing?: Options['spacing'];
   tracking?: Options['tracking'];
   contour?: Options['contour'];
+  /** Default `'extended'` (Options.coverage): `'core'` leaves native what
+   * 4.3.1 left native (other Latin-script languages, time, dfn, kbd, ins,
+   * visually hidden text, sup and sub). */
+  coverage?: Options['coverage'];
   /** Default `true`: copying composed text puts the source on the clipboard,
    * without the generated line breaks. `false` leaves copying to the
    * browser, whose copied text then has a line break at every composed line
@@ -483,7 +487,7 @@ class RichText extends Component<RichProps, State> {
     this.setState({ plan, stale: false });
   };
   render(): ReactElement {
-    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
+    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, coverage: _coverage, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
     // Education happens during render, where an ancestor's lang is

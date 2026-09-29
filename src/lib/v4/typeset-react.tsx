@@ -29,7 +29,7 @@ const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useL
  * Inline interactive children belong outside this plain-text adapter. A ref
  * resolves to the host element.
  */
-export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, priority = 'auto', onResult, ...attributes }, forwarded) {
+export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, coverage, priority = 'auto', onResult, ...attributes }, forwarded) {
   const ref = useRef<HTMLElement | null>(null);
   const refCleanup = useRef<(() => void) | undefined>(undefined);
   // A classic callback ref (node, then null), which React 18 and 19 both
@@ -49,8 +49,8 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
   // after hydration.
   const curled = (smartQuotes === 'en' || smartQuotes === 'en-declared') && englishScope(attributes.lang, smartQuotes === 'en-declared');
   const quotes = smartQuotes === 'en-declared' && !curled ? false : smartQuotes;
-  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy };
+  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage };
   const report = useRef(onResult);
   report.current = onResult;
   // The text as it shows before composition: educated like the server HTML.
@@ -130,6 +130,6 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     if (first.current) { first.current = false; return; }
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, 'force', true);
-  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy]);
+  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, coverage]);
   return createElement(as, { ...attributes, ref: setHost, 'data-typeset-react': '' }, curled ? educate(initialText) : initialText);
 });

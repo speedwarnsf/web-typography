@@ -14,7 +14,11 @@
 //             heading names. Optional (--firefox, or TYPESET_AX_FIREFOX=1),
 //             run in the nightly lane.
 // Fixtures: the acceptance page, the promise corpus with links, emphasis and
-// headings, and TypesetText/TypesetRichText blocks, at 320, 375 and 768 px.
+// headings, TypesetText/TypesetRichText blocks, and the markup 4.4 newly
+// composes (sup, sub, time, dfn, kbd, ins, visually hidden link text, a
+// Spanish phrase, Greek letters), at 320, 375 and 768 px. The coverage
+// blocks' words are compared with the Chromium tree's words before
+// composition, which joins words at visually hidden text natively too.
 // Two more lanes on the corpus: composed at 768 px and narrowed to 320 px
 // (blocks far offscreen wait, stale, to be recomposed), and composed with an
 // accessibility tree already live, as with a screen reader running, then
@@ -92,6 +96,26 @@ function corpusHTML() {
 <script src="/typeset.js"></script><script>window.composeAll=()=>{const c=Typeset.mount(document,'main p, main h2',{smartQuotes:'en'});return c.ready;};</script></body></html>`;
 }
 
+/** Markup 4.4 composes by default (coverage: 'extended') that 4.3 left
+ * native: sup and sub, time, dfn, kbd, ins, visually hidden link text, a
+ * phrase in another language, and Greek letters in English. */
+function coverageHTML() {
+  const sr = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0';
+  const blocks = [
+    'The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<sup>1</sup> Bring a photo ID and arrive a few minutes before your appointment.',
+    'Drink water through the day; plain H<sub>2</sub>O is the best choice for most people, and the nurse can suggest how much to aim for in hot weather.',
+    'The walk-in hours start at <time datetime="09:00">9 a.m.</time> on weekdays and run until the last visitor has been seen, which is usually by early evening.',
+    'To make the text on this page larger, press <kbd>Ctrl</kbd> and the plus key together, and press them again until the size feels comfortable to read.',
+    'A <dfn>walk-in visit</dfn> needs no appointment, and <ins>as of this month</ins> the clinic also takes walk-in visits for vaccines on Saturday mornings.',
+    `The clinic offers free testing on Saturdays, and results arrive by text message within two days. <a href="#hours">Read more<span style="${sr}"> about testing hours</span></a> on the clinic page before you come.`,
+    `<a href="#guide"><span style="${sr}">Printable </span>Guide to the clinic</a> in English and Spanish, with the hours, the bus stops and a map of the parking lot for every visitor.`,
+    'Staff greet every visitor with <span lang="es">bienvenidos a la clínica</span> and hand out a printed guide in both languages at the front desk.',
+    'The usual starting dose is 5 μg/mL, given once a day with food, and the pharmacist will check the label with you before the first dose.',
+  ];
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia;color:#111}p{margin:0 0 14px;text-wrap:wrap}</style></head><body><main>${blocks.map((html, i) => `<p id="v${i}">${html}</p>`).join('')}</main>
+<script src="/typeset.js"></script><script>window.composeAll=()=>{const c=Typeset.mount(document,'main p');return c.ready;};</script></body></html>`;
+}
+
 const acceptance = await acceptanceFixture();
 const acceptanceHTML = await (await fetch(acceptance.url)).text();
 await acceptance.close();
@@ -102,12 +126,17 @@ const SUBJECTS = [
 ];
 for (const subject of SUBJECTS) Object.assign(subject, { bundleText: await readFile(subject.bundle, 'utf8'), reactText: await reactBundle(subject.react) });
 
-/** @typedef {{ name: string, html: () => string, compose: string | null, blocks: string, widths?: number[], narrowTo?: number, live?: boolean, translate?: boolean, engines?: string[] }} Fixture */
+/** axReference: compare a composed block's words with the Chromium tree's
+ * words for the same block before composition, not with its source words.
+ * Chromium's tree joins the words on either side of visually hidden
+ * (out-of-flow) text natively too ("Read more" + "about testing hours").
+ * @typedef {{ name: string, html: () => string, compose: string | null, blocks: string, widths?: number[], narrowTo?: number, live?: boolean, translate?: boolean, engines?: string[], axReference?: boolean }} Fixture */
 /** @type {Fixture[]} */
 const FIXTURES = [
   { name: 'acceptance', html: () => acceptanceHTML, compose: 'compose', blocks: '[data-compose]' },
   { name: 'corpus', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2' },
   { name: 'react', html: () => '<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:16px;font:18px/1.5 Georgia}h2{font:600 24px/1.25 Georgia}p{margin:0 0 14px}</style></head><body><div id="root"></div><script src="/react-fixture.js"></script></body></html>', compose: null, blocks: '#root p, #root h2' },
+  { name: 'coverage', html: coverageHTML, compose: 'composeAll', blocks: 'main p', axReference: true },
   { name: 'corpus-narrowed', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2', widths: [768], narrowTo: 320 },
   { name: 'corpus-translated-live', html: corpusHTML, compose: 'composeAll', blocks: 'main p, main h2', widths: [320, 768], live: true, translate: true, engines: ['chromium', 'firefox'] },
 ];
@@ -254,6 +283,14 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
               await live.send('Accessibility.enable');
               await live.send('Accessibility.getFullAXTree');
             }
+            // The native tree's words, where the fixture compares with them.
+            /** @type {Record<string, string[]>} */
+            let nativeWords = {};
+            if (fixture.axReference && config.name === 'chromium' && fixture.compose) {
+              const pre = await domFacts(page, fixture.blocks);
+              const preAx = await chromiumAX(page, pre.blocks.map(b => b.id));
+              nativeWords = Object.fromEntries(pre.blocks.map(b => [b.id, words(preAx[b.id]?.text ?? '')]));
+            }
             if (fixture.compose) await page.evaluate(name => /** @type {any} */ (window)[name](), fixture.compose);
             else await page.waitForFunction(selector => { const els = [...document.querySelectorAll(selector)]; return els.length >= 7 && els.every(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome); }, fixture.blocks);
             await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -291,7 +328,7 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
             const blockFailures = [];
             if (config.name !== 'webkit') {
               for (const block of composed) {
-                const source = words(block.text), exposed = words(ax[block.id]?.text ?? '');
+                const source = nativeWords[block.id] ?? words(block.text), exposed = words(ax[block.id]?.text ?? '');
                 tally.blocks++;
                 if (exposed.join(' ') !== source.join(' ')) {
                   const words = unmatched(exposed, source);
@@ -299,7 +336,7 @@ for (const config of browsers.filter(b => b.name !== 'firefox' || firefoxLane)) 
                   blockFailures.push({ id: block.id, unmatchedWords: words.slice(0, 6), exposedWords: exposed.length, sourceWords: source.length });
                 }
               }
-              if (subject.key === 'candidate') checks.push({ browser: config.name, label: `candidate: ${where} composed block words equal source`, pass: blockFailures.length === 0, detail: blockFailures.slice(0, 5) });
+              if (subject.key === 'candidate') checks.push({ browser: config.name, label: `candidate: ${where} composed block words equal ${Object.keys(nativeWords).length ? 'the native tree\'s' : 'source'}`, pass: blockFailures.length === 0, detail: blockFailures.slice(0, 5) });
             }
             const linkFailures = [];
             for (const link of facts.links) {

@@ -125,6 +125,7 @@ attributes (last table).
 | `tracking` | `true` | Adjusts letter spacing by at most 0.01em per line after word spacing. |
 | `contour` | `'finished'` | Ranks candidates by their shape after spacing. `'natural'` is the earlier ranking. |
 | `copy` | `true` | Copying composed text gives the source text, without the generated line breaks. `false` leaves copying to the browser, whose copied text then has a line break at every composed line end. |
+| `coverage` | `'extended'` | Also composes what 4.3 left native: text declared in any Latin-script language (neutral line-end preferences, as for untagged text), a descendant in another Latin-script language, `time`, `dfn`, `kbd`, `ins`, visually hidden text, `sup` and `sub`. `'core'` leaves those native, as 4.3.1 did. |
 | `headings` | `true` | `false` makes `mount()`, `typesetAll()` and the loaders leave h1 to h6 and `role="heading"` untouched, with no outcome written. `typeset()` composes the element it is given. |
 | `text` | | For framework adapters: the current author text. |
 
@@ -152,6 +153,7 @@ installs them itself.
 | `data-typeset-tracking` | on | `"false"` turns off tracking only. |
 | `data-typeset-copy` | on | `"false"` leaves copying to the browser (the `copy` option). |
 | `data-typeset-headings` | on | `"false"` leaves headings untouched (the `headings` option). |
+| `data-typeset-coverage` | `"extended"` | `"core"` leaves native what 4.3.1 left native (the `coverage` option). |
 
 `typeset.us/go` (`dist/go.js`) sets only elements marked `data-typeset`;
 `typeset.us/auto` (`dist/auto.js`, the typeset.us loader) sets all prose.
