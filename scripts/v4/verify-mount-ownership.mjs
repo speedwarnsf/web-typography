@@ -17,12 +17,25 @@ for (const { name, engine, executablePath } of browsers) {
       const source = p.textContent;
       const check = (label, pass, detail) => checks.push({ label, pass: !!pass, detail });
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      // Settled means 500 ms with no pass and no change to the markup, reached
+      // within 3 s. A resize pass lands about 110 ms after the change here, but
+      // a loaded hosted runner once took longer than 250 ms (CI 36521588100,
+      // Firefox: before [1,0], after [2,0], one pass, late), and a single sample
+      // at 250 ms read that one late pass as a rewrite. Controllers that fight
+      // never go quiet, so they still fail within the bound.
       const settle = async (controllers, label) => {
         await wait(250);
-        const passes = controllers.map(c => c.stats.passes), markup = p.innerHTML;
-        await wait(500);
-        check(label, controllers.every((c, i) => c.stats.passes === passes[i]) && p.innerHTML === markup,
-          { before: passes, after: controllers.map(c => c.stats.passes), outcome: p.dataset.tsOutcome });
+        const before = controllers.map(c => c.stats.passes), start = performance.now();
+        let passes = before, markup = p.innerHTML, quietSince = start;
+        while (performance.now() - quietSince < 500 && performance.now() - start < 3000) {
+          await wait(25);
+          const now = controllers.map(c => c.stats.passes);
+          if (p.innerHTML !== markup || now.some((n, i) => n !== passes[i])) {
+            passes = now; markup = p.innerHTML; quietSince = performance.now();
+          }
+        }
+        check(label, performance.now() - quietSince >= 500,
+          { before, after: passes, outcome: p.dataset.tsOutcome, lastChangeMs: Math.round(quietSince - start) });
       };
       const title = api.mount(document, 'main .display', { mode: 'title', maxLines: 2 });
       const prose = api.mount(document, 'main p', { mode: 'body' });

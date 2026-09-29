@@ -127,6 +127,11 @@ text composes is unchanged.
 
 ### Development
 
+- `verify-mount-ownership` judges "settled" as 500 ms with no pass and no
+  change to the markup, reached within 3 s, instead of one sample 250 ms
+  after the change. Firefox on a hosted runner once made the resize's single
+  pass later than 250 ms (CI 36521588100: passes 1 then 2), which the sample
+  read as a rewrite. Controllers that keep rewriting still fail.
 - `verify-package-contents` allows 1.91 MB unpacked instead of 1.9 MB. The
   fixes above take the package from 1.88 MB (4.3.0) to 1.90 MB (1,902,907
   bytes, 87 files): the iframe record handling in every copy of `mount()`,
