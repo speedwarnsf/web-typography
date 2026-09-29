@@ -32,6 +32,11 @@ listed in the CHANGELOG under "Rendering changes", with the number of test
 paragraphs whose output changed. Any other change to default output ships
 behind an option, off by default, or waits for a major version.
 
+A minor release may also compose paragraphs the previous minor left native
+(new languages, inline elements); each addition is listed under "Rendering
+changes" with its count, never changes a paragraph the previous minor
+composed, and `coverage: 'core'` turns it off.
+
 ## Installing so nothing changes under you
 
 - npm: `npm i -E typeset.us@4.4.0` saves the exact version. A caret range
