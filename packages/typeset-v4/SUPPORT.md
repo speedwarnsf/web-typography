@@ -253,11 +253,14 @@ CommonJS entries when `process.env.NODE_ENV` is not `production`, and always in
 `typeset.global.js` and `go.js`) invalid options print one `console.warn` each
 and otherwise behave as before, for example:
 
-- `smartQuotes must be "en" or false (received true)`
-- `smartQuotes must be "en" or false (received "EN")`
+- `smartQuotes must be "en", "en-declared" or false (received true)`
+- `smartQuotes must be "en", "en-declared" or false (received "EN")`
+- `coverage must be "extended" or "core" (received "full")`
 - `spacing must be true or false (received "false")`
 - `tracking must be true or false (received 1)`
 - `opticalHanging must be true or false (received "yes")`
+- `copy must be true or false (received "no")`
+- `headings must be true or false (received "false")`
 - `lineBreaks must be "unicode" or "legacy" (received "auto")`
 - `contour must be "finished" or "natural" (received "smooth")`
 - `mode must be "body", "heading", "title" or "ui" (received "para")`

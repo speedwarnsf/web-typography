@@ -1,11 +1,4 @@
 {
   "note": "Checks expected to fail until the named 4.3 plan item lands. verify-release.mjs reports such a suite as XFAIL, and as XPASS (a failure) once every listed check passes, so each entry is removed by the change that fixes it. label is a regular expression over check labels; browser and modes (candidate, release, staged-release, prebuilt) narrow an entry.",
-  "entries": [
-    {
-      "script": "verify-options",
-      "label": "^SUPPORT\\.md documents \\[typeset\\] smartQuotes must be \"en\", \"en-declared\" or false",
-      "awaiting": "DOCS step: SUPPORT.md's list of development warnings names the 4.4 smartQuotes message",
-      "reason": "4.4 adds smartQuotes: 'en-declared', so the development warning for an invalid smartQuotes value now lists three values. SUPPORT.md is edited only by the DOCS step (PLAN section 5); the browser checks of the message itself pass."
-    }
-  ]
+  "entries": []
 }

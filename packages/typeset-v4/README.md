@@ -3,7 +3,7 @@
 Better line breaks for web text: no stranded short words or one-word last
 lines, links and styling intact, tested in Chromium, WebKit and Firefox.
 
-![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.3.1/before-after.png)
+![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.4.0/before-after.png)
 
 Typeset measures each paragraph in the browser, chooses where its lines
 break, and checks the result after rendering. If a result is not better, or
@@ -23,7 +23,7 @@ Start with CSS. Add Typeset where CSS stops.
 | Links, emphasis and React-rendered text kept exactly as authored | Typeset |
 | A result your CI can check (`auditJSON()`, `npx typeset-audit`) | Typeset |
 | Justified text with hyphenation | Not Typeset: CSS `text-align: justify` with `hyphens: auto`, or a TeX-style justifier |
-| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared English, French, German or Spanish; anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
+| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared in a Latin-script language (with line-end preferences for English, French, German and Spanish); anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
 
 On the typeset.us homepage demo, across 96 widths from 250 to 345 px, short
 words left hanging at line ends went from 215 to 38 against Chromium's
@@ -38,13 +38,13 @@ scripts/field/sweep-homepage.mjs reproduces it.)
 if it ever did.
 
 ```html
-<script src="https://typeset.us/go@4.3.1.js" integrity="sha384-PQvP42IgERdCbNk9MWI9BkD7n+k1WbL6ImFN3cAMbXQq25PhdJynmVXQM0UB3ksB" crossorigin="anonymous" defer></script>
+<script src="https://typeset.us/go@4.4.0.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
 ```
 
 It sets paragraphs, list items, headings, captions and table cells, with
-English smart quotes and hanging punctuation. The same file is on npm as
+hanging punctuation, and English smart quotes in text declared English. The same file is on npm as
 `typeset.us/auto`, so jsDelivr serves it with the same hash:
-`https://cdn.jsdelivr.net/npm/typeset.us@4.3.1/dist/auto.js`.
+`https://cdn.jsdelivr.net/npm/typeset.us@4.4.0/dist/auto.js`.
 Exclude an element and everything in it with `data-no-typeset`.
 
 Declare the page's language: `<html lang="en">`. Typeset keeps "a", "the"
@@ -81,7 +81,7 @@ version.
 **npm, for pages you script yourself:**
 
 ```sh
-npm i -E typeset.us@4.3.1
+npm i -E typeset.us@4.4.0
 ```
 
 ```ts
@@ -168,7 +168,7 @@ attributes (last table).
 
 In development builds an invalid option value, an unknown option or a
 non-string selector logs one `console.warn` (for example `[typeset]
-smartQuotes must be "en" or false (received true)`) and otherwise behaves as
+smartQuotes must be "en", "en-declared" or false (received true)`) and otherwise behaves as
 before. Production bundles leave the checks out; SUPPORT.md lists the
 messages.
 
@@ -191,8 +191,10 @@ installs them itself.
 | `data-typeset-copy` | on | `"false"` leaves copying to the browser (the `copy` option). |
 | `data-typeset-headings` | on | `"false"` leaves headings untouched (the `headings` option). |
 | `data-typeset-coverage` | `"extended"` | `"core"` leaves native what 4.3.1 left native (the `coverage` option). |
+| `data-typeset-defer` | waits for hydration where it finds a server-rendering framework's markers | `"hydration"` waits even without markers; `"none"` composes at DOMContentLoaded, as 4.3 did. |
 
-`typeset.us/go` (`dist/go.js`) sets only elements marked `data-typeset`;
+`typeset.us/opt-in` (`dist/go.js`; `typeset.us/go` is the same file, kept
+as a deprecated alias) sets only elements marked `data-typeset`;
 `typeset.us/auto` (`dist/auto.js`, the typeset.us loader) sets all prose.
 Both log a console note if nothing matches.
 
@@ -203,8 +205,8 @@ composed text gives the source text.
 
 | Install | Sets | Smart quotes | Hanging punctuation | Spacing, tracking | Headings | Copy |
 | --- | --- | --- | --- | --- | --- | --- |
-| Script tag, or `typeset.us/auto` | `p`, `li`, `blockquote`, `figcaption`, `h1` to `h6`, `td`, `th`, `dd`, `dt` | English, in English and untagged text | on | on | yes | on |
-| `typeset.us/go` | `[data-typeset]` | off | off | on | only if marked | on |
+| Script tag, or `typeset.us/auto` | `p`, `li`, `blockquote`, `figcaption`, `h1` to `h6`, `td`, `th`, `dd`, `dt` | English, in text declared English | on | on | yes | on |
+| `typeset.us/opt-in` | `[data-typeset]` | off | off | on | only if marked | on |
 | `mount(root, selector)` | your selector; without one, `[data-typeset]`, `p`, `blockquote`, `figcaption`, `h1` to `h6` | off | off | on | when matched | on |
 | `typeset(element)` | the element given | off | off | on | the element given, as a title inside h1 to h6 | on |
 | `TypesetText` | its own element (`as`) | off | off | on | `as="h1"` to `"h6"` | on |
@@ -231,7 +233,7 @@ it is not an error. The ones you will see most:
 
 All 43 outcomes, and the finishing statuses in `data-ts-spacing`,
 `data-ts-tracking`, `data-ts-hanging` and `data-ts-quotes`:
-https://typeset.us/releases/4.3.1/OUTCOMES.md. In TypeScript they are the
+https://typeset.us/releases/4.4.0/OUTCOMES.md. In TypeScript they are the
 `Outcome` and `FeatureStatus` types, and `OUTCOMES` lists them.
 
 ## Checking it in CI
@@ -278,13 +280,13 @@ Composition runs in the browser, on the main thread.
   only about 6 ms of composition runs inside it, and the rest of the
   on-screen work runs in the next frame, before it paints. Re-renders that
   change nothing write nothing.
-- Download, gzip: 56.5 KB for `go@4.3.1.js` or `auto.js`; with esbuild,
-  Rollup, webpack or Vite, which tree-shake, 50.4 KB for a bundle that
-  imports only `mount`, 50.5 KB for `TypesetText`, 46.8 KB for
-  `TypesetRichText` and 44.3 KB for `typeset()` alone. The helpers that
-  compose nothing are smaller: 14.5 KB for `analyzeBreaks()` and 1.5 KB for
+- Download, gzip: 59.9 KB for `go@4.4.0.js` or `auto.js`; with esbuild,
+  Rollup, webpack or Vite, which tree-shake, 52.4 KB for a bundle that
+  imports only `mount`, 52.6 KB for `TypesetText`, 48.8 KB for
+  `TypesetRichText` and 46.0 KB for `typeset()` alone. The helpers that
+  compose nothing are smaller: 14.9 KB for `analyzeBreaks()` and 1.6 KB for
   `smartQuotes()`. A bundler that does not tree-shake, such as Metro (Expo,
-  React Native Web), ships all of `typeset.us/react`: 63.2 KB for
+  React Native Web), ships all of `typeset.us/react`: 66.2 KB for
   `TypesetText` (4.2.0: 43.2 KB). No runtime dependencies.
 
 To keep the download off the critical path, load the package once the page
@@ -304,7 +306,7 @@ The text paints with the browser's wrapping and rewraps when it is
 composed. This moves the download, not the main-thread work, which is the
 same whenever it runs.
 
-The download sizes are 4.3.1's, minified by esbuild and compressed with
+The download sizes are 4.4.0's, minified by esbuild and compressed with
 gzip -9; the times are 4.3.0 figures from `npm run bench`, measured beside
 4.2.0 on the same machine. Full tables, the method and the comparison:
 https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
@@ -327,8 +329,10 @@ https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
 - **Right-to-left, vertical, and non-Latin scripts.** Arabic, Hebrew, CJK
   and other scripts keep the browser's layout (`native:script`,
   `native:direction`).
-- **Languages other than English, French, German and Spanish.** Other
-  declared languages keep the browser's layout.
+- **Line-end preferences beyond English, French, German and Spanish.**
+  Text declared in another Latin-script language is composed with neutral
+  preferences, as untagged text is (`coverage: 'core'` keeps it native, as
+  4.3 did); other declared languages keep the browser's layout.
 - **Editable text and live regions.** Editable content keeps the browser's
   layout, and so does text inside an `aria-live` region or a `status`,
   `alert`, `log`, `marquee` or `timer` role, or text that contains one, such
@@ -493,14 +497,14 @@ https://github.com/speedwarnsf/web-typography/blob/master/STABILITY.md
   (often called an orphan or widow).
 - **Hanging punctuation**: opening quotes and some capitals set slightly
   into the margin so the text edge looks straight.
-- **Pin**: a versioned file, such as `go@4.3.1.js`, whose bytes never
+- **Pin**: a versioned file, such as `go@4.4.0.js`, whose bytes never
   change, loaded with its integrity hash.
 
 ## More
 
-- Support range and known limitations: https://typeset.us/releases/4.3.1/SUPPORT.md
-- Moving from 4.2: https://typeset.us/releases/4.3.1/MIGRATION.md
-- For AI coding agents: https://typeset.us/releases/4.3.1/for-agents.md and
+- Support range and known limitations: https://typeset.us/releases/4.4.0/SUPPORT.md
+- Moving from 4.2: https://typeset.us/releases/4.4.0/MIGRATION.md
+- For AI coding agents: https://typeset.us/releases/4.4.0/for-agents.md and
   `capabilities.json`
 - Changes: https://github.com/speedwarnsf/web-typography/blob/master/CHANGELOG.md
 - Security policy and reporting: https://github.com/speedwarnsf/web-typography/blob/master/SECURITY.md
