@@ -11,12 +11,17 @@ export type Platform = {
   path: string[];
   tier?: string;
   note?: string;
+  /** Something the owner should know before pasting, shown above the steps. */
+  warning?: string;
 };
 
 import { PINNED_SNIPPET } from './install-snippet';
 
 /** The pinned loader with its integrity hash (from public/sri.json). */
 export const SNIPPET = PINNED_SNIPPET;
+
+/** React sites rendered on the server: the loader can set text before hydration. */
+const HYDRATION_WARNING = 'Framer and Wix build pages with React and render them on the server. The script can set text before React takes over in the browser; React then logs a hydration error (#418 or #425) and redraws the page once. The final page is correct, but error monitors such as Sentry will report it.';
 
 export const PLATFORMS: Record<string, Platform> = {
   ghost: {
@@ -50,12 +55,14 @@ export const PLATFORMS: Record<string, Platform> = {
     name: 'Framer',
     path: ['Site Settings', 'General', 'Custom Code → Start of head — paste, publish'],
     tier: 'Needs any paid site plan.',
+    warning: HYDRATION_WARNING,
   },
   wix: {
     key: 'wix',
     name: 'Wix',
     path: ['Settings', 'Custom code', 'Add code to Head — paste, apply'],
     tier: 'Needs a Premium plan with a connected domain.',
+    warning: HYDRATION_WARNING,
   },
   shopify: {
     key: 'shopify',

@@ -293,6 +293,11 @@ try {
       check('content', `homepage links to ${label}`, developer.includes(`href="${href}"`));
     }
     check('content', 'homepage states a measured loader size, not "38 KB", and no "--" dash', !/38(&nbsp;|\s)KB/.test(developer) && !developer.includes('doing -- visible') && /\d+\.\d(&nbsp;|\s)KB gzipped/.test(developer));
+    // Framer and Wix render React on the server; their pages warn about
+    // hydration errors, and the other platforms' pages do not.
+    const warned = [];
+    for (const route of platforms) if (/hydration error/.test(decode(await (await fetch(base + route)).text()))) warned.push(route);
+    check('content', '/install/framer and /install/wix, and no other platform page, warn about React hydration errors', JSON.stringify(warned.sort()) === JSON.stringify(['/install/framer', '/install/wix']), { platforms, warned });
     const frameworks = await (await fetch(base + '/install/frameworks')).text();
     check('content', '/install/frameworks has Next.js, Vite, Astro, SvelteKit and Vue recipes', ['Next.js (App Router)', 'Vite + React', 'Astro', 'SvelteKit', 'Vue and Nuxt'].every(t => frameworks.includes(t)));
     // New SvelteKit projects compile every file in runes mode, where

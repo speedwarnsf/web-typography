@@ -123,4 +123,5 @@ a.in-card:hover { border-color: #b8963e; }
   margin-bottom: 6px;
 }
 .in-note { color: #a3a3a3; font-size: 0.9375rem; max-width: 52ch; line-height: 1.65; margin-bottom: 20px; }
+.in-warning { color: #c9c9c9; border-left: 2px solid #b8963e; padding-left: 14px; }
 .in-back { display: inline-block; margin-top: 34px; font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #b8963e; text-decoration: none; }
