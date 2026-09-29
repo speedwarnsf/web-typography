@@ -15,7 +15,7 @@ import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
-import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, subscribe, translationActive } from './lifecycle';
+import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, signalQueued, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
 // Controllers share composition state, so only one may write a given target.
 import { mountOwners, mountWaiters } from './ownership';
@@ -1312,6 +1312,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       late = late.concat(queued);
       if (lateTimer === undefined) lateTimer = setTimeout(() => { lateTimer = undefined; if (!stopped) drain(); }, 0);
     }
+    // The same for a stylesheet change: in mount(body) only the lifecycle
+    // hub observes <head>.
+    if (signalQueued(doc)) triggeredSince = true;
     const own = composedSince && !triggeredSince;
     composedSince = triggeredSince = false;
     for (const entry of entries) {

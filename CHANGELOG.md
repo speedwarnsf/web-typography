@@ -46,16 +46,20 @@ Planned as 4.3.1. Not published.
   outside changes from their mutation records, and WebKit delivers the
   records of a change that an about:blank page makes in its same-origin
   iframe (a preview frame) after that frame's ResizeObserver callbacks. A
-  width change made in the frame after a composition was then taken for
-  the controller's own: a block widened from 230 to 290 px kept its 230 px
+  width change made in the frame after a composition was then taken for the
+  controller's own: a block widened from 230 to 290 px kept its 230 px
   lines, and one narrowed to a width its composed lines still fit kept lines
   composed for the old width. The ResizeObserver now takes the records
-  still queued and counts them as outside changes, and a pass handles
-  queued records before it stops observing instead of discarding them. In
-  WebKit, 4.3.0 kept the old lines in 16 of 40 probe attempts and in every
-  attempt of `verify-iframe-mount`'s new check; 4.3.1 recomposed every one.
-  On GitHub's macos-15 runners this was the WebKit failure of "a width
-  change is recomposed" in about a third of runs since 4.3.0.
+  still queued, its own and the stylesheet records of the lifecycle
+  observer (in `mount(body)` nothing else watches `<head>`), and counts them
+  as outside changes; a pass handles queued records before it stops
+  observing instead of discarding them. This was `verify-iframe-mount`'s
+  WebKit failure of "a width change is recomposed" on GitHub's macos-15
+  runners: 20 of 60 runs of 4.3.0 in a repeat loop (Nightly 36506714283
+  and 36508950284), none of 60 with the fix. Its new checks, which widen a
+  block by its style attribute and by a stylesheet from the page's
+  `requestAnimationFrame`, failed 4.3.0 in every run there (60 of 60 and
+  30 of 30).
 
 ### Development
 
@@ -70,9 +74,10 @@ Planned as 4.3.1. Not published.
   controller's passes and compositions, and a timeline of layout, record
   delivery and writes. Each pass starts from a 420 px iframe; the
   `mount(body)` pass used to inherit the first pass's 260 px, so its "iframe
-  resize" step resized nothing. A new check widens a block from the page's
-  `requestAnimationFrame` in the frame after a composition, which puts
-  WebKit's record after layout every time.
+  resize" step resized nothing. Two new checks widen a block, by its style
+  attribute and by a stylesheet, from the page's `requestAnimationFrame` in
+  the frame after a composition, where WebKit delivers the record after
+  layout; Chromium and Firefox deliver it first and pass either way.
 
 ## 4.3.0 - 2026-09-26
 

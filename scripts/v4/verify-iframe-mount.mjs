@@ -96,41 +96,53 @@ for (const { name, engine, executablePath } of browsers) {
         // An author's width change made in the first frame after a
         // composition, from this page's requestAnimationFrame. The page is
         // about:blank, and WebKit gives the iframe its own event loop: the
-        // style change's record waits for the iframe's microtask checkpoint,
-        // after the frame's ResizeObserver callbacks, so the controller's
+        // change's record waits for the iframe's microtask checkpoint, after
+        // the frame's ResizeObserver callbacks, so the controller's
         // ResizeObserver sees the new width with only its own composition
         // since it last delivered. That is the order in which 'a width change
         // is recomposed' failed on hosted WebKit runners. Widened, lines
-        // composed for the old width still fit, and 4.3.0 kept them. Each edit
-        // makes the block longer or shorter, so the frame between the edit and
-        // its composition delivers a resize, as it would on a page.
+        // composed for the old width still fit, and 4.3.0 kept them. A
+        // stylesheet in <head> is observed by the lifecycle hub, and in
+        // mount(body) by nothing else. Each edit makes the block longer or
+        // shorter, so the frame between the edit and its composition delivers
+        // a resize, as it would on a page.
         const b = doc.createElement('p');
+        b.id = 'b';
         b.style.width = '230px';
         b.textContent = text;
         doc.querySelector('main')?.append(b);
         await until(() => intact(b));
-        const kept = [];
-        for (let attempt = 0; attempt < 3; attempt++) {
-          compositions = controller.stats.compositions;
-          b.textContent = attempt % 2 ? text : edited;
-          const widened = await new Promise(resolve => {
-            const start = performance.now();
-            const frame = () => {
-              if (controller.stats.compositions > compositions) { compositions = controller.stats.compositions; seen = watch(b); b.style.width = '290px'; resolve(true); }
-              else if (performance.now() - start > 5000) resolve(false);
-              else requestAnimationFrame(frame);
-            };
-            requestAnimationFrame(frame);
-          });
-          if (!widened) { kept.push({ attempt, step: 'the edit was not composed' }); break; }
-          pass = await until(() => controller.stats.compositions > compositions && intact(b) && Math.abs(api.measureLayout(b).width - 290) < .5);
-          if (!pass) { kept.push({ attempt, ...seen(pass) }); break; }
-          seen(pass);
-          compositions = controller.stats.compositions;
-          b.style.width = '230px';
-          await until(() => controller.stats.compositions > compositions && intact(b));
+        const sheet = doc.createElement('style');
+        sheet.textContent = '#b{width:290px!important}';
+        /** @type {[string, () => void, () => void][]} */
+        const changes = [
+          ['a width change', () => { b.style.width = '290px'; }, () => { b.style.width = '230px'; }],
+          ['a stylesheet width change', () => { doc.head.append(sheet); }, () => { sheet.remove(); }],
+        ];
+        for (const [change, widen, narrow] of changes) {
+          const kept = [];
+          for (let attempt = 0; attempt < 3; attempt++) {
+            compositions = controller.stats.compositions;
+            b.textContent = b.textContent === edited ? text : edited;
+            const widened = await new Promise(resolve => {
+              const start = performance.now();
+              const frame = () => {
+                if (controller.stats.compositions > compositions) { compositions = controller.stats.compositions; seen = watch(b); widen(); resolve(true); }
+                else if (performance.now() - start > 5000) resolve(false);
+                else requestAnimationFrame(frame);
+              };
+              requestAnimationFrame(frame);
+            });
+            if (!widened) { kept.push({ attempt, step: 'the edit was not composed' }); break; }
+            pass = await until(() => controller.stats.compositions > compositions && intact(b) && Math.abs(api.measureLayout(b).width - 290) < .5);
+            if (!pass) { kept.push({ attempt, ...seen(pass) }); break; }
+            seen(pass);
+            compositions = controller.stats.compositions;
+            narrow();
+            await until(() => controller.stats.compositions > compositions && intact(b) && Math.abs(api.measureLayout(b).width - 230) < .5);
+          }
+          check(change + ' in the frame after a composition is recomposed (3 attempts)', !kept.length, kept.length ? kept : undefined);
         }
-        check('a width change in the frame after a composition is recomposed (3 attempts)', !kept.length, kept.length ? kept : undefined);
         // A font inside the iframe: its FontFaceSet, not the parent's, reports it.
         const face = new (/** @type {any} */ (iframe.contentWindow)).FontFace('LateFace', 'url(data:font/woff2;base64,' + font + ')', { weight: '100 900' });
         a.classList.add('late');

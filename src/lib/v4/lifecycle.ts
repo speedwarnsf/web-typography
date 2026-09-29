@@ -16,7 +16,7 @@ export interface LifecycleClient {
   translation?(active: boolean): void;
 }
 
-interface Hub { clients: Set<LifecycleClient>; faces: WeakSet<FontFace>; ready: boolean; translated: boolean; classed: boolean; stop: () => void }
+interface Hub { clients: Set<LifecycleClient>; faces: WeakSet<FontFace>; ready: boolean; translated: boolean; classed: boolean; stop: () => void; take: () => boolean }
 const hubs = new WeakMap<Document, Hub>();
 // On the document itself, so every engine copy on a page (a loader script and
 // a bundled React adapter, say) sees a translator's mark.
@@ -172,7 +172,7 @@ export function armFonts(doc: Document): void {
 
 function start(doc: Document): Hub {
   const view = doc.defaultView;
-  const hub: Hub = { clients: new Set(), faces: new WeakSet(), ready: false, translated: translationActive(doc), classed: translatedClass(doc), stop: () => {} };
+  const hub: Hub = { clients: new Set(), faces: new WeakSet(), ready: false, translated: translationActive(doc), classed: translatedClass(doc), stop: () => {}, take: () => false };
   const resize = () => notify(hub, client => client.resize?.());
   const fonts = () => { notify(hub, client => client.fonts?.()); armFonts(doc); };
   const loading = () => armFonts(doc);
@@ -187,11 +187,13 @@ function start(doc: Document): Hub {
   };
   // Stylesheets arrive and switch without touching composed text: a late
   // @font-face, a text-spacing bookmarklet, a theme <link media>.
-  const observer = new MutationObserver(records => {
+  const signal = (record: MutationRecord) => record.target === doc.documentElement && record.type === 'attributes' ? 'class' : styleMutation(record) ? 'styles' : '';
+  const handle = (records: MutationRecord[]) => {
     let styles = false, rootClass = false;
     for (const record of records) {
-      if (record.target === doc.documentElement && record.type === 'attributes') rootClass = true;
-      else if (styleMutation(record)) styles = true;
+      const kind = signal(record);
+      if (kind === 'class') rootClass = true;
+      else if (kind === 'styles') styles = true;
     }
     if (rootClass) {
       const classed = translatedClass(doc);
@@ -202,7 +204,14 @@ function start(doc: Document): Hub {
       if (now !== hub.translated) { hub.translated = now; notify(hub, client => client.translation?.(now)); }
     }
     if (styles) { notify(hub, client => client.styles?.()); armFonts(doc); }
-  });
+  };
+  const observer = new MutationObserver(handle);
+  hub.take = () => {
+    const records = observer.takeRecords();
+    if (!records.length) return false;
+    setTimeout(() => { if (hubs.get(doc) === hub) handle(records); }, 0);
+    return records.some(record => signal(record) !== '');
+  };
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class'] });
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
   const faces = doc.fonts as FontFaceSet | undefined;
@@ -228,6 +237,16 @@ function start(doc: Document): Hub {
     doc.removeEventListener('contentvisibilityautostatechange', visibility, true);
   };
   return hub;
+}
+
+/** Whether a stylesheet or root class change is still queued: made, and
+ * laid out, but not yet delivered to the hub's MutationObserver. WebKit
+ * delivers the records of a mutation that an about:blank page makes in its
+ * same-origin iframe after that frame's ResizeObserver callbacks, which call
+ * this; the records are taken and delivered in the next task, since those
+ * callbacks must not write. */
+export function signalQueued(doc: Document): boolean {
+  return hubs.get(doc)?.take() ?? false;
 }
 
 /** Receive this document's lifecycle signals until the returned function runs. */
