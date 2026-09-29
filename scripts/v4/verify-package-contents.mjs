@@ -105,8 +105,14 @@ try {
   // react.js (+0.9 KB) and both source maps (+2.2 KB each), their
   // declarations (lifecycle.d.ts and .d.cts +1.8 KB each), the marker rules
   // in dist/styles.css (+958 B), and capabilities.json, OUTCOMES.md and
-  // README.md (+2.3 KB together).
-  check('unpacked package is under 1.94 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1940000, packed.unpackedSize);
+  // README.md (+2.3 KB together). The 4.4 adoption docs took it past
+  // 1.94 MB (1,944,497 B, +8,046 B): README.md's install warnings
+  // (user-generated text, server-rendered React, lang), its defaults table,
+  // idle-load recipe and find-in-page, reader-view and translation limits
+  // (+6,919 B), SUPPORT.md's run-budget timings and translator notes
+  // (+672 B) and SECURITY.md's dated support window (+455 B), so the limit
+  // moves to 1.95 MB.
+  check('unpacked package is under 1.95 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1950000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];
