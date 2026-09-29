@@ -29,7 +29,7 @@ text and other Latin-script languages have neutral preferences (coverage:
   typeset.us@4.4.0, MIT: ESM, CJS, browser global, automatic loader, React and declarations
 - [Capabilities](https://typeset.us/capabilities.json): machine-readable support contract
 - [Outcomes](https://typeset.us/releases/4.4.0/OUTCOMES.md): what every data-ts-outcome means and what to do
-- [Migration](https://typeset.us/releases/4.4.0/MIGRATION.md): from 4.2, and rollback
+- [Migration](https://typeset.us/releases/4.4.0/MIGRATION.md): from 4.3 and 4.2, and rollback
 - [Support](https://typeset.us/releases/4.4.0/SUPPORT.md): tested range, known limitations and outstanding acceptance
 - [FAQ](https://typeset.us/faq): screen readers, layout shift, SEO, copying, no-JS
 - [Integrity](https://typeset.us/sri.json): immutable browser pins and advisories

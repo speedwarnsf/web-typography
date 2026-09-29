@@ -28,10 +28,35 @@ coverage additions below by default (`coverage: 'extended'`, one constant,
 `COVERAGE_DEFAULT` in `src/lib/v4/coverage.ts`). STABILITY.md as 4.3 wrote
 it lets a minor release add them only behind an option that is off by
 default, so the maintainer decides at the cut: keep `'extended'` together
-with the STABILITY.md sentence that allows it (a separate commit, so it can
-be reverted), or set `COVERAGE_DEFAULT` to `'core'`, revert that sentence and
-list the additions as opt-in. `'core'` composes exactly what 4.3.1 composed
-(counts below).
+with the STABILITY.md sentence that allows it (commit b913c19, separate so
+it can be reverted), or decline it. `'core'` composes exactly what 4.3.1
+composed (counts below). Declining takes, in one commit:
+
+- `git revert b913c19` (the STABILITY.md sentence);
+- `src/lib/v4/coverage.ts`: `COVERAGE_DEFAULT` to `'core'`, and its comment;
+- `src/lib/v4/typeset.next.ts`: the `coverage` option's JSDoc, which gives
+  the default as `'extended'` (the adapters' `coverage` prop and the loaders
+  defer to it);
+- `npm run docs:outcomes`: OUTCOMES.md and docs/outcomes.md name the default
+  from `COVERAGE_DEFAULT`, so they follow without an edit;
+- `packages/typeset-v4/README.md`: the "Do I need it?" languages row, the
+  sentence after the npm install line and the Stability section (a minor
+  release then changes default rendering only to fix a verified defect),
+  the options table's `coverage` row (default `'core'`; `'extended'` opts
+  in) and "What it won't do", line-end preferences;
+- `packages/typeset-v4/capabilities.json`: `defaults.coverage`,
+  `coverage.default` and `otherLatinLanguages`;
+- `packages/typeset-v4/SUPPORT.md`: the first bullet (other Latin-script
+  languages compose only with `coverage: 'extended'`);
+- `packages/typeset-v4/MIGRATION.md`: step 4 under "From 4.3" (the additions
+  become opt-in; nothing to do to keep 4.3.1's coverage);
+- `packages/typeset-v4/for-agents.md`: the languages paragraph, which names
+  `'extended'` as the default;
+- `public/llms.txt`: the line-end preferences sentence;
+- this section: the note above, the "Coverage additions" heading and the
+  `coverage` entry under Added, listed as opt-in;
+- tests that expect the additions by default (`verify-coverage`, the
+  coverage fixture in `verify-native-ax`) pass `coverage: 'extended'`.
 
 ### Rendering changes
 
@@ -287,6 +312,14 @@ and `/fix` flagging unpinned loaders; a hydration warning on the Framer and
 Wix install pages; the demo pages and the homepage manifesto recomposing
 when their width changes; no visit notifications to a public ntfy topic.
 
+These are on this release's branch and deploy with the site when it merges,
+since they describe 4.4.0: each install page says under its install line
+what the loader does by default; the Framer and Wix pages describe the
+hydration wait (Wix: add `data-typeset-defer="hydration"`); /faq answers page
+language, hydration errors and user-generated text, and gives the
+find-in-page, translation and reader-view measurements; the homepage's "Do
+I need it?" list has a languages row.
+
 ### Documentation
 
 - The package README warns at the script tag about `lang` (on 42 test
@@ -305,6 +338,19 @@ when their width changes; no visit notifications to a public ntfy topic.
 - SUPPORT.md gives the run-budget timings and names the new development
   warnings (`copy`, `headings`, `coverage` and the three `smartQuotes`
   values).
+- MIGRATION.md is "Moving to 4.4.0": what changes from 4.3 (the loader's
+  quote default, coverage, the run budget, the hydration wait,
+  `whenSettled()`, `./opt-in` and the CDN default file, the audit's review
+  items, marker styles and sizes), with the 4.2.0 steps kept below it.
+  SUPPORT.md and for-agents.md describe 4.4.0: every new option, loader
+  attribute, outcome and review item, with language claims qualified by
+  `coverage`, and the three limitations 4.3.1 said were planned for 4.4
+  marked as not addressed.
+- The package README has a "Visual tests" section (`whenSettled()` with
+  Playwright and a Storybook play function), a preview with
+  `npx typeset-audit --apply` before installing, the `overflow-x: clip` and
+  `priority="sync"` workarounds, `spacing: false` as the low-element mode and
+  the hosted loader's lack of an uptime guarantee.
 - The npm description says "tested in Chromium, WebKit and Firefox".
 - The internal launch and candidate notes moved out of the repository, and
   docs/OWNER-ACTIONS.md is a maintainer checklist that says what is done.

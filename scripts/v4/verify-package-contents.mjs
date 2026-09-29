@@ -132,7 +132,15 @@ try {
   // run-budget timings and translator notes (+672 B) and SECURITY.md's dated
   // support window (+455 B). Merged on release/4.4.0, with the README and
   // SUPPORT.md naming 4.4.0 and its new warnings: 2,034,092 B, 97 files.
-  check('unpacked package is under 2.04 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2040000, packed.unpackedSize);
+  // The 4.4.0 docs review added 32,975 B of package text (file sizes against
+  // de8c204): MIGRATION.md's "Moving to 4.4.0" (+9,227 B), SUPPORT.md's
+  // coverage-qualified languages, hydration wait, whenSettled(), headings,
+  // copy, entry points and review items (+8,382 B), for-agents.md's 4.4.0
+  // contract (+6,104 B, packed twice, as itself and as AGENTS.md), the
+  // README's Visual tests section, audit preview and workarounds (+2,965 B),
+  // capabilities.json (+149 B) and OUTCOMES.md (+44 B). Measured with them:
+  // 2,067,743 B, 97 files.
+  check('unpacked package is under 2.08 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2080000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];

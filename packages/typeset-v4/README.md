@@ -34,6 +34,19 @@ scripts/field/sweep-homepage.mjs reproduces it.)
 
 ## Install
 
+To see what Typeset would do to a page before you install anything, run the
+audit command on it with `--apply`, which composes an isolated copy in a
+headless browser and leaves your site alone:
+
+```sh
+npm i -D playwright && npx playwright install chromium
+npx typeset-audit --url https://example.com/your-post --selector 'article p' --apply
+```
+
+At four widths, the JSON counts the paragraphs by outcome ([What happened
+to my paragraph?](#what-happened-to-my-paragraph)) and lists any errors and
+items to review.
+
 **A script tag**, pinned: the file never changes, and the browser refuses it
 if it ever did.
 
@@ -45,6 +58,8 @@ It sets paragraphs, list items, headings, captions and table cells, with
 hanging punctuation, and English smart quotes in text declared English. The same file is on npm as
 `typeset.us/auto`, so jsDelivr serves it with the same hash:
 `https://cdn.jsdelivr.net/npm/typeset.us@4.4.0/dist/auto.js`.
+typeset.us hosting has no uptime guarantee: for production, serve the file
+from your own domain (`typeset.us/auto` from npm) or use the jsDelivr line.
 Exclude an element and everything in it with `data-no-typeset`.
 
 Declare the page's language: `<html lang="en">`. Typeset keeps "a", "the"
@@ -74,7 +89,8 @@ render costs main-thread time, and error monitors such as Sentry report it.
 In a test page, delaying hydration by 300 ms was enough to cause it. 4.4
 makes the script tag wait for hydration before its first composition on
 pages that carry a server-rendering framework's markers, such as those of
-Next.js and Gatsby. For text React renders, the adapters below, or `mount()`
+Next.js and Gatsby (`data-typeset-defer="hydration"` makes it wait on other
+pages too). For text React renders, the adapters below, or `mount()`
 called in a `useEffect`, which runs after hydration, avoid the race with any
 version.
 
@@ -118,7 +134,10 @@ the page's one-time setup not counted, continues in the next frame, as on a
 very slow device; under an `overflow-x: hidden` app root or in a
 horizontal carousel, offscreen blocks count as near and compose in frames,
 and in WebKit some animated carousel cards keep native lines, known
-limitations SUPPORT.md describes). Server-rendered HTML (Next.js,
+limitations SUPPORT.md describes: on an app root, `overflow-x: clip`
+clips the same way without making a scroll container, and
+`priority="sync"` on a hero block composes it in the commit, so it never
+paints native lines). Server-rendered HTML (Next.js,
 Remix) first paints with the browser's own wrapping and is composed after
 hydration, so it rewraps after the first paint, and on phones that often
 adds a line (see the FAQ on layout shift).
@@ -142,7 +161,9 @@ renders is best set with the adapters. For Vue, Svelte, Astro and plain
 HTML, see https://typeset.us/install/frameworks.
 
 `-E` saves the exact version. A minor release changes default rendering only
-to fix a verified defect (see [Stability](#stability)).
+to fix a verified defect, or, as 4.4 does with `coverage: 'extended'`, to
+compose paragraphs the previous minor left native, which `coverage: 'core'`
+turns off (see [Stability](#stability)).
 
 ## Options
 
@@ -158,7 +179,7 @@ attributes (last table).
 | `lineBreaks` | `'unicode'` | Unicode 17 line-break rules with English, French, German and Spanish preferences from `lang`. `'legacy'` is the earlier English-only path, kept for comparison. |
 | `smartQuotes` | `false` | `'en'` turns straight quotes and apostrophes curly in English text, declared or untagged. `'en-declared'` does so only where `lang` declares English. A quote with a space on both sides, or with no quotation to close (`width="100"`), stays straight. Changes the copied text. |
 | `opticalHanging` | `false` | `true` hangs opening quotes and capitals into the margin when they fit. |
-| `spacing` | `true` | Adjusts word spaces (-20% to +33%) on composed left-aligned body text to even the right edge. `false` also turns off `tracking`. |
+| `spacing` | `true` | Adjusts word spaces (-20% to +33%) on composed left-aligned body text to even the right edge. `false` also turns off `tracking`, and is the low-element mode: no spacing markers or tracking wrappers, so a composed paragraph gains little more than its line breaks (very long pages, session-replay recorders). |
 | `tracking` | `true` | Adjusts letter spacing by at most 0.01em per line after word spacing. |
 | `contour` | `'finished'` | Ranks candidates by their shape after spacing. `'natural'` is the earlier ranking. |
 | `copy` | `true` | Copying composed text gives the source text, without the generated line breaks. `false` leaves copying to the browser, whose copied text then has a line break at every composed line end. |
@@ -190,7 +211,7 @@ installs them itself.
 | `data-typeset-tracking` | on | `"false"` turns off tracking only. |
 | `data-typeset-copy` | on | `"false"` leaves copying to the browser (the `copy` option). |
 | `data-typeset-headings` | on | `"false"` leaves headings untouched (the `headings` option). |
-| `data-typeset-coverage` | `"extended"` | `"core"` leaves native what 4.3.1 left native (the `coverage` option). |
+| `data-typeset-coverage` | the `coverage` default | `"core"` leaves native what 4.3.1 left native; `"extended"` composes the additions (the `coverage` option). |
 | `data-typeset-defer` | waits for hydration where it finds a server-rendering framework's markers | `"hydration"` waits even without markers; `"none"` composes at DOMContentLoaded, as 4.3 did. |
 
 `typeset.us/opt-in` (`dist/go.js`; `typeset.us/go` is the same file, kept
@@ -261,6 +282,46 @@ loader's `window.TypesetReady`, or an outcome on every element in scope)
 for up to `--timeout` seconds (30) per width, and names any element still
 unprocessed. It needs Node 18.3 or later; the library itself runs in the
 browser and has no Node requirement.
+
+## Visual tests
+
+Typeset composes after the page loads: it waits for web fonts, on a
+server-rendered page for hydration, and composes offscreen text later, so a
+screenshot taken at the load event can catch native lines, or lines still
+changing. Wait for `whenSettled()` first. It resolves `{ settled: true }` once
+every `mount()` controller and React adapter block has its outcome, no
+composition work is queued, no web font is loading and a loader waiting for
+hydration has composed, or `{ settled: false }` at the timeout (default
+10 s). Under jsdom and happy-dom it resolves at once.
+
+With the script tag, in Playwright:
+
+```ts
+await page.goto('/article');
+const { settled } = await page.evaluate(() => window.Typeset.whenSettled());
+expect(settled).toBe(true);
+await expect(page).toHaveScreenshot();
+```
+
+With npm, `whenSettled` comes from `typeset.us` or `typeset.us/react`, and
+every engine copy on the page reports to it. A Storybook play function runs
+in the page, so it can await it directly:
+
+```ts
+import { whenSettled } from 'typeset.us';
+
+export const Article = {
+  play: async () => {
+    await whenSettled({ timeout: 5000 });
+  },
+};
+```
+
+For Playwright, expose it from your app in test builds (for example
+`window.whenSettled = whenSettled`) and call it from `page.evaluate` as
+above. It does not wait for blocks React has not mounted yet (a pending
+Suspense boundary), for a finite CSS animation to end, or for offscreen
+blocks a resize left until they are scrolled near.
 
 ## What it costs
 
@@ -470,8 +531,11 @@ package and call `mount()` when you choose, for example after
 
 Semver covers API names, `auditJSON` `schemaVersion`, outcome codes, CLI
 exit codes and default rendering. A minor release changes default rendering
-only to fix a verified defect, and lists each change in the CHANGELOG under
-"Rendering changes". Published files never change. `go.js` is for trying
+only to fix a verified defect, or to compose paragraphs the previous minor
+left native (as 4.4 does with `coverage: 'extended'`; `coverage: 'core'`
+turns that off, and no paragraph the previous minor composed changes), and
+lists each change in the CHANGELOG under "Rendering changes". Published
+files never change. `go.js` is for trying
 Typeset out: it follows 4.x and will never move to 5.0. 4.x gets bug and
 security fixes until at least 2027-09-30, whenever 5.0 ships, and when a
 minor release ships, the one before it gets security fixes for 60 more
@@ -503,7 +567,7 @@ https://github.com/speedwarnsf/web-typography/blob/master/STABILITY.md
 ## More
 
 - Support range and known limitations: https://typeset.us/releases/4.4.0/SUPPORT.md
-- Moving from 4.2: https://typeset.us/releases/4.4.0/MIGRATION.md
+- Moving from 4.3 or 4.2: https://typeset.us/releases/4.4.0/MIGRATION.md
 - For AI coding agents: https://typeset.us/releases/4.4.0/for-agents.md and
   `capabilities.json`
 - Changes: https://github.com/speedwarnsf/web-typography/blob/master/CHANGELOG.md

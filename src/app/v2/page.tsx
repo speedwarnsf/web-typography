@@ -679,6 +679,7 @@ function DevelopersBand() {
         <li><span>The same result in Firefox</span><span className="v2-gold">Typeset</span></li>
         <li><span>Links and styling kept exactly; results your CI can check</span><span className="v2-gold">Typeset</span></li>
         <li><span>Justified text with hyphenation</span><span>Not Typeset: CSS <code>hyphens: auto</code></span></li>
+        <li><span>Right-to-left or non-Latin scripts; line-end rules for languages other than English, French, German and Spanish</span><span>CSS <code>text-wrap: pretty</code></span></li>
       </ul>
       <p className="v2-body v2-narrow">
         {LOADER_GZIP_KB}&nbsp;KB gzipped for the script tag. No dependencies, no

@@ -1,15 +1,41 @@
-# Typeset 4.3.1 support contract
+# Typeset 4.4.0 support contract
 
-4.3.1, a patch release of 4.3.0, is released with owner approval within the
-range below. Local tests
+4.4.0, a minor release of 4.3 that includes 4.3.2's fix, is released with
+owner approval within the range below. Local tests
 are not certification for every device, browser, font, or sentence.
 What each outcome means: OUTCOMES.md. What a version promises: STABILITY.md
-in the repository.
+in the repository. What changed from 4.3: MIGRATION.md.
 
-- Horizontal LTR Latin prose/titles; declared English, French, German and
-  Spanish. Untagged Latin uses neutral preferences.
+- Horizontal LTR Latin prose/titles. Line-end preferences for declared
+  English, French, German and Spanish; untagged Latin uses neutral
+  preferences, and no language is inferred. With `coverage: 'extended'`
+  (the default), text declared in any other language whose likely script is
+  Latin (pt, pt-BR, it, nl, pl, sv, tr, vi, fil, sw, ht, sr-Latn and so on)
+  also composes, with neutral preferences, and an unreadable tag
+  (`{{ page.lang }}`) counts as untagged. With `coverage: 'core'`, other
+  declared languages keep the browser's layout (`native:language`), as in
+  4.3.1. Under both, a `lang` spelled with an underscore or as a language
+  name (`en_US`, `en_US.UTF-8`, `EN_us`, `english`, `Deutsch`, `francais`,
+  `español`, and the unambiguous names for pt, it and nl) is read as the
+  language it names; languages written in other scripts (ar, he, ja, zh, ko,
+  th, hi, el, Cyrillic sr), and Latin text under such a tag, keep the
+  browser's layout.
 - Ordinary inline links, bold, italics and supported semantic spans. Author
-  elements are not cloned/reparented by the imperative rich renderer.
+  elements are not cloned/reparented by the imperative rich renderer. With
+  `coverage: 'extended'` also `time`, `dfn`, `kbd` and `ins`; `sup` and
+  `sub`, `vertical-align: super` and `sub`, and a `sup` raised with
+  `position: relative` (normalize.css, Tailwind preflight), measured in
+  place and verified against the rendered lines; visually hidden text (the
+  sr-only pattern, clip-path variants included) and `aria-hidden` elements
+  with no width, as zero-width atoms that no generated break falls inside
+  and that measurement, spacing and tracking leave out. `'core'` leaves a
+  block with any of them native, as 4.3.1 did. Still native under both:
+  `br`, `img`, `svg`, `q`, `bdi`, a visible `aria-hidden` icon, `::after`
+  link icons and `vertical-align: top`.
+- Up to three Greek or Cyrillic letters in a row inside Latin text ("5 μg/mL",
+  "α-synuclein", "ΔG", "ПЦР") compose under both coverage values; a Greek
+  sentence, a Cyrillic word or four such letters in a row keep the block
+  native (`native:script`).
 - React 18.2 and later, and every React 19 minor (optional peers `react` and
   `react-dom`, `^18.2.0 || ^19.0.0`).
   `scripts/v4/verify-react-matrix.mjs` installs the packed package beside
@@ -55,8 +81,14 @@ emptied node set to '' again is not noticed; the legacy .ts-line renderer
 (lineBreaks: 'legacy' on plain text) copies text and never sees framework
 writes. `TypesetRichText` with any component child (next/link's `<Link>`,
 a router link, a function or class component) stays native
-(`native:react-component`); its children must be text and host elements. Unsupported CSS/scripts, mixed-language blocks, automatic/soft
-hyphens and editable content remain native. Native text may have authored
+(`native:react-component`); its children must be text and host elements.
+Unsupported CSS/scripts, automatic/soft hyphens and editable content remain
+native. So does a block with a descendant in a language written in another
+script (a Japanese phrase in English text: `native:mixed-language`); a
+descendant in another Latin-script language (`<span lang="es">`,
+`lang="en-GB"` inside untagged text) is part of the paragraph and set with
+the block's preferences under `coverage: 'extended'`, and leaves the block
+`native:mixed-language` under `'core'`. Native text may have authored
 overflow or an orphan: fallback means declined intervention, not perfection.
 
 Justified text remains native and reports `native:justify`: a generated break
@@ -102,12 +134,21 @@ transforms are supported; text is not composed under scale, rotation,
 perspective or nonzero Z, though a composition made before such a transform
 is kept while it applies.
 
-Smart quotes are explicit English, quotes-only. Each quote keeps its kind:
+Smart quotes are explicit English, quotes-only. `smartQuotes: 'en'` curls
+quotes in declared English and untagged text; `'en-declared'` (new in 4.4,
+and the automatic loader's default) only where the element or an ancestor
+declares `en` or `en-*`, so an untagged German or French page keeps its
+quotes. `data-typeset-smart-quotes="en"` gives the loader 4.3's behaviour. A
+double quote with white space or the text's edge on both sides (French
+spaced quotes), or with no open quotation to close (`width="100"`), stays
+straight; primes after a number (`5'10"`) and elisions are curled as in
+4.3.1. Each quote keeps its kind:
 single quotes are never turned into double quotes, or the reverse. From 4.3
 TypesetText curls them during render, so server HTML already has them;
 TypesetRichText does so only with lang="en" (or en-*) on the component itself,
 since render cannot see an ancestor's lang, and warns in development builds
-when it is missing. Educated quotes stay in every state, not only in composed
+when it is missing; with `'en-declared'` both adapters need `lang` on the
+component. Educated quotes stay in every state, not only in composed
 lines: text that declines, shows native wrapping while its width changes
 (`data-ts-stale`), waits offscreen or is kept native because a
 TypesetRichText child is a component (the text it passes to that component
@@ -243,6 +284,77 @@ as they were, so a framework's next write to its own node and a later
 remain, so a translation of that text is read per line. `TypesetText` steps
 aside like `mount()`.
 
+Server-rendered pages (the loaders, from 4.4). On a page with a
+server-rendering marker (`#__next`, `#__NEXT_DATA__`, `self.__next_f`,
+`#___gatsby`, `[data-framer-hydrate-v2]`, `astro-island`,
+`[data-server-rendered]`, or a React root on the document, the body or a
+child of the body), the automatic and opt-in loaders wait for the framework
+before their first composition: React, until each server-rendered target
+(or an ancestor below the body) is hydrated; Astro, until no
+`astro-island[ssr]` is left apart from `client:visible` and `client:media`
+islands; Vue 2, until no `[data-server-rendered]` is left; then one idle
+callback (a 50 ms timer where there is none), for at most 10 s. A paragraph
+composed before React hydrates it no longer matches the server HTML, and
+React 18 and 19 then report recoverable hydration errors (#418, and in 18
+#425 and #423) and render the root again on the client. In a Chromium probe
+(an SSR article hydrated 300 ms after the client script, with `<div
+id="__next">`), React 18.2.0 and 19.3.0 logged no error, kept the server
+node and composed after hydration. `data-typeset-defer="hydration"` waits
+without a marker (see Known limitations for Wix);
+`data-typeset-defer="none"` composes at DOMContentLoaded, as 4.3 did. Without a marker the timing is 4.3's. The text paints with the
+browser's wrapping until the first composition, and `window.TypesetReady`
+resolves after it. The React adapters and `mount()` called in an effect run
+after hydration and need no wait.
+
+`whenSettled(options?: { timeout?: number })`, from 4.4 in `typeset.us`,
+`typeset.us/react` and `window.Typeset`, resolves `{ settled: true }` once
+every `mount()` controller and every React adapter host has its outcome, no
+composition work is queued or timed, no web font is loading and a loader
+waiting for hydration has composed, at two checks 50 ms apart, and
+`{ settled: false }` if work remains at the timeout (default 10,000 ms).
+Under jsdom and happy-dom it resolves at once. Engine copies on one page
+(the CommonJS and ESM entries, a script-tag loader beside an npm import)
+share one list of work. It does not wait for hosts React has not mounted
+yet (a pending Suspense boundary), for a finite CSS animation to end, or for
+offscreen blocks a resize left native until they are scrolled near.
+
+`headings` (default `true`): `headings: false`, or
+`data-typeset-headings="false"` on the loaders, makes `mount()`,
+`typesetAll()` and the loaders leave `h1` to `h6`, `[role=heading]` and
+anything inside them untouched, with no outcome written; `typeset(el)` still
+composes the element it is given. A heading that wraps has a generated
+break inside it, which iOS VoiceOver may read as two items; this has not
+yet been checked by ear. `copy` (default `true`): a document copy handler
+puts the source text on the clipboard, without the generated line breaks,
+and yields to copy handlers the page registered first. `copy: false`
+(`data-typeset-copy="false"`, `copy={false}` on the adapters) leaves an
+element's copying to the browser, whose copied text then has a line break
+at every composed line end; the handler is installed only when some
+composed element has copy on.
+
+Entry points. `typeset.us/auto` (`dist/auto.js`) is the automatic loader,
+byte for byte the website's `go@<version>.js`. `typeset.us/opt-in`
+(`dist/go.js`, from 4.4) composes only `[data-typeset]` or
+`data-typeset-selector`; `typeset.us/go` is the same file and types, a
+deprecated alias kept until at least 5.0. The package's `jsdelivr` and
+`unpkg` fields name `dist/auto.js`, so the bare
+`https://cdn.jsdelivr.net/npm/typeset.us` URL serves the automatic loader
+(4.3 served `dist/typeset.global.js`, which composes nothing by itself).
+typeset.us hosting has no uptime guarantee; the npm package and jsDelivr
+serve the same files.
+
+Audit review items new in 4.4: `clipped` (an element whose overflow is
+`hidden` or `clip` with `text-overflow: ellipsis` or `-webkit-line-clamp`,
+reported instead of an `overflow` error), `untagged` (composed text with no
+`lang`, so English line-end preferences are off) and `uncomposed` (nothing
+in scope composed, for a reason other than nothing to improve, including
+`native:environment` under jsdom). Review items never fail the gate; `pass`
+and `schemaVersion` 1 are unchanged. `typeset-audit` prints one
+`typeset-audit: warning:` line on stderr for `uncomposed`, with the same exit
+code. After their first pass the loaders log at most two `console.info`
+lines, never a warning or an error, for the same two conditions as
+`untagged` and `uncomposed`.
+
 Errors and warnings. For anything that is not an element, `typeset()` throws:
 `TypeError: [typeset] typeset() expects an HTMLElement (received ...)`.
 For a root that is not a document, element or selector, `mount()` throws:
@@ -322,7 +434,11 @@ CI or representative-device proof. Pilot within your actual site and devices.
 No install hooks, telemetry, page-content uploads or required runtime service.
 Mount's incremental discovery, visible-first scheduling (text near the
 viewport composes in the next task, offscreen text in idle time or when it
-comes near) and yielded batches reduce redundant work; real text, font,
+comes near) and yielded batches reduce redundant work. The React adapters
+compose offscreen blocks in long idle periods; when the browser stops giving
+the page idle periods (Chromium can, for seconds, once its frames stop), the
+remaining blocks compose in animation frames, 12 ms a frame, until idle
+periods return (from 4.3.2). Real text, font,
 metric and width changes still recompose. The 8ms batch target cannot
 preempt one paragraph or a browser layout.
 Large-document discovery/layout can still create long tasks. Benchmarks of a
@@ -372,7 +488,7 @@ changes only an isolated preview, never a deployed site.
   End, an anchor link, one large wheel delta soon after a load, or while an
   animation keeps frames pending) paints its native lines for one frame and
   rewraps in the next. With the React adapters, `priority="sync"` composes a
-  block in its commit instead. Planned for 4.4.
+  block in its commit instead. Not addressed in 4.4.
 - **Offscreen text under a wrapper that scrolls horizontally.** Nearness
   is measured against the nearest ancestor that scrolls on either axis. An
   app root with `overflow-x: hidden` (its `overflow-y` then computes to
@@ -385,7 +501,7 @@ changes only an isolated preview, never a deployed site.
   (23 of 48 in the test fixture; 4.2.0 composed 47). The text is always
   correct: each block paints its composed lines or native ones, never
   double-wrapped. On an app root, `overflow-x: clip` clips the same way
-  without making a scroll container. Planned for 4.4.
+  without making a scroll container. Not addressed in 4.4.
 - **Text scrolled on screen in the frame after it mounts, below a full
   first frame.** Before the first paint, `TypesetText` and
   `TypesetRichText` compose the blocks on screen, then those within a
@@ -400,7 +516,7 @@ changes only an isolated preview, never a deployed site.
   timer, in none either way. 4.3.0 did it in every run from the frame after
   mounting, sometimes to a second block, and in some runs after a 0 ms
   timer (Chromium; every run on GitHub's macOS runners in WebKit).
-  `priority="sync"` composes a block in its commit instead. Planned for
+  `priority="sync"` composes a block in its commit instead. Not addressed in
   4.4.
 - **A very long unbreakable run, in WebKit.** Measuring a paragraph reads
   each word's boxes, and a word the browser splits across lines is read one
@@ -477,7 +593,10 @@ changes only an isolated preview, never a deployed site.
   4.2.0. `lineBreaks: 'legacy'` does not decline an indent (neither did
   4.2.0): depending on what was measured before it, an indented paragraph
   or heading can be composed with the indent repeated on every line.
-- **Right-to-left, vertical and non-Latin text** keeps the browser's layout.
+- **Right-to-left, vertical and non-Latin text** keeps the browser's layout
+  (up to three Greek or Cyrillic letters in a row inside Latin text
+  compose). With `coverage: 'core'`, so does text declared in a Latin-script
+  language other than English, French, German and Spanish.
 - **Browser floor.** Composes where `Intl.Segmenter`, `ResizeObserver` and
   `MutationObserver` exist; the supported browsers also have CSS
   `text-wrap`: Chrome and Edge 114, Safari 17.4 and Firefox 125, or later. Elsewhere, and in DOM emulations such as jsdom and
@@ -485,6 +604,13 @@ changes only an isolated preview, never a deployed site.
   with `native:environment`; nothing throws. Tested in Playwright's
   Chromium, WebKit and Firefox, and with those APIs deleted; the versions
   are in each report.
+- **Hydration wait.** A marked page whose framework never hydrates composes
+  when the 10 s cap runs out, and so does one where a third-party script
+  adds paragraphs inside a React root before DOMContentLoaded. Wix pages
+  carry no marker in the list and keep 4.3's timing unless the script tag
+  has `data-typeset-defer="hydration"`, which waits for React only when its
+  root exists by the load event. `[data-framer-hydrate-v2]` has not been
+  checked on a live Framer site.
 - **Framework-owned text.** `mount()` and the loaders keep text that Vue,
   Svelte, Lit, Solid or React update in place correct (see above for how and
   for the limits). Direct `typeset()` and `restore()` calls without a

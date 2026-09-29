@@ -6,6 +6,12 @@
  * packages/typeset-v4/OUTCOMES.md and docs/outcomes.md.
  */
 import type { Outcome, FEATURE_STATUSES } from './outcomes';
+import { COVERAGE_DEFAULT } from './coverage';
+
+/** How rows name extended coverage. It follows COVERAGE_DEFAULT, so if that
+ * default changes (decision O1 for 4.4.0), npm run docs:outcomes regenerates
+ * OUTCOMES.md without editing these rows. */
+const EXTENDED = COVERAGE_DEFAULT === 'extended' ? "with coverage: 'extended' (the default)" : "with coverage: 'extended'";
 
 export type OutcomeGroup = 'composed' | 'nothing to improve' | 'unsupported content' | "couldn't improve safely" | 'not processed';
 export interface OutcomeRow {
@@ -51,11 +57,11 @@ export const OUTCOME_DOCS = {
   'native:ui': { group: 'unsupported content', expected: true, meaning: "mode: 'ui' (or data-typeset-mode=\"ui\") marks interface text, which is never composed.", action: 'None.' },
   'native:justify': { group: 'unsupported content', expected: true, meaning: 'The text is justified (text-align: justify or justify-all), or its text-align-last differs from text-align, and it runs to more than one line. A generated break ends its line, so every composed line would take the last-line alignment.', action: 'None; justified text is left to the browser. Set text-align: start (with the default text-align-last) to have it composed.' },
   'native:live-region': { group: 'unsupported content', expected: true, meaning: 'The element is inside a live region, or contains one (a result count or a "saved" status inside a paragraph): the nearest region has an aria-live value other than "off" (an empty one counts as absent), or role status, alert, log, marquee or timer, or is an <output>, without aria-live="off". Screen readers announce every change there, so Typeset never measures, breaks or rewrites it. Regions in open shadow roots count, such as a toast that wraps a <slot> in role="status".', action: 'None. If the element is not really a live region, remove the role or set aria-live="off". A role set through ElementInternals or in a closed shadow root cannot be seen: mark that text data-no-typeset.' },
-  'native:rich-element': { group: 'unsupported content', expected: true, meaning: 'The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code, and with the default coverage time, dfn, kbd, ins, sup and sub), such as an image, a line break, button or nested block.', action: 'None, or compose the text blocks inside it separately.' },
-  'native:rich-excluded': { group: 'unsupported content', expected: true, meaning: 'The block contains hidden, aria-hidden, editable or data-no-typeset content. With the default coverage, visually hidden text (the sr-only pattern) and aria-hidden elements with no width take no room and are composed around.', action: 'None.' },
+  'native:rich-element': { group: 'unsupported content', expected: true, meaning: `The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code, and, ${EXTENDED}, time, dfn, kbd, ins, sup and sub), such as an image, a line break, button or nested block.`, action: 'None, or compose the text blocks inside it separately.' },
+  'native:rich-excluded': { group: 'unsupported content', expected: true, meaning: `The block contains hidden, aria-hidden, editable or data-no-typeset content. ${EXTENDED[0].toUpperCase() + EXTENDED.slice(1)}, visually hidden text (the sr-only pattern) and aria-hidden elements with no width take no room and are composed around.`, action: 'None.' },
   'native:rich-direction': { group: 'unsupported content', expected: true, meaning: 'An inline element changes direction, bidi or writing mode, or is not visible.', action: 'None.' },
   'native:rich-whitespace': { group: 'unsupported content', expected: true, meaning: 'The block or its inline markup is indented (any text-indent, including a first-line indent such as p + p { text-indent: 1.5em } and a hanging indent), preserves whitespace, or changes text advances (a transform).', action: 'None; indented paragraphs keep the browser\'s layout.' },
-  'native:rich-layout': { group: 'unsupported content', expected: true, meaning: 'An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). With the default coverage, raised text is measured in place: vertical-align super or sub, and sup or sub raised with position: relative and a top offset (normalize.css).', action: 'None.' },
+  'native:rich-layout': { group: 'unsupported content', expected: true, meaning: `An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). ${EXTENDED[0].toUpperCase() + EXTENDED.slice(1)}, raised text is measured in place: vertical-align super or sub, and sup or sub raised with position: relative and a top offset (normalize.css).`, action: 'None.' },
   'native:rich-box': { group: 'unsupported content', expected: true, meaning: 'An inline element has negative padding, borders or margins, or box-decoration-break: clone.', action: 'None.' },
   'native:rich-decorated': { group: 'unsupported content', expected: true, meaning: 'An inline element has ::before or ::after content.', action: 'None.' },
   'native:rich-tokens': { group: 'unsupported content', expected: false, meaning: 'The words could not be matched to text positions in the markup.', action: 'Report it with auditJSON output; this should be rare.' },

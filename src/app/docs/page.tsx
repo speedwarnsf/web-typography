@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const SITE: { href: string; name: string; what: string }[] = [
   { href: '/install', name: 'Install', what: 'The pinned script tag, and exact steps for Ghost, WordPress, Webflow, Squarespace, Framer, Wix, Shopify and Google Tag Manager.' },
   { href: '/install/frameworks', name: 'Framework recipes', what: 'npm, React, Next.js, Vite, Astro, SvelteKit, Vue and Nuxt.' },
-  { href: '/faq', name: 'FAQ', what: 'Screen readers, layout shift, SEO, copying, printing and translation, readers without JavaScript, and when it runs.' },
+  { href: '/faq', name: 'FAQ', what: 'Screen readers, layout shift, SEO, copying, printing and translation, page language, hydration errors, user comments, readers without JavaScript, and when it runs.' },
   { href: '/help', name: 'Help', what: 'Checking a page, which issue form to use, and how to report a security problem.' },
   { href: '/privacy', name: 'Privacy', what: 'What this site and its host collect, and why the script makes no network requests.' },
 ];

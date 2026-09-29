@@ -43,9 +43,9 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
   spacing?: Options['spacing'];
   tracking?: Options['tracking'];
   contour?: Options['contour'];
-  /** Default `'extended'` (Options.coverage): `'core'` leaves native what
-   * 4.3.1 left native (other Latin-script languages, time, dfn, kbd, ins,
-   * visually hidden text, sup and sub). */
+  /** Default: Options.coverage's. `'core'` leaves native what 4.3.1 left
+   * native (other Latin-script languages, time, dfn, kbd, ins, visually
+   * hidden text, sup and sub); `'extended'` composes them. */
   coverage?: Options['coverage'];
   /** Default `true`: copying composed text puts the source on the clipboard,
    * without the generated line breaks. `false` leaves copying to the

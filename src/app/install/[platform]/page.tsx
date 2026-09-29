@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { INSTALL_ORDER, PLATFORMS, SNIPPET } from '@/lib/platforms';
+import { LOADER_DEFAULTS } from '@/lib/install-snippet';
 import '../install.css';
 
 // These pages exist to capture "add custom code to <platform>" intent and
@@ -52,6 +53,7 @@ export default async function InstallPlatform({ params }: { params: Promise<{ pl
         <Link href="/fix">the grader</Link> — it confirms the script is on the
         page and re-sets your opening paragraph both ways.
       </p>
+      <p className="in-fine">{LOADER_DEFAULTS}</p>
 
       <Link className="in-back" href="/install">
         ← All platforms
