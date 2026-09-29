@@ -228,8 +228,8 @@ try {
   }
   if (sections.has('content')) {
     // D4: every install line the site renders is the pinned loader with the
-    // integrity hash from public/sri.json; the evergreen go.js appears only
-    // with its label.
+    // integrity hash from public/sri.json, or the same file from jsDelivr
+    // with the same hash; the unpinned go.js and go@4.js are never offered.
     const sri = JSON.parse(await readFile('public/sri.json', 'utf8'));
     // React separates adjacent text with <!-- --> in server HTML.
     const decode = (/** @type {string} */ html) => html.replace(/<!-- -->/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
@@ -239,12 +239,31 @@ try {
       const response = await fetch(base + route);
       const html = decode(await response.text());
       const snippets = [...html.matchAll(/<script src="https:\/\/typeset\.us\/(go(?:@[\d.]+)?\.js|typeset(?:@[\d.]+\.min)?\.min\.js|typeset@[\d.]+\.min\.js)"([^>]*)>/g)];
-      const bad = snippets.filter(([, file, attributes]) => {
-        if (/@/.test(file)) return /integrity="([^"]+)"/.exec(attributes)?.[1] !== sri.files[file] || !/crossorigin="anonymous"/.test(attributes);
-        return !/never move to 5\.0/.test(html);
-      }).map(m => m[0]);
-      check('content', `${route}: install lines are pinned with sri.json's integrity (go.js only with its label)`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+      const bad = snippets.filter(([, file, attributes]) => /integrity="([^"]+)"/.exec(attributes)?.[1] !== sri.files[file] || !/crossorigin="anonymous"/.test(attributes)).map(m => m[0]);
+      check('content', `${route}: install lines are pinned with sri.json's integrity, never the unpinned go.js or go@4.js`, response.status === 200 && bad.length === 0 && (route === '/fix' || snippets.length > 0), { status: response.status, snippets: snippets.length, bad });
+      if (['/', '/install', '/utility'].includes(route)) {
+        const cdn = [...html.matchAll(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/typeset\.us@([\d.]+)\/dist\/auto\.js"([^>]*)>/g)];
+        check('content', `${route}: offers the jsDelivr line with the pinned loader's own hash`, cdn.length > 0 && cdn.every(([, version, attributes]) => version === sri.version && /integrity="([^"]+)"/.exec(attributes)?.[1] === sri.files[`go@${sri.version}.js`] && /crossorigin="anonymous"/.test(attributes)), cdn.map(m => m[0]));
+      }
     }
+
+    // /fix names a page's Typeset tag, and flags one that can change under
+    // the page: go.js or go@4.js, or a hosted file without its hash.
+    const { build } = await import('esbuild');
+    const bundle = await build({ entryPoints: ['src/lib/install-detect.ts'], bundle: true, format: 'esm', write: false, platform: 'neutral', logLevel: 'silent' });
+    const { detectInstall } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+    const tag = (/** @type {string} */ src, integrity = '') => `<!doctype html><html><head><script src="${src}"${integrity ? ` integrity="${integrity}" crossorigin="anonymous"` : ''} defer></script></head><body><p>Text.</p></body></html>`;
+    const pinnedHash = sri.files[`go@${sri.version}.js`];
+    const samples = [
+      ['go.js', tag('https://typeset.us/go.js'), 'moving'],
+      ['go@4.js', tag('https://typeset.us/go@4.js'), 'moving'],
+      ['the pinned line', sri.snippet, null],
+      ['the jsDelivr line', tag(`https://cdn.jsdelivr.net/npm/typeset.us@${sri.version}/dist/auto.js`, pinnedHash), null],
+      ['a pinned file without its hash', tag(`https://typeset.us/go@${sri.version}.js`), 'no-integrity'],
+      ['a self-hosted dist/auto.js', tag('/vendor/typeset/dist/auto.js'), null],
+    ];
+    const graded = samples.map(([label, html, expected]) => ({ label, expected, ...detectInstall(html) }));
+    check('content', '/fix detects typeset.us, jsDelivr, unpkg and self-hosted loaders, and flags only go.js, go@4.js and hosted files without a hash', graded.every(g => g.installed && g.unpinned === g.expected) && !detectInstall(tag('https://example.com/app.js')).installed, graded);
 
     // D5: titles, descriptions and unfurl images.
     for (const route of ['/', '/sponsor', '/library', '/install/frameworks']) {

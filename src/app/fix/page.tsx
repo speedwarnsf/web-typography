@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import typeset, { measureLayout } from '@/lib/typeset-site';
 import { PLATFORMS, SNIPPET, detectPlatform, type Platform } from '@/lib/platforms';
+import { detectInstall, type InstallCheck } from '@/lib/install-detect';
 
 const WEAK = new Set([
   'a', 'an', 'the', 'of', 'in', 'at', 'by', 'to', 'for', 'with', 'from', 'on',
@@ -31,6 +32,8 @@ type Graded = {
   platform: Platform;
   /** The fetched HTML carries a typeset script tag — the page runs the engine. */
   installed: boolean;
+  /** That tag can change under the page: go.js or go@4.js, or no integrity hash. */
+  unpinned: InstallCheck['unpinned'];
 };
 
 type NotGraded = { reason: string; platform?: Platform };
@@ -150,9 +153,10 @@ export default function FixPage() {
         return;
       }
       const platform = detectPlatform(body.html, target);
-      // Install detection: a typeset script tag in the served HTML (the
-      // evergreen go.js, a pinned go@x.y.z.js, or the library build).
-      const installed = /<script[^>]+src="[^"]*(?:typeset\.us\/go(?:@[\d.]+)?\.js|typeset\.min\.js|typeset\.us\/typeset)[^"]*"/i.test(body.html);
+      // Install detection: a typeset script tag in the served HTML (a
+      // typeset.us loader or library, the npm package from jsDelivr or unpkg,
+      // or a self-hosted dist/auto.js), and whether it is pinned.
+      const { installed, unpinned } = detectInstall(body.html);
       const { paragraph, title, reason } = extractParagraph(body.html);
       if (platform === 'substack') {
         setResult({ state: 'substack', title });
@@ -164,7 +168,7 @@ export default function FixPage() {
         setResult({ state: 'notgraded', why: { reason: reason!, platform: platform.key !== 'unknown' ? platform : undefined } });
         return;
       }
-      setResult({ state: 'graded', data: { paragraph, title, platform, installed } });
+      setResult({ state: 'graded', data: { paragraph, title, platform, installed, unpinned } });
     } catch {
       setResult({ state: 'notgraded', why: { reason: 'Couldn’t reach that page. Nothing was graded.' } });
     }
@@ -295,6 +299,13 @@ export default function FixPage() {
                 Typeset detected on this page — it ships the engine&rsquo;s
                 script, so what your readers see is already composed. The
                 panels above re-set the raw text for comparison.
+              </p>
+            )}
+            {g.unpinned && (
+              <p className="fx-source fx-gold" data-no-typeset>
+                {g.unpinned === 'moving'
+                  ? 'This page loads an unpinned Typeset file (go.js or go@4.js); it changes with every 4.x release and carries no integrity hash. Use the pinned line below.'
+                  : 'This page loads Typeset from a shared host without an integrity hash, so the browser cannot refuse a changed file. Use the pinned line below.'}
               </p>
             )}
           </section>

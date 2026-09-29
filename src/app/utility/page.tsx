@@ -1,5 +1,5 @@
 import CodeBlock from "@/components/CodeBlock";
-import { EVERGREEN_NOTE, EVERGREEN_SNIPPET, LIBRARY_PINNED, LIBRARY_SNIPPET, PINNED_SNIPPET, PINNED_VERSION } from "@/lib/install-snippet";
+import { EVERGREEN_NOTE, HOSTING_NOTE, JSDELIVR_SNIPPET, LIBRARY_PINNED, LIBRARY_SNIPPET, PINNED_SNIPPET, PINNED_VERSION } from "@/lib/install-snippet";
 import { readFileSync } from "fs";
 import path from "path";
 import EssayModal from "./EssayModal";
@@ -55,8 +55,16 @@ export default function UtilityPage() {
             code={PINNED_SNIPPET}
             title={`go@${PINNED_VERSION}.js — anywhere HTML runs, pinned`}
           />
+          {JSDELIVR_SNIPPET && (
+            <div className="mt-6">
+              <CodeBlock
+                code={JSDELIVR_SNIPPET}
+                title={`typeset.us@${PINNED_VERSION}/dist/auto.js — the same file from npm via jsDelivr, same hash`}
+              />
+            </div>
+          )}
           <p className="text-sm text-neutral-500 mt-4 max-w-2xl" style={{ fontFamily: "var(--font-source-sans)", textWrap: "pretty" }}>
-            Trying it out? <code className="text-neutral-300">{EVERGREEN_SNIPPET}</code> also works. {EVERGREEN_NOTE}
+            {HOSTING_NOTE} {EVERGREEN_NOTE}
           </p>
         </section>
 

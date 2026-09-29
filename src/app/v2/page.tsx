@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import typeset, { measureLayout, restore } from '@/lib/typeset-site';
 import { withDemoMeasurement } from '@/lib/typeset-demo';
 import { strandedOpener } from '@/lib/v4/phrase-boundaries';
-import { LOADER_GZIP_KB, NPM_INSTALL, PINNED_SNIPPET, PINNED_VERSION } from '@/lib/install-snippet';
+import { JSDELIVR_SNIPPET, LOADER_GZIP_KB, NPM_INSTALL, PINNED_SNIPPET, PINNED_VERSION } from '@/lib/install-snippet';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -638,6 +638,12 @@ function DevelopersBand() {
           <p className="v2-dev-k">Any site, one tag</p>
           <code className="v2-dev-code">{PINNED_SNIPPET}</code>
           <p className="v2-dev-note">Version {PINNED_VERSION}, with its integrity hash. The file never changes.</p>
+          {JSDELIVR_SNIPPET && (
+            <>
+              <code className="v2-dev-code v2-dev-code-alt">{JSDELIVR_SNIPPET}</code>
+              <p className="v2-dev-note">The same file from npm via jsDelivr, with the same hash.</p>
+            </>
+          )}
         </div>
         <div className="v2-dev-card">
           <p className="v2-dev-k">npm</p>
@@ -1136,6 +1142,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   color: #d6d6d6; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .v2-dev-note { font-family: var(--font-source-sans), sans-serif; font-size: .85rem; color: #8f8f8f; margin: 0; text-wrap: pretty; }
+.v2-dev-code-alt { margin-top: 20px; padding-top: 18px; border-top: 1px solid #1c1c1c; }
 .v2-dev-h3 {
   font-family: var(--font-playfair), Georgia, serif;
   font-size: 1.35rem; color: #efefef; margin: 0 0 14px; text-wrap: balance;
