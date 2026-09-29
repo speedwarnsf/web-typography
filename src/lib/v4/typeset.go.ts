@@ -1,3 +1,4 @@
+import { afterHydration } from './hydration';
 import * as api from './typeset.release';
 import type { Controller } from './typeset.next';
 declare global { interface Window { Typeset: typeof api; TypesetReady: Promise<Controller> } }
@@ -13,6 +14,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => resolve(), { once: true });
     else resolve();
   }).then(async () => {
+    // On a server-rendered page, after the framework hydrates (hydration.ts).
+    await afterHydration(document, selector, script?.dataset.typesetDefer);
     const controller = api.mount(document, selector, options);
     await controller.ready;
     // This loader composes only explicit targets. Say so once when there are

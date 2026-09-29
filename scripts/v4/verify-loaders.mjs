@@ -125,6 +125,70 @@ for (const config of browsers) {
   } finally { await browser.close(); }
 }
 
+// 4.4: on a server-rendered page the loaders compose after the framework
+// hydrates it (hydration.ts). React is simulated here by the keys it sets:
+// __reactContainer$ on the root when hydrateRoot() runs, __reactFiber$ on each
+// element once its subtree is hydrated (on an ancestor for HTML React never
+// hydrates, such as dangerouslySetInnerHTML). Real React 18 and 19 SSR pages
+// are the adoption hydration probe's.
+const SERVER = (/** @type {string} */ root) => '<html lang="en"><style>p{width:320px;font:20px/1.5 Georgia}</style><body>' + root
+  + '<p data-typeset>Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned.</p>'
+  + '<div class="html"><p data-typeset>It fills each line until the words run out, and calls that typography, which it is not, and a compositor would not either.</p></div></div></body></html>';
+for (const config of browsers) {
+  const browser = await config.engine.launch({ executablePath: config.executablePath });
+  try {
+    for (const [loader, file] of [['package go.js', artifacts.go], ...(hasAuto ? [['package auto.js', artifacts.auto]] : [])]) {
+      const content = await readFile(file, 'utf8');
+      for (const [variant, root, defer] of [['#__next', '<div id="__next">', ''], ['#__next, data-typeset-defer="none"', '<div id="__next">', 'none'], ['no marker, data-typeset-defer="hydration"', '<div id="app">', 'hydration']]) {
+        const label = `${loader} hydration (${variant})`;
+        /** @param {string} what @param {unknown} pass @param {unknown} [detail] */
+        const check = (what, pass, detail) => checks.push({ browser: config.name, label: `${label}: ${what}`, pass: !!pass, ...(pass ? {} : { detail }) });
+        const page = await browser.newPage();
+        page.setDefaultTimeout(20000);
+        try {
+          await page.setContent(SERVER(root));
+          const r = await page.evaluate(async ({ content, defer }) => {
+            const w = /** @type {any} */ (window);
+            const sleep = (/** @type {number} */ ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const paragraphs = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('p[data-typeset]')]);
+            const outcomes = () => paragraphs.map(p => p.dataset.tsOutcome || null);
+            const script = document.createElement('script');
+            if (defer) script.dataset.typesetDefer = defer;
+            script.textContent = content;
+            const start = performance.now();
+            document.head.append(script);
+            const ready = w.TypesetReady.then(() => performance.now() - start);
+            const settled = w.Typeset.whenSettled().then((/** @type {{ settled: boolean }} */ s) => ({ ...s, at: performance.now() - start, outcomes: outcomes() }));
+            await sleep(400);
+            const beforeRoot = outcomes();
+            const root = /** @type {any} */ (document.body.firstElementChild);
+            root['__reactContainer$e3'] = {};
+            await sleep(300);
+            const beforeFiber = outcomes();
+            const hydratedAt = performance.now() - start;
+            /** @type {any} */ (paragraphs[0])['__reactFiber$e3'] = {};
+            /** @type {any} */ (document.querySelector('.html'))['__reactFiber$e3'] = {};
+            const readyAt = await Promise.race([ready, sleep(3000).then(() => null)]);
+            return { beforeRoot, beforeFiber, hydratedAt, readyAt, settled: await settled, after: outcomes() };
+          }, { content, defer });
+          const composed = (/** @type {(string | null)[]} */ list) => list.every(o => o === 'composed:rich');
+          const untouched = (/** @type {(string | null)[]} */ list) => list.every(o => o === null);
+          if (variant === '#__next') {
+            check('nothing is composed before React hydrates, with the root marked or not', untouched(r.beforeRoot) && untouched(r.beforeFiber), r);
+            check('composes once each server-rendered paragraph, or its ancestor, is hydrated', r.readyAt !== null && r.readyAt > r.hydratedAt && composed(r.after), r);
+            check('whenSettled() waits for the hydration wait and the composition', r.settled.settled === true && r.settled.at > r.hydratedAt && composed(r.settled.outcomes), r.settled);
+          } else {
+            check('composes without waiting for hydration', r.readyAt !== null && r.readyAt < 400 && composed(r.beforeRoot), r);
+            check('whenSettled() resolves once composed', r.settled.settled === true && composed(r.settled.outcomes), r.settled);
+          }
+        } catch (error) {
+          errors.push({ browser: config.name, error: label + ': ' + String(/** @type {Error} */ (error).stack || error) });
+        } finally { await page.close(); }
+      }
+    }
+  } finally { await browser.close(); }
+}
+
 const failures = checks.filter(c => !c.pass);
 await writeFile('output/loaders.json', JSON.stringify({ version, loaders: Object.fromEntries(loaders), autoLoader: hasAuto ? artifacts.auto : 'absent (dist predates 4.3)', checks, errors }, null, 2));
 console.log(JSON.stringify({ version, loaderChecks: checks.length, failures, errors }, null, 2));
