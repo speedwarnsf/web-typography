@@ -37,7 +37,7 @@ for (const config of browsers) {
   try {
     for (const [loader, file] of loaders) {
       const content = await readFile(file, 'utf8');
-      for (const option of ['default', 'tracking', 'spacing']) {
+      for (const option of ['default', 'tracking', 'spacing', 'copy']) {
         const page = await browser.newPage();
         page.setDefaultTimeout(20000);
         const label = `${loader} ${option}`;
@@ -50,6 +50,7 @@ for (const config of browsers) {
             const script = document.createElement('script');
             if (option === 'tracking') script.dataset.typesetTracking = 'false';
             if (option === 'spacing') script.dataset.typesetSpacing = 'false';
+            if (option === 'copy') script.dataset.typesetCopy = 'false';
             script.textContent = content; document.head.append(script);
           }, { content, option });
           await page.evaluate(() => /** @type {any} */ (window).TypesetReady);
@@ -62,8 +63,18 @@ for (const config of browsers) {
           check('text unchanged', result.text === before, result.text);
           check('composes rich', result.outcome === 'composed:rich', result.outcome);
           check('data-no-typeset untouched', result.excluded === undefined, result.excluded);
-          check('tracking ' + (option === 'default' ? 'applied' : 'off'), option === 'default' ? result.tracking === 'applied' : result.tracking === 'off', result.tracking);
+          const trackingOff = option === 'tracking' || option === 'spacing';
+          check('tracking ' + (trackingOff ? 'off' : 'applied'), trackingOff ? result.tracking === 'off' : result.tracking === 'applied', result.tracking);
           check('spacing ' + (option === 'spacing' ? 'off' : 'on'), option === 'spacing' ? result.spacing === 'off' : result.spacing !== 'off', result.spacing);
+          // The engine copies composed text as its source; data-typeset-copy="false" (4.4) leaves copying to the browser.
+          const copied = await page.evaluate(() => {
+            const p = /** @type {HTMLElement} */ (document.querySelector('[data-typeset]')), range = document.createRange(), selection = /** @type {Selection} */ (getSelection());
+            range.selectNodeContents(p); selection.removeAllRanges(); selection.addRange(range);
+            const event = new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() });
+            p.dispatchEvent(event); selection.removeAllRanges();
+            return { handled: event.defaultPrevented, text: event.clipboardData?.getData('text/plain') };
+          });
+          check(option === 'copy' ? 'copy left to the browser' : 'copy puts the source text on the clipboard', option === 'copy' ? !copied.handled : copied.handled && copied.text === before, copied);
           await page.evaluate(() => /** @type {any} */ (window).TypesetReady.then((/** @type {any} */ controller) => controller.disconnect()));
           check('disconnect restores text', await page.locator('[data-typeset]').textContent() === before);
           check('disconnect removes markers', await page.locator('[data-ts-track], [data-ts-space], [data-ts-break]').count() === 0);

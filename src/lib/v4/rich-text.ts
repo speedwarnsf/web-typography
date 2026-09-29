@@ -622,7 +622,7 @@ const wrapOverrides = new WeakMap<Element, { value: string; priority: string }>(
  * there and left empty, or the framework's next write would land on the
  * marker and be lost. Nor between a comment and the node after it (see
  * afterComment): such a marker goes before the comment. */
-export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
+export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = [], copy = true): RichOutput {
   const restoreSelection = selectionBookmark(element);
   const hadStyle = element.hasAttribute('style');
   const wrapStyle = element.style.getPropertyValue('text-wrap-style');
@@ -684,7 +684,8 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   for (const split of splits.values()) split.expected = split.parts.map(part => part.data);
   if (splits.size) markers.push(...shieldWhitespace(element));
   restoreSelection();
-  const releaseCopy = preserveRichCopy(element);
+  // copy: false leaves this element's copying to the browser.
+  const releaseCopy = copy ? preserveRichCopy(element) : () => {};
   let released = false;
   return {
     nodes: [element, ...element.querySelectorAll('*'), ...textRuns(element).map(r => r.node)],
@@ -799,7 +800,9 @@ function renderedText(source: string, range: Range, root: HTMLElement): string {
 }
 
 const copyRoots = new WeakMap<Document, WeakMap<HTMLElement, number>>();
-/** Source copying is independent of visual line breaks. Respect site handlers. */
+/** Source copying is independent of visual line breaks. Respect site handlers.
+ * The document's handler is added with the first element registered here;
+ * an element composed with copy: false is never registered. */
 export function preserveRichCopy(element: HTMLElement): () => void {
   const doc = element.ownerDocument;
   let roots = copyRoots.get(doc);

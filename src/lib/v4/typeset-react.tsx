@@ -29,7 +29,7 @@ const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useL
  * Inline interactive children belong outside this plain-text adapter. A ref
  * resolves to the host element.
  */
-export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, priority = 'auto', onResult, ...attributes }, forwarded) {
+export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, priority = 'auto', onResult, ...attributes }, forwarded) {
   const ref = useRef<HTMLElement | null>(null);
   const refCleanup = useRef<(() => void) | undefined>(undefined);
   // A classic callback ref (node, then null), which React 18 and 19 both
@@ -40,8 +40,8 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     else { if (refCleanup.current) refCleanup.current(); else assignRef(forwarded, null); refCleanup.current = undefined; }
   }, [forwarded]);
   const [initialText] = useState(text);
-  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
+  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy };
   const report = useRef(onResult);
   report.current = onResult;
   // Curl quotes during render, so server HTML, no-JS readers and crawlers get
@@ -126,6 +126,6 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     if (first.current) { first.current = false; return; }
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, 'force', true);
-  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
+  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy]);
   return createElement(as, { ...attributes, ref: setHost, 'data-typeset-react': '' }, curled ? educate(initialText) : initialText);
 });

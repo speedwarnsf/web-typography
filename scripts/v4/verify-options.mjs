@@ -73,6 +73,15 @@ for (const { name, engine, executablePath } of browsers) {
       await page.waitForTimeout(20);
       record(name, `typeset(el, ${options}) warns once: ${expected}`, warnings.length === 1 && warnings[0] === expected, warnings);
     }
+    // copy (4.4) is a known boolean option: true and false compose without a
+    // warning, another value warns once.
+    warnings.length = 0;
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); for (const copy of [false, true]) { window.Typeset.typeset(el, { copy }); window.Typeset.restore(el); } });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { copy: false }) and { copy: true } log no warning', warnings.length === 0, [...warnings]);
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { copy: "no" }) warns once: copy must be true or false', warnings.length === 1 && warnings[0] === '[typeset] copy must be true or false (received "no")', [...warnings]);
     // Keys named like Object.prototype members (an options object parsed
     // from JSON) warn like any unknown key and stop no later warning.
     warnings.length = 0;

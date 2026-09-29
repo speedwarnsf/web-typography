@@ -75,6 +75,13 @@ export interface Options {
    * clause opener. `'compact'`: one more line only to repair a one-word last
    * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
+  /** Default `true`: a document copy handler puts the source text on the
+   * clipboard, without the generated line breaks (and, for rich text, the
+   * markup without engine markers). `false` leaves this element's copying to
+   * the browser, whose copied text then has a line break at every composed
+   * line end. The handler is installed only when some composed element has
+   * copy on, and it yields to any copy handler the page registered first. */
+  copy?: boolean;
   /** Current author text. Framework adapters pass this on updates. */
   text?: string;
 }
@@ -233,7 +240,7 @@ function transformOnly(a: string, b: string): boolean {
   return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
 }
 function optionsKey(options: Options): string {
-  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
+  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour, options.copy]);
 }
 function signature(el: HTMLElement, options: Options, layout = layoutKey(el)): string {
   return el.innerHTML + '\u0000' + layout + '\u0000' + optionsKey(options);
@@ -526,6 +533,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   // Natural word spaces measured for the contour serve the spacing finish.
   // Only within this call: a later call may see different fonts.
   const spaceWidths = new Map<string, number>();
+  // With copy: false the document copy handler leaves this element alone.
+  const copy = options.copy !== false;
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
     let optical: RichOutput | undefined;
     let spacing: RichOutput | undefined;
@@ -540,7 +549,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
-        spacing = renderRichText(element, [], [], plan.adjustments);
+        spacing = renderRichText(element, [], [], plan.adjustments, copy);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !spacingVerified(element, plan, measureLayout(element))) {
           spacing.cleanup(); spacing = undefined; features.spacing = 'native:spacing-verification';
         }
@@ -554,7 +563,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.tracking = plan.outcome;
       if (plan.runs.length) {
-        tracking = renderTracking(element, plan);
+        tracking = renderTracking(element, plan, copy);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !trackingVerified(element, plan, measureLayout(element))) {
           tracking.cleanup(); tracking = undefined; features.tracking = 'native:tracking-verification';
         }
@@ -567,7 +576,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const plan = planOpticalHanging(element, layout);
       features.hanging = plan.outcome;
       if (plan.hangs.length) {
-        optical = renderRichText(element, [], plan.hangs);
+        optical = renderRichText(element, [], plan.hangs, [], copy);
         const after = measureLayout(element);
         if (!opticalVerified(element, layout, after, plan.hangs) || richFingerprint(element) !== fingerprint) {
           optical.cleanup(); optical = undefined; features.hanging = 'native:hanging-verification';
@@ -626,7 +635,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     const plan = planRichText(element, { ...options, mode }, before, spaceWidths);
     search = plan.search;
     if (plan.outcome !== 'composed:rich') return finish(plan.outcome, plan.constraint);
-    rich = renderRichText(element, plan.breaks);
+    rich = renderRichText(element, plan.breaks, [], [], copy);
     const after = measureLayout(element);
     if (!richLayoutVerified(plan, after) || element.textContent !== source || richFingerprint(element) !== plan.styleSignature
       || (!before.lastSingleton && after.lastSingleton && mode === 'body')) {

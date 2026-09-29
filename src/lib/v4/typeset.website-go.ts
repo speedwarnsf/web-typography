@@ -15,6 +15,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     opticalHanging: script?.dataset.typesetOpticalHanging !== 'false',
     spacing: script?.dataset.typesetSpacing !== 'false',
     tracking: script?.dataset.typesetTracking !== 'false',
+    copy: script?.dataset.typesetCopy !== 'false',
   };
   window.Typeset = api;
   window.TypesetReady = new Promise<void>(resolve => {

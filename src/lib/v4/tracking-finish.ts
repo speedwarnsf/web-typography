@@ -101,7 +101,7 @@ export function trackingStyle(run: TrackingRun, inline: boolean): Record<string,
  * wrapper as in 4.2: frameworks that hold them write to them in place, and
  * some (Solid) skip a write when the node's text already equals the new
  * value, which an emptied node would always do for ''. */
-export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput {
+export function renderTracking(element: HTMLElement, plan: TrackingPlan, copy = true): RichOutput {
   const restoreSelection = selectionBookmark(element), texts = textRuns(element);
   const inline = !markerRules(element);
   const splits = new Map<Text, SplitRecord>();
@@ -139,7 +139,7 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
   for (const record of splits.values()) record.expected = record.parts.map(part => part.data);
   const shields = splits.size ? shieldWhitespace(element) : [];
   restoreSelection();
-  const releaseCopy = preserveRichCopy(element);
+  const releaseCopy = copy ? preserveRichCopy(element) : () => {};
   let released = false;
   return { nodes: [element], heads: new Set(splits.keys()), cleanup(written) {
     if (released) return;

@@ -42,6 +42,11 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
   spacing?: Options['spacing'];
   tracking?: Options['tracking'];
   contour?: Options['contour'];
+  /** Default `true`: copying composed text puts the source on the clipboard,
+   * without the generated line breaks. `false` leaves copying to the
+   * browser, whose copied text then has a line break at every composed line
+   * end (Options.copy). */
+  copy?: Options['copy'];
   /** 'auto' (default) composes in the commit only what is on screen, within
    * a small time budget, and the rest before its first paint or in idle
    * time. 'sync' composes in the commit, as 4.2 did, for hero text.
@@ -276,7 +281,7 @@ class RichText extends Component<RichProps, State> {
     const el = this.host.current;
     if (!el || this.entry?.element === el) return;
     this.unbind();
-    this.releaseCopy = preserveRichCopy(el);
+    this.releaseCopy = this.props.copy === false ? undefined : preserveRichCopy(el);
     const entry: AdapterEntry = {
       element: el, priority: this.props.priority ?? 'auto',
       // Outside a commit the whole plan-and-finish chain runs synchronously
@@ -333,6 +338,11 @@ class RichText extends Component<RichProps, State> {
     if (previous.forwardedRef !== this.props.forwardedRef && this.host.current) {
       if (this.refCleanup) this.refCleanup(); else assignRef(previous.forwardedRef, null);
       this.refCleanup = assignRef(this.props.forwardedRef, this.host.current);
+    }
+    // copy={false} leaves this host's copying to the browser.
+    if ((previous.copy === false) !== (this.props.copy === false) && this.entry) {
+      this.releaseCopy?.();
+      this.releaseCopy = this.props.copy === false ? undefined : preserveRichCopy(this.entry.element);
     }
     if (!restoreSelection) return;
     restoreSelection();
@@ -472,7 +482,7 @@ class RichText extends Component<RichProps, State> {
     this.setState({ plan, stale: false });
   };
   render(): ReactElement {
-    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
+    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
     const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);

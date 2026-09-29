@@ -27,7 +27,7 @@ const choices: Record<string, readonly unknown[]> = {
   mode: ['body', 'heading', 'title', 'ui'],
   density: ['compact', 'editorial'],
 };
-const booleans = ['opticalHanging', 'spacing', 'tracking'];
+const booleans = ['opticalHanging', 'spacing', 'tracking', 'copy'];
 const list = (values: readonly unknown[]) => values.map(value => typeof value === 'string' ? JSON.stringify(value) : String(value)).join(' or ').replace(/ or (?=.* or )/g, ', ');
 
 export function checkOptions(api: string, options: unknown): void {
