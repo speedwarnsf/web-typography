@@ -17,6 +17,15 @@
 // about; those cells are
 // counted and must still keep the paragraph's promises: no overflow, no new
 // orphan, and the same decision in every engine where 4.2.0 agreed.
+//
+// The coverage corpus (tests/v4-corpus-4.4.json: long unbreakable runs,
+// declared languages, Greek letters in Latin text, inline elements, quotes)
+// is composed at the same widths and fonts and reported apart, as the
+// "coverage" variant, against the release 4.4 is measured against
+// (--coverage-baseline, default the published 4.3.1). A coverage cell must be
+// identical to that release unless its case names the outcome this build
+// must report (expect) or a change this build makes (coverageChanges below);
+// report.counts.<engine> coverage says how many cells each build composed.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { browsers } from './browsers.mjs';
@@ -28,6 +37,7 @@ const { values } = parseArgs({ options: {
   engines: { type: 'string' },
   out: { type: 'string', default: 'output/golden.json' },
   baseline: { type: 'string', default: 'public/releases/4.2.0/typeset.global.js' },
+  'coverage-baseline': { type: 'string', default: 'public/releases/4.3.1/typeset.global.js' },
   dump: { type: 'string' },
   // Sweep bind weights (typeset.ts bindWeights), e.g. '{"pair":1.5}'. Release
   // builds compile the override out, so the subject is then a research build
@@ -43,13 +53,16 @@ watchdog.unref();
 const corpus = JSON.parse(await readFile('tests/v4-corpus.json', 'utf8')).paragraphs;
 /** @type {{ id: string, text: string }[]} */
 const adversarial = JSON.parse(await readFile('tests/v4-corpus-adversarial.json', 'utf8')).paragraphs;
+/** @type {{ id: string, group: string, class: string, html: string, lang?: string, options?: Record<string, unknown>, style?: string, expect?: string }[]} */
+const coverage = JSON.parse(await readFile('tests/v4-corpus-4.4.json', 'utf8')).cases;
 const baseline = await readFile(values.baseline, 'utf8');
+const coverageBaseline = await readFile(values['coverage-baseline'], 'utf8');
 const subject = values.bind
   ? (await (await import('esbuild')).build({ entryPoints: ['src/lib/v4/typeset.release.standalone.ts'], bundle: true, format: 'iife', target: 'es2022', write: false, logLevel: 'silent',
     define: { __TYPESET_BIND_OVERRIDE__: 'globalThis.__TYPESET_BIND__', 'process.env.NODE_ENV': '"development"' } })).outputFiles[0].text
   : await readFile(process.env.TYPESET_BUNDLE || 'packages/typeset-v4/dist/typeset.global.js', 'utf8');
 const stride = Math.max(1, Number(values.stride) || 1);
-const report = { ...await releaseIdentity(), baseline: values.baseline, stride, checks: /** @type {any[]} */ ([]), errors: /** @type {any[]} */ ([]), browsers: /** @type {Record<string, string>} */ ({}), counts: /** @type {Record<string, any>} */ ({}), changed: /** @type {any[]} */ ([]) };
+const report = { ...await releaseIdentity(), baseline: values.baseline, coverageBaseline: values['coverage-baseline'], baselineVersions: /** @type {Record<string, string>} */ ({}), stride, checks: /** @type {any[]} */ ([]), errors: /** @type {any[]} */ ([]), browsers: /** @type {Record<string, string>} */ ({}), counts: /** @type {Record<string, any>} */ ({}), changed: /** @type {any[]} */ ([]) };
 
 const texts = corpus.filter((/** @type {string} */ _, /** @type {number} */ i) => i % stride === 0);
 const widths = [240, 320, 400, 560];
@@ -72,7 +85,7 @@ function separated(text) {
   for (let i = 0; i < words.length; i += 4) chunks.push(words.slice(i, i + 4).join(' '));
   return chunks.join(' <!-- -->');
 }
-/** @typedef {{ id: string, variant: string, tag: string, html: string, width: number, font: string, options: Record<string, unknown>, style?: string }} Cell */
+/** @typedef {{ id: string, variant: string, tag: string, html: string, width: number, font: string, options: Record<string, unknown>, style?: string, lang?: string, case?: string, group?: string, expect?: string }} Cell */
 /** @type {Cell[]} */
 const cells = [];
 for (const [index, text] of texts.entries()) for (const width of widths) for (const font of fonts) {
@@ -95,9 +108,25 @@ for (const { id, text } of adversarial) for (const width of widths) for (const f
   cells.push({ id: 'adversarial-legacy ' + at, variant: 'adversarial-legacy', tag: 'p', html: escape(text), width, font, options: { lineBreaks: 'legacy', contour: 'natural' } });
 }
 
+// Coverage cells are composed at every width and font, like the corpus, with
+// the case's options, lang and style.
+for (const item of coverage) for (const width of widths) for (const font of fonts) {
+  cells.push({ id: `coverage ${item.id}@${width}/${font}`, variant: 'coverage', tag: 'p', html: item.html, width, font, options: item.options ?? {},
+    ...(item.style && { style: item.style }), ...(item.lang !== undefined && { lang: item.lang }), case: item.id, group: item.group, ...(item.expect && { expect: item.expect }) });
+}
+
+/**
+ * Coverage cases this build changes on purpose, by case id, with the change.
+ * A cell whose case names an `expect` outcome is checked against it instead.
+ * Every other coverage cell must be identical to the coverage baseline.
+ * @type {Record<string, string>}
+ */
+const coverageChanges = {};
+
 /** Runs in the page: compose each cell with one build and describe the result. */
 function compose({ cells, build, baseline }) {
-  const api = build === 'baseline' ? window.Baseline : window.Typeset;
+  // The baseline build of a coverage cell is the coverage baseline.
+  const builds = cell => build === 'subject' ? window.Typeset : cell.variant === 'coverage' ? window.CoverageBaseline : window.Baseline;
   // Smart quotes are the one sanctioned change to the characters.
   const plain = text => text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"');
   // Line review items of the audit under test, by type: the build under
@@ -111,9 +140,11 @@ function compose({ cells, build, baseline }) {
   };
   const out = [];
   for (const [index, cell] of cells.entries()) {
+    const api = builds(cell);
     const el = document.createElement(cell.tag);
     el.id = 'golden-cell';
     el.style.cssText = `font:18px/1.5 ${cell.font === 'Georgia' ? 'Georgia, serif' : cell.font};width:${cell.width}px;margin:0;text-wrap:wrap;${cell.style || ''}`;
+    if (cell.lang !== undefined) el.setAttribute('lang', cell.lang);
     el.innerHTML = cell.html;
     document.body.append(el);
     const native = api.measureLayout(el);
@@ -244,9 +275,12 @@ async function runEngine({ name, engine, executablePath }) {
     await page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"><style>body{margin:24px}a{color:#176650}</style></head><body></body></html>');
     await installFixtureFont(page);
     if (values.bind) await page.evaluate(bind => { globalThis.__TYPESET_BIND__ = JSON.parse(bind); }, values.bind);
+    await page.addScriptTag({ content: coverageBaseline });
+    await page.evaluate(() => { window.CoverageBaseline = window.Typeset; });
     await page.addScriptTag({ content: baseline });
     await page.evaluate(() => { window.Baseline = window.Typeset; });
     await page.addScriptTag({ content: subject });
+    report.baselineVersions[name] = await page.evaluate(() => [window.Baseline.VERSION, window.CoverageBaseline.VERSION, window.Typeset.VERSION].join(' / '));
     /** @type {any[]} */ const base = [], cand = [];
     // Chunks keep each evaluate well inside Playwright's timeout.
     for (let i = 0; i < cells.length; i += 60) {
@@ -271,11 +305,16 @@ const runs = (await Promise.allSettled(browsers.filter(b => engines.includes(b.n
 const check = (/** @type {string} */ browser, /** @type {string} */ label, /** @type {unknown} */ pass, /** @type {unknown} */ detail) =>
   report.checks.push({ browser, label, pass: !!pass, ...(detail === undefined ? {} : { detail }) });
 const byId = new Map(cells.map(cell => [cell.id, cell]));
+/** Whether two builds' records of one cell differ, beyond the neutral changes. @param {any} c @param {any} b */
+const differs = (c, b) => c.outcome !== b.outcome || neutral(c.markup) !== neutral(b.markup) || JSON.stringify(c.features) !== JSON.stringify(b.features);
+const total = (/** @type {Record<string, number>} */ counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
+/** A coverage cell this build changes on purpose. @param {Cell} cell */
+const coverageChanged = cell => !!cell.expect || (!!cell.case && cell.case in coverageChanges);
 for (const { name, base, cand } of runs) {
-  const variants = [...new Set(cells.map(cell => cell.variant))];
+  const variants = [...new Set(cells.map(cell => cell.variant))].filter(variant => variant !== 'coverage');
   for (const variant of variants) {
     const pairs = cand.map((c, i) => ({ c, b: base[i], cell: /** @type {Cell} */ (byId.get(c.id)) })).filter(p => p.cell.variant === variant);
-    const differ = pairs.filter(({ c, b }) => c.outcome !== b.outcome || neutral(c.markup) !== neutral(b.markup) || JSON.stringify(c.features) !== JSON.stringify(b.features));
+    const differ = pairs.filter(({ c, b }) => differs(c, b));
     const attributesOnly = pairs.filter(({ c, b }) => c.markup !== b.markup && !differ.some(d => d.c === c) && attributeNeutral(c.markup) === attributeNeutral(b.markup)).length;
     const breaksOutside = pairs.filter(({ c, b }) => attributeNeutral(c.markup) !== attributeNeutral(b.markup) && !differ.some(d => d.c === c)).length;
     const unexplained = differ.filter(({ cell }) => !changeReasons(cell).length);
@@ -310,7 +349,6 @@ for (const { name, base, cand } of runs) {
     // problem for another, but never ends with more of them than both the
     // browser and 4.2.0 had. (Declined justified text is native by design.)
     if (variant === 'justified') continue;
-    const total = (/** @type {Record<string, number>} */ counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
     const worse = differ.filter(({ c }) => total(c.review.subject) > Math.max(total(c.review.native), total(c.review.baseline)))
       .filter(({ c }) => !Object.keys(tradeOffs).some(key => c.id.endsWith(' ' + key)));
     check(name, `${variant}: no changed paragraph has more line-end problems than native and 4.2.0`, !worse.length,
@@ -326,10 +364,51 @@ for (const { name, base, cand } of runs) {
       { composed: composed.length, regressed: composed.filter(({ c }) => c.regressed).length, inconsistent: inconsistent.slice(0, 3).map(({ c }) => ({ id: c.id, review: c.review, regressed: c.regressed })) });
   }
   // A recorded trade-off that no longer occurs must be removed from the list.
-  for (const key of Object.keys(tradeOffs)) {
+  // The trade-offs are against 4.2.0: against a later baseline they are not
+  // changes at all.
+  if (/^4\.2\./.test(report.baselineVersions[name] ?? '')) for (const key of Object.keys(tradeOffs)) {
     const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (attributeNeutral(c.markup) !== attributeNeutral(base[i].markup) || c.outcome !== base[i].outcome));
     check(name, `recorded trade-off still occurs: ${key}`, occurs);
   }
+}
+
+// The coverage corpus, against the coverage baseline: each case that names an
+// expected outcome reports it, every other cell is identical unless its case
+// is a change this build makes, and no cell gains overflow, a new orphan or
+// more line-end problems than both native and the baseline had.
+for (const { name, base, cand } of runs) {
+  const pairs = cand.map((c, i) => ({ c, b: base[i], cell: /** @type {Cell} */ (byId.get(c.id)) })).filter(p => p.cell.variant === 'coverage');
+  if (!pairs.length) continue;
+  const version = (report.baselineVersions[name] ?? '').split(' / ')[1] || 'the coverage baseline';
+  const differ = pairs.filter(({ c, b }) => differs(c, b));
+  const unexplained = differ.filter(({ cell }) => !coverageChanged(cell));
+  const composed = (/** @type {any} */ record) => String(record.outcome).startsWith('composed');
+  /** @type {Record<string, { cells: number, changed: number, baselineComposed: number, subjectComposed: number, outcomes: Record<string, number> }>} */
+  const groups = {};
+  for (const { c, b, cell } of pairs) {
+    const group = groups[/** @type {string} */ (cell.group)] ??= { cells: 0, changed: 0, baselineComposed: 0, subjectComposed: 0, outcomes: {} };
+    group.cells++; group.changed += +differ.some(d => d.c === c);
+    group.baselineComposed += +composed(b); group.subjectComposed += +composed(c);
+    const key = b.outcome === c.outcome ? c.outcome : b.outcome + ' -> ' + c.outcome;
+    group.outcomes[key] = (group.outcomes[key] || 0) + 1;
+  }
+  report.counts[`${name} coverage`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length,
+    baselineComposed: pairs.filter(({ b }) => composed(b)).length, subjectComposed: pairs.filter(({ c }) => composed(c)).length, groups };
+  for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: [cell.expect ? 'expect ' + cell.expect : coverageChanges[/** @type {string} */ (cell.case)] ?? 'unexplained'], baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
+  const wrong = pairs.filter(({ c, cell }) => cell.expect && c.outcome !== cell.expect);
+  check(name, 'coverage: every case with an expected outcome reports it', !wrong.length, wrong.slice(0, 4).map(({ c, cell }) => ({ id: c.id, expect: cell.expect, outcome: c.outcome })));
+  check(name, `coverage: identical to ${version} outside the changes this build makes`, !unexplained.length,
+    unexplained.length ? unexplained.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: [b.outcome, ...b.lines], subject: [c.outcome, ...c.lines] })) : { cells: pairs.length, changed: differ.length });
+  // Long unbreakable runs overflow natively in both builds.
+  const overflow = pairs.filter(({ c, b }) => c.overflow > Math.max(.5, b.overflow + .5));
+  check(name, 'coverage: no overflow the baseline did not have', !overflow.length, overflow.slice(0, 4).map(({ c, b }) => ({ id: c.id, overflow: c.overflow, baseline: b.overflow })));
+  const orphans = pairs.filter(({ c }) => c.orphan && !c.nativeOrphan);
+  check(name, 'coverage: no new orphan', !orphans.length, orphans.slice(0, 4).map(({ c }) => ({ id: c.id, lines: c.lines })));
+  const damaged = pairs.filter(({ c }) => !c.textIntact || /^threw/.test(c.outcome));
+  check(name, 'coverage: source text intact', !damaged.length, damaged.slice(0, 4).map(({ c }) => ({ id: c.id, outcome: c.outcome })));
+  const worse = differ.filter(({ c }) => total(c.review.subject) > Math.max(total(c.review.native), total(c.review.baseline)));
+  check(name, 'coverage: no changed paragraph has more line-end problems than native and the baseline', !worse.length,
+    worse.slice(0, 4).map(({ c }) => ({ id: c.id, review: c.review, lines: c.lines })));
 }
 
 // Engines keep agreeing wherever 4.2.0 made the same decision in each. Where
@@ -343,6 +422,12 @@ if (runs.length > 1) {
   const unchanged = [], changed = { cells: 0, before: 0, after: 0, introduced: 0 }, corpus = { cells: 0, before: 0 };
   for (const [index, cell] of cells.entries()) {
     if (cell.variant === 'justified') continue;
+    // A coverage cell: engines agree wherever the coverage baseline's did,
+    // unless its case is a change this build makes (checked above).
+    if (cell.variant === 'coverage') {
+      if (!coverageChanged(cell) && same('base', index) && !same('cand', index)) unchanged.push({ id: cell.id, ...Object.fromEntries(runs.map(run => [run.name, [run.cand[index].outcome, ...run.cand[index].lines]])) });
+      continue;
+    }
     const reasons = changeReasons(cell).length > 0;
     if (!cell.variant.startsWith('adversarial')) { corpus.cells++; corpus.before += +!same('base', index); }
     if (reasons) { changed.cells++; changed.before += +!same('base', index); changed.after += +!same('cand', index); changed.introduced += +(same('base', index) && !same('cand', index)); }
@@ -358,7 +443,17 @@ report.summary = { cells: cells.length, engines: runs.map(run => run.name), seco
   checks: report.checks.length, failed: report.checks.filter(c => !c.pass).length, errors: report.errors.length,
   changed: Object.fromEntries(Object.entries(report.counts).map(([key, value]) => [key, value.changed])),
   attributesOnly: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => 'attributesOnly' in value).map(([key, value]) => [key, value.attributesOnly])),
-  breaksOutside: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => value.breaksOutside).map(([key, value]) => [key, value.breaksOutside])) };
+  breaksOutside: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => value.breaksOutside).map(([key, value]) => [key, value.breaksOutside])),
+  // Per engine: the 4.2/4.3 corpus against --baseline, and the coverage
+  // corpus against --coverage-baseline (cells each build composed).
+  existing: Object.fromEntries(runs.map(({ name }) => {
+    const rows = Object.entries(report.counts).filter(([key]) => key.startsWith(name + ' ') && key !== name + ' coverage').map(([, value]) => value);
+    return [name, { cells: rows.reduce((sum, row) => sum + row.cells, 0), changed: rows.reduce((sum, row) => sum + row.changed, 0) }];
+  })),
+  coverage: Object.fromEntries(runs.filter(({ name }) => report.counts[name + ' coverage']).map(({ name }) => {
+    const { cells, changed, baselineComposed, subjectComposed } = report.counts[name + ' coverage'];
+    return [name, { cells, changed, baselineComposed, subjectComposed }];
+  })) };
 await writeFile(values.out, JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ ...report.summary, failures: report.checks.filter(c => !c.pass).slice(0, 8), errors: report.errors.slice(0, 4) }, null, 2));
 if (report.summary.failed || report.summary.errors || !runs.length) process.exitCode = 1;
