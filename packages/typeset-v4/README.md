@@ -3,7 +3,7 @@
 Better line breaks for web text: no stranded short words or one-word last
 lines, links and styling intact, verified in Chrome, Safari and Firefox.
 
-![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.3.0/before-after.png)
+![The same paragraph at 375 px. Top: the browser with text-wrap: pretty leaves "a" at the end of three lines. Bottom: Typeset leaves none, in the same seven lines.](https://typeset.us/releases/4.3.1/before-after.png)
 
 Typeset measures each paragraph in the browser, chooses where its lines
 break, and checks the result after rendering. If a result is not better, or
@@ -37,19 +37,19 @@ scripts/field/sweep-homepage.mjs reproduces it.)
 if it ever did.
 
 ```html
-<script src="https://typeset.us/go@4.3.0.js" integrity="sha384-yHVZ46QyyOffm12e72GsBgkcZ96FcCaqK7POZ5/BGDkmfjEZ1dLV81vmBvCusTUX" crossorigin="anonymous" defer></script>
+<script src="https://typeset.us/go@4.3.1.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
 ```
 
 It sets paragraphs, list items, headings, captions and table cells, with
 English smart quotes and hanging punctuation. The same file is on npm as
 `typeset.us/auto`, so jsDelivr serves it with the same hash:
-`https://cdn.jsdelivr.net/npm/typeset.us@4.3.0/dist/auto.js`.
+`https://cdn.jsdelivr.net/npm/typeset.us@4.3.1/dist/auto.js`.
 Exclude an element and everything in it with `data-no-typeset`.
 
 **npm, for pages you script yourself:**
 
 ```sh
-npm i -E typeset.us@4.3.0
+npm i -E typeset.us@4.3.1
 ```
 
 ```ts
@@ -174,7 +174,7 @@ it is not an error. The ones you will see most:
 
 All 42 outcomes, and the finishing statuses in `data-ts-spacing`,
 `data-ts-tracking`, `data-ts-hanging` and `data-ts-quotes`:
-https://typeset.us/releases/4.3.0/OUTCOMES.md. In TypeScript they are the
+https://typeset.us/releases/4.3.1/OUTCOMES.md. In TypeScript they are the
 `Outcome` and `FeatureStatus` types, and `OUTCOMES` lists them.
 
 ## Checking it in CI
@@ -221,15 +221,16 @@ Composition runs in the browser, on the main thread.
   only about 6 ms of composition runs inside it, and the rest of the
   on-screen work runs in the next frame, before it paints. Re-renders that
   change nothing write nothing.
-- Download, gzip: 55.9 KB for `go@4.3.0.js` or `auto.js`; with esbuild,
-  Rollup, webpack or Vite, which tree-shake, 49.8 KB for a bundle that
-  imports only `mount` and 49.9 KB for `TypesetText`. A bundler that does
+- Download, gzip: 56.5 KB for `go@4.3.1.js` or `auto.js`; with esbuild,
+  Rollup, webpack or Vite, which tree-shake, 50.4 KB for a bundle that
+  imports only `mount` and 50.5 KB for `TypesetText`. A bundler that does
   not tree-shake, such as Metro (Expo, React Native Web), ships all of
-  `typeset.us/react`: 62.2 KB for `TypesetText` (4.2.0: 43.2 KB). No
+  `typeset.us/react`: 63.2 KB for `TypesetText` (4.2.0: 43.2 KB). No
   runtime dependencies.
 
-These are 4.3.0 figures from `npm run bench`, measured beside 4.2.0 on the
-same machine. Full tables, the method and the comparison:
+The download sizes are 4.3.1's; the times are 4.3.0 figures from `npm run
+bench`, measured beside 4.2.0 on the same machine. Full tables, the method
+and the comparison:
 https://github.com/speedwarnsf/web-typography/blob/master/docs/BENCHMARKS.md.
 
 ## What it won't do
@@ -381,14 +382,14 @@ https://github.com/speedwarnsf/web-typography/blob/master/STABILITY.md
   (often called an orphan or widow).
 - **Hanging punctuation**: opening quotes and some capitals set slightly
   into the margin so the text edge looks straight.
-- **Pin**: a versioned file, such as `go@4.3.0.js`, whose bytes never
+- **Pin**: a versioned file, such as `go@4.3.1.js`, whose bytes never
   change, loaded with its integrity hash.
 
 ## More
 
-- Support range and known limitations: https://typeset.us/releases/4.3.0/SUPPORT.md
-- Moving from 4.2: https://typeset.us/releases/4.3.0/MIGRATION.md
-- For AI coding agents: https://typeset.us/releases/4.3.0/for-agents.md and
+- Support range and known limitations: https://typeset.us/releases/4.3.1/SUPPORT.md
+- Moving from 4.2: https://typeset.us/releases/4.3.1/MIGRATION.md
+- For AI coding agents: https://typeset.us/releases/4.3.1/for-agents.md and
   `capabilities.json`
 - Changes: https://github.com/speedwarnsf/web-typography/blob/master/CHANGELOG.md
 - Security policy and reporting: https://github.com/speedwarnsf/web-typography/blob/master/SECURITY.md

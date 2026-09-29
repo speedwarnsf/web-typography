@@ -34,14 +34,14 @@ behind an option, off by default, or waits for a major version.
 
 ## Installing so nothing changes under you
 
-- npm: `npm i -E typeset.us@4.3.0` saves the exact version. A caret range
-  (`^4.3.0`) takes minor releases automatically, including their listed
+- npm: `npm i -E typeset.us@4.3.1` saves the exact version. A caret range
+  (`^4.3.1`) takes minor releases automatically, including their listed
   rendering changes.
 - Script tag: use the pinned loader with its integrity hash, from
   https://typeset.us/sri.json:
 
   ```html
-  <script src="https://typeset.us/go@4.3.0.js" integrity="sha384-yHVZ46QyyOffm12e72GsBgkcZ96FcCaqK7POZ5/BGDkmfjEZ1dLV81vmBvCusTUX" crossorigin="anonymous" defer></script>
+  <script src="https://typeset.us/go@4.3.1.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
   ```
 
 - `go@4.js` follows the latest 4.x release. `go.js` is for trying Typeset

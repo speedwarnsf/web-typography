@@ -10,9 +10,23 @@ Hashes for every published version live in
 
 ---
 
-## Unreleased
+## 4.3.1 - Unreleased
 
-Planned as 4.3.1. Not published.
+4.3.1 is a patch release of 4.3.0: no API, option, outcome code or default
+changed. It fixes three timing defects in keeping composed text correct
+while a page changes, found by the checks that GitHub's hosted runners and
+the 4.3.0 release cut ran.
+
+### Rendering changes
+
+None. `scripts/v4/verify-golden.mjs` run with the published 4.3.0 build as
+its baseline, 3,932 cells per engine (every corpus and adversarial
+paragraph at four widths in two fonts, plain, rich, legacy, with finishes,
+comment separators, as titles and justified): 0 cells differ in Chromium,
+WebKit or Firefox. The fixes below change when a block composes while the
+page changes and, in the WebKit iframe case, which width its lines end up
+composed for (4.3.0 kept lines composed for the old width); what settled
+text composes is unchanged.
 
 ### Fixed
 
@@ -25,19 +39,26 @@ Planned as 4.3.1. Not published.
   frame's compositions ran past 100 ms, or another frame's compositions fell
   between a block's composition and its next check, the window had lapsed
   and the same blocks recomposed in every frame. Both windows now leave out
-  the adapters' own work, during which no text metric can change. A 1.2 s
-  font-size transition over 16 blocks in Chromium at 4x CPU
-  (`scripts/v4/verify-recompose-storms.mjs`): 4.3.0 failed the check in 4 of
-  6 staged release-cut runs on the maintainer's M2 Pro (66 to 76
-  compositions, 9 to 14 long tasks of up to 135 ms, half of them over
-  100 ms) and in 4 of 11 runs on GitHub's macos-15 runners (up to 88
-  compositions and 17 long tasks); 4.3.1 made 32 to 44 compositions and 0 to
-  2 long tasks in 36 transitions on the M2 Pro. With the CPU throttled
-  further, where 4.3.0 storms in most runs (6x: 30 to 68 compositions and 6
-  to 11 long tasks; 8x: 45 to 55 and 11 to 13), 4.3.1 composes each block
-  about twice (6x: 31 to 32 compositions and 2 to 3 long tasks; 8x: 29 to 33
-  and 2 to 5; 12x and 16x: 28 to 33). This changes when blocks compose, not
-  what they compose.
+  the adapters' own work, during which no text metric can change. On
+  screen, where a held block paints native lines, that applies only to a
+  change within two rendering updates of the block's composition (a
+  slider's next input comes one update on, a transition's next step two),
+  once the composition before it had followed such a change too: a
+  continuous change holds from its second step, and a one-off second
+  change, such as a text-size control used twice on a slow device,
+  composes as in 4.3.0. A 1.2 s font-size transition over 16 blocks in
+  Chromium at 4x CPU (`scripts/v4/verify-recompose-storms.mjs`): 4.3.0
+  failed the check in 4 of 6 staged release-cut runs on the maintainer's M2
+  Pro (66 to 76 compositions, 9 to 14 long tasks of up to 135 ms, half of
+  them over 100 ms) and in 4 of 11 runs on GitHub's macos-15 runners (up to
+  88 compositions and 17 long tasks); 4.3.1 made 33 to 44 compositions and
+  0 to 3 long tasks in 24 transitions on the M2 Pro. With the CPU
+  throttled further, where 4.3.0 storms in most runs (6x: 30 to 68
+  compositions and 6 to 11 long tasks; 8x: 45 to 55 and 11 to 13), 4.3.1
+  composes each block two or three times (6x: 38 compositions and 3 or 4
+  long tasks; 8x: 38 to 41 and 5 to 7; 12x: 32 to 34). What a block
+  composes is unchanged; a held block paints native lines until the change
+  settles, as in 4.3.0.
 - **`mount()` recomposes a width change that WebKit lays out before it
   delivers the change's mutation record.** Since 4.3.0, `mount()` keeps a
   composed block whose lines still fit a new width when only its own
@@ -95,14 +116,23 @@ Planned as 4.3.1. Not published.
   gave as "text scrolled into view during its first frames, in Chromium",
   now describes that case.
 
+### Known limitations
+
+- A block just below a scroll pane's fold that the first frame's budget
+  leaves for the second frame still paints native lines for one frame when
+  the page scrolls it in from the frame after mounting (see the fix above,
+  and SUPPORT.md). `priority="sync"` composes a block in its commit
+  instead. Planned for 4.4.
+- 4.3.0's other known limitations stand; SUPPORT.md lists them.
+
 ### Development
 
 - The storm check's 60-frame text-size slider is enforced on GitHub's
   hosted runners again. Its speed-calibrated entry, added after 65
   compositions against a limit of 64 in macos-15 run 36284847012, blamed
   the wall-clock hold-off window fixed above. On the M2 Pro the slider made
-  26 to 32 compositions and 2 long tasks in 12 runs, and 25 or 26
-  compositions at 6x to 16x CPU.
+  28 to 39 compositions and 2 long tasks in 8 runs, and 25 or 26
+  compositions at 6x to 12x CPU.
 - `verify-iframe-mount` reports what a failed recomposition check saw: the
   block's outcome, stale mark, lines against breaks and widths, the
   controller's passes and compositions, and a timeline of layout, record

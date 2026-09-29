@@ -1,6 +1,7 @@
-# Typeset 4.3.0 support contract
+# Typeset 4.3.1 support contract
 
-4.3.0 is released with owner approval within the range below. Local tests
+4.3.1, a patch release of 4.3.0, is released with owner approval within the
+range below. Local tests
 are not certification for every device, browser, font, or sentence.
 What each outcome means: OUTCOMES.md. What a version promises: STABILITY.md
 in the repository.
@@ -216,7 +217,14 @@ scale) moves no line, so a composition made before it is kept; text that
 could not be composed while a transform applied (`native:transformed`, such
 as a dialog's `@starting-style` scale-in or a card inserted with
 `element.animate()`) is composed again when the transform's transition or
-animation ends.
+animation ends. With the React adapters, a block whose text metrics keep
+changing (a font-size or spacing transition, a text-size slider) shows native
+wrapping until they hold for 100 ms, then composes once, instead of
+composing in every frame. A change counts as continuous when it comes within
+100 ms of the block's last composition, or, on screen, within two rendering
+updates of a composition that itself followed such a change; the adapters'
+own work, which on a slow device can outlast 100 ms, is left out of both
+windows. A one-off change later than that composes.
 `mount()` also works on the document or elements of a same-origin iframe.
 The React adapters share one registry per document, with the same
 triggers (a host whose height changes at the same width has its layout key
