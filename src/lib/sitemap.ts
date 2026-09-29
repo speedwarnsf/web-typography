@@ -166,6 +166,7 @@ export function getPageInfo(pathname: string): PageInfo | null {
 /** Pages not in the main sections (shown separately in menu) */
 export const metaPages: SitePage[] = [
   { slug: "/about", name: "About", description: "About the author" },
+  { slug: "/docs", name: "Docs", description: "Install guides, recipes and the package reference" },
   { slug: "/help", name: "Help", description: "Questions, bad breaks and security reports" },
   { slug: "/sponsor", name: "Sponsor", description: "Sponsor this project" },
   { slug: "/privacy", name: "Privacy", description: "What the site collects: no cookies, no analytics" },

@@ -45,7 +45,7 @@ let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 
-const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/help', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/sponsor', '/utility', '/v2', '/variable-fonts'];
+const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/docs', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/help', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/sponsor', '/utility', '/v2', '/variable-fonts'];
 const ATTACK = `<!doctype html><html><head>
 <base href="https://attacker.invalid/">
 <meta http-equiv="refresh" content="0;url=https://attacker.invalid/">
@@ -270,7 +270,7 @@ try {
     // D5: the homepage names its baseline by engine and claims only what that
     // engine does; the developer band links to GitHub, npm and the docs.
     const developer = decode(await (await fetch(base + '/')).text());
-    for (const [label, href] of [['GitHub', 'https://github.com/speedwarnsf/web-typography'], ['npm', 'https://www.npmjs.com/package/typeset.us'], ['framework recipes', '/install/frameworks']]) {
+    for (const [label, href] of [['GitHub', 'https://github.com/speedwarnsf/web-typography'], ['npm', 'https://www.npmjs.com/package/typeset.us'], ['framework recipes', '/install/frameworks'], ['the docs page', '/docs']]) {
       check('content', `homepage links to ${label}`, developer.includes(`href="${href}"`));
     }
     check('content', 'homepage states a measured loader size, not "38 KB", and no "--" dash', !/38(&nbsp;|\s)KB/.test(developer) && !developer.includes('doing -- visible') && /\d+\.\d(&nbsp;|\s)KB gzipped/.test(developer));
@@ -310,12 +310,29 @@ try {
         await context.close();
       } finally { await browser.close(); }
     }
+    // /docs and /help: every link on this site resolves.
+    for (const route of ['/docs', '/help']) {
+      const html = await (await fetch(base + route)).text();
+      const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+      const local = [...new Set([...main.matchAll(/href="(\/[^"#]*)"/g)].map(m => m[1]))];
+      const broken = [];
+      for (const path of local) { const r = await fetch(base + path); if (r.status !== 200) broken.push(`${path} ${r.status}`); }
+      check('content', `${route}: every link to this site resolves`, local.length > 0 && broken.length === 0, { local, broken });
+    }
     if (values.network) {
       // npmjs.com answers scripts with 403, so the npm link is checked through
       // the registry, which serves the same package.
       for (const [label, url] of [['GitHub link', 'https://github.com/speedwarnsf/web-typography'], ['npm link (registry)', 'https://registry.npmjs.org/typeset.us']]) {
         const r = await fetch(url, { method: 'GET', redirect: 'follow' }).catch(() => null);
         check('content', `${label} resolves: ${url}`, r?.status === 200, r?.status);
+      }
+      // The repository documents /docs and /help link, at the pinned tag.
+      for (const route of ['/docs', '/help']) {
+        const html = decode(await (await fetch(base + route)).text());
+        const remote = [...new Set([...html.matchAll(/href="(https:\/\/github\.com\/speedwarnsf\/web-typography\/blob\/[^"]+)"/g)].map(m => m[1]))];
+        const broken = [];
+        for (const url of remote) { const r = await fetch(url, { method: 'GET', redirect: 'follow' }).catch(() => null); if (r?.status !== 200) broken.push(`${url} ${r?.status}`); }
+        check('content', `${route}: every repository document it links resolves on GitHub`, remote.length > 0 && broken.length === 0, { remote: remote.length, broken });
       }
     }
   }

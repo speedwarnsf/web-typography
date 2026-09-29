@@ -666,7 +666,7 @@ function DevelopersBand() {
       <nav className="v2-links">
         <a href="https://github.com/speedwarnsf/web-typography">GitHub</a>
         <a href="https://www.npmjs.com/package/typeset.us">npm</a>
-        <a href={`/releases/${PINNED_VERSION}/README.md`}>Docs</a>
+        <a href="/docs">Docs</a>
         <a href="/install/frameworks">Next, Vite, Astro, Svelte, Vue</a>
         <a href="/install">No-code platforms</a>
         <a href="/faq">FAQ</a>

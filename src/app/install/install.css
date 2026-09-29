@@ -53,6 +53,12 @@
 .in-lede a, .in-note a { color: #b8963e; text-decoration: none; }
 .in-lede a:hover, .in-note a:hover, .in-fine a:hover { text-decoration: underline; }
 .in-section { margin-bottom: 36px; }
+.in-docs { margin: 0 0 8px; max-width: 60ch; }
+.in-docs > div { padding: 12px 0; border-bottom: 1px solid #161616; }
+.in-docs dt { font-family: var(--font-playfair), Georgia, serif; font-weight: 700; font-size: 1.125rem; margin-bottom: 4px; }
+.in-docs dt a { color: #b8963e; text-decoration: none; }
+.in-docs dt a:hover { text-decoration: underline; }
+.in-docs dd { margin: 0; color: #a3a3a3; font-size: 0.9375rem; line-height: 1.6; }
 .in-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
