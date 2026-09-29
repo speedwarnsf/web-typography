@@ -172,7 +172,7 @@ it is not an error. The ones you will see most:
 | `native:verification` | The result did not check out after rendering, so it was undone. |
 | `skipped:excluded` | Inside `data-no-typeset`, code, a form control or a nav. |
 
-All 42 outcomes, and the finishing statuses in `data-ts-spacing`,
+All 43 outcomes, and the finishing statuses in `data-ts-spacing`,
 `data-ts-tracking`, `data-ts-hanging` and `data-ts-quotes`:
 https://typeset.us/releases/4.3.1/OUTCOMES.md. In TypeScript they are the
 `Outcome` and `FeatureStatus` types, and `OUTCOMES` lists them.

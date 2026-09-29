@@ -10,7 +10,7 @@ import { planOpticalHanging, opticalVerified } from './optical-hanging';
 import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
-import { languageOf, languageWeakEnding } from './break-opportunities';
+import { exceedsRunBudget, languageOf, languageWeakEnding } from './break-opportunities';
 import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
@@ -514,7 +514,10 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   const nodes = Array.from(element.childNodes);
   const hadStyle = element.hasAttribute('style');
   const styles = { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize };
-  const before = visible ? measureLayout(element) : emptyMetrics();
+  // An unbreakable run too long to measure safely (see RUN_BUDGET): decline
+  // before reading a single box, so nothing here costs its square.
+  const overlong = visible && exceedsRunBudget(source);
+  const before = visible && !overlong ? measureLayout(element) : emptyMetrics();
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
   // The composition's style fingerprint as the last verification confirmed
@@ -571,7 +574,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
         }
       }
     }
-    const after = visible ? measureLayout(element) : emptyMetrics();
+    const after = visible && !overlong ? measureLayout(element) : emptyMetrics();
     let widest = 0;
     if (outcome.startsWith('composed') && after.lines.length) {
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
@@ -600,6 +603,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     return result;
   };
   if (!source.trim()) return finish('native:empty');
+  if (overlong) return finish('native:run-budget');
   const cs = getComputedStyle(element);
   const lang = element.closest('[lang]')?.getAttribute('lang');
   if (options.lineBreaks !== 'unicode' && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return finish('native:language');

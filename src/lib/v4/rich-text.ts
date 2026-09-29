@@ -5,7 +5,7 @@ import { composeTitle } from './title-layout';
 import { measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import type { Options } from './typeset.next';
-import { analyzeBreaks, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
+import { analyzeBreaks, exceedsRunBudget, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
 import { englishPhraseGroups, keptPhrases, phraseBreakCosts, retainSentenceLayout, strandedOpener } from './phrase-boundaries';
 import { retainParagraphRhythm } from './paragraph-rhythm';
 import { opticalMarkerStyle } from './optical-hanging';
@@ -171,6 +171,11 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   const source = element.textContent || '';
   if (!canCompose(element.ownerDocument)) {
     return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: '' };
+  }
+  // An unbreakable run too long to measure safely (see RUN_BUDGET): declined
+  // before any box is read.
+  if (exceedsRunBudget(source)) {
+    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: 'native:run-budget', breaks: [], widths: [], styleSignature: '' };
   }
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));

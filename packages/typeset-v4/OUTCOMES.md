@@ -72,6 +72,7 @@ Left as the browser set it, because every candidate failed a limit or a check af
 | Outcome | What happened | Expected | What to do |
 | --- | --- | --- | --- |
 | `native:budget` | The block is longer than the composition budget (500 words or 12,000 characters). | Yes | None; very long blocks are left to the browser. |
+| `native:run-budget` | Some run of more than 500 characters has no line-break opportunity (a long string of one punctuation mark, letters with no space, text joined by no-break spaces). Measuring such a run costs the square of its length in WebKit (about 37 s for 11,000 closing quotes), so the block is declined before anything is measured; result.before and result.after hold no lines. Prose has no such runs; user-generated text can. | Yes | None; the browser wraps it. On containers of user-generated text, overflow-wrap: break-word lets the browser wrap such a run at the measure. |
 | `native:no-candidate` | No arrangement of the allowed breaks fits the width and line limits. result.constraint says why: an unbreakable run wider than the box, a line budget, or the search. | No | Read result.constraint; widen the box, allow overflow-wrap: break-word, or raise maxLines. |
 | `native:line-budget` | Every candidate needs more lines than allowed (maxLines, or the native line count plus the body allowance). | Yes | None, or raise maxLines or use density: 'editorial'. |
 | `native:quality` | The composed result would have created a one-word last line the browser did not have, so it was discarded. | Yes | None. |

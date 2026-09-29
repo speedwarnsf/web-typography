@@ -30,6 +30,40 @@ export function languageOf(tag: string | null | undefined): string {
     return locale.script && locale.script !== 'Latn' ? 'unsupported' : locale.language || 'und';
   } catch { return 'invalid'; }
 }
+/**
+ * The most code points (collapsible white space aside) a paragraph may hold
+ * between two line-break opportunities. Measuring reads each word's boxes,
+ * and WebKit's Range.getClientRects() takes time in proportion to the length
+ * of the line a range is on, so a longer unbreakable run costs the square of
+ * its length: 11,000 closing quotes and a letter took about 37 s in
+ * typeset() in WebKit, 11,000 letters, a hyphen and a letter about 15 s.
+ * Prose has no such runs; untrusted text (a comment, a profile) can. A block
+ * with one is declined as native:run-budget before anything is measured.
+ */
+export const RUN_BUDGET = 500;
+// A letter or digit, spaces, then a letter is always an opportunity (UAX #14
+// LB18: break after spaces; no earlier rule applies to these classes).
+const certainBreak = /(?<=[\p{L}\p{N}] +)(?=\p{L})/u;
+/** Code points that render: collapsible white space does not. */
+function runLength(text: string): number {
+  let length = 0;
+  for (const char of text) if (char !== ' ' && char !== '\t' && char !== '\n' && char !== '\r' && char !== '\f') length++;
+  return length;
+}
+/** Whether some stretch of `source` between two line-break opportunities
+ * holds more than RUN_BUDGET code points. Linear, and nearly free for
+ * prose: the Unicode rules run only where the text goes more than
+ * RUN_BUDGET characters without a space between letters. */
+export function exceedsRunBudget(source: string): boolean {
+  if (source.length <= RUN_BUDGET || !source.split(certainBreak).some(piece => piece.length > RUN_BUDGET)) return false;
+  let start = 0;
+  for (const { position } of new Rules().breaks(source.replace(/[\t\r\n]/g, ' '))) {
+    if (runLength(source.slice(start, position)) > RUN_BUDGET) return true;
+    start = position;
+  }
+  return runLength(source.slice(start)) > RUN_BUDGET;
+}
+
 export function languageWeakEnding(word: string, language: string): boolean {
   if (language === 'en') return isWeakEnding(word);
   if (!profiles[language]) return false;

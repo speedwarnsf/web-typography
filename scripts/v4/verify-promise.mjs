@@ -81,6 +81,36 @@ for(const config of browsers){
         }
         p.style.cssText='';
       }
+      // A run of more than 500 code points with no line-break opportunity is
+      // declined before anything is measured (native:run-budget). WebKit's
+      // Range.getClientRects() costs the length of the line a range is on, so
+      // measuring such a run cost its square: 4.3.1 took about 37 s on 11,000
+      // closing quotes and a letter, and 15 s on 11,000 letters, a hyphen and
+      // a letter (SUPPORT.md). Both are under the 12,000-character budget.
+      {
+        p.style.cssText='font:18px/1.5 Georgia;width:600px';
+        const cases=[['11,000 closing quotes and a letter','\u201d'.repeat(11000)+'x'],['11,000 letters, a hyphen and a letter','a'.repeat(11000)+'-x'],
+          ['11,000 letters in a sentence','Someone wrote '+'a'.repeat(11000)+' and left.'],['5,000 spaced opening brackets','A reply: '+'( '.repeat(5000)+'and more.'],
+          ['3,000 no-break-joined words','A caption: '+'ab\u00a0'.repeat(3000)+'end.']];
+        for(const [label,text] of cases){
+          api.restore(p);p.textContent=text;
+          const began=performance.now(),result=api.typeset(p),ms=performance.now()-began;
+          check('run budget: '+label+' declines as native:run-budget in under 50 ms, with nothing measured',result.outcome==='native:run-budget'&&ms<50&&!result.before.lines.length&&!result.after.lines.length&&p.textContent===text&&p.dataset.tsOutcome==='native:run-budget',{ms:Math.round(ms),outcome:result.outcome});
+          api.restore(p);p.textContent=text;
+          const planned=performance.now(),plan=internals.planRichText(p,{lineBreaks:'unicode'}),planMs=performance.now()-planned;
+          check('run budget: planRichText declines '+label+' in under 50 ms',plan.outcome==='native:run-budget'&&planMs<50&&!plan.before.lines.length,{ms:Math.round(planMs),outcome:plan.outcome});
+        }
+        // At the limit a run is measured and composed or declined as before
+        // (verify-golden compares the 499- and 501-character cases with 4.3.1).
+        api.restore(p);p.style.width='240px';
+        for(const [length,expected] of /** @type {[number,boolean][]} */ ([[499,false],[500,false],[501,true]])){
+          p.textContent='The code '+'x'.repeat(length)+' was pasted into the reply and the thread went on below it.';
+          const result=api.typeset(p);
+          check('run budget: a '+length+'-character run '+(expected?'is':'is not')+' declined',(result.outcome==='native:run-budget')===expected,result.outcome);
+          api.restore(p);
+        }
+        p.style.cssText='';
+      }
       const ink=[];
       for(const font of ['Georgia','Arial','Times New Roman','Courier New'])for(const size of [16,32,48])for(const char of ['"','\u201c','\u2018','T','V','A','O','H']){
         p.style.fontFamily=font;p.style.fontSize=size+'px';p.style.width='900px';p.textContent=char+'he gallery';

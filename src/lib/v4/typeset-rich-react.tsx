@@ -410,7 +410,8 @@ class RichText extends Component<RichProps, State> {
     const mode: Mode = props.mode || (el.dataset.typesetMode as Mode | undefined) || (el.closest('h1,h2,h3,h4,h5,h6') ? 'title' : 'body');
     const educate = props.smartQuotes === 'en' && /^en(?:-|$)/i.test(props.lang || '') && quoteTreeSupported(props.children);
     const result: Result = {
-      outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME ? plan.before : measureLayout(el),
+      // Nothing was measured for these; a long unbreakable run is not read now either.
+      outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME || plan.outcome === 'native:run-budget' ? plan.before : measureLayout(el),
       changed: !!(plan.breaks.length || plan.hangs?.length || plan.spacing?.adjustments.length || plan.tracking?.runs.length),
       durationMs: performance.now() - started,
       ...(plan.constraint && { constraint: plan.constraint }), ...(plan.search && { search: plan.search }),
