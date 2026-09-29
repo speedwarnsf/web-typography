@@ -1179,8 +1179,9 @@ pin and no bytes under `public/` or `dist/` changed. The npm tarball's
 and the wide-measure behavior, and every benchmark citation was re-measured
 on the 3.5.0 engine (`npm run bench`): 1.6 ms median per paragraph and
 92.9 ms full page at 1x (was 1.4 / 86.4 on 3.4.x), 7.1 ms / 418.5 ms at 4x.
-docs/RESEARCH.md Part XII records the 3.5.0 derivations; TYPESET-NOTES.md
-is marked historical.
+docs/RESEARCH.md Part XII records the 3.5.0 derivations; TYPESET-NOTES.md,
+the pre-compositor issue notes, was marked historical; it has since moved
+out of the repository.
 
 ---
 

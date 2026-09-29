@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { INSTALL_ORDER, PLATFORMS, SNIPPET } from '@/lib/platforms';
-import { EVERGREEN_NOTE, EVERGREEN_SNIPPET, NPM_INSTALL, PINNED_VERSION } from '@/lib/install-snippet';
+import { EVERGREEN_NOTE, HOSTING_NOTE, JSDELIVR_SNIPPET, NPM_INSTALL, PINNED_VERSION } from '@/lib/install-snippet';
 import '../install/install.css';
 
 export const metadata: Metadata = {
@@ -33,11 +33,23 @@ export default function InstallIndex() {
         after — it reads your page, confirms the script is installed, and
         re-sets your opening paragraph both ways.
       </p>
+      {JSDELIVR_SNIPPET && (
+        <>
+          <p className="in-label">The same file from npm via jsDelivr</p>
+          <div className="in-snippet" data-no-typeset>
+            <code>{JSDELIVR_SNIPPET}</code>
+          </div>
+          <p className="in-fine">
+            Byte for byte the file above, with the same integrity hash, served
+            from the typeset.us npm package by jsDelivr.
+          </p>
+        </>
+      )}
       <p className="in-fine">
-        Just trying it out? <code data-no-typeset>{EVERGREEN_SNIPPET}</code>{' '}
-        also works. {EVERGREEN_NOTE} Building with npm?{' '}
+        {HOSTING_NOTE} Building with npm?{' '}
         <code data-no-typeset>{NPM_INSTALL}</code>, then see the{' '}
-        <Link href="/install/frameworks">framework recipes</Link>.
+        <Link href="/install/frameworks">framework recipes</Link>.{' '}
+        {EVERGREEN_NOTE}
       </p>
 
       <div className="in-grid">

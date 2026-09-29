@@ -5,11 +5,13 @@ goes to npm is always the tarball the cut recorded in the ledger,
 `public/releases/x.y.z/typeset.us-x.y.z.tgz`, never a fresh pack. Two
 paths publish it:
 
-- **The maintainer account**, until npm trusted publishing is configured
-  ([OWNER-ACTIONS.md](OWNER-ACTIONS.md)). 4.2.0 and 4.3.0 were published
-  this way; they have no npm provenance attestation.
-- **`.github/workflows/release.yml`**, with npm provenance, once trusted
-  publishing is configured.
+- **`.github/workflows/release.yml`**, with npm provenance, through npm
+  trusted publishing, which the owner reports configured for this workflow
+  and its `npm` environment ([OWNER-ACTIONS.md](OWNER-ACTIONS.md)). 4.3.1
+  is meant to be the first release published this way; once it is on npm,
+  `npm view typeset.us@4.3.1 dist.attestations` shows whether it was.
+- **The maintainer account**, by hand. 4.2.0 and 4.3.0 were published this
+  way; they have no npm provenance attestation.
 
 ## 1. Before the cut
 

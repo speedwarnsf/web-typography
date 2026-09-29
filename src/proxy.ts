@@ -17,7 +17,7 @@ function contentSecurityPolicy(nonce: string, dev = false): string {
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    "connect-src 'self' data: https://ntfy.sh",
+    "connect-src 'self' data:",
     "media-src 'self'",
     "frame-src 'self'",
     "worker-src 'self' blob:",
