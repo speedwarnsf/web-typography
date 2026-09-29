@@ -3,6 +3,16 @@
 // builders). The iframe's nodes come from another realm, so the controller must
 // not rely on instanceof against the parent's constructors, and must listen to
 // the iframe's own font set and window.
+//
+// Each pass (mount(document) and mount(body)) starts from a 420 px iframe, so
+// both passes' "iframe resize" steps resize it. A recomposition check that
+// fails reports what the block shows (outcome, [data-ts-stale], lines against
+// breaks, measured and box widths), what the controller did since the change
+// (passes and compositions; its pending, resizing and settle state are not
+// public, and show here as passes and [data-ts-stale]) and a timeline from
+// this page's own observers of the block: when layout reached the new size,
+// when the mutation's record was delivered, and each write, stale mark and
+// outcome.
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
 import { artifacts } from './candidate.mjs';
@@ -24,6 +34,7 @@ for (const { name, engine, executablePath } of browsers) {
       const checks = await page.evaluate(async ({ frame, mode, font }) => {
         const api = /** @type {any} */ (window).Typeset;
         const iframe = /** @type {HTMLIFrameElement} */ (document.getElementById('f'));
+        iframe.style.width = '420px';
         await new Promise(resolve => { iframe.onload = resolve; iframe.srcdoc = frame; });
         const doc = /** @type {Document} */ (iframe.contentDocument);
         const out = [];
@@ -31,6 +42,31 @@ for (const { name, engine, executablePath } of browsers) {
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         const until = async (test, ms = 5000) => { const start = performance.now(); while (!test()) { if (performance.now() - start > ms) return false; await wait(20); } return true; };
         const intact = el => el.dataset.tsOutcome === 'composed:rich' && api.measureLayout(el).lines.length === el.querySelectorAll('br[data-ts-break]').length + 1;
+        /** Watch a block from just before a change. The returned function
+         * stops watching and reports its state, with the timeline on failure.
+         * @param {HTMLElement} el */
+        const watch = el => {
+          const start = performance.now(), since = { passes: controller.stats.passes, compositions: controller.stats.compositions };
+          /** @type {[number, string, number?][]} ms after the change, event, repeats */
+          const events = [];
+          const note = (/** @type {string} */ event) => {
+            const last = events[events.length - 1];
+            if (last?.[1] === event) last[2] = (last[2] ?? 1) + 1;
+            else events.push([Math.round(performance.now() - start), event]);
+          };
+          const mutations = new MutationObserver(records => {
+            for (const r of records) note(r.type !== 'attributes' ? 'written' : r.attributeName === 'data-ts-outcome' ? 'outcome ' + el.dataset.tsOutcome : r.attributeName === 'style' ? 'style record delivered' : r.attributeName + (el.hasAttribute(/** @type {string} */ (r.attributeName)) ? ' set' : ' removed'));
+          });
+          mutations.observe(el, { attributes: true, attributeFilter: ['style', 'data-ts-stale', 'data-ts-outcome'], childList: true });
+          const sizes = new ResizeObserver(entries => { for (const e of entries) note('laid out at ' + Math.round(e.contentRect.width * 10) / 10 + ' x ' + Math.round(e.contentRect.height * 10) / 10); });
+          sizes.observe(el);
+          return (/** @type {boolean} */ pass) => {
+            mutations.disconnect(); sizes.disconnect();
+            const layout = api.measureLayout(el);
+            const state = { outcome: el.dataset.tsOutcome, stale: el.hasAttribute('data-ts-stale'), lines: layout.lines.length, breaks: el.querySelectorAll('br[data-ts-break]').length, width: layout.width, box: parseFloat(getComputedStyle(el).width), passes: controller.stats.passes - since.passes, compositions: controller.stats.compositions - since.compositions, ms: Math.round(performance.now() - start) };
+            return pass ? state : { ...state, events: events.slice(0, 40) };
+          };
+        };
         const controller = api.mount(mode === 'document' ? doc : doc.body, 'p');
         await controller.ready;
         const a = /** @type {HTMLElement} */ (doc.getElementById('a'));
@@ -41,15 +77,22 @@ for (const { name, engine, executablePath } of browsers) {
         check('an inserted paragraph is composed', await until(() => intact(inserted)), inserted.dataset.tsOutcome);
         const edited = 'The replacement paragraph must be recomposed after its text changes, and the engine must not restore any words from the old version.';
         let compositions = controller.stats.compositions;
+        let seen = watch(a);
         a.textContent = edited;
-        check('a text edit is recomposed', await until(() => controller.stats.compositions > compositions && a.textContent === edited && intact(a)), { outcome: a.dataset.tsOutcome, text: a.textContent });
+        let pass = await until(() => controller.stats.compositions > compositions && a.textContent === edited && intact(a));
+        check('a text edit is recomposed', pass, { ...seen(pass), text: a.textContent === edited ? 'edited' : a.textContent });
         compositions = controller.stats.compositions;
+        seen = watch(a);
         a.style.width = '230px';
-        check('a width change is recomposed', await until(() => controller.stats.compositions > compositions && intact(a) && Math.abs(api.measureLayout(a).width - 230) < .5), api.measureLayout(a).width);
+        pass = await until(() => controller.stats.compositions > compositions && intact(a) && Math.abs(api.measureLayout(a).width - 230) < .5);
+        check('a width change is recomposed', pass, seen(pass));
         compositions = controller.stats.compositions;
+        const frameWidth = iframe.getBoundingClientRect().width;
+        seen = watch(inserted);
         iframe.style.width = '260px';
         inserted.style.width = 'auto';
-        check('an iframe resize is recomposed', await until(() => controller.stats.compositions > compositions && intact(inserted) && api.measureLayout(inserted).width <= 260), api.measureLayout(inserted).width);
+        pass = frameWidth === 420 && await until(() => controller.stats.compositions > compositions && intact(inserted) && api.measureLayout(inserted).width <= 260);
+        check('an iframe resize is recomposed', pass, { iframe: frameWidth + ' -> ' + iframe.getBoundingClientRect().width, ...seen(pass) });
         // A font inside the iframe: its FontFaceSet, not the parent's, reports it.
         const face = new (/** @type {any} */ (iframe.contentWindow)).FontFace('LateFace', 'url(data:font/woff2;base64,' + font + ')', { weight: '100 900' });
         a.classList.add('late');
@@ -57,9 +100,11 @@ for (const { name, engine, executablePath } of browsers) {
         await wait(200);
         compositions = controller.stats.compositions;
         const before = a.innerHTML;
+        seen = watch(a);
         doc.fonts.add(face);
         await face.load();
-        check('a font loaded inside the iframe is recomposed', await until(() => controller.stats.compositions > compositions && intact(a) && a.innerHTML !== before), { outcome: a.dataset.tsOutcome, lines: api.measureLayout(a).lines.length, breaks: a.querySelectorAll('br[data-ts-break]').length });
+        pass = await until(() => controller.stats.compositions > compositions && intact(a) && a.innerHTML !== before);
+        check('a font loaded inside the iframe is recomposed', pass, seen(pass));
         controller.disconnect();
         check('disconnect restores the iframe text', !doc.querySelector('[data-ts-break]') && a.textContent === edited);
         return out;
