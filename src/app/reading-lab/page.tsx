@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import typeset, { typesetText } from "@/lib/typeset-site";
 import CodeBlock from "@/components/CodeBlock";
+import { useComposedWidth } from "@/lib/use-composed-width";
 import { PINNED_SNIPPET } from "@/lib/install-snippet";
 
 interface TypographySettings {
@@ -117,6 +118,9 @@ export default function ReadingLab() {
 
   const previewRef = useRef<HTMLDivElement>(null);
   const [ragSmoothed, setRagSmoothed] = useState(false);
+  // Composed lines are fixed to a width: compose again when the preview's
+  // width changes (rotation, window resize).
+  const previewWidth = useComposedWidth(previewRef);
 
   // Debounced rag smoothing — 1s after settings stop changing
   useEffect(() => {
@@ -134,7 +138,7 @@ export default function ReadingLab() {
       delete p.dataset.typesetDone;
       typeset(p);
     });
-  }, [ragSmoothed]);
+  }, [ragSmoothed, previewWidth]);
 
   const comfortScore = calculateComfortScore();
 

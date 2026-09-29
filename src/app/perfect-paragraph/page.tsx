@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import typeset, { typesetText, measureCh, measureLayout, restore } from '@/lib/typeset-site';
 import CodeBlock from '@/components/CodeBlock';
+import { useComposedWidth } from '@/lib/use-composed-width';
 
 const DEFAULT_TEXT = "She worked in a studio on the edge of the city. It was small but it had good light and a view of the park across the road. The tools of her trade filled every surface \u2014 ink, paper, type specimens, a loupe she kept on a brass chain. Everything had its place and every place had a purpose. She believed good work came from good order, and two decades of practice had proven her right.";
 
@@ -145,6 +146,9 @@ export default function PerfectParagraph() {
 
   const typesetRef = useRef<HTMLParagraphElement>(null);
   const defaultRef = useRef<HTMLParagraphElement>(null);
+  // Compose again, and re-measure both panels, when the column's width
+  // changes (rotation, window resize): composed lines are fixed to a width.
+  const composedWidth = useComposedWidth(typesetRef);
   const [tally, setTally] = useState<{ d: PanelTally; t: PanelTally } | null>(null);
 
   // Calculate refinement score
@@ -194,7 +198,7 @@ export default function PerfectParagraph() {
     return () => {
       cancelled = true;
     };
-  }, [text, toggles]);
+  }, [text, toggles, composedWidth]);
 
   const handleToggle = (id: string) => {
     setToggles(prev => ({ ...prev, [id]: !prev[id] }));
