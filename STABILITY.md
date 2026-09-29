@@ -51,7 +51,13 @@ behind an option, off by default, or waits for a major version.
 ## Cadence and support
 
 - At most one minor release every two to four weeks; patches as needed.
-- The previous minor line gets security fixes (see SECURITY.md); 4.2.x does
-  now.
+- The 4.x line gets bug and security fixes until at least 2027-09-30,
+  whenever 5.0 ships. Fixes land in the latest 4.x minor.
+- When a minor release ships, the minor before it gets security fixes for
+  60 days after that release date, then none. 4.2.x gets security fixes
+  until 2026-11-26, 60 days after 4.3.0 reached npm; it also has the
+  screen-reader defect 4.3 fixed, so upgrade.
+- SECURITY.md lists the supported versions and how to report a
+  vulnerability.
 - Anything deprecated is announced in the CHANGELOG at least one minor
   release before a major version removes it.

@@ -464,7 +464,10 @@ Semver covers API names, `auditJSON` `schemaVersion`, outcome codes, CLI
 exit codes and default rendering. A minor release changes default rendering
 only to fix a verified defect, and lists each change in the CHANGELOG under
 "Rendering changes". Published files never change. `go.js` is for trying
-Typeset out: it follows 4.x and will never move to 5.0. Details:
+Typeset out: it follows 4.x and will never move to 5.0. 4.x gets bug and
+security fixes until at least 2027-09-30, whenever 5.0 ships, and when a
+minor release ships, the one before it gets security fixes for 60 more
+days. Details:
 https://github.com/speedwarnsf/web-typography/blob/master/STABILITY.md
 
 ## Glossary
