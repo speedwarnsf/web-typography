@@ -1,6 +1,7 @@
 import type { LayoutMetrics } from './layout-metrics';
 import { afterComment, engineText, positional, preserveRichCopy, reactOwned, rejoinSplits, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
 import type { RichOutput, SplitRecord } from './rich-text';
+import { markerRules } from './lifecycle';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
 export const MAX_TRACKING_EM = .01;
@@ -77,11 +78,16 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
  * whole and unwrapped (see afterComment). */
 const heldAfterComment = (node: Text): boolean => node.length > 0 && !engineText.has(node) && afterComment(node) && !reactOwned(node);
 
-export function trackingStyle(run: TrackingRun): Record<string, string> {
-  return { all: 'unset', display: 'inline', letterSpacing: run.letterSpacing + run.px + 'px',
+/** A wrapper's own letter and word spacing. `all: unset` and display come
+ * from the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where
+ * that sheet cannot apply, see markerRules) writes them on the wrapper, as 4.3
+ * did. */
+export function trackingStyle(run: TrackingRun, inline: boolean): Record<string, string> {
+  const spacing = { letterSpacing: run.letterSpacing + run.px + 'px',
     // CSS tracking also affects spaces. Compensate so the word-space finish
     // retains its measured 80-133% envelope instead of paying for tracking twice.
     wordSpacing: run.wordSpacing - run.px + 'px' };
+  return inline ? { all: 'unset', display: 'inline', ...spacing } : spacing;
 }
 
 /** Wrap contiguous text runs and space markers, never author elements.
@@ -97,6 +103,7 @@ export function trackingStyle(run: TrackingRun): Record<string, string> {
  * value, which an emptied node would always do for ''. */
 export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput {
   const restoreSelection = selectionBookmark(element), texts = textRuns(element);
+  const inline = !markerRules(element);
   const splits = new Map<Text, SplitRecord>();
   const split = (head: Text, at: number) => {
     const tail = head.splitText(at);
@@ -121,11 +128,11 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
         // its text; or, after a comment (not React's), leave it whole.
         if (!(node as Text).length || heldAfterComment(node as Text)) { wrapper = null; continue; }
         const piece = split(node as Text, 0);
-        if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
+        if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run, inline); piece.before(wrapper); }
         wrapper.append(piece);
         continue;
       }
-      if (!wrapper || wrapper.nextSibling !== node) { wrapper = trackingWrapper(element, run); node.before(wrapper); }
+      if (!wrapper || wrapper.nextSibling !== node) { wrapper = trackingWrapper(element, run, inline); node.before(wrapper); }
       wrapper.append(node);
     }
   }
@@ -151,10 +158,10 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
   } };
 }
 
-function trackingWrapper(element: HTMLElement, run: TrackingRun): HTMLElement {
+function trackingWrapper(element: HTMLElement, run: TrackingRun, inline: boolean): HTMLElement {
   const wrapper = element.ownerDocument.createElement('span');
   wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
-  Object.assign(wrapper.style, trackingStyle(run));
+  Object.assign(wrapper.style, trackingStyle(run, inline));
   return wrapper;
 }
 

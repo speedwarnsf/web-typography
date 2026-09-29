@@ -128,11 +128,21 @@ for(const config of browsers){
       p.style.fontFamily='Georgia';p.style.fontSize='20px';p.style.width='340px';
       p.textContent='"A short quotation."';
       const original=p.innerHTML;
-      for(const css of ['[data-ts-hang]{margin-left:-80px!important}','[data-ts-hang]::before{content:"X"}','[data-ts-hang]{position:relative!important;top:10px}']){
+      for(const css of ['[data-ts-hang]{margin-left:-80px!important}','[data-ts-hang]::before{content:"X"}']){
         const style=document.createElement('style');style.textContent=css;document.head.append(style);
         const r=api.typeset(p,{opticalHanging:true});
         check('unsafe optical finish rolls back '+css,r.features.hanging==='native:hanging-verification'&&!p.querySelector('[data-ts-hang]')&&p.textContent==='"A short quotation."',r.features);
         api.restore(p);style.remove();check('rollback restores source '+css,p.innerHTML===original);
+      }
+      // 4.4: a marker's position, like its other shared declarations, comes
+      // from the engine's layered !important rules, which a page's unlayered
+      // !important rule no longer reaches: the hang applies, static. (4.3
+      // wrote them inline, which the rule beat, and rolled the hang back.)
+      {
+        const style=document.createElement('style');style.textContent='[data-ts-hang]{position:relative!important;top:10px}';document.head.append(style);
+        const r=api.typeset(p,{opticalHanging:true}),marker=p.querySelector('[data-ts-hang]');
+        check('a page !important rule does not move a hanging marker',r.features.hanging==='applied'&&marker&&getComputedStyle(marker).position==='static'&&p.textContent==='"A short quotation."',r.features);
+        api.restore(p);style.remove();check('restore after a hang the page rule did not reach',p.innerHTML===original);
       }
       // Independent contour oracle: no production scoring/finish helper calls.
       const score=widths=>{

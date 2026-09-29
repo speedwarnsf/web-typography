@@ -15,6 +15,7 @@ import { inlineBoxInsets } from './inline-box';
 import { preservesAdvances } from './geometry';
 import type { SpaceAdjustment } from './spacing-finish';
 import { canCompose, ENVIRONMENT_OUTCOME } from './environment';
+import { markerRules } from './lifecycle';
 
 export const BREAK_ATTRIBUTE = 'data-ts-break';
 const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE', 'CODE']);
@@ -633,6 +634,9 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   const source = element.textContent || '';
   const markers: HTMLElement[] = [];
   const splits = new Map<Text, SplitRecord>();
+  // Spacing and hanging markers take their shared declarations from the
+  // engine's stylesheet where it applies (see markerRules).
+  const inline = (hangs.length || spaces.length) && !markerRules(element);
   const insertions = [...breaks.map(offset => ({ offset, px: 0, spacing: false })), ...hangs.map(hang => ({ ...hang, spacing: false })),
     ...spaces.map(space => ({ ...space, spacing: true }))].sort((a, b) => b.offset - a.offset || b.px - a.px);
   for (const { offset, px, spacing } of insertions) {
@@ -652,10 +656,10 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     if (px || !breakReplacesSpace(source, offset)) marker.setAttribute('aria-hidden', 'true');
     if (spacing) {
       marker.dataset.tsSpace = String(offset);
-      Object.assign(marker.style, spacingMarkerStyle(px));
+      Object.assign(marker.style, spacingMarkerStyle(px, !!inline));
     } else if (px) {
       marker.dataset.tsHang = String(offset);
-      Object.assign(marker.style, opticalMarkerStyle(px));
+      Object.assign(marker.style, opticalMarkerStyle(px, !!inline));
     // !important beats author br{display:none}; the variable lets print CSS,
     // stale mode and authors switch every generated break off at once.
     } else marker.style.setProperty('display', 'var(--ts-break-display, inline)', 'important');

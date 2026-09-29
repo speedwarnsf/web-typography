@@ -21,7 +21,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
-import { printing, rendered } from './lifecycle';
+import { markerRules, printing, rendered } from './lifecycle';
 
 /** Host elements the adapters render. The engine decides at run time what it
  * composes: an inline host such as a default label reports native:inline. */
@@ -97,7 +97,9 @@ function trackingForTree(plan: TrackingPlan, children: ReactNode): TrackingPlan 
   return { ...plan, runs };
 }
 
-function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean): ReactNode {
+/** `inline`: markers carry their shared declarations themselves, where the
+ * engine's stylesheet does not reach the host (see markerRules). */
+function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean, inline: boolean): ReactNode {
   let offset = 0;
   const source = quoteSource(children);
   const educated = educate ? smartQuotes(source) : null;
@@ -146,7 +148,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       let active: TrackingRun | undefined;
       let tracked: ReactNode[] = [];
       const flush = () => {
-        if (active && tracked.length) pieces.push(createElement('span', { key: 'track-' + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active) }, ...tracked));
+        if (active && tracked.length) pieces.push(createElement('span', { key: 'track-' + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active, inline) }, ...tracked));
         active = undefined; tracked = [];
       };
       const append = (piece: ReactNode, at: number, marker = false) => {
@@ -162,8 +164,8 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
         // Exposed where it stands in for the collapsed space; see renderRichText.
         if (breaks.has(stop) && (stop === offset || !moved.has(stop))) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true, style: breakStyle }), stop, true);
         if (stop === offset) { cursor = local; continue; }
-        if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
-        if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
+        if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!, inline) }), stop, true);
+        if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!, inline) }), stop);
         cursor = local;
       }
       append(text.slice(cursor), start + cursor); flush();
@@ -257,6 +259,9 @@ class RichText extends Component<RichProps, State> {
    * translator is filling. Unlike mount(), the adapter cannot remove the
    * breaks it rendered. */
   private frozen = false;
+  /** Markers carry their shared declarations inline: the engine's stylesheet
+   * did not reach the host when it was last rendered (see markerRules). */
+  private inlineMarkers = false;
 
   static getDerivedStateFromProps(props: RichProps, state: State): Partial<State> | null {
     const key = childrenKey(props.children);
@@ -481,7 +486,13 @@ class RichText extends Component<RichProps, State> {
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,
       'data-ts-spacing': _spacing === false ? 'off' : plan?.spacing?.outcome || 'native:spacing-uncomposed',
       'data-ts-tracking': _tracking === false || _spacing === false ? 'off' : plan?.tracking?.outcome || 'native:tracking-uncomposed' };
-    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate));
+    // Read only: the registry installs the sheet, and puts it back if the
+    // page drops it. React 19's strict mode renders again while the host ref
+    // is detached; the last answer stands then.
+    const markers = !!(shown?.hangs?.length || shown?.spacing?.adjustments.length || shown?.tracking?.runs.length);
+    if (markers && this.host.current) this.inlineMarkers = !markerRules(this.host.current, false);
+    const inline = markers && this.inlineMarkers;
+    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate, inline));
     if (!educate) return createElement(as, props, children);
     // Kept native (native:react-component), still with the quotes asked for.
     const educated = educateNodes(children, smartQuotes(quoteSource(children)), { offset: 0 });

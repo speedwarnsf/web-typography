@@ -12,6 +12,84 @@ const report={...await releaseIdentity(),checks:[],cases:[],errors:[],browsers:{
 await mkdir('output/playwright',{recursive:true});
 const fixtureHTML=await readFile('lab/spacing-react.html','utf8');
 const fixtureBundle=await build({entryPoints:['lab/spacing-react.tsx'],bundle:true,format:'esm',target:'es2022',write:false,plugins:[reactUnderTest()]});
+/**
+ * 4.4 moved the declarations every spacing and hanging marker and tracking
+ * wrapper shares into the engine's stylesheet (the markers' !important in a
+ * named layer); each keeps only its own advance or spacing inline. Checked on corpus
+ * paragraphs with the default finish and optical hanging: the inline styles
+ * are those values alone; a page that removes constructable stylesheets gets
+ * the 4.3 inline declarations with identical outcomes and geometry; hostile
+ * page CSS on every span gives the outcome 4.3.1 gives or a native one, never
+ * broken text; and a shadow root gets the sheet too.
+ * @param {any} browser @param {string} name
+ */
+async function markerStyles(browser,name){
+  const check=(label,pass,detail)=>report.checks.push({browser:name,label:'markers (4.4): '+label,pass:!!pass,...(detail!==undefined&&{detail})});
+  const subject=await readFile(process.env.TYPESET_BUNDLE||'packages/typeset-v4/dist/typeset.global.js','utf8');
+  const baseline=await readFile('public/releases/4.3.1/typeset.global.js','utf8');
+  const open=async(/** @type {{ init?: () => void, css?: string }} */ {init,css=''}={})=>{
+    const tab=await browser.newPage({viewport:{width:1200,height:900}});
+    tab.on('pageerror',error=>report.errors.push({browser:name,error:error.message}));
+    await tab.setContent('<!doctype html><html lang="en"><head><style>body{margin:24px}p{font:20px/1.5 Georgia;width:340px;text-wrap:wrap;margin:0 0 12px}'+css+'</style></head><body></body></html>');
+    // setContent does not navigate, so an init script would not run: run it before the engine loads.
+    if(init)await tab.evaluate(init);
+    await tab.addScriptTag({content:baseline});await tab.evaluate(()=>{window.Baseline=window.Typeset;});
+    await tab.addScriptTag({content:subject});
+    return tab;
+  };
+  // Composes each text with one build, reports what a reader and the audit see, and restores.
+  const run=(tab,build)=>tab.evaluate(({texts,build})=>{
+    const api=build==='baseline'?window.Baseline:window.Typeset,round=v=>Math.round(v*100)/100;
+    return texts.map(text=>{
+      const p=document.createElement('p');p.textContent=text;document.body.append(p);
+      const result=api.typeset(p,{opticalHanging:true}),layout=api.measureLayout(p);
+      const markers=[...p.querySelectorAll('[data-ts-space][data-ts-break], [data-ts-hang][data-ts-break]')],tracks=[...p.querySelectorAll('[data-ts-track]')];
+      const record={outcome:result.outcome,features:result.features,intact:p.textContent===text,overflow:layout.overflow,
+        lines:layout.lines.length,breaks:p.querySelectorAll('br[data-ts-break]').length,
+        geometry:JSON.stringify([layout.lines.map(line=>[line.left,line.top,line.width].map(round)),[...markers,...tracks].map(el=>{const cs=getComputedStyle(el),box=el.getBoundingClientRect();return [cs.marginLeft,cs.letterSpacing,cs.wordSpacing,round(box.width),round(box.height)].join(' ');})]),
+        markerStyles:[...new Set(markers.map(el=>Array.from({length:el.style.length},(_,i)=>el.style[i]).sort().join(',')))],
+        trackStyles:[...new Set(tracks.map(el=>el.style.length<=2?Array.from({length:el.style.length},(_,i)=>el.style[i]).sort().join(','):'all '+el.style.length))],
+        computed:[...markers.map(el=>{const cs=getComputedStyle(el);return cs.display+' '+cs.position+' '+cs.fontSize+' '+cs.paddingLeft+' '+cs.marginRight;}),...tracks.map(el=>{const cs=getComputedStyle(el);return cs.display+' '+cs.paddingLeft+' '+cs.marginLeft;})],
+        markers:markers.length,tracks:tracks.length};
+      api.restore(p);p.remove();return record;
+    });
+  },{texts,build});
+  const texts=paragraphs.slice(0,16);
+  const sheet=await open(),withSheet=await run(sheet,'subject');
+  const layered=await sheet.evaluate(()=>document.adoptedStyleSheets.some(s=>[...s.cssRules].some(rule=>/** @type {any} */ (rule).name==='typeset-markers')));
+  check('the engine adopts one stylesheet with the typeset-markers layer',layered);
+  const markers=withSheet.reduce((n,r)=>n+r.markers,0),tracks=withSheet.reduce((n,r)=>n+r.tracks,0);
+  check('spacing and hanging markers carry only margin-left inline',markers>20&&withSheet.every(r=>r.markerStyles.every(list=>list==='margin-left')),{markers,styles:[...new Set(withSheet.flatMap(r=>r.markerStyles))]});
+  check('tracking wrappers carry only letter-spacing and word-spacing inline',tracks>5&&withSheet.every(r=>r.trackStyles.every(v=>v==='letter-spacing,word-spacing')),{tracks,styles:[...new Set(withSheet.flatMap(r=>r.trackStyles))]});
+  check('markers compute as 4.3 wrote them: inline, static, font-size 0, no padding or right margin',withSheet.every(r=>r.computed.every(v=>/^inline (static 0px 0px 0px|0px 0px)$/.test(v))),[...new Set(withSheet.flatMap(r=>r.computed))].slice(0,6));
+  // A shadow root gets the same sheet.
+  const shadow=await sheet.evaluate(async text=>{
+    const host=document.createElement('div');document.body.append(host);
+    const root=host.attachShadow({mode:'open'});root.innerHTML='<style>p{font:20px/1.5 Georgia;width:340px;margin:0}</style><p></p>';
+    root.querySelector('p').textContent=text;
+    const controller=window.Typeset.mount(root,'p',{opticalHanging:true});await controller.ready;
+    const markers=[...root.querySelectorAll('[data-ts-space], [data-ts-hang]')];
+    const out={outcome:root.querySelector('p').dataset.tsOutcome,adopted:root.adoptedStyleSheets.length,markers:markers.length,
+      inline:markers.every(el=>el.style.length===1&&el.style.marginLeft),computed:markers.every(el=>getComputedStyle(el).fontSize==='0px'&&getComputedStyle(el).display==='inline')};
+    controller.disconnect();host.remove();return out;
+  },paragraphs[20]);
+  check('inside a shadow root: the sheet is adopted there and markers carry only margin-left',shadow.outcome==='composed:rich'&&shadow.adopted>0&&shadow.markers>0&&shadow.inline&&shadow.computed,shadow);
+  await sheet.close();
+  // No constructable stylesheets: the 4.3 inline declarations, same result.
+  const bare=await open({init:()=>{delete Document.prototype.adoptedStyleSheets;delete ShadowRoot.prototype.adoptedStyleSheets;}});
+  const inline=await run(bare,'subject');await bare.close();
+  check('without constructable stylesheets markers fall back to the 4.3 inline declarations',inline.every(r=>r.markerStyles.every(list=>list.split(',').length>=17&&list.includes('font-size')))&&inline.every(r=>r.trackStyles.every(v=>v.startsWith('all '))),[...new Set(inline.flatMap(r=>[...r.markerStyles,...r.trackStyles]))].slice(0,4));
+  const drift=inline.map((r,i)=>({i,same:r.outcome===withSheet[i].outcome&&JSON.stringify(r.features)===JSON.stringify(withSheet[i].features)&&r.geometry===withSheet[i].geometry})).filter(r=>!r.same);
+  check('the inline fallback gives identical outcomes, finishes and geometry',!drift.length,drift.slice(0,4));
+  // Hostile CSS on every span: 4.3.1's outcome or a native one, text intact, lines as composed.
+  const hostile=await open({css:'span{display:block!important;padding:3px!important;margin:9px}'});
+  const before=await run(hostile,'baseline'),after=await run(hostile,'subject');await hostile.close();
+  const broken=after.map((r,i)=>({i,r,b:before[i]})).filter(({r,b})=>!r.intact||r.overflow>.5||(r.outcome!==b.outcome&&!r.outcome.startsWith('native'))||(r.outcome==='composed:rich'&&r.lines!==r.breaks+1)||!r.computed.every(v=>/^inline (static 0px 0px 0px|0px 0px)$/.test(v)));
+  check('span{display:block!important;padding:3px!important;margin:9px} gives 4.3.1\'s outcome or a native one, never broken text',!broken.length,
+    {broken:broken.slice(0,3).map(({i,r,b})=>({i,subject:[r.outcome,r.features],baseline:[b.outcome,b.features]})),
+      spacing:{baseline:before.filter(r=>r.features?.spacing==='applied').length,subject:after.filter(r=>r.features?.spacing==='applied').length}});
+}
+
 for(const {name,engine,executablePath} of browsers){
   const browser=await engine.launch({executablePath});report.browsers[name]=browser.version();
   try{
@@ -128,6 +206,13 @@ for(const {name,engine,executablePath} of browsers){
     for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);check('React responsive '+width,await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'output/playwright/spacing-react-'+name+'-'+width+'.png',fullPage:true});}
     await page.getByRole('button',{name:'Toggle mount',exact:true}).click();check('React unmount',await page.locator('#rich').count()===0);
     await page.getByRole('button',{name:'Toggle mount',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.typesetDone==='1');check('React remount',true);
+    await page.waitForFunction(()=>document.querySelector('#rich')?.dataset.tsTracking==='applied');
+    check('React markers carry only their own values inline (4.4)',await page.evaluate(()=>{
+      const own=(el,names)=>{const style=el.style;return style.length===names.length&&names.every(name=>style.getPropertyValue(name));};
+      const spaces=[...document.querySelectorAll('#rich [data-ts-space], #rich [data-ts-hang]')],tracks=[...document.querySelectorAll('#rich [data-ts-track]')];
+      return spaces.length>0&&tracks.length>0&&spaces.every(el=>own(el,['margin-left'])&&getComputedStyle(el).fontSize==='0px')&&tracks.every(el=>own(el,['letter-spacing','word-spacing'])&&getComputedStyle(el).display==='inline');
+    }));
+    await markerStyles(browser,name);
     console.log(name+': spacing matrix complete');
   }catch(error){report.errors.push({browser:name,error:error.stack});}
   finally{await browser.close();}

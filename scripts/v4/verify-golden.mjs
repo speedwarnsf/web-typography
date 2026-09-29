@@ -11,8 +11,11 @@
 // outcome, the finish features and the element's markup after composition,
 // which carries every break, spacing marker and tracking run. Cells must be
 // identical to 4.2.0, apart from the attribute-only accessibility and break
-// display changes (attributeNeutral, counted apart) and a break moved out of
-// the element that starts its line (breakOutside, counted apart), unless the text contains
+// display changes (attributeNeutral, counted apart), a break moved out of
+// the element that starts its line (breakOutside, counted apart) and 4.4's
+// move of the markers' shared declarations into the engine's stylesheet
+// (styleMoved, counted apart; line boxes and marker geometry must be
+// identical), unless the text contains
 // a construction a 4.3 rendering change (CHANGELOG, "Rendering changes") is
 // about; those cells are
 // counted and must still keep the paragraph's promises: no overflow, no new
@@ -152,7 +155,24 @@ function compose({ cells, build, baseline }) {
     let result;
     try { result = api.typeset(el, cell.options); } catch (error) { result = { outcome: 'threw ' + error.message, after: native, features: null }; }
     const after = api.measureLayout(el);
-    const record = { id: cell.id, outcome: result.outcome, features: result.features ?? null, markup: el.innerHTML,
+    // The markup with each spacing and hanging marker's style reduced to its
+    // advance and each tracking wrapper's to its spacing (4.4 moved the rest
+    // to the engine's stylesheet; see styleMoved), and the geometry that must
+    // not change where only that moved: line boxes, and each marker's spacing
+    // and box. (A marker's advance is in the markup; its computed margin is
+    // left out because WebKit reports the used, 1/64 px value for 4.3's
+    // inline declarations and the specified one for 4.4's, where the line
+    // boxes are identical.)
+    const moved = /** @type {HTMLElement} */ (el.cloneNode(true));
+    for (const marker of moved.querySelectorAll('[data-ts-space][data-ts-break], [data-ts-hang][data-ts-break]')) marker.setAttribute('style', 'margin-left: ' + marker.style.marginLeft + ';');
+    for (const wrapper of moved.querySelectorAll('[data-ts-track]')) wrapper.setAttribute('style', 'letter-spacing: ' + wrapper.style.letterSpacing + '; word-spacing: ' + wrapper.style.wordSpacing + ';');
+    const round = value => Math.round(value * 100) / 100;
+    const geometry = JSON.stringify([after.lines.map(line => [line.left, line.top, line.width].map(round)),
+      [...el.querySelectorAll('[data-ts-space][data-ts-break], [data-ts-hang][data-ts-break], [data-ts-track]')].map(marker => {
+        const cs = getComputedStyle(marker), box = marker.getBoundingClientRect();
+        return [cs.letterSpacing, cs.wordSpacing, round(box.width), round(box.height)].join(' ');
+      })]);
+    const record = { id: cell.id, outcome: result.outcome, features: result.features ?? null, markup: el.innerHTML, moved: moved.innerHTML, geometry,
       breaks: after.lines.map(line => line.sourceStart), lines: after.lines.map(line => line.text), nativeText: native.lines.map(line => line.text),
       overflow: after.overflow, nativeOrphan: native.lastSingleton, orphan: after.lastSingleton, nativeLines: native.lines.length,
       textIntact: plain(el.textContent) === plain(new DOMParser().parseFromString('<body>' + cell.html, 'text/html').body.textContent),
@@ -305,8 +325,18 @@ const runs = (await Promise.allSettled(browsers.filter(b => engines.includes(b.n
 const check = (/** @type {string} */ browser, /** @type {string} */ label, /** @type {unknown} */ pass, /** @type {unknown} */ detail) =>
   report.checks.push({ browser, label, pass: !!pass, ...(detail === undefined ? {} : { detail }) });
 const byId = new Map(cells.map(cell => [cell.id, cell]));
-/** Whether two builds' records of one cell differ, beyond the neutral changes. @param {any} c @param {any} b */
-const differs = (c, b) => c.outcome !== b.outcome || neutral(c.markup) !== neutral(b.markup) || JSON.stringify(c.features) !== JSON.stringify(b.features);
+/**
+ * Whether two builds' records of one cell differ, beyond the neutral changes.
+ * Markers are compared by their per-marker values only (moved): 4.4 moved
+ * the declarations every spacing and hanging marker and tracking wrapper
+ * shares out of its style attribute into the engine's stylesheet. The cells
+ * that change alone are counted apart (styleMoved), and must keep identical
+ * line boxes and marker geometry.
+ * @param {any} c @param {any} b
+ */
+const differs = (c, b) => c.outcome !== b.outcome || neutral(c.moved) !== neutral(b.moved) || JSON.stringify(c.features) !== JSON.stringify(b.features);
+/** @param {any} c @param {any} b */
+const styleMovedOnly = (c, b) => !differs(c, b) && neutral(c.markup) !== neutral(b.markup);
 const total = (/** @type {Record<string, number>} */ counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
 /** A coverage cell this build changes on purpose. @param {Cell} cell */
 const coverageChanged = cell => !!cell.expect || (!!cell.case && cell.case in coverageChanges);
@@ -315,10 +345,14 @@ for (const { name, base, cand } of runs) {
   for (const variant of variants) {
     const pairs = cand.map((c, i) => ({ c, b: base[i], cell: /** @type {Cell} */ (byId.get(c.id)) })).filter(p => p.cell.variant === variant);
     const differ = pairs.filter(({ c, b }) => differs(c, b));
-    const attributesOnly = pairs.filter(({ c, b }) => c.markup !== b.markup && !differ.some(d => d.c === c) && attributeNeutral(c.markup) === attributeNeutral(b.markup)).length;
-    const breaksOutside = pairs.filter(({ c, b }) => attributeNeutral(c.markup) !== attributeNeutral(b.markup) && !differ.some(d => d.c === c)).length;
+    const attributesOnly = pairs.filter(({ c, b }) => c.moved !== b.moved && !differ.some(d => d.c === c) && attributeNeutral(c.moved) === attributeNeutral(b.moved)).length;
+    const breaksOutside = pairs.filter(({ c, b }) => attributeNeutral(c.moved) !== attributeNeutral(b.moved) && !differ.some(d => d.c === c)).length;
+    const moved = pairs.filter(({ c, b }) => styleMovedOnly(c, b));
     const unexplained = differ.filter(({ cell }) => !changeReasons(cell).length);
-    report.counts[`${name} ${variant}`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length, attributesOnly, breaksOutside };
+    report.counts[`${name} ${variant}`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length, attributesOnly, breaksOutside, styleMoved: moved.length };
+    const shifted = moved.filter(({ c, b }) => c.geometry !== b.geometry);
+    check(name, `${variant}: cells whose marker styles alone moved to the stylesheet keep identical line boxes and marker geometry`, !shifted.length,
+      shifted.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: b.geometry.slice(0, 300), subject: c.geometry.slice(0, 300) })));
     for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: changeReasons(cell), baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
     check(name, `${variant}: identical to 4.2.0 unless a rendering change applies`, unexplained.length === 0,
       unexplained.length ? unexplained.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: [b.outcome, ...b.lines], subject: [c.outcome, ...c.lines] })) : { cells: pairs.length, changed: differ.length });
@@ -367,7 +401,7 @@ for (const { name, base, cand } of runs) {
   // The trade-offs are against 4.2.0: against a later baseline they are not
   // changes at all.
   if (/^4\.2\./.test(report.baselineVersions[name] ?? '')) for (const key of Object.keys(tradeOffs)) {
-    const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (attributeNeutral(c.markup) !== attributeNeutral(base[i].markup) || c.outcome !== base[i].outcome));
+    const occurs = cand.some((c, i) => c.id.endsWith(' ' + key) && (attributeNeutral(c.moved) !== attributeNeutral(base[i].moved) || c.outcome !== base[i].outcome));
     check(name, `recorded trade-off still occurs: ${key}`, occurs);
   }
 }
@@ -382,6 +416,10 @@ for (const { name, base, cand } of runs) {
   const version = (report.baselineVersions[name] ?? '').split(' / ')[1] || 'the coverage baseline';
   const differ = pairs.filter(({ c, b }) => differs(c, b));
   const unexplained = differ.filter(({ cell }) => !coverageChanged(cell));
+  const moved = pairs.filter(({ c, b }) => styleMovedOnly(c, b));
+  const shifted = moved.filter(({ c, b }) => c.geometry !== b.geometry);
+  check(name, 'coverage: cells whose marker styles alone moved to the stylesheet keep identical line boxes and marker geometry', !shifted.length,
+    shifted.slice(0, 4).map(({ c, b }) => ({ id: c.id, baseline: b.geometry.slice(0, 300), subject: c.geometry.slice(0, 300) })));
   const composed = (/** @type {any} */ record) => String(record.outcome).startsWith('composed');
   /** @type {Record<string, { cells: number, changed: number, baselineComposed: number, subjectComposed: number, outcomes: Record<string, number> }>} */
   const groups = {};
@@ -392,7 +430,7 @@ for (const { name, base, cand } of runs) {
     const key = b.outcome === c.outcome ? c.outcome : b.outcome + ' -> ' + c.outcome;
     group.outcomes[key] = (group.outcomes[key] || 0) + 1;
   }
-  report.counts[`${name} coverage`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length,
+  report.counts[`${name} coverage`] = { cells: pairs.length, changed: differ.length, unexplained: unexplained.length, styleMoved: moved.length,
     baselineComposed: pairs.filter(({ b }) => composed(b)).length, subjectComposed: pairs.filter(({ c }) => composed(c)).length, groups };
   for (const { c, b, cell } of differ) report.changed.push({ browser: name, id: c.id, reasons: [cell.expect ? 'expect ' + cell.expect : coverageChanges[/** @type {string} */ (cell.case)] ?? 'unexplained'], baseline: { outcome: b.outcome, lines: b.lines }, subject: { outcome: c.outcome, lines: c.lines } });
   const wrong = pairs.filter(({ c, cell }) => cell.expect && c.outcome !== cell.expect);
@@ -444,15 +482,16 @@ report.summary = { cells: cells.length, engines: runs.map(run => run.name), seco
   changed: Object.fromEntries(Object.entries(report.counts).map(([key, value]) => [key, value.changed])),
   attributesOnly: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => 'attributesOnly' in value).map(([key, value]) => [key, value.attributesOnly])),
   breaksOutside: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => value.breaksOutside).map(([key, value]) => [key, value.breaksOutside])),
+  styleMoved: Object.fromEntries(Object.entries(report.counts).filter(([, value]) => value.styleMoved).map(([key, value]) => [key, value.styleMoved])),
   // Per engine: the 4.2/4.3 corpus against --baseline, and the coverage
   // corpus against --coverage-baseline (cells each build composed).
   existing: Object.fromEntries(runs.map(({ name }) => {
     const rows = Object.entries(report.counts).filter(([key]) => key.startsWith(name + ' ') && key !== name + ' coverage').map(([, value]) => value);
-    return [name, { cells: rows.reduce((sum, row) => sum + row.cells, 0), changed: rows.reduce((sum, row) => sum + row.changed, 0) }];
+    return [name, { cells: rows.reduce((sum, row) => sum + row.cells, 0), changed: rows.reduce((sum, row) => sum + row.changed, 0), styleMoved: rows.reduce((sum, row) => sum + (row.styleMoved ?? 0), 0) }];
   })),
   coverage: Object.fromEntries(runs.filter(({ name }) => report.counts[name + ' coverage']).map(({ name }) => {
-    const { cells, changed, baselineComposed, subjectComposed } = report.counts[name + ' coverage'];
-    return [name, { cells, changed, baselineComposed, subjectComposed }];
+    const { cells, changed, styleMoved, baselineComposed, subjectComposed } = report.counts[name + ' coverage'];
+    return [name, { cells, changed, styleMoved, baselineComposed, subjectComposed }];
   })) };
 await writeFile(values.out, JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ ...report.summary, failures: report.checks.filter(c => !c.pass).slice(0, 8), errors: report.errors.slice(0, 4) }, null, 2));

@@ -82,10 +82,17 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
 /** Empty, noninteractive markers change advances, never source characters.
  * An empty inline span keeps its horizontal margin without becoming an atomic
  * inline: inline-block made Chromium drop the adjacent word space from its
- * accessibility tree ('careful notes' read as 'carefulnotes'). */
-export function spacingMarkerStyle(px: number): Record<string, string> {
+ * accessibility tree ('careful notes' read as 'carefulnotes'). Only the
+ * advance is per marker. The rest is the same for every marker and comes from
+ * the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where that
+ * sheet cannot apply, see markerRules) writes it on the marker, as 4.3 did. */
+export function spacingMarkerStyle(px: number, inline: boolean): Record<string, string> {
+  if (!inline) return { marginLeft: px + 'px' };
+  // Longhands for the margin: React warns when a style object that changes
+  // between renders (here, when the sheet stops applying) mixes a shorthand
+  // with one of its longhands.
   return { display: 'inline', position: 'static', float: 'none', width: '0px', height: '0px', minWidth: '0px', minHeight: '0px',
-    margin: '0px', marginLeft: px + 'px', padding: '0px', border: '0px', boxShadow: 'none', outline: 'none', transform: 'none',
+    marginTop: '0px', marginRight: '0px', marginBottom: '0px', marginLeft: px + 'px', padding: '0px', border: '0px', boxShadow: 'none', outline: 'none', transform: 'none',
     fontSize: '0px', lineHeight: '0', verticalAlign: 'baseline', pointerEvents: 'none' };
 }
 
