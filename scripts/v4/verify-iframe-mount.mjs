@@ -31,7 +31,7 @@ for (const { name, engine, executablePath } of browsers) {
     await page.setContent(`<!doctype html><html lang="en"><body style="margin:0"><iframe id="f" style="width:420px;height:600px;border:0"></iframe></body></html>`);
     await page.addScriptTag({ content: script });
     for (const mode of ['document', 'body']) {
-      const checks = await page.evaluate(async ({ frame, mode, font }) => {
+      const checks = await page.evaluate(async ({ frame, text, mode, font }) => {
         const api = /** @type {any} */ (window).Typeset;
         const iframe = /** @type {HTMLIFrameElement} */ (document.getElementById('f'));
         iframe.style.width = '420px';
@@ -93,6 +93,44 @@ for (const { name, engine, executablePath } of browsers) {
         inserted.style.width = 'auto';
         pass = frameWidth === 420 && await until(() => controller.stats.compositions > compositions && intact(inserted) && api.measureLayout(inserted).width <= 260);
         check('an iframe resize is recomposed', pass, { iframe: frameWidth + ' -> ' + iframe.getBoundingClientRect().width, ...seen(pass) });
+        // An author's width change made in the first frame after a
+        // composition, from this page's requestAnimationFrame. The page is
+        // about:blank, and WebKit gives the iframe its own event loop: the
+        // style change's record waits for the iframe's microtask checkpoint,
+        // after the frame's ResizeObserver callbacks, so the controller's
+        // ResizeObserver sees the new width with only its own composition
+        // since it last delivered. That is the order in which 'a width change
+        // is recomposed' failed on hosted WebKit runners. Widened, lines
+        // composed for the old width still fit, and 4.3.0 kept them. Each edit
+        // makes the block longer or shorter, so the frame between the edit and
+        // its composition delivers a resize, as it would on a page.
+        const b = doc.createElement('p');
+        b.style.width = '230px';
+        b.textContent = text;
+        doc.querySelector('main')?.append(b);
+        await until(() => intact(b));
+        const kept = [];
+        for (let attempt = 0; attempt < 3; attempt++) {
+          compositions = controller.stats.compositions;
+          b.textContent = attempt % 2 ? text : edited;
+          const widened = await new Promise(resolve => {
+            const start = performance.now();
+            const frame = () => {
+              if (controller.stats.compositions > compositions) { compositions = controller.stats.compositions; seen = watch(b); b.style.width = '290px'; resolve(true); }
+              else if (performance.now() - start > 5000) resolve(false);
+              else requestAnimationFrame(frame);
+            };
+            requestAnimationFrame(frame);
+          });
+          if (!widened) { kept.push({ attempt, step: 'the edit was not composed' }); break; }
+          pass = await until(() => controller.stats.compositions > compositions && intact(b) && Math.abs(api.measureLayout(b).width - 290) < .5);
+          if (!pass) { kept.push({ attempt, ...seen(pass) }); break; }
+          seen(pass);
+          compositions = controller.stats.compositions;
+          b.style.width = '230px';
+          await until(() => controller.stats.compositions > compositions && intact(b));
+        }
+        check('a width change in the frame after a composition is recomposed (3 attempts)', !kept.length, kept.length ? kept : undefined);
         // A font inside the iframe: its FontFaceSet, not the parent's, reports it.
         const face = new (/** @type {any} */ (iframe.contentWindow)).FontFace('LateFace', 'url(data:font/woff2;base64,' + font + ')', { weight: '100 900' });
         a.classList.add('late');
@@ -108,7 +146,7 @@ for (const { name, engine, executablePath } of browsers) {
         controller.disconnect();
         check('disconnect restores the iframe text', !doc.querySelector('[data-ts-break]') && a.textContent === edited);
         return out;
-      }, { frame, mode, font: fixtureFont.toString('base64') });
+      }, { frame, text, mode, font: fixtureFont.toString('base64') });
       report.checks.push(...checks.map(c => ({ browser: name, ...c })));
     }
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack || error) }); }

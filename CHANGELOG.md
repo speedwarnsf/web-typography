@@ -38,6 +38,24 @@ Planned as 4.3.1. Not published.
   about twice (6x: 31 to 32 compositions and 2 to 3 long tasks; 8x: 29 to 33
   and 2 to 5; 12x and 16x: 28 to 33). This changes when blocks compose, not
   what they compose.
+- **`mount()` recomposes a width change that WebKit lays out before it
+  delivers the change's mutation record.** Since 4.3.0, `mount()` keeps a
+  composed block whose lines still fit a new width when only its own
+  compositions happened since its ResizeObserver last delivered (two
+  `auto` grid tracks traded room without end otherwise). It learned of
+  outside changes from their mutation records, and WebKit delivers the
+  records of a change that an about:blank page makes in its same-origin
+  iframe (a preview frame) after that frame's ResizeObserver callbacks. A
+  width change made in the frame after a composition was then taken for
+  the controller's own: a block widened from 230 to 290 px kept its 230 px
+  lines, and one narrowed to a width its composed lines still fit kept lines
+  composed for the old width. The ResizeObserver now takes the records
+  still queued and counts them as outside changes, and a pass handles
+  queued records before it stops observing instead of discarding them. In
+  WebKit, 4.3.0 kept the old lines in 16 of 40 probe attempts and in every
+  attempt of `verify-iframe-mount`'s new check; 4.3.1 recomposed every one.
+  On GitHub's macos-15 runners this was the WebKit failure of "a width
+  change is recomposed" in about a third of runs since 4.3.0.
 
 ### Development
 
@@ -47,6 +65,14 @@ Planned as 4.3.1. Not published.
   the wall-clock hold-off window fixed above. On the M2 Pro the slider made
   26 to 32 compositions and 2 long tasks in 12 runs, and 25 or 26
   compositions at 6x to 16x CPU.
+- `verify-iframe-mount` reports what a failed recomposition check saw: the
+  block's outcome, stale mark, lines against breaks and widths, the
+  controller's passes and compositions, and a timeline of layout, record
+  delivery and writes. Each pass starts from a 420 px iframe; the
+  `mount(body)` pass used to inherit the first pass's 260 px, so its "iframe
+  resize" step resized nothing. A new check widens a block from the page's
+  `requestAnimationFrame` in the frame after a composition, which puts
+  WebKit's record after layout every time.
 
 ## 4.3.0 - 2026-09-26
 

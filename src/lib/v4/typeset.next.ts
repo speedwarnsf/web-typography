@@ -1181,7 +1181,11 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Only an attribute other than style can make new elements match.
     if (newMatches) discover(target);
   };
-  const observer = new MutationObserver(records => {
+  /** An observed mutation that can move a line: any but a style change that
+   * only moves or fades a box. */
+  const outside = (record: MutationRecord) => !(record.type === 'attributes' && record.attributeName === 'style'
+    && movedOnly(record.oldValue, (record.target as Element).getAttribute('style')));
+  const mutated = (records: MutationRecord[]) => {
     const restyled = new Set<HTMLElement>(), matching = new Set<HTMLElement>();
     const stale = new Set<HTMLElement>(), written = new Set<Node>();
     // Owned text that may now be in a live region: moved into one (a toast),
@@ -1198,7 +1202,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       // handled per node in attributesChanged, whose recheck releases what is
       // no longer eligible.
       if (record.type === 'attributes') {
-        if (record.attributeName === 'style' && movedOnly(record.oldValue, target.getAttribute('style'))) continue;
+        if (!outside(record)) continue;
         triggeredSince = true;
         restyled.add(target);
         if (record.attributeName !== 'style') matching.add(target);
@@ -1243,7 +1247,21 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Each restyled node once per delivery, however many records it produced.
     for (const target of restyled) attributesChanged(target, matching.has(target));
     schedule();
-  });
+  };
+  // Records the ResizeObserver took before the MutationObserver delivered
+  // them (see resize).
+  let late: MutationRecord[] = [];
+  let lateTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Handle records in the order they were queued: those the ResizeObserver
+   * took, then those delivered, then any still queued, which the handler's
+   * own disconnect() would otherwise discard. */
+  const drain = (records: MutationRecord[] = []) => {
+    if (lateTimer !== undefined) { clearTimeout(lateTimer); lateTimer = undefined; }
+    const all = late.concat(records, observer.takeRecords());
+    late = [];
+    if (all.length) mutated(all);
+  };
+  const observer = new MutationObserver(records => drain(records));
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
   const sizes = new WeakMap<Element, { w: number; h: number }>();
   // Layout sizes, like the ResizeObserver's: a transform (a scale animation)
@@ -1282,6 +1300,18 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Reads only. A write here that changed any observed size would make every
     // engine report "ResizeObserver loop completed with undelivered notifications".
     let widened = false;
+    // A mutation this layout already shows, with its record still queued: an
+    // outside change, whatever else composed. WebKit delivers the records of
+    // a mutation an about:blank page makes in its same-origin iframe after
+    // that frame's ResizeObserver callbacks. Counted as our own, an author's
+    // width change kept lines composed for the old width. The records are
+    // handled in the next task, since nothing here may write.
+    const queued = observer.takeRecords();
+    if (queued.length) {
+      if (queued.some(outside)) triggeredSince = true;
+      late = late.concat(queued);
+      if (lateTimer === undefined) lateTimer = setTimeout(() => { lateTimer = undefined; if (!stopped) drain(); }, 0);
+    }
     const own = composedSince && !triggeredSince;
     composedSince = triggeredSince = false;
     for (const entry of entries) {
@@ -1391,6 +1421,9 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     idle = undefined;
     // Print shows native wrapping; the work waits until printing ends.
     if (stopped || printing(doc)) return;
+    // Records still queued belong to others: handle them before disconnect()
+    // discards them, as the adapter registry's writing() does.
+    drain();
     observer.disconnect();
     ensureLifecycleStyles(doc);
     const start = performance.now();
@@ -1522,6 +1555,8 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();
       unsubscribe();
       if (settleTimer !== undefined) clearTimeout(settleTimer);
+      if (lateTimer !== undefined) clearTimeout(lateTimer);
+      late = [];
       if (guardFrame) view?.cancelAnimationFrame(guardFrame);
       if (shownFrame) view?.cancelAnimationFrame(shownFrame);
       if (restoreContent) for (const el of owned) restore(el);
