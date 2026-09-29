@@ -167,6 +167,7 @@ export function getPageInfo(pathname: string): PageInfo | null {
 export const metaPages: SitePage[] = [
   { slug: "/about", name: "About", description: "About the author" },
   { slug: "/support", name: "Support", description: "Support this project" },
+  { slug: "/privacy", name: "Privacy", description: "What the site collects: no cookies, no analytics" },
 ];
 
 export function getAllPages(): SitePage[] {

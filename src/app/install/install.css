@@ -50,6 +50,9 @@
   max-width: 56ch;
 }
 .in-fine a { color: #b8963e; text-decoration: none; }
+.in-lede a, .in-note a { color: #b8963e; text-decoration: none; }
+.in-lede a:hover, .in-note a:hover, .in-fine a:hover { text-decoration: underline; }
+.in-section { margin-bottom: 36px; }
 .in-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

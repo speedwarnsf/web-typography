@@ -111,6 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <footer className="px-6 py-6 text-center text-xs text-neutral-500" data-no-typeset>
             <a href={`/releases/${PINNED_VERSION}/`}>Typeset {PINNED_VERSION}</a>
             {' / '}<a href="/releases/3.5.1/">V3 archive</a>
+            {' / '}<a href="/privacy">Privacy</a>
           </footer>
           <BackToTop />
         </div>

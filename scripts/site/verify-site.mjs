@@ -5,7 +5,9 @@
 //   node scripts/site/verify-site.mjs [--only security,content] [--audit]
 //
 // security (K10): every page carries a nonce CSP, nosniff and frame
-//   protection, and loads with no CSP violation or page error; an attacker
+//   protection, and loads with no CSP violation or page error in any of the
+//   three engines; pages contact only the hosts /privacy names; security.txt
+//   is served; an attacker
 //   page run through /audit and /dna executes nothing and cannot restyle the
 //   site; a hostile /pairing-cards link inserts nothing into the card it
 //   generates; /api/fetch-url refuses loopback, metadata and private addresses and
@@ -43,8 +45,7 @@ let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 
-const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
-const KEY_ROUTES = ['/', '/audit', '/dna', '/proof', '/fix', '/essay', '/install'];
+const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
 const ATTACK = `<!doctype html><html><head>
 <base href="https://attacker.invalid/">
 <meta http-equiv="refresh" content="0;url=https://attacker.invalid/">
@@ -94,15 +95,19 @@ try {
       check('security', `/api/fetch-url refuses ${target}`, (r.status === 403 || r.status === 400) && !body.html, { status: r.status, body });
     }
 
+    /** @type {Record<string, Set<string>>} */
+    const contactedBy = {};
     for (const config of browsers) {
       const browser = await config.engine.launch({ executablePath: config.executablePath, timeout: 20000 });
       try {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-        for (const route of config.name === 'chromium' ? ROUTES : KEY_ROUTES) {
+        for (const route of ROUTES) {
           const page = await context.newPage();
           page.setDefaultTimeout(20000);
           /** @type {string[]} */
           const problems = [];
+          // Every request this page makes to another origin, by host.
+          page.on('request', request => { const url = new URL(request.url()); if (/^https?:$/.test(url.protocol) && url.origin !== base) (contactedBy[url.host] ??= new Set()).add(`${config.name} ${route}`); });
           page.on('pageerror', error => { problems.push('pageerror: ' + error.message.slice(0, 200)); });
           page.on('console', message => { if (message.type() === 'error' && /Content Security Policy|CSP|Refused to/.test(message.text())) problems.push('console: ' + message.text().slice(0, 200)); });
           await page.addInitScript(() => { document.addEventListener('securitypolicyviolation', e => { (/** @type {any} */ (window).__violations ??= []).push(`${e.violatedDirective} ${e.blockedURI}`); }); });
@@ -194,6 +199,22 @@ try {
       } finally { await browser.close(); }
     }
 
+    // The site sets no trackers: pages contact no origin but their own and
+    // the hosts /privacy names (data-host), and /privacy names no host that
+    // no page contacts.
+    const privacy = await (await fetch(base + '/privacy')).text();
+    const listed = [...new Set([...privacy.matchAll(/data-host="([^"]+)"/g)].map(m => m[1]))].sort();
+    const contacted = Object.keys(contactedBy).sort();
+    check('security', 'pages contact no origin but their own and the hosts /privacy lists, and /privacy lists only hosts pages contact', listed.length > 0 && JSON.stringify(listed) === JSON.stringify(contacted), { listed, contacted: Object.fromEntries(Object.entries(contactedBy).map(([host, where]) => [host, [...where].slice(0, 6)])) });
+    const connect = /connect-src ([^;]*)/.exec(csp)?.[1] ?? '';
+    check('security', "the page CSP lets scripts connect only to the site itself (connect-src 'self' data:)", connect.trim() === "'self' data:", connect);
+
+    // security.txt (RFC 9116): contact, a policy and an expiry under a year.
+    const securityTxt = await fetch(base + '/.well-known/security.txt');
+    const fields = Object.fromEntries([...(await securityTxt.text()).matchAll(/^([\w-]+): (.+)$/gm)].map(m => [m[1], m[2].trim()]));
+    const expires = Date.parse(fields.Expires ?? '');
+    check('security', '/.well-known/security.txt: text/plain with Contact, Expires (under a year away), Policy, Preferred-Languages and Canonical', securityTxt.status === 200 && /^text\/plain/.test(securityTxt.headers.get('content-type') ?? '') && /^mailto:/.test(fields.Contact ?? '') && expires > Date.now() && expires - Date.now() < 365 * 864e5 && /SECURITY\.md$/.test(fields.Policy ?? '') && fields['Preferred-Languages'] === 'en' && fields.Canonical === 'https://typeset.us/.well-known/security.txt', { status: securityTxt.status, type: securityTxt.headers.get('content-type'), fields });
+
     // Rate limit last: it spends this client's budget.
     const statuses = [];
     for (let n = 0; n < 14; n++) statuses.push((await fetch(`${base}/api/fetch-url?url=${encodeURIComponent('http://127.0.0.1/')}`, { headers: { 'x-forwarded-for': '203.0.113.9' } })).status);
@@ -235,6 +256,7 @@ try {
       if (image) { const r = await fetch(image.replace(/^https?:\/\/[^/]+/, base)); imageOK = r.status === 200 && /image\/png/.test(r.headers.get('content-type') ?? ''); }
       check('content', `${route}: own title, description and an og:image that renders`, !!title && !!meta('description') && !!meta('og:title') && imageOK, { title, description: meta('description'), image, imageOK });
     }
+    check('content', '/privacy has its own title', decode(await (await fetch(base + '/privacy')).text()).includes('<title>Privacy: what typeset.us collects</title>'));
     check('content', '/ and /support have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/support')).text()).includes('<title>Support Typeset'));
 
     // D5: the homepage names its baseline by engine and claims only what that
