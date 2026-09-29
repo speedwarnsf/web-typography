@@ -94,18 +94,34 @@ async function composeInto(el: HTMLElement, text: string, staggerMs: number, bas
  * exists to prove composition. Watch it ourselves: recompose whenever the
  * width genuinely changes. Once the entrance has played (v2-in), lines
  * re-appear without stagger.
+ *
+ * The observer only records the width and schedules the composition for the
+ * next animation frame, cancelling any frame still pending. Composing inside
+ * the callback changed the block's height while ResizeObserver was still
+ * delivering, which WebKit reports as a "ResizeObserver loop completed with
+ * undelivered notifications" page error.
  */
-function watchRecompose(el: HTMLElement, text: string, staggerMs: number, baseMs: number): ResizeObserver {
+function watchRecompose(el: HTMLElement, text: string, staggerMs: number, baseMs: number): { disconnect(): void } {
   let lastWidth = el.clientWidth;
+  let frame = 0;
   const ro = new ResizeObserver(() => {
     const w = el.clientWidth;
     if (Math.abs(w - lastWidth) < 2) return;
     lastWidth = w;
-    const revealed = el.classList.contains('v2-in');
-    void composeInto(el, text, revealed ? 0 : staggerMs, revealed ? 0 : baseMs);
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      const revealed = el.classList.contains('v2-in');
+      void composeInto(el, text, revealed ? 0 : staggerMs, revealed ? 0 : baseMs);
+    });
   });
   ro.observe(el);
-  return ro;
+  return {
+    disconnect() {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+    },
+  };
 }
 
 interface PanelStats {
@@ -207,7 +223,7 @@ function Hero({ reduced }: { reduced: boolean }) {
     const el = h1Ref.current;
     if (!el) return;
     let cancelled = false;
-    let ro: ResizeObserver | null = null;
+    let ro: { disconnect(): void } | null = null;
     (async () => {
       await composeInto(el, HERO_TEXT, 140, 200);
       if (cancelled) return;
@@ -691,7 +707,7 @@ function Manifesto() {
     if (!el) return;
     let cancelled = false;
     let io: IntersectionObserver | null = null;
-    let ro: ResizeObserver | null = null;
+    let ro: { disconnect(): void } | null = null;
     (async () => {
       await composeInto(el, MANIFESTO_TEXT, 90, 60);
       if (cancelled) return;
