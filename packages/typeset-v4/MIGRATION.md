@@ -2,7 +2,7 @@
 
 4.3.1 is a patch release of 4.3.0: it fixes defects and changes no API,
 option, outcome code or default. From 4.3.0, install the exact version
-(`npm i -E typeset.us@4.3.1`, or the pin `go@4.3.1.js` with its integrity
+(`npm i -E typeset.us@4.3.2`, or the pin `go@4.3.2.js` with its integrity
 hash from https://typeset.us/sri.json); nothing else changes. The CHANGELOG
 lists what it fixes. From 4.2.0, follow the steps below.
 
@@ -16,8 +16,8 @@ in the CHANGELOG with the number of test paragraphs it changed.
 1. Keep your current lockfile and deployment until your own checks pass.
    Disconnect the old controller, or unmount the React adapters, before
    replacing the engine. Never run two Typeset versions on the same text.
-2. Install the exact version: `npm i -E typeset.us@4.3.1`, or change the
-   script pin to `go@4.3.1.js` with its integrity hash from
+2. Install the exact version: `npm i -E typeset.us@4.3.2`, or change the
+   script pin to `go@4.3.2.js` with its integrity hash from
    https://typeset.us/sri.json.
 3. React 18.2 and later now install without `--legacy-peer-deps`, and
    Playwright is no longer a peer. If you added either workaround for 4.2,
@@ -54,7 +54,7 @@ in the CHANGELOG with the number of test paragraphs it changed.
    - A line holding text right after an HTML comment (React's server
      rendering separator `<!-- -->`, WordPress's `<!--more-->`) is not
      letter-spaced; the paragraph's other lines are.
-   - `go@4.3.1.js` and `typeset.us/auto` compose content inside `.demo`
+   - `go@4.3.2.js` and `typeset.us/auto` compose content inside `.demo`
      and `[data-no-smooth]`, which `go@4.2.0.js` skipped. Mark content
      that should stay as the browser sets it with `data-no-typeset`.
    - Quote corrections: nested quotes open correctly and 'n', 'bout, 'round
