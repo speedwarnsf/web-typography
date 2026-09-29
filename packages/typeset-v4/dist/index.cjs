@@ -4319,6 +4319,11 @@ function nearObserver(doc, callback) {
   if (!view || typeof view.IntersectionObserver !== "function") return null;
   const observers = /* @__PURE__ */ new Map();
   const roots = /* @__PURE__ */ new WeakMap();
+  const unreported = /* @__PURE__ */ new Set();
+  const reported = (entries) => {
+    for (const entry of entries) unreported.delete(entry.target);
+    callback(entries);
+  };
   const scrollport = (element) => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
       const cs = view.getComputedStyle(node);
@@ -4335,13 +4340,15 @@ function nearObserver(doc, callback) {
       }
       let entry = observers.get(root);
       if (!entry) {
-        entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: "100% 0px" }), targets: /* @__PURE__ */ new Set() };
+        entry = { observer: new view.IntersectionObserver(reported, { root, rootMargin: "100% 0px" }), targets: /* @__PURE__ */ new Set() };
         observers.set(root, entry);
       }
+      if (!entry.targets.has(element)) unreported.add(element);
       entry.observer.observe(element);
       entry.targets.add(element);
     },
     unobserve(element) {
+      unreported.delete(element);
       const root = roots.get(element);
       const entry = root === void 0 ? void 0 : observers.get(root);
       if (!entry) return;
@@ -4355,6 +4362,14 @@ function nearObserver(doc, callback) {
     disconnect() {
       for (const entry of observers.values()) entry.observer.disconnect();
       observers.clear();
+      unreported.clear();
+    },
+    nearBeforeReport(element, box) {
+      if (!unreported.has(element) || !(box.width > 0 && box.height > 0)) return false;
+      const root = roots.get(element);
+      const port = root ? root.getBoundingClientRect() : { top: 0, bottom: view.innerHeight, left: 0, right: view.innerWidth };
+      const margin = port.bottom - port.top;
+      return box.bottom >= port.top - margin && box.top <= port.bottom + margin && box.right >= port.left && box.left <= port.right;
     }
   };
 }
@@ -4382,7 +4397,7 @@ function armFonts(doc) {
 function start(doc) {
   const view = doc.defaultView;
   const hub = { clients: /* @__PURE__ */ new Set(), faces: /* @__PURE__ */ new WeakSet(), ready: false, translated: translationActive(doc), classed: translatedClass(doc), stop: () => {
-  } };
+  }, take: () => false };
   const resize = () => notify(hub, (client) => client.resize?.());
   const fonts = () => {
     notify(hub, (client) => client.fonts?.());
@@ -4398,11 +4413,13 @@ function start(doc) {
     const target = event.target;
     if (target?.nodeType === 1 && !event.skipped) notify(hub, (client) => client.visibility?.(target));
   };
-  const observer = new MutationObserver((records) => {
+  const signal = (record) => record.target === doc.documentElement && record.type === "attributes" ? "class" : styleMutation(record) ? "styles" : "";
+  const handle = (records) => {
     let styles = false, rootClass = false;
     for (const record of records) {
-      if (record.target === doc.documentElement && record.type === "attributes") rootClass = true;
-      else if (styleMutation(record)) styles = true;
+      const kind = signal(record);
+      if (kind === "class") rootClass = true;
+      else if (kind === "styles") styles = true;
     }
     if (rootClass) {
       const classed = translatedClass(doc);
@@ -4418,7 +4435,25 @@ function start(doc) {
       notify(hub, (client) => client.styles?.());
       armFonts(doc);
     }
-  });
+  };
+  const observer = new MutationObserver(handle);
+  let taken = [], signalled = false;
+  let takenTimer;
+  hub.take = () => {
+    const records = observer.takeRecords();
+    if (records.length) {
+      taken = taken.concat(records);
+      if (records.some((record) => signal(record) !== "")) signalled = true;
+      if (takenTimer === void 0) takenTimer = setTimeout(() => {
+        const batch = taken;
+        taken = [];
+        signalled = false;
+        takenTimer = void 0;
+        if (hubs.get(doc) === hub) handle(batch);
+      }, 0);
+    }
+    return signalled;
+  };
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ["class"] });
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: ["media", "disabled", "href", "rel"] });
   const faces = doc.fonts;
@@ -4445,6 +4480,9 @@ function start(doc) {
     doc.removeEventListener("contentvisibilityautostatechange", visibility, true);
   };
   return hub;
+}
+function signalQueued(doc) {
+  return hubs.get(doc)?.take() ?? false;
 }
 function subscribe(doc, client) {
   let hub = hubs.get(doc);
@@ -4557,7 +4595,7 @@ var mountOwners = /* @__PURE__ */ new WeakMap();
 var mountWaiters = /* @__PURE__ */ new WeakMap();
 
 // src/lib/v4/typeset.next.ts
-var VERSION = "4.3.0";
+var VERSION = "4.3.1";
 var states = /* @__PURE__ */ new WeakMap();
 function staleSplit(element, state, record, written) {
   if (record.type === "characterData") {
@@ -5552,7 +5590,8 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     for (let el = target2.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
     if (newMatches) discover(target2);
   };
-  const observer = new MutationObserver((records) => {
+  const outside = (record) => !(record.type === "attributes" && record.attributeName === "style" && movedOnly(record.oldValue, record.target.getAttribute("style")));
+  const mutated = (records) => {
     const restyled = /* @__PURE__ */ new Set(), matching = /* @__PURE__ */ new Set();
     const stale = /* @__PURE__ */ new Set(), written = /* @__PURE__ */ new Set();
     const live = /* @__PURE__ */ new Set();
@@ -5571,7 +5610,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
         }
       }
       if (record.type === "attributes") {
-        if (record.attributeName === "style" && movedOnly(record.oldValue, target2.getAttribute("style"))) continue;
+        if (!outside(record)) continue;
         triggeredSince = true;
         restyled.add(target2);
         if (record.attributeName !== "style") matching.add(target2);
@@ -5619,7 +5658,19 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     }
     for (const target2 of restyled) attributesChanged(target2, matching.has(target2));
     schedule();
-  });
+  };
+  let late = [];
+  let lateTimer;
+  const drain = (records = []) => {
+    if (lateTimer !== void 0) {
+      clearTimeout(lateTimer);
+      lateTimer = void 0;
+    }
+    const all = late.concat(records, observer.takeRecords());
+    late = [];
+    if (all.length) mutated(all);
+  };
+  const observer = new MutationObserver((records) => drain(records));
   const sizes = /* @__PURE__ */ new WeakMap();
   const boxOf = (el) => {
     const cs = getComputedStyle(el);
@@ -5644,6 +5695,18 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
   const watched = /* @__PURE__ */ new Map();
   const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver((entries) => {
     let widened = false;
+    if (composedSince && !triggeredSince) {
+      const queued = observer.takeRecords();
+      if (queued.length) {
+        if (queued.some(outside)) triggeredSince = true;
+        late = late.concat(queued);
+        if (lateTimer === void 0) lateTimer = setTimeout(() => {
+          lateTimer = void 0;
+          if (!stopped) drain();
+        }, 0);
+      }
+      if (!triggeredSince && signalQueued(doc)) triggeredSince = true;
+    }
     const own = composedSince && !triggeredSince;
     composedSince = triggeredSince = false;
     for (const entry of entries) {
@@ -5763,6 +5826,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     timer = void 0;
     idle = void 0;
     if (stopped || printing(doc)) return;
+    drain();
     observer.disconnect();
     ensureLifecycleStyles(doc);
     const start2 = performance.now();
@@ -5881,6 +5945,8 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
       viewport?.disconnect();
       unsubscribe();
       if (settleTimer !== void 0) clearTimeout(settleTimer);
+      if (lateTimer !== void 0) clearTimeout(lateTimer);
+      late = [];
       if (guardFrame) view?.cancelAnimationFrame(guardFrame);
       if (shownFrame) view?.cancelAnimationFrame(shownFrame);
       if (restoreContent) for (const el of owned) restore(el);

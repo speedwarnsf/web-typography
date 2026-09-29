@@ -25,7 +25,10 @@
  * the size has held for RESIZE_SETTLE_MS; so does a host whose metrics change
  * again within RESIZE_SETTLE_MS of a check composing it (a font-size or
  * spacing transition, a text-size slider), unless a font face finished in
- * between, which composes. A size a composition changes itself (a box sized
+ * between, which composes; both windows are timed less this registry's own
+ * work, so that slow frames do not end them (on screen, only for a change
+ * within two rendering updates of a composition that followed one too; see
+ * pageTime). A size a composition changes itself (a box sized
  * by its content narrowing to the composed lines, a grid track or table
  * column passing room to a neighbour) is not a resize: a composed host whose
  * lines still fit keeps them (see rebase and resized). Hidden hosts keep their composition
@@ -76,6 +79,12 @@ const IDLE_TIMEOUT_MS = 1000;
  * scroll), which one composition on a slow device can overrun. */
 const LONG_IDLE_MS = 20;
 const RESIZE_SETTLE_MS = 100;
+/** How many rendering updates after the pass that composed an on-screen
+ * host a change still counts as quick (see pageTime). In a continuous change
+ * its next check comes one update on (a slider's input lands before the
+ * frame's pass) or two (a transition steps in the next update, whose
+ * ResizeObserver delivery queues the check). */
+const HOLD_FRAMES = 2;
 // Edge's translator tags the nodes it rewrites with the _mst attributes; the
 // hidden and open attributes reveal text, which then composes before the
 // reveal paints.
@@ -118,15 +127,23 @@ function createRegistry(doc: Document): Registry {
   const near = new Set<AdapterEntry>();
   const resizing = new Set<AdapterEntry>();
   // Hosts in `resizing` because their metrics changed continuously (process),
-  // and when a check last composed each host, with the font key it saw.
+  // and when a check last composed each host: the page time of its pass (see
+  // pageTime), the wall time its composition ended, the rendering update of
+  // its pass (see frameSeen), the font key it saw, and whether that check
+  // came quickly after the composition before it.
   const continuous = new Set<AdapterEntry>();
-  const checked = new WeakMap<AdapterEntry, { at: number; fonts: string }>();
+  const checked = new WeakMap<AdapterEntry, { at: number; wall: number; frame: number; fonts: string; quick: boolean }>();
+  // The page time at which a pass last found a held host changed again.
+  let heldAt = -Infinity;
   // Content-box sizes as last seen by the ResizeObserver or left by our writes.
   const sizes = new WeakMap<Element, { w: number; h: number }>();
   const watchers = new Map<Element, Set<AdapterEntry>>();
   const parents = new Map<AdapterEntry, Element | null>();
   const later = (fn: () => void, ms: number) => (win || globalThis).setTimeout(fn, ms);
-  const frame = (fn: () => void): void => { if (win?.requestAnimationFrame) win.requestAnimationFrame(fn); else later(fn, 16); };
+  const frame = (fn: (time?: number) => void): void => { if (win?.requestAnimationFrame) win.requestAnimationFrame(fn); else later(fn, 16); };
+  // Rendering updates seen (see frameSeen), the last one's timestamp, and
+  // the count up to which the ticker keeps counting them.
+  let frames = 0, frameTime = -1, tickUntil = 0, ticking = false;
   let commitStart = 0;
   let costPerChar = 0;
   // Whether a composition in this document has laid out lines. The first
@@ -142,6 +159,9 @@ function createRegistry(doc: Document): Registry {
   let settle: ReturnType<typeof setTimeout> | undefined;
   let mutations: MutationObserver | null = null, observer: ResizeObserver | null = null, viewport: NearObserver | null = null;
   let writingDepth = 0;
+  // Wall time spent in this registry's passes and compositions, and whether
+  // a pass is running (see pageTime).
+  let busy = 0, passing = false;
   // Whether a composition, and whether anything outside the registry that can
   // move a line (a DOM change outside the hosts' text, a window resize, a
   // font, stylesheet, metric, visibility or translation signal), happened
@@ -171,6 +191,7 @@ function createRegistry(doc: Document): Registry {
     writing(() => entry.compose(reason, inCommit));
     composedSince = true;
     const took = performance.now() - begun;
+    if (!passing) busy += took;
     let setup = 0;
     if (!warm && entry.element.dataset.tsOutcome?.startsWith('composed')) { warm = true; setup = took; }
     // Learn this device's cost per character of composed text, so a budget
@@ -255,13 +276,73 @@ function createRegistry(doc: Document): Registry {
     if (win && typeof win.requestIdleCallback === 'function') win.requestIdleCallback(flushIdle, { timeout: Math.max(1, IDLE_TIMEOUT_MS - (performance.now() - idleSince)) });
     else later(() => flushIdle(), 50);
   }
-  /** Compose (or check) one pending host; returns run()'s setup time. */
-  function process(entry: AdapterEntry, reason: Reason, fonts: string): number {
+  /** Page time: wall time less the time this registry's own passes and
+   * compositions took. No text metric can change while they run (a
+   * transition steps, and a slider's input lands, only between tasks), so the
+   * continuous-change hold-off and its settle are timed in page time: whether
+   * a host changed again within RESIZE_SETTLE_MS of the pass whose check
+   * composed it, and whether RESIZE_SETTLE_MS passed with no held host
+   * changing. In wall time, our own work used the window up: a frame whose
+   * compositions ran past RESIZE_SETTLE_MS (VISIBLE_BUDGET_MS allows 120 ms,
+   * which a slow or throttled device reaches), or a frame composing other
+   * blocks between a block's composition and its next check (which comes two
+   * frames on, as the ResizeObserver's baseline is the size the composition
+   * left), let the window lapse, and every frame of a font-size transition
+   * recomposed the same blocks: a storm of 100 to 135 ms tasks at 4x CPU.
+   * On screen, where holding paints native lines, page time is not enough:
+   * a wave of compositions (the rest of a screen, then one near block per
+   * frame at 4x CPU) leaves little page time for hundreds of ms, and a
+   * second, separate change in that time (a text-size control used twice)
+   * was held too, painting native lines for 250 to 320 ms where 4.3.0
+   * recomposed. An on-screen host is held in page time only when the change
+   * came within HOLD_FRAMES rendering updates of its composition, and that
+   * composition had followed such a quick change too: a continuous change
+   * holds from its second step (one composition more per block than a hold
+   * at once), and two separate changes compose as in 4.3.0, which held
+   * within RESIZE_SETTLE_MS of wall time and still does. */
+  const pageTime = () => performance.now() - busy;
+  /** Count a rendering update: every animation-frame callback in one update
+   * gets the same timestamp. The ticker counts the updates that follow a
+   * pass composing checked hosts, where no pass of ours may run, so that a
+   * host's frame count ages even while the page does nothing. */
+  function frameSeen(time?: number): void {
+    if (time === undefined) frames++;
+    else if (time !== frameTime) { frameTime = time; frames++; }
+  }
+  function tick(time?: number): void {
+    frameSeen(time);
+    if (frames < tickUntil) frame(tick); else ticking = false;
+  }
+  /** One frame's (or idle slice's) processing. In page time it takes no time:
+   * `start` is also when it ends. */
+  interface Pass { began: number; start: number; frame: number; idle: boolean; fonts: string; composed: [AdapterEntry, number, boolean][]; held: boolean }
+  function beginPass(fonts: string, idle: boolean): Pass {
+    passing = true;
+    const began = performance.now();
+    return { began, start: began - busy, frame: frames, idle, fonts, composed: [], held: false };
+  }
+  function endPass(pass: Pass): void {
+    passing = false;
+    busy += performance.now() - pass.began;
+    for (const [entry, wall, quick] of pass.composed) checked.set(entry, { at: pass.start, wall, frame: pass.frame, fonts: pass.fonts, quick });
+    // Not after an idle slice: frames would cut the long idle periods the
+    // next slices wait for.
+    if (pass.composed.length && !pass.idle) {
+      tickUntil = frames + HOLD_FRAMES + 1;
+      if (!ticking) { ticking = true; frame(tick); }
+    }
+    if (pass.held) { heldAt = pass.start; settleLater(); }
+  }
+  /** Compose (or check) one pending host, on screen or not; returns run()'s
+   * setup time. */
+  function process(entry: AdapterEntry, reason: Reason, pass: Pass, onScreen: boolean): number {
     const drop = () => { pending.delete(entry); near.delete(entry); viewport?.unobserve(entry.element); };
+    const { fonts } = pass;
+    let quick = false;
     if (reason === 'check') {
       // A host being resized, or whose metrics keep changing, is checked once
       // they settle, not per frame; a change meanwhile moves the settle on.
-      if (resizing.has(entry)) { if (continuous.has(entry)) settleLater(); drop(); return 0; }
+      if (resizing.has(entry)) { if (continuous.has(entry)) pass.held = true; drop(); return 0; }
       // A hidden host keeps its composition; it is checked when shown.
       if (!rendered(entry.element) || !entry.changed(fonts)) { drop(); return 0; }
       // Changed again soon after a check composed it: a font-size or spacing
@@ -270,17 +351,24 @@ function createRegistry(doc: Document): Registry {
       // composition in every frame (long tasks, dropped frames). A font face
       // finishing is a one-off change, even when faces finish in successive
       // frames (the key holds every face's status, used or not): it composes.
+      // Soon: within RESIZE_SETTLE_MS of wall time of its composition, as in
+      // 4.3.0, or quick: within RESIZE_SETTLE_MS of page time of the pass that
+      // composed it (see pageTime). On screen, quick also means within
+      // HOLD_FRAMES rendering updates, and holds only a host whose previous
+      // composition was quick as well.
       const last = checked.get(entry);
-      if (entry.widest() && last !== undefined && last.fonts === fonts && performance.now() - last.at < RESIZE_SETTLE_MS) {
+      quick = last !== undefined && last.fonts === fonts && pass.start - last.at < RESIZE_SETTLE_MS && (!onScreen || pass.frame - last.frame <= HOLD_FRAMES);
+      const soon = last !== undefined && last.fonts === fonts && (performance.now() - last.wall < RESIZE_SETTLE_MS || (quick && (!onScreen || last.quick)));
+      if (entry.widest() && soon) {
         writing(() => entry.stale());
         resizing.add(entry); continuous.add(entry);
-        settleLater();
+        pass.held = true;
         drop();
         return 0;
       }
     }
     const setup = run(entry, reason, false);
-    if (reason === 'check') checked.set(entry, { at: performance.now(), fonts }); else checked.delete(entry);
+    if (reason === 'check') pass.composed.push([entry, performance.now(), quick]); else checked.delete(entry);
     return setup;
   }
   function settleLater(): void {
@@ -290,26 +378,35 @@ function createRegistry(doc: Document): Registry {
   /** On-screen work, before this frame paints, top to bottom, then nearby
    * hosts within FRAME_BUDGET_MS. Only visible work beyond VISIBLE_BUDGET_MS
    * (the document's one-time setup not counted) continues in the next frame. */
-  function flushFrame(): void {
+  function flushFrame(time?: number): void {
     frameQueued = false;
+    frameSeen(time);
     // Print shows native wrapping; the work waits until printing ends.
     if (!pending.size || printing(doc)) return;
     ensureLifecycleStyles(doc);
     let start = performance.now();
     const fonts = fontKey(doc);
+    const pass = beginPass(fonts, false);
     // All reads first: one layout, then the compositions.
     const queued = [...pending.keys()].map(entry => ({ entry, rect: entry.element.getBoundingClientRect() }));
     const height = win?.innerHeight ?? 0, width = win?.innerWidth ?? 0;
     const onScreen = queued.filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width)
       .sort((a, b) => a.rect.top - b.rect.top).map(({ entry }) => entry);
-    const soon = [...onScreen, ...queued.map(({ entry }) => entry).filter(entry => near.has(entry) && !onScreen.includes(entry))];
+    // Near as the near observer reported, or, before its first report on a
+    // host, as the host's box is now. That report comes in a task after the
+    // next rendering update, and a page's own animation frame can scroll the
+    // host in first: an app shell's pane scrolled in the frame after its
+    // screen mounted painted the block below its fold native and rewrapped it
+    // a frame or two later.
+    const soon = [...onScreen, ...queued.filter(({ entry, rect }) => !onScreen.includes(entry) && (near.has(entry) || !!viewport?.nearBeforeReport(entry.element, rect))).map(({ entry }) => entry)];
     let composed = 0;
     for (const entry of soon) {
       // At least one per frame, so a slow device still makes progress.
       if (composed && !fits(entry, start, onScreen.includes(entry) ? VISIBLE_BUDGET_MS : FRAME_BUDGET_MS)) { frameQueued = true; frame(flushFrame); break; }
       const reason = pending.get(entry);
-      if (reason) { start += process(entry, reason, fonts); composed++; }
+      if (reason) { start += process(entry, reason, pass, onScreen.includes(entry)); composed++; }
     }
+    endPass(pass);
     // A composition can start a font load (a face first used by this text).
     if (composed) armFonts(doc);
   }
@@ -324,13 +421,14 @@ function createRegistry(doc: Document): Registry {
     if (deadline && !deadline.didTimeout && deadline.timeRemaining() < LONG_IDLE_MS) { requestIdle(); return; }
     idleSince = 0;
     const start = performance.now();
-    const fonts = fontKey(doc);
+    const pass = beginPass(fontKey(doc), true);
     const order = [...pending.keys()].sort((a, b) => Number(near.has(b)) - Number(near.has(a)));
     for (const entry of order) {
       const reason = pending.get(entry);
-      if (reason) process(entry, reason, fonts);
+      if (reason) process(entry, reason, pass, false);
       if (deadline?.didTimeout || performance.now() - start >= IDLE_SLICE_MS || (deadline && deadline.timeRemaining() <= 1)) break;
     }
+    endPass(pass);
     armFonts(doc);
     schedule();
   }
@@ -460,14 +558,19 @@ function createRegistry(doc: Document): Registry {
    * a same-depth notification (a ResizeObserver loop error). A hidden host
    * whose container changed width will be shown at another width: it shows
    * native lines from now, a write inside a hidden subtree that moves nothing. */
-  function staleCheck(): void {
+  function staleCheck(time?: number): void {
     staleQueued = false;
+    frameSeen(time);
     ensureLifecycleStyles(doc);
     const doomed = [...resizing].filter(entry => entries.has(entry.element) && entry.widest()
       && (rendered(entry.element) ? entry.widest() > contentWidth(entry.element) + .5 : entry.element.isConnected));
     for (const entry of doomed) writing(() => entry.stale());
   }
   function settled(): void {
+    // Continuous changes settle once no held host has changed for
+    // RESIZE_SETTLE_MS of page time (see pageTime).
+    const quiet = pageTime() - heldAt;
+    if (quiet < RESIZE_SETTLE_MS) { settle = later(settled, RESIZE_SETTLE_MS - quiet); return; }
     settle = undefined;
     for (const entry of resizing) if (entries.has(entry.element)) { checked.delete(entry); enqueue(entry, 'check'); }
     resizing.clear(); continuous.clear();

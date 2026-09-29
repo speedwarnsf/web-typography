@@ -308,6 +308,15 @@ for (const { name, engine, executablePath } of browsers) {
       // recomposed every frame would add a long task and a composition per
       // block for each of its ~72 frames (1.2 s), so one long task a block
       // still stops it on any machine, and the composition limit does too.
+      // 4.3.0 did storm here on a slow frame: it timed the hold-off from each
+      // block's own composition in wall-clock time, so once a frame's
+      // compositions ran past RESIZE_SETTLE_MS (100 ms) the next check found
+      // it lapsed and the same blocks recomposed every frame (M2 Pro staged
+      // release cuts: 66 to 76 compositions and 9 to 14 long tasks of up to
+      // 135 ms, half over 100 ms, in 4 of 6 runs; macos-15: 4 of 11 runs, up
+      // to 88 and 17). 4.3.1 leaves the adapters' own work out of the window:
+      // 32 to 44 compositions and 0 to 2 long tasks in 36 transitions on the
+      // M2 Pro, and about two compositions a block at 6x to 16x CPU.
       const transitions = [];
       for (let run = 0; run < 3; run++) transitions.push(await change('transition'));
       check('React at 4x CPU: a font-size transition recomposes each block a few times, not every frame, and ends composed (3 runs)',

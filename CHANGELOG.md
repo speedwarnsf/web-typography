@@ -10,6 +10,168 @@ Hashes for every published version live in
 
 ---
 
+## 4.3.1 - 2026-09-29
+
+4.3.1 is a patch release of 4.3.0: no API, option, outcome code or default
+changed. It fixes three timing defects in keeping composed text correct
+while a page changes, found by the checks that GitHub's hosted runners and
+the 4.3.0 release cut ran.
+
+### Rendering changes
+
+None. `scripts/v4/verify-golden.mjs` run with the published 4.3.0 build as
+its baseline, 3,932 cells per engine (every corpus and adversarial
+paragraph at four widths in two fonts, plain, rich, legacy, with finishes,
+comment separators, as titles and justified): 0 cells differ in Chromium,
+WebKit or Firefox. The fixes below change when a block composes while the
+page changes and, in the WebKit iframe case, which width its lines end up
+composed for (4.3.0 kept lines composed for the old width); what settled
+text composes is unchanged.
+
+### Fixed
+
+- **React hosts no longer recompose in every frame of a font-size transition
+  on a slow device.** `TypesetText` and `TypesetRichText` show native lines
+  while a block's text metrics change again within 100 ms of a check
+  composing it, and compose it once they hold for 100 ms. 4.3.0 timed both
+  windows in wall-clock time from the block's own composition, and a frame
+  on a slow device may spend up to 120 ms composing on-screen blocks. Once a
+  frame's compositions ran past 100 ms, or another frame's compositions fell
+  between a block's composition and its next check, the window had lapsed
+  and the same blocks recomposed in every frame. Both windows now leave out
+  the adapters' own work, during which no text metric can change. On
+  screen, where a held block paints native lines, that applies only to a
+  change within two rendering updates of the block's composition (a
+  slider's next input comes one update on, a transition's next step two),
+  once the composition before it had followed such a change too: a
+  continuous change holds from its second step, and a one-off second
+  change, such as a text-size control used twice on a slow device,
+  composes as in 4.3.0. A 1.2 s font-size transition over 16 blocks in
+  Chromium at 4x CPU (`scripts/v4/verify-recompose-storms.mjs`): 4.3.0
+  failed the check in 4 of 6 staged release-cut runs on the maintainer's M2
+  Pro (66 to 76 compositions, 9 to 14 long tasks of up to 135 ms, half of
+  them over 100 ms) and in 4 of 11 runs on GitHub's macos-15 runners (up to
+  88 compositions and 17 long tasks); 4.3.1 made 33 to 44 compositions and
+  0 to 3 long tasks in 24 transitions on the M2 Pro. With the CPU
+  throttled further, where 4.3.0 storms in most runs (6x: 30 to 68
+  compositions and 6 to 11 long tasks; 8x: 45 to 55 and 11 to 13), 4.3.1
+  composes each block two or three times (6x: 38 compositions and 3 or 4
+  long tasks; 8x: 38 to 41 and 5 to 7; 12x: 32 to 34). What a block
+  composes is unchanged; a held block paints native lines until the change
+  settles, as in 4.3.0.
+- **`mount()` recomposes a width change that WebKit lays out before it
+  delivers the change's mutation record.** Since 4.3.0, `mount()` keeps a
+  composed block whose lines still fit a new width when only its own
+  compositions happened since its ResizeObserver last delivered (two
+  `auto` grid tracks traded room without end otherwise). It learned of
+  outside changes from their mutation records, and WebKit delivers the
+  records of a change that an about:blank page makes in its same-origin
+  iframe (a preview frame) after that frame's ResizeObserver callbacks. A
+  width change made in the frame after a composition was then taken for the
+  controller's own: a block widened from 230 to 290 px kept its 230 px
+  lines, and one narrowed to a width its composed lines still fit kept lines
+  composed for the old width. The ResizeObserver now takes the records
+  still queued, its own and the stylesheet records of the lifecycle
+  observer (in `mount(body)` nothing else watches `<head>`), and counts them
+  as outside changes; a pass handles queued records before it stops
+  observing instead of discarding them. This was `verify-iframe-mount`'s
+  WebKit failure of "a width change is recomposed" on GitHub's macos-15
+  runners: 20 of 60 runs of 4.3.0 in a repeat loop (Nightly 36506714283
+  and 36508950284), none of 60 with the fix. Its new checks, which widen a
+  block by its style attribute and by a stylesheet from the page's
+  `requestAnimationFrame`, failed 4.3.0 in every run there (60 of 60 and
+  30 of 30).
+- **A React block just below the fold of a scroll pane no longer paints
+  native lines for a frame when the page scrolls right after mounting.**
+  `TypesetText` and `TypesetRichText` compose the blocks within a viewport
+  height of the screen, or of the scroll container they scroll in, before
+  they come on screen. They learned which blocks those were from an
+  IntersectionObserver, whose first report comes in a task after the next
+  rendering update. A page that scrolled from its own
+  `requestAnimationFrame` in the first frame or two after mounting (an app
+  shell's `overflow:auto` pane, restored or flicked as the screen appears)
+  brought the first block below the fold on screen before that report, and
+  the block painted native lines and was rewrapped a frame later. Until the
+  observer first reports on a block, the adapters now judge its nearness
+  from its box, which they read each frame anyway, as the observer would:
+  against the scroll container's box, or the window's, grown by its height.
+  `verify-scheduler`'s "TypesetText in an overflow:auto scroller, scrolled
+  in 0 ms after mounting" failed with this flash in every WebKit run on
+  GitHub's macos-15 runners (19 of 19, always one frame of block 1), in 2 of
+  6 staged 4.3.0 release-cut runs on the maintainer's M2 Pro in Chromium,
+  and in 4 of 20 Chromium runs of the same page there before this fix.
+  Scrolled from the first frame after mounting, 4.3.0 flashed the block in
+  every run in all three engines (15 of 15). With the fix, none flashed in
+  56 probe runs of that page (scrolled in the first frame or after a 0 ms
+  timer, 8 of them at 4x CPU) or in 11 full `verify-scheduler` runs.
+  Blocks that 4.3.0 composed in the second frame after mounting, once the
+  observer reported them near, may now compose in the first, within the
+  same 12 ms frame budget; what they compose is unchanged. A block that the
+  budget leaves for the second frame, because the first frame's on-screen
+  work used it up, still flashes when the page scrolls it in from the frame
+  after mounting: with five blocks on screen in the same pane, in every
+  run in the three engines (12 of 12, as with 4.3.0, which also flashed a
+  second block in 4 of them), and in none scrolled after a 0 ms timer
+  (4.3.0: 2 of 4 in Chromium). SUPPORT.md's known limitation, which 4.3.0
+  gave as "text scrolled into view during its first frames, in Chromium",
+  now describes that case.
+
+### Known limitations
+
+- A block just below a scroll pane's fold that the first frame's budget
+  leaves for the second frame still paints native lines for one frame when
+  the page scrolls it in from the frame after mounting (see the fix above,
+  and SUPPORT.md). `priority="sync"` composes a block in its commit
+  instead. Planned for 4.4.
+- 4.3.0's other known limitations stand; SUPPORT.md lists them.
+
+### Development
+
+- `verify-mount-ownership` judges "settled" as 500 ms with no pass and no
+  change to the markup, reached within 3 s, instead of one sample 250 ms
+  after the change. Firefox on a hosted runner once made the resize's single
+  pass later than 250 ms (CI 36521588100: passes 1 then 2), which the sample
+  read as a rewrite. Controllers that keep rewriting still fail.
+- `verify-package-contents` allows 1.91 MB unpacked instead of 1.9 MB. The
+  fixes above take the package from 1.88 MB (4.3.0) to 1.90 MB (1,902,907
+  bytes, 87 files): the iframe record handling in every copy of `mount()`,
+  the React registry's hold-off rules in both React builds, and the notes
+  on them in SUPPORT.md and MIGRATION.md.
+- The storm check's 60-frame text-size slider is enforced on GitHub's
+  hosted runners again. Its speed-calibrated entry, added after 65
+  compositions against a limit of 64 in macos-15 run 36284847012, blamed
+  the wall-clock hold-off window fixed above. On the M2 Pro the slider made
+  28 to 39 compositions and 2 long tasks in 8 runs, and 25 or 26
+  compositions at 6x to 12x CPU.
+- `verify-iframe-mount` reports what a failed recomposition check saw: the
+  block's outcome, stale mark, lines against breaks and widths, the
+  controller's passes and compositions, and a timeline of layout, record
+  delivery and writes. Each pass starts from a 420 px iframe; the
+  `mount(body)` pass used to inherit the first pass's 260 px, so its "iframe
+  resize" step resized nothing. Two new checks widen a block, by its style
+  attribute and by a stylesheet, from the page's `requestAnimationFrame` in
+  the frame after a composition, where WebKit delivers the record after
+  layout; Chromium and Firefox deliver it first and pass either way.
+- `verify-scheduler`'s scroll-pane check also scrolls from the frame after
+  mounting, where 4.3.0 painted the block below the fold native in every
+  run in the three engines, and reports which frames flashed.
+- The WebKit speed-calibrated entry for `verify-scheduler`'s "TypesetText
+  in an overflow:auto scroller, scrolled in 0 ms after mounting" is removed,
+  so GitHub's hosted runners enforce it again. It failed there in every
+  run with the same one-frame flash of the same block, which was the race
+  fixed above, not speed.
+- `verify-scheduler`'s scroll-pane checks read whether every block ended
+  composed, and the pane's observer released, once the check's frames stop,
+  and report the blocks still waiting when its 2 s watch ended. The watch's
+  own animation frame leaves every idle period too short for the adapters'
+  idle work, so the two blocks more than a pane height below the fold
+  compose on 1 s idle timeouts in Chromium and Firefox, and the second
+  composed 37 to 48 ms before the watch ended on the M2 Pro; a hosted
+  Firefox run (CI 36478408446, attempt 1) ended it with a block still
+  waiting and no flash. Each frame is now compared with the lines as the
+  blocks end, so a block painted native through the watch and composed
+  after it still fails.
+
 ## 4.3.0 - 2026-09-26
 
 4.3.0 follows 4.2.0. It is a minor release: no public API was renamed or

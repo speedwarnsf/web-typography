@@ -14,8 +14,10 @@
 //   An app shell's overflow:auto pane: text below its fold is near when it
 //   is within a viewport height of the pane, so blocks scrolled in soon after
 //   they mount (an entrance animation keeping frames pending) paint composed,
-//   never native lines rewrapped a few frames later; with TypesetText, and
-//   with mount() once its first pass could have run. The nearest container
+//   never native lines rewrapped a few frames later, even when the page
+//   scrolls them in within the frame after mounting, before the pane's
+//   IntersectionObserver first reports; with TypesetText, and with mount()
+//   once its first pass could have run. The nearest container
 //   that scrolls is the text's scrollport from the time it registers, so
 //   FAQ answers in closed <details>, text pushed down by content loaded
 //   above it and the rows of a virtualized list placed with a transform
@@ -542,11 +544,38 @@ for (const { name, engine, executablePath } of browsers) {
         result.band >= 2 && !!result.painted && result.painted.every(outcome => outcome.startsWith('composed')), result);
       await page.close();
     }
-    // Text in an overflow:auto scroller, scrolled in soon after it mounts.
+    // Text in an overflow:auto scroller, scrolled in soon after it mounts:
+    // from an animation frame requested right after mounting (delay -1: the
+    // first frame, after the adapters' own frame work), from one requested
+    // after a 0 ms timer (the first or the second frame, as the timer and the
+    // frame fall), and 300 ms on. The first block below the pane's fold comes
+    // on screen in the first scroll frame. The pane's IntersectionObserver
+    // first reports in a task after a rendering update, and until 4.3.1 the
+    // adapters knew no block below the fold was near before that report: in
+    // the first frame, and in the second when the report came late, block 1
+    // painted native lines and was rewrapped a frame later (delay -1: every
+    // run in the three engines on the M2 Pro; delay 0: every WebKit run on
+    // GitHub's macos-15 runners, and 4 of 20 Chromium runs on the M2 Pro).
     // mount() composes nothing before the page's first paint, so its text is
     // scrolled in once its first pass could have run.
+    // The frames are watched for 2 s after the scroll. The watcher's own
+    // animation frame runs throughout, which leaves every idle period shorter
+    // than the adapters' LONG_IDLE_MS, so the blocks more than a pane height
+    // below its fold after the scroll (10 and 11 at 400 x 700) compose on
+    // idle timeouts, one per IDLE_TIMEOUT_MS (1 s), by design (WebKit, with
+    // no idle callbacks, uses a timer). In Chromium and Firefox on the M2 Pro
+    // block 11 composed 2,083 to 2,156 ms after mounting, 37 to 48 ms before
+    // the watch ended, and a hosted runner once ended the watch with a block
+    // still waiting (Firefox, CI 36478408446 attempt 1: composed 11, no
+    // flash, the pane's observer still observing). Neither block is on screen
+    // or within a pane height of it, so neither can flash. Whether every
+    // block ends composed, and the pane's observer released, is read once
+    // the watcher's frames stop (up to 3 s more), and the blocks still
+    // waiting when the watch ended are reported. Each frame's lines are
+    // compared with the lines as they end then, so a block painted native
+    // through the watch and composed after it is still a flash.
     for (const kind of ['react', 'mount']) {
-      for (const delay of kind === 'react' ? [0, 300] : [300]) {
+      for (const delay of kind === 'react' ? [-1, 0, 300] : [300]) {
         const page = await browser.newPage({ viewport: { width: 400, height: 700 } });
         page.setDefaultTimeout(20000);
         await page.setContent(nestedPage);
@@ -598,18 +627,27 @@ for (const { name, engine, executablePath } of browsers) {
           const hero = /** @type {HTMLElement} */ (document.getElementById('hero'));
           const animate = () => { const p = (performance.now() - t0) / 700; hero.style.transform = `translateY(${Math.round(20 * (1 - Math.min(1, p)))}px)`; if (p < 1) requestAnimationFrame(animate); };
           requestAnimationFrame(animate);
-          await new Promise(r => setTimeout(r, Math.max(0, delay - (performance.now() - t0))));
+          if (delay >= 0) await new Promise(r => setTimeout(r, Math.max(0, delay - (performance.now() - t0))));
           const scroller = /** @type {HTMLElement} */ (document.getElementById('scroller'));
           armed = true; requestAnimationFrame(frame);
           await new Promise(resolve => { let k = 0; const step = () => { scroller.scrollTop += 80; if (++k < 6) requestAnimationFrame(step); else resolve(undefined); }; requestAnimationFrame(step); });
           await new Promise(r => setTimeout(r, 2000));
           armed = false;
-          const final = [...document.querySelectorAll('.r')].map(el => lines(el));
+          const blocks = () => /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.r')]);
+          // Blocks not yet composed as the watch ends, by how far their top is
+          // below the pane's fold, in pane heights.
+          const pane = scroller.getBoundingClientRect();
+          const waiting = blocks().map((el, i) => ({ i, el })).filter(({ el }) => !el.dataset.tsOutcome)
+            .map(({ i, el }) => ({ i, panes: Math.round((el.getBoundingClientRect().top - pane.bottom) / pane.height * 100) / 100 }));
+          for (let k = 0; k < 60 && !blocks().every(el => el.dataset.tsOutcome); k++) await new Promise(r => setTimeout(r, 50));
+          // Lines as they end, so a block painted native throughout the watch
+          // and composed only after it still counts as a flash.
+          const final = blocks().map(el => lines(el));
           const flashes = painted.flatMap((blocks, f) => blocks.filter(b => b.lines !== final[b.i]).map(b => ({ frame: f, block: b.i })));
-          return { frames: painted.length, flashFrames: new Set(flashes.map(x => x.frame)).size, flashBlocks: [...new Set(flashes.map(x => x.block))], composed: [...document.querySelectorAll('.r')].filter(el => /** @type {HTMLElement} */ (el).dataset.tsOutcome).length,
+          return { frames: painted.length, flashFrames: new Set(flashes.map(x => x.frame)).size, flashAt: [...new Set(flashes.map(x => x.frame))].slice(0, 4), flashBlocks: [...new Set(flashes.map(x => x.block))], waiting, composed: blocks().filter(el => el.dataset.tsOutcome).length,
             rootedObservers: w.rootedObservers.length, liveRootedObservers: w.rootedObservers.filter((/** @type {any} */ o) => o.live).length };
         }, { kind, delay });
-        check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller, scrolled in ${delay} ms after mounting: no block paints native lines and is rewrapped`, result.flashFrames === 0 && result.frames > 0 && result.composed === 12, result);
+        check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller, scrolled in ${delay < 0 ? 'the frame' : `${delay} ms`} after mounting: no block paints native lines and is rewrapped`, result.flashFrames === 0 && result.frames > 0 && result.composed === 12, result);
         check(`${kind === 'react' ? 'TypesetText' : 'mount()'} in an overflow:auto scroller: the scroller's observer is released once nothing waits on it`, result.rootedObservers > 0 && result.liveRootedObservers === 0, result);
         await page.close();
       }

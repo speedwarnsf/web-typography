@@ -16,7 +16,7 @@ export interface LifecycleClient {
   translation?(active: boolean): void;
 }
 
-interface Hub { clients: Set<LifecycleClient>; faces: WeakSet<FontFace>; ready: boolean; translated: boolean; classed: boolean; stop: () => void }
+interface Hub { clients: Set<LifecycleClient>; faces: WeakSet<FontFace>; ready: boolean; translated: boolean; classed: boolean; stop: () => void; take: () => boolean }
 const hubs = new WeakMap<Document, Hub>();
 // On the document itself, so every engine copy on a page (a loader script and
 // a bundled React adapter, say) sees a translator's mark.
@@ -107,20 +107,35 @@ export function rendered(element: Element): boolean {
 }
 
 /** Watches whether elements are within a viewport height of what shows them. */
-export interface NearObserver { observe(element: Element): void; unobserve(element: Element): void; disconnect(): void }
+export interface NearObserver {
+  observe(element: Element): void; unobserve(element: Element): void; disconnect(): void;
+  /** Until the observer first reports on an observed element, whether its
+   * box (read by the caller, before any write) is within a viewport height of
+   * what shows it; false once it has reported, or if it has no box. */
+  nearBeforeReport(element: Element, box: DOMRectReadOnly): boolean;
+}
 /** IntersectionObservers that report an element within a viewport height of
  * what shows it: the window, or the nearest scroll container it scrolls in.
  * An app shell's overflow:auto pane clips its content, and a root margin on
  * the window does not reach past that clip, so text below the fold there
  * was never near until it was on screen. One observer per scrollport, held
  * only while it observes something, so a scroll container a route removed
- * is not kept alive; an element's scrollport is found once. Null without
+ * is not kept alive; an element's scrollport is found once. The first report
+ * on an element comes in a task after the next rendering update, and a
+ * page's own animation frame can scroll the element in before it, so until
+ * then nearBeforeReport answers from the element's box. Null without
  * IntersectionObserver. */
 export function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null {
   const view = doc.defaultView as (Window & typeof globalThis) | null;
   if (!view || typeof view.IntersectionObserver !== 'function') return null;
   const observers = new Map<Element | null, { observer: IntersectionObserver; targets: Set<Element> }>();
   const roots = new WeakMap<Element, Element | null>();
+  // Observed elements not reported on yet.
+  const unreported = new Set<Element>();
+  const reported = (entries: IntersectionObserverEntry[]) => {
+    for (const entry of entries) unreported.delete(entry.target);
+    callback(entries);
+  };
   const scrollport = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
       const cs = view.getComputedStyle(node);
@@ -133,11 +148,13 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
       let root = roots.get(element);
       if (root === undefined) { root = scrollport(element); roots.set(element, root); }
       let entry = observers.get(root);
-      if (!entry) { entry = { observer: new view.IntersectionObserver(callback, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      if (!entry) { entry = { observer: new view.IntersectionObserver(reported, { root, rootMargin: '100% 0px' }), targets: new Set() }; observers.set(root, entry); }
+      if (!entry.targets.has(element)) unreported.add(element);
       entry.observer.observe(element);
       entry.targets.add(element);
     },
     unobserve(element) {
+      unreported.delete(element);
       const root = roots.get(element);
       const entry = root === undefined ? undefined : observers.get(root);
       if (!entry) return;
@@ -146,7 +163,16 @@ export function nearObserver(doc: Document, callback: (entries: IntersectionObse
       // The window's observer stays; a scroll container's goes with its last target.
       if (root && !entry.targets.size) { entry.observer.disconnect(); observers.delete(root); }
     },
-    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); },
+    disconnect() { for (const entry of observers.values()) entry.observer.disconnect(); observers.clear(); unreported.clear(); },
+    nearBeforeReport(element, box) {
+      if (!unreported.has(element) || !(box.width > 0 && box.height > 0)) return false;
+      // As the observer computes it: the scrollport's box, or the window's,
+      // grown by its own height above and below ('100% 0px').
+      const root = roots.get(element);
+      const port = root ? root.getBoundingClientRect() : { top: 0, bottom: view.innerHeight, left: 0, right: view.innerWidth };
+      const margin = port.bottom - port.top;
+      return box.bottom >= port.top - margin && box.top <= port.bottom + margin && box.right >= port.left && box.left <= port.right;
+    },
   };
 }
 
@@ -172,7 +198,7 @@ export function armFonts(doc: Document): void {
 
 function start(doc: Document): Hub {
   const view = doc.defaultView;
-  const hub: Hub = { clients: new Set(), faces: new WeakSet(), ready: false, translated: translationActive(doc), classed: translatedClass(doc), stop: () => {} };
+  const hub: Hub = { clients: new Set(), faces: new WeakSet(), ready: false, translated: translationActive(doc), classed: translatedClass(doc), stop: () => {}, take: () => false };
   const resize = () => notify(hub, client => client.resize?.());
   const fonts = () => { notify(hub, client => client.fonts?.()); armFonts(doc); };
   const loading = () => armFonts(doc);
@@ -187,11 +213,13 @@ function start(doc: Document): Hub {
   };
   // Stylesheets arrive and switch without touching composed text: a late
   // @font-face, a text-spacing bookmarklet, a theme <link media>.
-  const observer = new MutationObserver(records => {
+  const signal = (record: MutationRecord) => record.target === doc.documentElement && record.type === 'attributes' ? 'class' : styleMutation(record) ? 'styles' : '';
+  const handle = (records: MutationRecord[]) => {
     let styles = false, rootClass = false;
     for (const record of records) {
-      if (record.target === doc.documentElement && record.type === 'attributes') rootClass = true;
-      else if (styleMutation(record)) styles = true;
+      const kind = signal(record);
+      if (kind === 'class') rootClass = true;
+      else if (kind === 'styles') styles = true;
     }
     if (rootClass) {
       const classed = translatedClass(doc);
@@ -202,7 +230,26 @@ function start(doc: Document): Hub {
       if (now !== hub.translated) { hub.translated = now; notify(hub, client => client.translation?.(now)); }
     }
     if (styles) { notify(hub, client => client.styles?.()); armFonts(doc); }
-  });
+  };
+  const observer = new MutationObserver(handle);
+  // Records taken from the queue (see signalQueued), handled in the next
+  // task, and whether any is a signal: every controller whose
+  // ResizeObserver delivers in this frame asks, and the first takes them.
+  let taken: MutationRecord[] = [], signalled = false;
+  let takenTimer: ReturnType<typeof setTimeout> | undefined;
+  hub.take = () => {
+    const records = observer.takeRecords();
+    if (records.length) {
+      taken = taken.concat(records);
+      if (records.some(record => signal(record) !== '')) signalled = true;
+      if (takenTimer === undefined) takenTimer = setTimeout(() => {
+        const batch = taken;
+        taken = []; signalled = false; takenTimer = undefined;
+        if (hubs.get(doc) === hub) handle(batch);
+      }, 0);
+    }
+    return signalled;
+  };
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class'] });
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
   const faces = doc.fonts as FontFaceSet | undefined;
@@ -228,6 +275,16 @@ function start(doc: Document): Hub {
     doc.removeEventListener('contentvisibilityautostatechange', visibility, true);
   };
   return hub;
+}
+
+/** Whether a stylesheet or root class change is still queued: made, and
+ * laid out, but not yet delivered to the hub's MutationObserver. WebKit
+ * delivers the records of a mutation that an about:blank page makes in its
+ * same-origin iframe after that frame's ResizeObserver callbacks, which call
+ * this. The records are taken and handled in the next task, since those
+ * callbacks must not write; until then every caller is told of them. */
+export function signalQueued(doc: Document): boolean {
+  return hubs.get(doc)?.take() ?? false;
 }
 
 /** Receive this document's lifecycle signals until the returned function runs. */

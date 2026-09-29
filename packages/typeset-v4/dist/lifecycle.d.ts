@@ -42,6 +42,10 @@ export interface NearObserver {
     observe(element: Element): void;
     unobserve(element: Element): void;
     disconnect(): void;
+    /** Until the observer first reports on an observed element, whether its
+     * box (read by the caller, before any write) is within a viewport height of
+     * what shows it; false once it has reported, or if it has no box. */
+    nearBeforeReport(element: Element, box: DOMRectReadOnly): boolean;
 }
 /** IntersectionObservers that report an element within a viewport height of
  * what shows it: the window, or the nearest scroll container it scrolls in.
@@ -49,12 +53,22 @@ export interface NearObserver {
  * the window does not reach past that clip, so text below the fold there
  * was never near until it was on screen. One observer per scrollport, held
  * only while it observes something, so a scroll container a route removed
- * is not kept alive; an element's scrollport is found once. Null without
+ * is not kept alive; an element's scrollport is found once. The first report
+ * on an element comes in a task after the next rendering update, and a
+ * page's own animation frame can scroll the element in before it, so until
+ * then nearBeforeReport answers from the element's box. Null without
  * IntersectionObserver. */
 export declare function nearObserver(doc: Document, callback: (entries: IntersectionObserverEntry[]) => void): NearObserver | null;
 /** Re-arm font notifications. WebKit fires no loading events for fonts a
  * stylesheet requests, so every face still loading is watched directly. */
 export declare function armFonts(doc: Document): void;
+/** Whether a stylesheet or root class change is still queued: made, and
+ * laid out, but not yet delivered to the hub's MutationObserver. WebKit
+ * delivers the records of a mutation that an about:blank page makes in its
+ * same-origin iframe after that frame's ResizeObserver callbacks, which call
+ * this. The records are taken and handled in the next task, since those
+ * callbacks must not write; until then every caller is told of them. */
+export declare function signalQueued(doc: Document): boolean;
 /** Receive this document's lifecycle signals until the returned function runs. */
 export declare function subscribe(doc: Document, client: LifecycleClient): () => void;
 /** Hooks for authors and for the engine's own transient states:

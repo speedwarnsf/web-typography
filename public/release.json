@@ -1,17 +1,17 @@
 {
-  "version": "4.3.0",
-  "previous": "4.2.0",
-  "previousBrowserPin": "4.2.0",
-  "package": "typeset.us@4.3.0",
-  "download": "/releases/4.3.0/typeset.us-4.3.0.tgz",
-  "archive": "/releases/4.2.0/README.md",
-  "manifest": "/releases/4.3.0/manifest.json",
+  "version": "4.3.1",
+  "previous": "4.3.0",
+  "previousBrowserPin": "4.3.0",
+  "package": "typeset.us@4.3.1",
+  "download": "/releases/4.3.1/typeset.us-4.3.1.tgz",
+  "archive": "/releases/4.3.0/README.md",
+  "manifest": "/releases/4.3.1/manifest.json",
   "loader": {
-    "url": "/go@4.3.0.js",
-    "integrity": "sha384-yHVZ46QyyOffm12e72GsBgkcZ96FcCaqK7POZ5/BGDkmfjEZ1dLV81vmBvCusTUX",
-    "bytes": 143160,
-    "gzipBytes": 56071,
-    "npm": "typeset.us@4.3.0/dist/auto.js"
+    "url": "/go@4.3.1.js",
+    "integrity": "sha384-PQvP42IgERdCbNk9MWI9BkD7n+k1WbL6ImFN3cAMbXQq25PhdJynmVXQM0UB3ksB",
+    "bytes": 144219,
+    "gzipBytes": 56515,
+    "npm": "typeset.us@4.3.1/dist/auto.js"
   },
   "aliases": {
     "/go@4.js": "latest 4.x; no integrity hash",
