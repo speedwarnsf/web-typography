@@ -375,11 +375,22 @@ changes only an isolated preview, never a deployed site.
   correct: each block paints its composed lines or native ones, never
   double-wrapped. On an app root, `overflow-x: clip` clips the same way
   without making a scroll container. Planned for 4.4.
-- **Text scrolled into view during its first frames, in Chromium.** A
-  block that a scroll brings on screen within its first frames after it
-  mounts can paint its native lines for one frame and rewrap in the next
-  (8 of 20 runs in the test fixture; Firefox and WebKit 0 of 8). 4.2.0 did
-  not do this. Planned for 4.4.
+- **Text scrolled on screen in the frame after it mounts, below a full
+  first frame.** Before the first paint, `TypesetText` and
+  `TypesetRichText` compose the blocks on screen, then those within a
+  viewport height below the fold (of the window, or of the pane they scroll
+  in) while the frame's 12 ms budget lasts. A page that scrolls from its own
+  `requestAnimationFrame` right after mounting moves text after that work,
+  so a block just below the fold that the budget left for the next frame
+  paints its native lines for one frame and rewraps in the next. In the
+  test fixture (a 700 px pane scrolled 80 px a frame from the frame after
+  mounting) that happens in every run in all three engines when five
+  blocks are on screen, and in none when one is; scrolled after a 0 ms
+  timer, in none either way. 4.3.0 did it in every run from the frame after
+  mounting, sometimes to a second block, and in some runs after a 0 ms
+  timer (Chromium; every run on GitHub's macOS runners in WebKit).
+  `priority="sync"` composes a block in its commit instead. Planned for
+  4.4.
 - **A very long unbreakable run, in WebKit.** Measuring a paragraph reads
   each word's boxes, and a word the browser splits across lines is read one
   character at a time, so that each character counts on its own line.

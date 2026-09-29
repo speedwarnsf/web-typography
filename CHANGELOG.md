@@ -85,7 +85,15 @@ Planned as 4.3.1. Not published.
   timer, 8 of them at 4x CPU) or in 11 full `verify-scheduler` runs.
   Blocks that 4.3.0 composed in the second frame after mounting, once the
   observer reported them near, may now compose in the first, within the
-  same 12 ms frame budget; what they compose is unchanged.
+  same 12 ms frame budget; what they compose is unchanged. A block that the
+  budget leaves for the second frame, because the first frame's on-screen
+  work used it up, still flashes when the page scrolls it in from the frame
+  after mounting: with five blocks on screen in the same pane, in every
+  run in the three engines (12 of 12, as with 4.3.0, which also flashed a
+  second block in 4 of them), and in none scrolled after a 0 ms timer
+  (4.3.0: 2 of 4 in Chromium). SUPPORT.md's known limitation, which 4.3.0
+  gave as "text scrolled into view during its first frames, in Chromium",
+  now describes that case.
 
 ### Development
 
