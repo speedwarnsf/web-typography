@@ -9,13 +9,6 @@
       "observed": "macos-15 run 36258432379: TypesetText 13 of 16 on-screen blocks uncomposed in the first frame. ubuntu-latest run 36255458992: TypesetText 16 of 19, TypesetRichText 4 of 19. M2 Pro: 0."
     },
     {
-      "script": "verify-scheduler",
-      "label": "^TypesetText in an overflow:auto scroller, scrolled in 0 ms after mounting: no block paints native lines and is rewrapped$",
-      "browser": "webkit",
-      "reason": "Whether the scroll lands before the visible blocks' first composition finishes is timing.",
-      "observed": "macos-15 run 36258432379: 1 flash frame (1 block) in 125 frames. M2 Pro: 0."
-    },
-    {
       "script": "verify-framework-text",
       "label": ": recomposes after updates with no audit error$",
       "reason": "The audit samples each block 260 ms after the fifth update; on a hosted runner the first recomposition can take longer, so the sample catches it in progress (stale-layout, stale-output). Every later sample is clean.",

@@ -107,6 +107,11 @@ Planned as 4.3.1. Not published.
 - `verify-scheduler`'s scroll-pane check also scrolls from the frame after
   mounting, where 4.3.0 painted the block below the fold native in every
   run in the three engines, and reports which frames flashed.
+- The WebKit speed-calibrated entry for `verify-scheduler`'s "TypesetText
+  in an overflow:auto scroller, scrolled in 0 ms after mounting" is removed,
+  so GitHub's hosted runners enforce it again. It failed there in every
+  run with the same one-frame flash of the same block, which was the race
+  fixed above, not speed.
 
 ## 4.3.0 - 2026-09-26
 
