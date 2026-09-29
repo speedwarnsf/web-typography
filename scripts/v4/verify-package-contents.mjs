@@ -61,7 +61,13 @@ try {
   check('exports ./auto -> dist/auto.js with the loader globals\' types (go.d.ts), packed', pkg.exports?.['./auto']?.default === './dist/auto.js' && pkg.exports?.['./auto']?.types === './dist/go.d.ts'
     && files.has('dist/auto.js') && files.has('dist/go.d.ts') && pkg.typesVersions?.['*']?.auto?.[0] === 'dist/go.d.ts', { auto: pkg.exports?.['./auto'], typesVersions: pkg.typesVersions });
   check('dist/auto.js is side-effectful (never tree-shaken away)', pkg.sideEffects?.includes('./dist/auto.js'), pkg.sideEffects);
-  check('bare jsDelivr and unpkg URLs serve the browser global, not CommonJS', pkg.jsdelivr === './dist/typeset.global.js' && pkg.unpkg === './dist/typeset.global.js' && files.has('dist/typeset.global.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // 4.4: a bare CDN URL does what a newcomer expects, the automatic loader
+  // (4.3 served the API-only browser global, which composes nothing).
+  check('bare jsDelivr and unpkg URLs serve the automatic loader (dist/auto.js), not CommonJS', pkg.jsdelivr === './dist/auto.js' && pkg.unpkg === './dist/auto.js' && files.has('dist/auto.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // ./opt-in names what ./go does (compose only [data-typeset]); ./go stays
+  // as a deprecated alias of the same file until at least 5.0.
+  check('exports ./opt-in and ./go resolve to the same file and types (dist/go.js, go.d.ts), packed', ['./opt-in', './go'].every(entry => pkg.exports?.[entry]?.default === './dist/go.js' && pkg.exports?.[entry]?.types === './dist/go.d.ts')
+    && files.has('dist/go.js') && pkg.typesVersions?.['*']?.['opt-in']?.[0] === 'dist/go.d.ts' && pkg.typesVersions?.['*']?.go?.[0] === 'dist/go.d.ts', { optIn: pkg.exports?.['./opt-in'], go: pkg.exports?.['./go'], typesVersions: pkg.typesVersions });
   const siteGo = artifacts.siteGo;
   if (files.has('dist/auto.js')) {
     const [auto, site] = await Promise.all([readFile(`${staged.dir}/dist/auto.js`), readFile(siteGo)]);
@@ -113,8 +119,14 @@ try {
   // eight new declaration files (coverage, language, loader-notes and
   // hidden-inline, .d.ts and .d.cts, 7.0 KB), the options' JSDoc in the
   // other declarations, and capabilities.json, OUTCOMES.md and README.md
-  // (about +4 KB together).
-  check('unpacked package is under 2.01 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2010000, packed.unpackedSize);
+  // (about +4 KB together). The E3 integration fixes added 19,878 B on E1
+  // (measured alone): the hydration wait in go.js and auto.js (+2.2 KB each,
+  // whenSettled() included) and go.js.map (+3.8 KB), whenSettled() and its
+  // work tracking in index.cjs, react.cjs and the ESM chunk (+1.7 KB each),
+  // typeset.global.js (+0.8 KB) and its map (+1.5 KB), settled.d.ts and
+  // .d.cts (+0.8 KB each), and capabilities.json's whenSettled, hydration and
+  // entry-point facts (+2.1 KB).
+  check('unpacked package is under 2.03 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2030000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];

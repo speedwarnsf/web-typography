@@ -65,8 +65,8 @@ for (const [major, types] of /** @type {const} */ ([['18', join(env.modules, '@t
   await mkdir(join(consumer, 'node_modules/typeset.us'), { recursive: true });
   await cp(declarations, join(consumer, 'node_modules/typeset.us/dist'), { recursive: true });
   await copyFile('packages/typeset-v4/package.json', join(consumer, 'node_modules/typeset.us/package.json'));
-  for (const [entry, body] of /** @type {const} */ ([['auto', 'const c = await window.TypesetReady; c.refresh(); window.Typeset.auditJSON();'],
-    ['go', 'const c = await window.TypesetReady; c.disconnect(); window.Typeset.auditJSON();'], ['global', 'window.Typeset.typeset(document.body);']])) {
+  for (const [entry, body] of /** @type {const} */ ([['auto', 'const c = await window.TypesetReady; c.refresh(); window.Typeset.auditJSON(); const s: boolean = (await window.Typeset.whenSettled({ timeout: 5000 })).settled; void s;'],
+    ['go', 'const c = await window.TypesetReady; c.disconnect(); window.Typeset.auditJSON();'], ['opt-in', 'const c = await window.TypesetReady; c.refresh(); await window.Typeset.whenSettled();'], ['global', 'window.Typeset.typeset(document.body);']])) {
     await writeFile(join(consumer, `${entry}.ts`), `import 'typeset.us/${entry}';\n${body}\nexport {};\n`);
     await writeFile(join(consumer, `tsconfig.${entry}.json`), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, skipLibCheck: false, target: 'es2022', module: 'esnext', moduleResolution: 'bundler', lib: ['es2022', 'dom'], types: [] }, files: [`${entry}.ts`] }, null, 2));
     const run = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(consumer, `tsconfig.${entry}.json`)], { encoding: 'utf8', timeout: 120000 });
@@ -99,6 +99,7 @@ for (const major of ['18', '19']) {
     check(`${lane}: the text stays readable, links and emphasis included`, seen.rendered?.text === text && seen.rendered?.rich === 'Hello world, with a link.' && seen.rendered?.richLink && seen.updated === 'Updated text.', seen.rendered);
     check(`${lane}: both adapters report native:environment, to the DOM and onResult`, seen.rendered?.textOutcome === 'native:environment' && seen.rendered?.richOutcome === 'native:environment'
       && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'text' && r[1] === 'native:environment') && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'rich' && r[1] === 'native:environment'), { rendered: seen.rendered, results: seen.results });
+    check(`${lane}: whenSettled() from typeset.us and typeset.us/react resolves { settled: true } at once`, seen.settled?.core === true && seen.settled?.react === true && seen.settled.ms < 200, seen.settled);
     check(`${lane}: refs resolve to the host elements`, seen.refs?.text && seen.refs?.rich, seen.refs);
     check(`${lane}: typeset(), mount() and auditJSON() report native:environment and do not throw`, seen.typeset === 'native:environment' && seen.mount === 'native:environment' && seen.audit === 'boolean', seen);
     check(`${lane}: auditJSON() adds an uncomposed review item naming native:environment (4.4)`, seen.auditUncomposed === true, seen.auditUncomposed);

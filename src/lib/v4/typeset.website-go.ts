@@ -1,3 +1,4 @@
+import { afterHydration } from './hydration';
 import * as api from './typeset.release';
 import { loaderNotes } from './loader-notes';
 
@@ -29,6 +30,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => resolve(), { once: true });
     else resolve();
   }).then(async () => {
+    // On a server-rendered page, after the framework hydrates (hydration.ts).
+    await afterHydration(document, selector, script?.dataset.typesetDefer);
     const controller = api.mount(document, selector, options);
     await controller.ready;
     if (!document.querySelector(selector)) console.info('typeset.us auto loader: no element matches ' + requested + ', so nothing was composed. New matches are composed as they appear.');

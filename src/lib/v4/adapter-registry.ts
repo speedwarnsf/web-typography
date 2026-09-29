@@ -41,6 +41,7 @@ import { mountOwners, releaseOwner } from './ownership';
 import { canCompose, canMaintain } from './environment';
 import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, styleMutation, subscribe, translationActive } from './lifecycle';
 import type { NearObserver } from './lifecycle';
+import { trackWork } from './settled';
 
 export type Priority = 'auto' | 'sync';
 export type Reason = 'mount' | 'force' | 'check';
@@ -171,6 +172,7 @@ function createRegistry(doc: Document): Registry {
   let started = false;
   let windowWidth = win?.innerWidth ?? 0;
   let unsubscribe: (() => void) | undefined;
+  let untrack: (() => void) | undefined;
 
   // The adapters render synchronously in test runners, so a DOM emulation
   // (no layout yet or ever) is answered at once rather than queued.
@@ -624,12 +626,15 @@ function createRegistry(doc: Document): Registry {
       visibility: target => check(target), translation: translated });
     (doc.fonts as FontFaceSet | undefined)?.ready?.then(() => { if (entries.size) check(); });
     armFonts(doc);
+    // For whenSettled(): hosts waiting to compose, or a resize settling.
+    untrack = trackWork(() => pending.size > 0 || resizing.size > 0 || settle !== undefined || staleQueued);
   }
   function stop(): void {
     started = false;
     mutations?.disconnect(); observer?.disconnect(); viewport?.disconnect();
     mutations = observer = viewport = null;
     unsubscribe?.(); unsubscribe = undefined;
+    untrack?.(); untrack = undefined;
     clearTimeout(settle); settle = undefined;
     pending.clear(); near.clear(); resizing.clear(); continuous.clear(); idleSince = 0;
   }
