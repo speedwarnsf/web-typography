@@ -54,12 +54,14 @@ export default function UtilityPage() {
           <CodeBlock
             code={PINNED_SNIPPET}
             title={`go@${PINNED_VERSION}.js — anywhere HTML runs, pinned`}
+            defaultOpen
           />
           {JSDELIVR_SNIPPET && (
             <div className="mt-6">
               <CodeBlock
                 code={JSDELIVR_SNIPPET}
                 title={`typeset.us@${PINNED_VERSION}/dist/auto.js — the same file from npm via jsDelivr, same hash`}
+                defaultOpen
               />
             </div>
           )}
