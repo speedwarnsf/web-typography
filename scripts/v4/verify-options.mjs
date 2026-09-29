@@ -18,8 +18,8 @@ const html = `<!doctype html><html lang="en"><body style="margin:0;font:17px/1.4
 
 // Each misuse and the warning it must print once.
 const misuses = [
-  ['{ smartQuotes: true }', '[typeset] smartQuotes must be "en" or false (received true)'],
-  ['{ smartQuotes: "EN" }', '[typeset] smartQuotes must be "en" or false (received "EN")'],
+  ['{ smartQuotes: true }', '[typeset] smartQuotes must be "en", "en-declared" or false (received true)'],
+  ['{ smartQuotes: "EN" }', '[typeset] smartQuotes must be "en", "en-declared" or false (received "EN")'],
   ['{ spacing: "false" }', '[typeset] spacing must be true or false (received "false")'],
   ['{ tracking: 1 }', '[typeset] tracking must be true or false (received 1)'],
   ['{ opticalHanging: "yes" }', '[typeset] opticalHanging must be true or false (received "yes")'],

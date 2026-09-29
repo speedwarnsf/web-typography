@@ -1,3 +1,5 @@
+import { languageOf } from './language';
+
 /** Leading elisions: an apostrophe that opens a word stands for dropped
  * letters, not an opening quote ('90s, 'tis, 'em, 'cause). */
 const elision = /^(?:\d{2}s\b|tis\b|twas\b|em\b|cause\b|til\b)/iu;
@@ -74,8 +76,14 @@ export function smartQuotes(text: string): string {
     const after = text[index + 1] || '';
     const opening = !before || /[\s([{\u2014\u2013\u201c\u2018]/u.test(before);
     if (quote === '"') {
-      if (opening && after && !/\s/u.test(after)) { doubleOpen = true; put('\u201c'); }
-      else if (/\d/u.test(before) && !doubleOpen) put(quote);
+      // Straight where it cannot be a quotation mark in English: with space
+      // (or the text's edge) on both sides, as French spaced quotes are
+      // written (4.3 made " Bonjour " two closing quotes); and where it would
+      // close no open quotation, as in width="100" (4.3 made the first one
+      // closing) or after a number (5'10", 27"), as before.
+      if ((!before || /\s/u.test(before)) && (!after || /\s/u.test(after))) put(quote);
+      else if (opening && after && !/\s/u.test(after)) { doubleOpen = true; put('\u201c'); }
+      else if (!doubleOpen) put(quote);
       else { doubleOpen = false; put('\u201d'); }
       continue;
     }
@@ -92,12 +100,22 @@ export function smartQuotes(text: string): string {
 
 export interface QuoteTransform { outcome: string; restore: () => void }
 
-/** Same-length edits preserve source offsets, and restoration respects external edits. */
-export function applySmartQuotes(element: HTMLElement): QuoteTransform {
+/** Whether quotes may be educated in text whose nearest lang is `tag`:
+ * text declared English, in any spelling (en, en-GB, en_US), and, unless
+ * `declared` (smartQuotes: 'en-declared'), untagged text. */
+export function englishScope(tag: string | null | undefined, declared: boolean): boolean {
+  const language = languageOf(tag);
+  return language === 'en' || (!declared && language === 'und');
+}
+
+/** Same-length edits preserve source offsets, and restoration respects
+ * external edits. `declared` educates only text an ancestor declares English
+ * (smartQuotes: 'en-declared', the auto loader's default); otherwise
+ * untagged text counts as English too. */
+export function applySmartQuotes(element: HTMLElement, declared = false): QuoteTransform {
   const skip = 'code, pre, kbd, samp, input, textarea, script, style, [data-no-typeset], [contenteditable]:not([contenteditable="false"])';
-  const lang = element.closest('[lang]')?.getAttribute('lang');
-  if ((lang && !/^en(?:-|$)/i.test(lang)) || element.matches(skip) || element.querySelector(skip)
-    || [...element.querySelectorAll('[lang]')].some(el => !/^en(?:-|$)/i.test(el.getAttribute('lang') || ''))) {
+  if (!englishScope(element.closest('[lang]')?.getAttribute('lang'), declared) || element.matches(skip) || element.querySelector(skip)
+    || [...element.querySelectorAll('[lang]')].some(el => languageOf(el.getAttribute('lang')) !== 'en')) {
     return { outcome: 'native:quotes-scope', restore: () => {} };
   }
   const source = element.textContent || '';

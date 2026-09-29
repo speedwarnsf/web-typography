@@ -119,7 +119,7 @@ attributes (last table).
 | `maxLines` | not set | Most lines a result may use; a longer one is declined (`native:line-budget`). |
 | `keep` | not set | Phrases to keep on one line, such as `['New York']`, matched ignoring case and surrounding punctuation. A phrase that fits the measure is never split; one the browser splits can earn one extra line (not with `density: 'compact'`). Titles keep phrases within their fewest lines. |
 | `lineBreaks` | `'unicode'` | Unicode 17 line-break rules with English, French, German and Spanish preferences from `lang`. `'legacy'` is the earlier English-only path, kept for comparison. |
-| `smartQuotes` | `false` | `'en'` turns straight quotes and apostrophes curly in English text. Changes the copied text. |
+| `smartQuotes` | `false` | `'en'` turns straight quotes and apostrophes curly in English text, declared or untagged. `'en-declared'` does so only where `lang` declares English. A quote with a space on both sides, or with no quotation to close (`width="100"`), stays straight. Changes the copied text. |
 | `opticalHanging` | `false` | `true` hangs opening quotes and capitals into the margin when they fit. |
 | `spacing` | `true` | Adjusts word spaces (-20% to +33%) on composed left-aligned body text to even the right edge. `false` also turns off `tracking`. |
 | `tracking` | `true` | Adjusts letter spacing by at most 0.01em per line after word spacing. |
@@ -145,7 +145,7 @@ installs them itself.
 | Script attribute | Default | What it does |
 | --- | --- | --- |
 | `data-typeset-selector` | all prose blocks (`auto`), `[data-typeset]` (`go`) | Which elements to set. |
-| `data-typeset-smart-quotes` | `"en"` (`auto`), off (`go`) | `"false"` turns quotes off; `"en"` turns them on. |
+| `data-typeset-smart-quotes` | `"en-declared"` (`auto`), off (`go`) | `"false"` turns quotes off; `"en"` also curls untagged text, as 4.3's `auto` did; `"en-declared"` curls only text declared English. |
 | `data-typeset-optical-hanging` | `"true"` (`auto`), off (`go`) | `"false"` or `"true"`. |
 | `data-typeset-spacing` | on | `"false"` turns off word spacing and tracking. |
 | `data-typeset-tracking` | on | `"false"` turns off tracking only. |

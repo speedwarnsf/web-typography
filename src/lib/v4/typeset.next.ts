@@ -4,7 +4,7 @@ import { composeTitle } from './title-layout';
 import { contentWidth, measureForAudit, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import { inLiveRegion, liveText, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
-import { applySmartQuotes, smartQuotes } from './smart-quotes';
+import { applySmartQuotes, englishScope, smartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
 import type { RichOutput, RichPlan } from './rich-text';
@@ -36,9 +36,12 @@ export interface Options {
    * kept for comparison; it is not identical to 3.x. */
   lineBreaks?: 'legacy' | 'unicode';
   /** Default `false`. `'en'` converts straight quotes and apostrophes to curly
-   * ones in declared-English text (quotes only; same length, so offsets and
-   * copying stay aligned). Changes the copied text. */
-  smartQuotes?: 'en' | false;
+   * ones in English text: declared English, or untagged (quotes only; same
+   * length, so offsets and copying stay aligned). `'en-declared'` converts
+   * them only where the element or an ancestor declares English (the auto
+   * loader's default), so an untagged German or French page keeps its
+   * quotes. Changes the copied text. */
+  smartQuotes?: 'en' | 'en-declared' | false;
   /** Default `false`. `true` hangs opening punctuation and measured capitals
    * into the left margin, reversibly, when the glyph fits inside any clip. */
   opticalHanging?: boolean;
@@ -467,9 +470,9 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     if (options.text !== undefined) {
       // TypesetText curls quotes as it renders: that text is current, and a
       // new value is written educated as it would be outside a region.
-      const curled = options.smartQuotes === 'en' ? smartQuotes(options.text) : options.text;
+      const curled = options.smartQuotes === 'en' || options.smartQuotes === 'en-declared' ? smartQuotes(options.text) : options.text;
       const lang = element.closest('[lang]')?.getAttribute('lang');
-      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = !lang || /^en(?:-|$)/i.test(lang) ? curled : options.text;
+      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = englishScope(lang, options.smartQuotes === 'en-declared') ? curled : options.text;
       authorTexts.set(element, options.text);
     }
     return { outcome: 'native:live-region', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
@@ -514,7 +517,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   }
   const rawMarkup = element.innerHTML;
   const restoreQuoteSelection = selectionBookmark(element);
-  const quotes = options.smartQuotes === 'en' ? applySmartQuotes(element) : undefined;
+  const quotes = options.smartQuotes === 'en' || options.smartQuotes === 'en-declared' ? applySmartQuotes(element, options.smartQuotes === 'en-declared') : undefined;
   restoreQuoteSelection();
   const source = element.textContent || '';
   const originalMarkup = element.innerHTML;

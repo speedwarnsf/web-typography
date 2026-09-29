@@ -12,7 +12,8 @@ import type { AdapterEntry, Priority } from './adapter-registry';
 export type { Priority } from './adapter-registry';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options, Result } from './typeset.next';
-import { smartQuotes } from './smart-quotes';
+import { englishScope, smartQuotes } from './smart-quotes';
+import { languageOf } from './language';
 import { planOpticalHanging, opticalMarkerStyle, opticalVerified } from './optical-hanging';
 import type { LayoutMetrics } from './layout-metrics';
 import type { OpticalHang } from './optical-hanging';
@@ -78,7 +79,7 @@ function quoteTreeSupported(children: ReactNode): boolean {
   let supported = true;
   Children.forEach(children, child => {
     if (!isValidElement<{ children?: ReactNode; lang?: string; 'data-no-typeset'?: unknown }>(child)) return;
-    if ((child.props.lang && !/^en(?:-|$)/i.test(child.props.lang)) || child.props['data-no-typeset'] !== undefined
+    if ((child.props.lang && languageOf(child.props.lang) !== 'en') || child.props['data-no-typeset'] !== undefined
       || (typeof child.type === 'string' && !['a', 'b', 'strong', 'em', 'i', 'span', 'small', 'u', 's', 'del', 'mark', 'abbr', 'cite'].includes(child.type))
       || !quoteTreeSupported(child.props.children)) supported = false;
   });
@@ -423,7 +424,7 @@ class RichText extends Component<RichProps, State> {
     if (!callback || !plan) return;
     const props = this.props;
     const mode: Mode = props.mode || (el.dataset.typesetMode as Mode | undefined) || (el.closest('h1,h2,h3,h4,h5,h6') ? 'title' : 'body');
-    const educate = props.smartQuotes === 'en' && /^en(?:-|$)/i.test(props.lang || '') && quoteTreeSupported(props.children);
+    const educate = (props.smartQuotes === 'en' || props.smartQuotes === 'en-declared') && englishScope(props.lang, true) && quoteTreeSupported(props.children);
     const result: Result = {
       // Nothing was measured for these; a long unbreakable run is not read now either.
       outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME || plan.outcome === 'native:run-budget' ? plan.before : measureLayout(el),
@@ -485,7 +486,10 @@ class RichText extends Component<RichProps, State> {
     const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
-    const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);
+    // Education happens during render, where an ancestor's lang is
+    // invisible: lang on the component must declare English, for 'en' and
+    // 'en-declared' alike.
+    const educate = (quotes === 'en' || quotes === 'en-declared') && englishScope(this.props.lang, true) && quoteTreeSupported(children);
     if (quotes === 'en' && !this.props.lang && !warnedQuotesLang && development()) {
       warnedQuotesLang = true;
       // Education happens during render, where an ancestor's lang is invisible.

@@ -9,7 +9,7 @@ import { assignRef, layoutKey, transformOnly } from './adapter-keys';
 import { ENVIRONMENT_OUTCOME } from './environment';
 import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
-import { smartQuotes as educate } from './smart-quotes';
+import { englishScope, smartQuotes as educate } from './smart-quotes';
 import { linesExtent } from './layout-metrics';
 import { selectionBookmark } from './rich-text';
 export { TypesetRichText } from './typeset-rich-react';
@@ -40,15 +40,19 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     else { if (refCleanup.current) refCleanup.current(); else assignRef(forwarded, null); refCleanup.current = undefined; }
   }, [forwarded]);
   const [initialText] = useState(text);
-  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy };
-  const report = useRef(onResult);
-  report.current = onResult;
   // Curl quotes during render, so server HTML, no-JS readers and crawlers get
   // them and hydration matches. Education is idempotent; typeset() still owns
-  // later text. An ancestor's lang is invisible here, so only a missing or
-  // English lang prop qualifies, as the DOM path's scope check would allow.
-  const curled = smartQuotes === 'en' && (!attributes.lang || /^en(?:-|$)/i.test(attributes.lang));
+  // later text. An ancestor's lang is invisible here, so only the lang prop
+  // counts: English, or with 'en' also none, as the DOM path's scope check
+  // would allow. 'en-declared' therefore needs lang on the component, and
+  // without it typeset() is not asked for quotes either: they would change
+  // after hydration.
+  const curled = (smartQuotes === 'en' || smartQuotes === 'en-declared') && englishScope(attributes.lang, smartQuotes === 'en-declared');
+  const quotes = smartQuotes === 'en-declared' && !curled ? false : smartQuotes;
+  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy };
+  const report = useRef(onResult);
+  report.current = onResult;
   // The text as it shows before composition: educated like the server HTML.
   const native = useRef('');
   native.current = curled ? educate(text) : text;

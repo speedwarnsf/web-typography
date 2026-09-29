@@ -11,7 +11,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   // with data-no-typeset.
   const selector = ':is(' + requested + '):not([data-typeset-react], [data-typeset-react] *, [data-typeset-react-rich], [data-typeset-react-rich] *)';
   const options = {
-    smartQuotes: script?.dataset.typesetSmartQuotes === 'false' ? false as const : 'en' as const,
+    // English quotes where English is declared; "en" also curls untagged
+    // text, as 4.3 did by default, and "false" turns quotes off.
+    smartQuotes: script?.dataset.typesetSmartQuotes === 'false' ? false as const : script?.dataset.typesetSmartQuotes === 'en' ? 'en' as const : 'en-declared' as const,
     opticalHanging: script?.dataset.typesetOpticalHanging !== 'false',
     spacing: script?.dataset.typesetSpacing !== 'false',
     tracking: script?.dataset.typesetTracking !== 'false',
