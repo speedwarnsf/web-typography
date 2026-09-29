@@ -41,7 +41,7 @@ behind an option, off by default, or waits for a major version.
   https://typeset.us/sri.json:
 
   ```html
-  <script src="https://typeset.us/go@4.4.0.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
+  <script src="https://typeset.us/go@4.4.0.js" integrity="sha384-OPixflfJwk7LTcwv7u1n3T6ratxF6EeTJXn3D/TnLw9bCV2qkIVogco3QFZj6l5D" crossorigin="anonymous" defer></script>
   ```
 
 - `go@4.js` follows the latest 4.x release. `go.js` is for trying Typeset

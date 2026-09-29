@@ -13,10 +13,23 @@
   font-size: var(--ts-bullet-size, 1.25em);
 }
 
-/* Generated line breaks. The engine installs these rules itself as a
-   constructable stylesheet; they are here for engines without one.
+/* Engine markers and generated line breaks. The engine installs these rules
+   itself as a constructable stylesheet; they are here for engines without
+   one. Spacing and hanging markers' shared declarations are !important in a
+   named layer; tracking wrappers' are not, so page !important rules and the
+   stale and print rules still reach their spacing. Each keeps only its own
+   advance or spacing inline.
    --ts-break-display switches every generated break; set it to inline on a
    composed element to keep its composition in print. */
+@layer typeset-markers {
+  :is([data-ts-space], [data-ts-hang])[data-ts-break] {
+    display: inline !important; position: static !important; float: none !important;
+    width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important; margin-top: 0 !important; margin-right: 0 !important;
+    margin-bottom: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; outline: none !important; transform: none !important;
+    font-size: 0 !important; line-height: 0 !important; vertical-align: baseline !important; pointer-events: none !important;
+  }
+}
+[data-ts-track]:not(#_):not(#_):not(#_) { all: unset; display: inline; }
 [data-ts-stale] { --ts-break-display: none; }
 [data-ts-stale] :is([data-ts-space], [data-ts-hang])[data-ts-break] { margin-left: 0 !important; }
 [data-ts-stale] [data-ts-track] { letter-spacing: inherit !important; word-spacing: inherit !important; }
