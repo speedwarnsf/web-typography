@@ -120,7 +120,7 @@ export default function ReadingLab() {
   const [ragSmoothed, setRagSmoothed] = useState(false);
   // Composed lines are fixed to a width: compose again when the preview's
   // width changes (rotation, window resize).
-  const previewWidth = useComposedWidth(previewRef);
+  const [widthKey, markComposed] = useComposedWidth(previewRef);
 
   // Debounced rag smoothing — 1s after settings stop changing
   useEffect(() => {
@@ -138,7 +138,8 @@ export default function ReadingLab() {
       delete p.dataset.typesetDone;
       typeset(p);
     });
-  }, [ragSmoothed, previewWidth]);
+    markComposed();
+  }, [ragSmoothed, widthKey, markComposed]);
 
   const comfortScore = calculateComfortScore();
 

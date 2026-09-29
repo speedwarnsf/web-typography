@@ -148,7 +148,7 @@ export default function PerfectParagraph() {
   const defaultRef = useRef<HTMLParagraphElement>(null);
   // Compose again, and re-measure both panels, when the column's width
   // changes (rotation, window resize): composed lines are fixed to a width.
-  const composedWidth = useComposedWidth(typesetRef);
+  const [widthKey, markComposed] = useComposedWidth(typesetRef);
   const [tally, setTally] = useState<{ d: PanelTally; t: PanelTally } | null>(null);
 
   // Calculate refinement score
@@ -191,6 +191,8 @@ export default function PerfectParagraph() {
         el.innerHTML = spanWrap(text.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
       }
 
+      markComposed();
+
       if (defaultRef.current) {
         setTally({ d: measurePanel(defaultRef.current), t: measurePanel(el) });
       }
@@ -198,7 +200,7 @@ export default function PerfectParagraph() {
     return () => {
       cancelled = true;
     };
-  }, [text, toggles, composedWidth]);
+  }, [text, toggles, widthKey, markComposed]);
 
   const handleToggle = (id: string) => {
     setToggles(prev => ({ ...prev, [id]: !prev[id] }));

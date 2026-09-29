@@ -223,7 +223,7 @@ function PairingCardBuilder() {
   // Composed lines are fixed to a width: compose the preview again when its
   // width changes (rotation, window resize). The PNG cards compose an
   // offscreen clone at a fixed size and need nothing more.
-  const bodyWidth = useComposedWidth(bodyParaRef);
+  const [widthKey, markComposed] = useComposedWidth(bodyParaRef);
   const [generatedImages, setGeneratedImages] = useState<{label: string; dataUrl: string; width: number; height: number}[]>([]);
   const [generating, setGenerating] = useState(false);
 
@@ -257,7 +257,8 @@ function PairingCardBuilder() {
     el.textContent = rawText;
     delete el.dataset.typesetDone;
     typeset(el);
-  }, [rawText, heading, body, bSize, leading, colW, bodyWidth]);
+    markComposed();
+  }, [rawText, heading, body, bSize, leading, colW, widthKey, markComposed]);
 
   const generatePNG = async (width: number, height: number, label: string): Promise<string> => {
     const { default: html2canvas } = await import("html2canvas-pro");

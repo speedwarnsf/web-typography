@@ -1,33 +1,46 @@
 'use client';
 
-import { useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+
+/** The element's content-box width, as ResizeObserver's inlineSize reports it. */
+function contentWidth(element: HTMLElement): number {
+  const style = getComputedStyle(element);
+  return element.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+}
 
 /**
- * The content-box inline size of an element that a demo page composes
- * itself with one-shot typeset(), as a value to list in the composing
- * effect's dependencies.
+ * Keeps a demo element composed for its current width.
  *
- * Composed lines end in <br>s measured for one width. These demo elements
- * opt out of the site's global controller, which recomposes on resize, so
- * after a rotation or a window resize the browser wrapped each composed line
- * again and painted alternating long and short lines (9 composed lines
+ * Demo pages compose their text themselves with one-shot typeset(), and opt
+ * those elements out of the site's global controller, which is what
+ * recomposes on resize. Composed lines end in <br>s measured for one width,
+ * so after a rotation or a window resize the browser wrapped each composed
+ * line again and painted alternating long and short lines (9 composed lines
  * painted as 18 on /perfect-paragraph at 375 -> 320 px).
  *
- * The first observation is the width the page composed for and changes
- * nothing. After that, a width that differs by 2 px or more and holds for
- * 100 ms (the engine's own resize window) is committed in an animation
- * frame, never inside the ResizeObserver callback, so recomposing cannot
- * feed the observer in the same frame. Height-only changes are ignored, and
- * so is a zero width (a hidden panel keeps its composition until it shows
- * at a different width). Returns 0 until the first committed change.
+ *   const [widthKey, markComposed] = useComposedWidth(ref);
+ *   useEffect(() => { typeset(ref.current); markComposed(); }, [text, widthKey]);
+ *
+ * markComposed() records the width the text was just composed for. When the
+ * element's content-box inline size then differs from it by 2 px or more
+ * and holds for 100 ms (the engine's own resize window), widthKey changes in
+ * an animation frame, never inside the ResizeObserver callback, so
+ * recomposing cannot feed the observer in the same frame. Height-only
+ * changes are ignored, and so is a zero width: a hidden panel recomposes
+ * when it shows at a width other than the one it was composed for.
  */
-export function useComposedWidth(ref: RefObject<HTMLElement | null>): number {
-  const [width, setWidth] = useState(0);
+export function useComposedWidth(ref: RefObject<HTMLElement | null>): [number, () => void] {
+  const [widthKey, setWidthKey] = useState(0);
+  const composedFor = useRef(-1);
+
+  const markComposed = useCallback(() => {
+    const element = ref.current;
+    if (element) composedFor.current = contentWidth(element);
+  }, [ref]);
 
   useEffect(() => {
     const element = ref.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    let composedFor = -1;
     let latest = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let frame = 0;
@@ -37,24 +50,18 @@ export function useComposedWidth(ref: RefObject<HTMLElement | null>): number {
       timer = undefined;
       frame = 0;
     };
+    const stale = (width: number) => composedFor.current >= 0 && Math.abs(width - composedFor.current) >= 2;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[entries.length - 1];
       const box = entry.contentBoxSize?.[0];
       const inline = box ? box.inlineSize : entry.contentRect.width;
-      if (composedFor < 0) {
-        composedFor = inline;
-        return;
-      }
       cancel();
-      if (inline < 1) return;
+      if (inline < 1 || !stale(inline)) return;
       latest = inline;
-      if (Math.abs(inline - composedFor) < 2) return;
       timer = setTimeout(() => {
         frame = requestAnimationFrame(() => {
           frame = 0;
-          if (Math.abs(latest - composedFor) < 2) return;
-          composedFor = latest;
-          setWidth(Math.round(latest));
+          if (stale(latest)) setWidthKey((key) => key + 1);
         });
       }, 100);
     });
@@ -65,5 +72,5 @@ export function useComposedWidth(ref: RefObject<HTMLElement | null>): number {
     };
   }, [ref]);
 
-  return width;
+  return [widthKey, markComposed];
 }
