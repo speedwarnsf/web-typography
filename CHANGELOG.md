@@ -10,6 +10,64 @@ Hashes for every published version live in
 
 ---
 
+## 4.3.2 - 2026-09-29
+
+4.3.2 is a patch release of 4.3.1: no API, option, outcome code or default
+changed. It fixes how slowly the React adapters caught up with off-screen
+text on a page the browser gives no idle time.
+
+### Rendering changes
+
+None. The fix changes when an off-screen React block composes, not what it
+composes.
+
+### Fixed
+
+- **Off-screen React blocks catch up at once when the browser stops giving
+  the page idle periods.** `TypesetText` and `TypesetRichText` compose
+  blocks more than a viewport height from the screen in long idle periods,
+  waiting up to 1 s for one, and an idle callback that fired on that
+  timeout composed a single block, so that the rest of an animation frame
+  is never spent on them. Chromium can stop giving a page any idle period
+  for seconds once its frames stop. After a stepped 1280 to 900 px window
+  resize on a production Next.js site (27 and 41 blocks), in the route-runs
+  where that happened the page got one idle callback, or none, between 1.6
+  and 5 s after the resize, where the others got 65 to 73; their off-screen
+  blocks were composed one a second, still changing 4.4 s after the resize,
+  and some still showed native lines 8 s on. 4.3.0 does the same (3 of 16
+  route-runs with the 4.3.0 build, 1 of 24 with 4.3.1's, in one bisect), so
+  this is not the 4.3.1 regression that a first sample (3 of 7 against 0 of
+  6) suggested. Once an idle period has come, the adapters now also wait
+  for the next at most 50 ms of page time (their own work not counted); if
+  none comes, or none at all within the 1 s, the browser has stopped giving
+  them, and the remaining blocks compose in animation frames, 12 ms a
+  frame as nearby blocks do, until an idle period comes again. A timeout
+  that fires late, after a long task, waits on instead, so a page that is
+  busy for a moment and then animates again keeps its frames. While short
+  idle periods keep coming, a block still composes only on the 1 s timeout.
+  `verify-scheduler`'s new check narrows the container of 48 `TypesetText`
+  blocks, keeps frames running for 600 ms, then stops frames and idle
+  periods: 4.3.1 took 44 s to compose again the 23 off-screen blocks left
+  native in Chromium (19 still native at 5 s), 4.3.2 0.2 s.
+
+### Development
+
+- `verify-scheduler` gains "React adapters, frames and then idle periods
+  stopping: every offscreen block left native composes again within 5 s",
+  in Chromium and Firefox (WebKit has no `requestIdleCallback`; the
+  adapters use a timer there).
+
+### Known limitations
+
+- **The catch-up spends frame time when a script fills every frame.**
+  Measured once in Chromium at 4x CPU on a 120 Hz display, with a
+  requestAnimationFrame loop doing 10 ms of work a frame: after a width
+  change, 4.3.2 composed the 23 off-screen blocks in about 1.3 s, spending
+  up to 12 ms of each frame on them (92 fps fell to 66-75, frames over 20 ms
+  rose from 2-3 to 31-39, no new long task). 4.3.1 kept those frames free
+  but left 21 of the 23 blocks native at 3 s. On a 60 Hz display the same
+  work leaves idle time, and the catch-up waits for it.
+
 ## 4.3.1 - 2026-09-29
 
 4.3.1 is a patch release of 4.3.0: no API, option, outcome code or default

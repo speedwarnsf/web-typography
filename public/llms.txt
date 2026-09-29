@@ -1,17 +1,17 @@
 # typeset.us
 
-> Typeset 4.3.1: better line breaks for web text. No stranded short words or
+> Typeset 4.3.2: better line breaks for web text. No stranded short words or
 > one-word last lines, links and styling intact, checked after rendering in
 > Chrome, Safari and Firefox. Use CSS text-wrap: balance/pretty first.
 
-Install: npm i -E typeset.us@4.3.1. For static HTML, use the pinned
-go@4.3.1.js with its integrity hash; the exact tag is "snippet" in
+Install: npm i -E typeset.us@4.3.2. For static HTML, use the pinned
+go@4.3.2.js with its integrity hash; the exact tag is "snippet" in
 https://typeset.us/sri.json. Override data-typeset-selector to choose text.
 For React-owned content use TypesetText or TypesetRichText from
 typeset.us/react (React 18.2+ and 19), never overlapping mounts.
 auditJSON reports errors, reviews, coverage, native retention and feature
 outcomes; every outcome is explained in
-https://typeset.us/releases/4.3.1/OUTCOMES.md. A passing safety audit is not
+https://typeset.us/releases/4.3.2/OUTCOMES.md. A passing safety audit is not
 a claim of perfect aesthetics. Declared languages: en/fr/de/es; untagged
 Latin has neutral preferences. No hyphenation, justification or RTL.
 
@@ -25,11 +25,11 @@ Latin has neutral preferences. No hyphenation, justification or RTL.
 ## Package
 
 - [typeset.us on npm](https://www.npmjs.com/package/typeset.us):
-  typeset.us@4.3.1, MIT: ESM, CJS, browser global, automatic loader, React and declarations
+  typeset.us@4.3.2, MIT: ESM, CJS, browser global, automatic loader, React and declarations
 - [Capabilities](https://typeset.us/capabilities.json): machine-readable support contract
-- [Outcomes](https://typeset.us/releases/4.3.1/OUTCOMES.md): what every data-ts-outcome means and what to do
-- [Migration](https://typeset.us/releases/4.3.1/MIGRATION.md): from 4.2, and rollback
-- [Support](https://typeset.us/releases/4.3.1/SUPPORT.md): tested range, known limitations and outstanding acceptance
+- [Outcomes](https://typeset.us/releases/4.3.2/OUTCOMES.md): what every data-ts-outcome means and what to do
+- [Migration](https://typeset.us/releases/4.3.2/MIGRATION.md): from 4.2, and rollback
+- [Support](https://typeset.us/releases/4.3.2/SUPPORT.md): tested range, known limitations and outstanding acceptance
 - [FAQ](https://typeset.us/faq): screen readers, layout shift, SEO, copying, no-JS
 - [Integrity](https://typeset.us/sri.json): immutable browser pins and advisories
 - [V3 archive](https://typeset.us/releases/3.5.1/): old source, npm and browser assets

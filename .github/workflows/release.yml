@@ -207,6 +207,13 @@ jobs:
         env:
           PUBLISHED_BY: ${{ steps.publish.outputs.by }}
         run: |
+          # npm answers "may take a few minutes to become available" after a
+          # publish: 4.3.1's check ran 2 s later, got a 404 and failed the job
+          # before the GitHub Release. Wait up to 10 minutes for the version.
+          for i in $(seq 1 60); do
+            npm view "typeset.us@$VERSION" dist.integrity > /dev/null 2>&1 && break
+            echo "Waiting for npm to serve typeset.us@$VERSION ($i)"; sleep 10
+          done
           node scripts/v4/verify-ledger.mjs --network
           if [ "$PUBLISHED_BY" = workflow ]; then
             npm view "typeset.us@$VERSION" dist.attestations --json | tee output/npm-attestations.json

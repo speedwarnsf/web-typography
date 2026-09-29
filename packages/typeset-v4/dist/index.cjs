@@ -4595,7 +4595,7 @@ var mountOwners = /* @__PURE__ */ new WeakMap();
 var mountWaiters = /* @__PURE__ */ new WeakMap();
 
 // src/lib/v4/typeset.next.ts
-var VERSION = "4.3.1";
+var VERSION = "4.3.2";
 var states = /* @__PURE__ */ new WeakMap();
 function staleSplit(element, state, record, written) {
   if (record.type === "characterData") {

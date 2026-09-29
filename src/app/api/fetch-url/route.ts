@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 const WINDOW_MS = 60_000;
 const LIMIT = 12;
 const recent = new Map<string, number[]>();
+let lastSweep = 0;
 
 function clientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -23,7 +24,12 @@ function rateLimited(key: string, now = Date.now()): boolean {
   const hits = (recent.get(key) ?? []).filter(t => now - t < WINDOW_MS);
   hits.push(now);
   recent.set(key, hits);
-  if (recent.size > 10_000) for (const [k, v] of recent) if (now - v[v.length - 1] > WINDOW_MS) recent.delete(k);
+  // Forget clients whose last request is older than the window, at most once
+  // a window, so no address is held for more than two minutes (/privacy).
+  if (now - lastSweep > WINDOW_MS) {
+    lastSweep = now;
+    for (const [k, v] of recent) if (now - v[v.length - 1] > WINDOW_MS) recent.delete(k);
+  }
   return hits.length > LIMIT;
 }
 
