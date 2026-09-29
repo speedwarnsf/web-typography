@@ -42,6 +42,10 @@
   overflow-x: auto;
   white-space: nowrap;
 }
+/* A multi-line snippet (pre > code): the padding belongs to the block, not
+   to the inline code, whose left padding would indent only the first line. */
+.in-snippet pre { padding: 13px 14px; }
+.in-snippet pre code { display: block; padding: 0; overflow-x: visible; }
 .in-fine {
   margin: 14px 0 40px;
   font-size: 0.8125rem;
@@ -50,6 +54,15 @@
   max-width: 56ch;
 }
 .in-fine a { color: #b8963e; text-decoration: none; }
+.in-lede a, .in-note a { color: #b8963e; text-decoration: none; }
+.in-lede a:hover, .in-note a:hover, .in-fine a:hover { text-decoration: underline; }
+.in-section { margin-bottom: 36px; }
+.in-docs { margin: 0 0 8px; max-width: 60ch; }
+.in-docs > div { padding: 12px 0; border-bottom: 1px solid #161616; }
+.in-docs dt { font-family: var(--font-playfair), Georgia, serif; font-weight: 700; font-size: 1.125rem; margin-bottom: 4px; }
+.in-docs dt a { color: #b8963e; text-decoration: none; }
+.in-docs dt a:hover { text-decoration: underline; }
+.in-docs dd { margin: 0; color: #a3a3a3; font-size: 0.9375rem; line-height: 1.6; }
 .in-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -114,4 +127,5 @@ a.in-card:hover { border-color: #b8963e; }
   margin-bottom: 6px;
 }
 .in-note { color: #a3a3a3; font-size: 0.9375rem; max-width: 52ch; line-height: 1.65; margin-bottom: 20px; }
+.in-warning { color: #c9c9c9; border-left: 2px solid #b8963e; padding-left: 14px; }
 .in-back { display: inline-block; margin-top: 34px; font-family: var(--font-mono), monospace; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #b8963e; text-decoration: none; }

@@ -9,7 +9,6 @@ for (const { name, engine, executablePath } of browsers) {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   const check = (label, pass, detail) => report.checks.push({ browser: name, label, pass: !!pass, detail });
   page.on('pageerror', error => report.errors.push({ browser: name, error: error.message }));
-  await page.route('**/ntfy.sh/**', route => route.fulfill({ status: 200, body: '{}' }));
   try {
     const visit = async path => {
       await page.goto(base + path);

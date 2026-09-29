@@ -191,7 +191,7 @@ for (const [name, unit, count] of LARGE) {
   const prose = TABLE.map(([input]) => input);
   const collect = (/** @type {unknown} */ value) => { if (typeof value === 'string') prose.push(value); else if (Array.isArray(value)) value.forEach(collect); else if (value && typeof value === 'object') Object.values(value).forEach(collect); };
   for (const file of ['tests/v4-corpus.json', 'corpus.json', 'tests/v4-corpus-adversarial.json']) collect(JSON.parse(await readFile(file, 'utf8')));
-  for (const file of ['README.md', 'CHANGELOG.md', 'ROADMAP.md', 'docs/show-hn.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/README.md']) prose.push(...(await readFile(file, 'utf8')).split(/\n{2,}/u));
+  for (const file of ['README.md', 'CHANGELOG.md', 'ROADMAP.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/README.md']) prose.push(...(await readFile(file, 'utf8')).split(/\n{2,}/u));
   const corpus = [...prose, ...prose.map(text => text.replace(/[\u2018\u2019]/gu, "'").replace(/[\u201c\u201d]/gu, '"'))];
   let differ = 0, curled = 0;
   /** @type {{ input: string, expected: string, actual: string }[]} */

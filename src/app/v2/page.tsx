@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import typeset, { measureLayout, restore } from '@/lib/typeset-site';
 import { withDemoMeasurement } from '@/lib/typeset-demo';
 import { strandedOpener } from '@/lib/v4/phrase-boundaries';
-import { LOADER_GZIP_KB, NPM_INSTALL, PINNED_SNIPPET, PINNED_VERSION } from '@/lib/install-snippet';
+import { JSDELIVR_SNIPPET, LOADER_GZIP_KB, NPM_INSTALL, PINNED_SNIPPET, PINNED_VERSION } from '@/lib/install-snippet';
 
 /**
  * /v2 — the flagship. A new era of web design (depth, organic motion,
@@ -94,18 +94,34 @@ async function composeInto(el: HTMLElement, text: string, staggerMs: number, bas
  * exists to prove composition. Watch it ourselves: recompose whenever the
  * width genuinely changes. Once the entrance has played (v2-in), lines
  * re-appear without stagger.
+ *
+ * The observer only records the width and schedules the composition for the
+ * next animation frame, cancelling any frame still pending. Composing inside
+ * the callback changed the block's height while ResizeObserver was still
+ * delivering, which WebKit reports as a "ResizeObserver loop completed with
+ * undelivered notifications" page error.
  */
-function watchRecompose(el: HTMLElement, text: string, staggerMs: number, baseMs: number): ResizeObserver {
+function watchRecompose(el: HTMLElement, text: string, staggerMs: number, baseMs: number): { disconnect(): void } {
   let lastWidth = el.clientWidth;
+  let frame = 0;
   const ro = new ResizeObserver(() => {
     const w = el.clientWidth;
     if (Math.abs(w - lastWidth) < 2) return;
     lastWidth = w;
-    const revealed = el.classList.contains('v2-in');
-    void composeInto(el, text, revealed ? 0 : staggerMs, revealed ? 0 : baseMs);
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      const revealed = el.classList.contains('v2-in');
+      void composeInto(el, text, revealed ? 0 : staggerMs, revealed ? 0 : baseMs);
+    });
   });
   ro.observe(el);
-  return ro;
+  return {
+    disconnect() {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+    },
+  };
 }
 
 interface PanelStats {
@@ -207,7 +223,7 @@ function Hero({ reduced }: { reduced: boolean }) {
     const el = h1Ref.current;
     if (!el) return;
     let cancelled = false;
-    let ro: ResizeObserver | null = null;
+    let ro: { disconnect(): void } | null = null;
     (async () => {
       await composeInto(el, HERO_TEXT, 140, 200);
       if (cancelled) return;
@@ -638,6 +654,12 @@ function DevelopersBand() {
           <p className="v2-dev-k">Any site, one tag</p>
           <code className="v2-dev-code">{PINNED_SNIPPET}</code>
           <p className="v2-dev-note">Version {PINNED_VERSION}, with its integrity hash. The file never changes.</p>
+          {JSDELIVR_SNIPPET && (
+            <>
+              <code className="v2-dev-code v2-dev-code-alt">{JSDELIVR_SNIPPET}</code>
+              <p className="v2-dev-note">The same file from npm via jsDelivr, with the same hash.</p>
+            </>
+          )}
         </div>
         <div className="v2-dev-card">
           <p className="v2-dev-k">npm</p>
@@ -666,7 +688,7 @@ function DevelopersBand() {
       <nav className="v2-links">
         <a href="https://github.com/speedwarnsf/web-typography">GitHub</a>
         <a href="https://www.npmjs.com/package/typeset.us">npm</a>
-        <a href={`/releases/${PINNED_VERSION}/README.md`}>Docs</a>
+        <a href="/docs">Docs</a>
         <a href="/install/frameworks">Next, Vite, Astro, Svelte, Vue</a>
         <a href="/install">No-code platforms</a>
         <a href="/faq">FAQ</a>
@@ -685,7 +707,7 @@ function Manifesto() {
     if (!el) return;
     let cancelled = false;
     let io: IntersectionObserver | null = null;
-    let ro: ResizeObserver | null = null;
+    let ro: { disconnect(): void } | null = null;
     (async () => {
       await composeInto(el, MANIFESTO_TEXT, 90, 60);
       if (cancelled) return;
@@ -1136,6 +1158,7 @@ html:has(.v2-root) { scroll-behavior: smooth; background: #050505; }
   color: #d6d6d6; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .v2-dev-note { font-family: var(--font-source-sans), sans-serif; font-size: .85rem; color: #8f8f8f; margin: 0; text-wrap: pretty; }
+.v2-dev-code-alt { margin-top: 20px; padding-top: 18px; border-top: 1px solid #1c1c1c; }
 .v2-dev-h3 {
   font-family: var(--font-playfair), Georgia, serif;
   font-size: 1.35rem; color: #efefef; margin: 0 0 14px; text-wrap: balance;

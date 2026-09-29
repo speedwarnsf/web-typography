@@ -23,7 +23,6 @@ try {
     const browser = await engine.launch({ executablePath, timeout: 20000 });
     try {
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
-      await context.route(/^https:\/\/ntfy\.sh\//, route => route.abort());
       const page = await context.newPage();
       page.setDefaultTimeout(20000);
       await page.goto(base + '/', { waitUntil: 'load' });

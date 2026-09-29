@@ -62,5 +62,4 @@ documented outcomes. No new typographic features.
   `renderFrozenLines` and others) to `typeset.us/legacy`, and unify the
   outcome vocabulary into a strict union.
 
-Suggestions: open a Discussion, or an issue with a page that shows the
-problem.
+Suggestions: open an issue with a page that shows the problem.

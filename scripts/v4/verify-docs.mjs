@@ -200,7 +200,7 @@ try {
     [/English (?:prose )?only/i, 'English-only claim'], [/cloned per\s+segment/, 'v3 link cloning'], [/npx typeset\.us audit/, 'old CLI name'], [/48[–-]80 retained/, 'v3 search size'],
     [/React 19\.2\.3 is the local target|Locally targeted React: 19\.2\.3/, 'React 19.2.3-only claim'], [/abandons a word\.\s+The book version never does/, 'homepage orphan claim'], [/SceneF/, 'client name'],
   ];
-  const CURRENT = ['packages/typeset-v4/README.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/for-agents.md', 'packages/typeset-v4/OUTCOMES.md', 'README.md', 'STABILITY.md', 'SECURITY.md', 'CONTRIBUTING.md', 'ROADMAP.md', 'docs/show-hn.md', 'docs/outcomes.md', 'docs/RELEASING.md', 'public/llms.txt'];
+  const CURRENT = ['packages/typeset-v4/README.md', 'packages/typeset-v4/SUPPORT.md', 'packages/typeset-v4/MIGRATION.md', 'packages/typeset-v4/for-agents.md', 'packages/typeset-v4/OUTCOMES.md', 'README.md', 'STABILITY.md', 'SECURITY.md', 'CONTRIBUTING.md', 'ROADMAP.md', 'docs/outcomes.md', 'docs/RELEASING.md', 'public/llms.txt'];
   /** @type {Record<string, string>} */
   const texts = {};
   for (const file of CURRENT) texts[file] = await readFile(file, 'utf8');

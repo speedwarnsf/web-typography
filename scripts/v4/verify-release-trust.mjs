@@ -124,7 +124,7 @@ try {
     check(`${file}: checkout does not persist credentials`, [...text.matchAll(/uses: actions\/checkout@/g)].length === [...text.matchAll(/persist-credentials: false/g)].length);
   }
   const ci = await readFile('.github/workflows/ci.yml', 'utf8');
-  check('ci.yml runs on master, release/** and pull requests', /branches: \[master, 'codex\/release-\*', 'release\/\*\*'\]/.test(ci) && /pull_request:/.test(ci));
+  check('ci.yml runs on master pushes and pull requests, once per pull request', /push:\s*\n\s*branches: \[master\]/.test(ci) && /pull_request:/.test(ci) && /cancel-in-progress: true/.test(ci));
 
   const release = await readFile('.github/workflows/release.yml', 'utf8');
   const verify = block(release, '  verify:'), publish = block(release, '  publish:');

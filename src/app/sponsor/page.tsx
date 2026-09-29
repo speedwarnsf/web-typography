@@ -13,7 +13,7 @@ const STRIPE_LINKS = {
   custom: "https://buy.stripe.com/eVq28sc5O3xB1SbgUKfbq08",
 };
 
-export default function SupportPage() {
+export default function SponsorPage() {
   const [isMonthly, setIsMonthly] = useState(false);
 
   const tiers = [
@@ -70,7 +70,7 @@ export default function SupportPage() {
         {/* Header */}
         <div className="mb-16">
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#B8963E] mb-6">
-            Support
+            Sponsor
           </div>
           <h1 className="text-4xl sm:text-5xl mb-8">
             Help Us Build Better Tools

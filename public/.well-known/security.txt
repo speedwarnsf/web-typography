@@ -1,0 +1,5 @@
+Contact: mailto:dyork@typeset.us
+Expires: 2027-09-28T00:00:00.000Z
+Policy: https://github.com/speedwarnsf/web-typography/blob/master/SECURITY.md
+Preferred-Languages: en
+Canonical: https://typeset.us/.well-known/security.txt

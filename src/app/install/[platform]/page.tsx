@@ -33,6 +33,7 @@ export default async function InstallPlatform({ params }: { params: Promise<{ pl
       <h1>Add typeset to {p.name}</h1>
       {p.tier && <p className="in-tier" data-no-typeset>{p.tier}</p>}
       {p.note && <p className="in-note">{p.note}</p>}
+      {p.warning && <p className="in-note in-warning">{p.warning}</p>}
 
       <ol className="in-path">
         {p.path.map((step) => (

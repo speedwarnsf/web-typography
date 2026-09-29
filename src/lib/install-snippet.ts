@@ -1,9 +1,10 @@
 /**
  * Install lines shown on typeset.us, generated at build time from
- * public/sri.json, which only release-cut writes. The pinned loader, with its
- * integrity hash, is what every page offers first; the evergreen go.js is
- * offered only with its label. When a release is cut and the site deployed,
- * every snippet moves to the new version together.
+ * public/sri.json, which only release-cut writes. Every page offers the
+ * pinned loader with its integrity hash, and the same file from jsDelivr with
+ * the same hash; the unpinned go.js and go@4.js are named for local testing
+ * but never offered as a line to copy. When a release is cut and the site
+ * deployed, every snippet moves to the new version together.
  */
 import sri from '../../public/sri.json';
 import release from '../../public/release.json';
@@ -33,6 +34,8 @@ export const LIBRARY_PINNED = !!files[`typeset@${sri.version}.min.js`];
 /** The pinned loader's gzip size in KB, as release-cut measured it. */
 export const LOADER_GZIP_KB: string = (release.loader.gzipBytes / 1000).toFixed(1);
 
-/** The evergreen loader. Always shown with EVERGREEN_NOTE. */
-export const EVERGREEN_SNIPPET = '<script src="https://typeset.us/go.js" defer></script>';
-export const EVERGREEN_NOTE = 'go.js updates itself within 4.x, for trying Typeset out. It will never move to 5.0. For a site you run, use the pinned line with its integrity hash.';
+/** The unpinned loaders, named but never offered as a line to copy. */
+export const EVERGREEN_NOTE = 'The unpinned go.js and go@4.js follow each 4.x release and cannot carry an integrity hash, so use them only for local testing.';
+
+/** typeset.us hosting is a convenience; say so next to the lines that use it. */
+export const HOSTING_NOTE = 'typeset.us hosting has no uptime guarantee. For a strict Content Security Policy, or to keep every request on your own domain, install from npm and serve the file yourself.';
