@@ -112,6 +112,17 @@ Planned as 4.3.1. Not published.
   so GitHub's hosted runners enforce it again. It failed there in every
   run with the same one-frame flash of the same block, which was the race
   fixed above, not speed.
+- `verify-scheduler`'s scroll-pane checks read whether every block ended
+  composed, and the pane's observer released, once the check's frames stop,
+  and report the blocks still waiting when its 2 s watch ended. The watch's
+  own animation frame leaves every idle period too short for the adapters'
+  idle work, so the two blocks more than a pane height below the fold
+  compose on 1 s idle timeouts in Chromium and Firefox, and the second
+  composed 37 to 48 ms before the watch ended on the M2 Pro; a hosted
+  Firefox run (CI 36478408446, attempt 1) ended it with a block still
+  waiting and no flash. Each frame is now compared with the lines as the
+  blocks end, so a block painted native through the watch and composed
+  after it still fails.
 
 ## 4.3.0 - 2026-09-26
 
