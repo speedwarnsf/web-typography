@@ -23,6 +23,7 @@ Start with CSS. Add Typeset where CSS stops.
 | Links, emphasis and React-rendered text kept exactly as authored | Typeset |
 | A result your CI can check (`auditJSON()`, `npx typeset-audit`) | Typeset |
 | Justified text with hyphenation | Not Typeset: CSS `text-align: justify` with `hyphens: auto`, or a TeX-style justifier |
+| Better breaks in other languages, scripts or text styles | CSS `text-wrap: pretty`. Typeset composes horizontal, left-to-right Latin text, set ragged and unindented, that is untagged or declared English, French, German or Spanish; anything else keeps the browser's layout, though the script still downloads ([What it won't do](#what-it-wont-do)) |
 
 On the typeset.us homepage demo, across 96 widths from 250 to 345 px, short
 words left hanging at line ends went from 215 to 38 against Chromium's
@@ -45,6 +46,37 @@ English smart quotes and hanging punctuation. The same file is on npm as
 `typeset.us/auto`, so jsDelivr serves it with the same hash:
 `https://cdn.jsdelivr.net/npm/typeset.us@4.3.1/dist/auto.js`.
 Exclude an element and everything in it with `data-no-typeset`.
+
+Declare the page's language: `<html lang="en">`. Typeset keeps "a", "the"
+and "of" off line ends only in text declared English, and applies French,
+German and Spanish preferences the same way. Untagged text is composed with
+neutral preferences, which fix far fewer line ends: on 42 test paragraphs at
+375 px in Chromium, lines ending in a stranded short word went from 59 to 7
+with `lang="en"`, and only to 36 untagged.
+
+**Comments and other user-generated text.** The script tag sets every
+matching element on the page, including comments, reviews and profiles.
+Keep it to text you publish: mark those areas `data-no-typeset`, or give the
+script a narrower selector, such as `data-typeset-selector="article p"`, and
+set `overflow-wrap: break-word` on containers of user-generated text. In 4.3,
+a paragraph with a run of thousands of characters and no break opportunity,
+which prose never has, could freeze a Safari tab for tens of seconds. From
+4.4, a paragraph with more than 500 characters between two break
+opportunities keeps the browser's layout (`native:run-budget`) before
+anything is measured.
+
+**Server-rendered React (Next.js, Gatsby, Remix, Framer, Wix).** If the
+script tag composes text before React hydrates it, React finds markup it did
+not render, reports hydration errors (#418; React 18 also #425 and #423),
+throws the server HTML away and renders the page again in the browser.
+Typeset composes the new text, so the page ends up correct, but the extra
+render costs main-thread time, and error monitors such as Sentry report it.
+In a test page, delaying hydration by 300 ms was enough to cause it. 4.4
+makes the script tag wait for hydration before its first composition on
+pages that carry a server-rendering framework's markers, such as those of
+Next.js and Gatsby. For text React renders, the adapters below, or `mount()`
+called in a `useEffect`, which runs after hydration, avoid the race with any
+version.
 
 **npm, for pages you script yourself:**
 
@@ -88,15 +120,20 @@ horizontal carousel, offscreen blocks count as near and compose in frames,
 and in WebKit some animated carousel cards keep native lines, known
 limitations SUPPORT.md describes). Server-rendered HTML (Next.js,
 Remix) first paints with the browser's own wrapping and is composed after
-hydration, rewrapping without adding a line (see the FAQ on layout shift).
+hydration, so it rewraps after the first paint, and on phones that often
+adds a line (see the FAQ on layout shift).
 `TypesetRichText` children must be text and host elements (`a`, `strong`,
 `em`, `span` and the like): a component child, such as next/link's `<Link>`
 or a router link, keeps the whole paragraph native
 (`native:react-component`, with a console warning in development builds).
-Use `<a>` there, or compose the rendered HTML with `mount()`.
+Use `<a>` there, or compose the rendered HTML with `mount()`: for MDX,
+next/link, router links and i18n `<Trans>` content, the `SetArticle` recipe
+on https://typeset.us/install/frameworks is a client component that calls
+`mount()` on the rendered article after hydration.
 Under jsdom or happy-dom (Jest, Vitest) nothing can be measured, so both
 adapters render the text unchanged, report `native:environment` and never
-throw. Both take the options below as props.
+throw. Both take the options below as props. The adapters are for React DOM
+on the web; React Native's native views are not supported.
 
 Give each piece of text one owner: the adapter, `mount()` or a script tag.
 `mount()` and the loaders keep text that Svelte, Vue, Solid, Lit or React

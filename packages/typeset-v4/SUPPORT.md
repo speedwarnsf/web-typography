@@ -411,13 +411,18 @@ changes only an isolated preview, never a deployed site.
   letter about 15 s (Chromium 1.4 s, Firefox 0.2 s; the quotes take under
   0.1 s in both). Both are under the 12,000-character budget. Prose has no
   such runs, but untrusted text (comments, profiles) can use one to freeze
-  a Safari tab. Mitigation: set `overflow-wrap: break-word`, which Typeset
-  supports, on containers of user-generated text, so the run wraps at the
-  measure (the same two paragraphs: 0.8 s and 0.5 s); or leave such text
-  out of composition (`data-no-typeset`, or a selector that does not match
-  it); or collapse long runs of one punctuation mark before rendering.
-  Reading fewer characters would change the line metrics a result
-  reports, so 4.3 keeps the exact measurement.
+  a Safari tab. From 4.4, a block with more than 500 code points
+  (collapsible white space aside) between two line-break opportunities
+  keeps the browser's layout as `native:run-budget` before any box is read;
+  a run of exactly 500 is not declined. `typeset()` on the same two
+  paragraphs at 600 px, 18px Georgia, 4.3.1 against 4.4: WebKit 24,842 ms
+  and 9,904 ms against 18 ms and 8 ms; Chromium 29 ms and 1,328 ms against
+  19 ms and 7 ms; Firefox 33 ms and 156 ms against 24 ms and 10 ms. There
+  is no opt-out: it is a safety limit. Also set `overflow-wrap: break-word`,
+  which Typeset supports, on containers of user-generated text, so such a
+  run wraps at the measure (in 4.3, the same two paragraphs then took 0.8 s
+  and 0.5 s); or leave such text out of composition (`data-no-typeset`, or a
+  selector that does not match it).
 - **Machine translation.** While a page is translated (Google Translate and
   Chrome set `translated-ltr`/`translated-rtl` on `<html>`, translators wrap
   text in `<font>`, Edge adds `_msttexthash`), `mount()`, the loaders,
