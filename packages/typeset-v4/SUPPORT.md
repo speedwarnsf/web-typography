@@ -440,7 +440,12 @@ comes near) and yielded batches reduce redundant work. The React adapters
 compose offscreen blocks in long idle periods; when the browser stops giving
 the page idle periods (Chromium can, for seconds, once its frames stop), the
 remaining blocks compose in animation frames, 12 ms a frame, until idle
-periods return (from 4.3.2). Real text, font,
+periods return (from 4.3.2). That costs a busy page frames while it lasts:
+with a script filling every frame (Chromium, 4x CPU slowdown, 120 Hz), the
+catch-up took up to 12 ms of each frame for about 1.3 s, the page fell from
+92 fps to 66 to 75, and frames over 20 ms went from 2 or 3 to 31 to 39, with
+no new long tasks; 4.3.1 kept those frames but left 21 of 23 off-screen
+blocks stale 3 s later. Real text, font,
 metric and width changes still recompose. The 8ms batch target cannot
 preempt one paragraph or a browser layout.
 Large-document discovery/layout can still create long tasks. Benchmarks of a
@@ -609,7 +614,10 @@ changes only an isolated preview, never a deployed site.
   are in each report.
 - **Hydration wait.** A marked page whose framework never hydrates composes
   when the 10 s cap runs out, and so does one where a third-party script
-  adds paragraphs inside a React root before DOMContentLoaded. Wix pages
+  adds paragraphs inside a React root before DOMContentLoaded. In Chromium
+  and WebKit the first composition comes no earlier than the load event
+  either way: `mount()` waits for `document.fonts.ready`, which they resolve
+  only at load (Firefox before it). This dates from 4.3. Wix pages
   carry no marker in the list and keep 4.3's timing unless the script tag
   has `data-typeset-defer="hydration"`, which waits for React only when its
   root exists by the load event. `[data-framer-hydrate-v2]` has not been

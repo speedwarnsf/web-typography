@@ -139,7 +139,9 @@ try {
   // contract (+6,104 B, packed twice, as itself and as AGENTS.md), the
   // README's Visual tests section, audit preview and workarounds (+2,965 B),
   // capabilities.json (+149 B) and OUTCOMES.md (+44 B). Measured with them:
-  // 2,067,743 B, 97 files.
+  // 2,067,743 B, 97 files. With the docs describing coverage: 'core' as the
+  // default (O1 declined), SUPPORT.md's hydration-wait and off-screen
+  // catch-up notes and the hydration cap (4a8bdfc): 2,068,719 B, 97 files.
   check('unpacked package is under 2.08 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2080000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));

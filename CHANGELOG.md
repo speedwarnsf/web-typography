@@ -257,6 +257,15 @@ Markup only, no change to layout:
 - `whenSettled()` does not wait for hosts React has not mounted yet (a
   pending Suspense boundary), for a finite CSS animation to end, or for
   off-screen blocks a resize left until they are scrolled near.
+- **Off-screen React blocks can cost a busy page frames while they catch
+  up** (the trade-off of 4.3.2's fix). When the browser gives no idle
+  periods because a script fills every frame, `TypesetText` and
+  `TypesetRichText` compose their off-screen blocks in animation frames, up
+  to 12 ms of each. Chromium at 4x CPU slowdown and 120 Hz, a script filling
+  every frame: for about 1.3 s the page ran at 66 to 75 fps instead of 92,
+  and frames over 20 ms went from 2 or 3 to 31 to 39, with no new long
+  tasks. 4.3.1 kept those frames but left 21 of the 23 off-screen blocks
+  stale 3 s later.
 - `::after` link icons still leave their paragraph native, under both
   `coverage` values.
 - 4.3's other known limitations stand; SUPPORT.md lists them.
@@ -268,20 +277,20 @@ entry point), the published 4.3.1 against 4.4.0:
 
 | Entry | 4.3.1 | 4.4.0 | Change |
 | --- | --- | --- | --- |
-| `go@<version>.js` / `dist/go.js` | 56,467 | 59,887 | +3,420 (+6.1%) |
-| `dist/auto.js` | 56,476 | 59,880 | +3,404 (+6.0%) |
-| `typeset.global.js` | 56,122 | 58,767 | +2,645 (+4.7%) |
-| `react.js` and its chunk | 54,083 | 56,601 | +2,518 (+4.7%) |
-| `mount` only | 50,361 | 52,356 | +1,995 (+4.0%) |
-| `TypesetText` only | 50,489 | 52,629 | +2,140 (+4.2%) |
-| `TypesetRichText` only | 46,820 | 48,795 | +1,975 (+4.2%) |
-| `typeset()` only | 44,294 | 45,960 | +1,666 (+3.8%) |
-| `analyzeBreaks()` only | 14,522 | 14,913 | +391 (+2.7%) |
+| `go@<version>.js` / `dist/go.js` | 56,467 | 59,941 | +3,474 (+6.2%) |
+| `dist/auto.js` | 56,476 | 59,935 | +3,459 (+6.1%) |
+| `typeset.global.js` | 56,122 | 58,770 | +2,648 (+4.7%) |
+| `react.js` and its chunk | 54,083 | 56,603 | +2,520 (+4.7%) |
+| `mount` only | 50,361 | 52,357 | +1,996 (+4.0%) |
+| `TypesetText` only | 50,489 | 52,631 | +2,142 (+4.2%) |
+| `TypesetRichText` only | 46,820 | 48,797 | +1,977 (+4.2%) |
+| `typeset()` only | 44,294 | 45,961 | +1,667 (+3.8%) |
+| `analyzeBreaks()` only | 14,522 | 14,916 | +394 (+2.7%) |
 | `smartQuotes()` only | 1,544 | 1,556 | +12 (+0.8%) |
-| `TypesetText`, no tree-shaking | 63,169 | 66,173 | +3,004 (+4.8%) |
+| `TypesetText`, no tree-shaking | 63,169 | 66,175 | +3,006 (+4.8%) |
 
 `whenSettled()` alone is 1,429 bytes. The unpacked npm package grows from
-1,902,907 bytes to 2,034,092 (97 files).
+1,902,907 bytes to 2,068,719 (97 files).
 
 ### Website (typeset.us, not the package)
 
@@ -318,7 +327,11 @@ I need it?" list has a languages row.
   off.
 - SUPPORT.md gives the run-budget timings and names the new development
   warnings (`copy`, `headings`, `coverage` and the three `smartQuotes`
-  values).
+  values). Its hydration-wait limitation says that in Chromium and WebKit
+  the first composition comes no earlier than the load event (from 4.3),
+  and it gives the off-screen catch-up's cost to a busy page.
+- ROADMAP.md says what 4.4 shipped and moves the rest to later in 4.x; the
+  choice of default coverage waits for 5.0.
 - MIGRATION.md is "Moving to 4.4.0": what changes from 4.3 (the loader's
   quote default, coverage, the run budget, the hydration wait,
   `whenSettled()`, `./opt-in` and the CDN default file, the audit's review
@@ -394,6 +407,18 @@ composes.
   blocks, keeps frames running for 600 ms, then stops frames and idle
   periods: 4.3.1 took 44 s to compose again the 23 off-screen blocks left
   native in Chromium (19 still native at 5 s), 4.3.2 0.2 s.
+
+### Known limitations
+
+- **Off-screen React blocks can cost a busy page frames while they catch
+  up** (the trade-off of this fix). When the browser gives no idle
+  periods because a script fills every frame, `TypesetText` and
+  `TypesetRichText` compose their off-screen blocks in animation frames, up
+  to 12 ms of each. Chromium at 4x CPU slowdown and 120 Hz, a script filling
+  every frame: for about 1.3 s the page ran at 66 to 75 fps instead of 92,
+  and frames over 20 ms went from 2 or 3 to 31 to 39, with no new long
+  tasks. 4.3.1 kept those frames but left 21 of the 23 off-screen blocks
+  stale 3 s later.
 
 ### Development
 
