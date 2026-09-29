@@ -111,8 +111,14 @@ try {
   // react.js (+0.9 KB) and both source maps (+2.2 KB each), their
   // declarations (lifecycle.d.ts and .d.cts +1.8 KB each), the marker rules
   // in dist/styles.css (+958 B), and capabilities.json, OUTCOMES.md and
-  // README.md (+2.3 KB together).
-  check('unpacked package is under 1.94 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1940000, packed.unpackedSize);
+  // README.md (+2.3 KB together). The E3 integration fixes took it to
+  // 1.96 MB (1,956,329 B, +19,878 B over E1, 89 files): the hydration wait in go.js and
+  // auto.js (+2.2 KB each, whenSettled() included) and go.js.map (+3.8 KB),
+  // whenSettled() and its work tracking in index.cjs, react.cjs and the ESM
+  // chunk (+1.7 KB each), typeset.global.js (+0.8 KB) and its map (+1.5 KB),
+  // settled.d.ts and .d.cts (+0.8 KB each), and capabilities.json's
+  // whenSettled, hydration and entry-point facts (+2.1 KB).
+  check('unpacked package is under 1.96 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1960000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];
