@@ -130,7 +130,8 @@ try {
   // server-rendered React, lang), its defaults table, idle-load recipe and
   // find-in-page, reader-view and translation limits (+6,919 B), SUPPORT.md's
   // run-budget timings and translator notes (+672 B) and SECURITY.md's dated
-  // support window (+455 B).
+  // support window (+455 B). Merged on release/4.4.0, with the README and
+  // SUPPORT.md naming 4.4.0 and its new warnings: 2,034,092 B, 97 files.
   check('unpacked package is under 2.04 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2040000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));

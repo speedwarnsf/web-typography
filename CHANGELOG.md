@@ -275,7 +275,7 @@ entry point), the published 4.3.1 against 4.4.0:
 | `TypesetText`, no tree-shaking | 63,169 | 66,173 | +3,004 (+4.8%) |
 
 `whenSettled()` alone is 1,429 bytes. The unpacked npm package grows from
-1,902,907 bytes to about 2.03 MB (verify-package-contents holds the figure).
+1,902,907 bytes to 2,034,092 (97 files).
 
 ### Website (typeset.us, not the package)
 
