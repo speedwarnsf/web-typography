@@ -10,7 +10,7 @@ Hashes for every published version live in
 
 ---
 
-## 4.3.1 - Unreleased
+## 4.3.1 - 2026-09-29
 
 4.3.1 is a patch release of 4.3.0: no API, option, outcome code or default
 changed. It fixes three timing defects in keeping composed text correct
