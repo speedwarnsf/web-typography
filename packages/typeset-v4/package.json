@@ -1,6 +1,6 @@
 {
   "name": "typeset.us",
-  "version": "4.3.1",
+  "version": "4.3.2",
   "description": "Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.",
   "keywords": ["typography", "line-breaking", "line-break", "text-wrap", "text-wrap-pretty", "orphans", "widows", "rag", "knuth-plass", "hanging-punctuation", "smart-quotes", "react", "paragraph"],
   "author": "Dustin York (https://typeset.us)",

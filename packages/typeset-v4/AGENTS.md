@@ -1,8 +1,8 @@
-# Typeset 4.3.1: agent integration contract
+# Typeset 4.3.2: agent integration contract
 
-Status: public release 4.3.1, a patch release of 4.3.0, which follows 4.2.0.
+Status: public release 4.3.2, a patch release of 4.3.1, which follows 4.2.0.
 Install the exact version,
-`npm i -E typeset.us@4.3.1`, or the pinned go@4.3.1.js with its integrity
+`npm i -E typeset.us@4.3.2`, or the pinned go@4.3.2.js with its integrity
 hash from https://typeset.us/sri.json, with project-owner approval, and
 retain the prior dependency/deployment for rollback. Never recommend the
 unpinned go.js for a production site. No telemetry, install hook, or
@@ -158,7 +158,7 @@ Read MIGRATION.md and SUPPORT.md inside this package. Keep the prior version pin
 the pilot passes. New globals use window.Typeset; go.js targets [data-typeset]
 explicitly. Restore or disconnect DOM ownership, unmount React, restore list
 styling, and revert the recorded dependency/deployment to roll back.
-The website go@4.3.1.js, and the identical typeset.us/auto (dist/auto.js)
+The website go@4.3.2.js, and the identical typeset.us/auto (dist/auto.js)
 in this package, keep the broad automatic prose/headings scope and craft
 defaults of the previous website loader, with one change: they also compose
 content inside .demo and [data-no-smooth], which go@4.2.0.js skipped (mark it

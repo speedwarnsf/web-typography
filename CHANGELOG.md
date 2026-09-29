@@ -57,6 +57,17 @@ composes.
   in Chromium and Firefox (WebKit has no `requestIdleCallback`; the
   adapters use a timer there).
 
+### Known limitations
+
+- **The catch-up spends frame time when a script fills every frame.**
+  Measured once in Chromium at 4x CPU on a 120 Hz display, with a
+  requestAnimationFrame loop doing 10 ms of work a frame: after a width
+  change, 4.3.2 composed the 23 off-screen blocks in about 1.3 s, spending
+  up to 12 ms of each frame on them (92 fps fell to 66-75, frames over 20 ms
+  rose from 2-3 to 31-39, no new long task). 4.3.1 kept those frames free
+  but left 21 of the 23 blocks native at 3 s. On a 60 Hz display the same
+  work leaves idle time, and the catch-up waits for it.
+
 ## 4.3.1 - 2026-09-29
 
 4.3.1 is a patch release of 4.3.0: no API, option, outcome code or default

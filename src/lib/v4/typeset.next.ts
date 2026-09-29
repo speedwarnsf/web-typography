@@ -22,7 +22,7 @@ import { mountOwners, mountWaiters } from './ownership';
 import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
 
-export const VERSION = '4.3.1';
+export const VERSION = '4.3.2';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 /**
  * Composition options. Defaults are those of the typeset.us package entry
