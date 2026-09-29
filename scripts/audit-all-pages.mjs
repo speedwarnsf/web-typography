@@ -23,7 +23,7 @@ const PAGES = [
   '/pairing-cards',
   '/rhetoric',
   '/specimen',
-  '/support',
+  '/sponsor',
   '/variable-fonts',
 ];
 

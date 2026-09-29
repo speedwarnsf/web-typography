@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Report a security problem privately
-    url: https://github.com/speedwarnsf/web-typography/security/advisories/new
-    about: Please do not open a public issue for a vulnerability. See SECURITY.md.
-  - name: Ask or share in Discussions
-    url: https://github.com/speedwarnsf/web-typography/discussions
-    about: Ideas, show-and-tell and open-ended questions.
+    url: https://github.com/speedwarnsf/web-typography/blob/master/SECURITY.md
+    about: Please do not open a public issue for a vulnerability. SECURITY.md gives the address to email.
+  - name: Get help
+    url: https://typeset.us/help
+    about: Where to look first, how to check your page, and how to reach the maintainer.

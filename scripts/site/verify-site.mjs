@@ -45,7 +45,7 @@ let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 
-const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/support', '/utility', '/v2', '/variable-fonts'];
+const ROUTES = ['/', '/about', '/animations', '/audit', '/clamp', '/dna', '/essay', '/faq', '/fix', '/font-inspector', '/for-agents', '/help', '/install', '/install/frameworks', '/library', '/list-test', '/pairing-cards', '/perfect-paragraph', '/privacy', '/proof', '/reading-lab', '/rhetoric', '/silver-bullet', '/specimen', '/sponsor', '/utility', '/v2', '/variable-fonts'];
 const ATTACK = `<!doctype html><html><head>
 <base href="https://attacker.invalid/">
 <meta http-equiv="refresh" content="0;url=https://attacker.invalid/">
@@ -247,7 +247,7 @@ try {
     }
 
     // D5: titles, descriptions and unfurl images.
-    for (const route of ['/', '/support', '/library', '/install/frameworks']) {
+    for (const route of ['/', '/sponsor', '/library', '/install/frameworks']) {
       const html = decode(await (await fetch(base + route)).text());
       const meta = (/** @type {string} */ key) => new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`).exec(html)?.[1] ?? null;
       const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
@@ -257,7 +257,15 @@ try {
       check('content', `${route}: own title, description and an og:image that renders`, !!title && !!meta('description') && !!meta('og:title') && imageOK, { title, description: meta('description'), image, imageOK });
     }
     check('content', '/privacy has its own title', decode(await (await fetch(base + '/privacy')).text()).includes('<title>Privacy: what typeset.us collects</title>'));
-    check('content', '/ and /support have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/support')).text()).includes('<title>Support Typeset'));
+    check('content', '/ and /sponsor have their own titles', decode(await (await fetch(base + '/')).text()).includes('<title>Typeset: better line breaks for web text</title>') && decode(await (await fetch(base + '/sponsor')).text()).includes('<title>Sponsor Typeset'));
+    // The Stripe page moved from /support; published 3.x manifests still link there.
+    const moved = await fetch(base + '/support', { redirect: 'manual' });
+    check('content', '/support redirects permanently (308) to /sponsor', moved.status === 308 && new URL(moved.headers.get('location') ?? '', base).pathname === '/sponsor', { status: moved.status, location: moved.headers.get('location') });
+    // Help pages, and menu labels: "Help" and "Sponsor", never "Support".
+    const help = decode(await (await fetch(base + '/help')).text());
+    check('content', '/help has its own title and links the FAQ, docs, both issue forms, the security policy and Sponsor', help.includes('<title>Help: questions, bad breaks and security reports</title>') && ['href="/faq"', 'href="/docs"', 'template=bad-break.yml', 'template=integration-question.yml', '/SECURITY.md"', 'href="/sponsor"'].every(link => help.includes(link)));
+    const menu = await readFile('src/lib/sitemap.ts', 'utf8');
+    check('content', 'the menu and command palette name Help and Sponsor, and no page "Support"', /name: "Help"/.test(menu) && /name: "Sponsor"/.test(menu) && !/name: "Support"/.test(menu));
 
     // D5: the homepage names its baseline by engine and claims only what that
     // engine does; the developer band links to GitHub, npm and the docs.

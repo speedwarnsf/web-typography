@@ -76,7 +76,7 @@ export default function Privacy() {
           Variable Fonts is read in your browser and never uploaded.
         </p>
         <p className="in-lede">
-          <strong>Payments.</strong> The <Link href="/support">support page</Link>{' '}
+          <strong>Payments.</strong> The <Link href="/sponsor">sponsor page</Link>{' '}
           links to Stripe. Nothing reaches Stripe until you follow a link, and
           Stripe handles the payment under{' '}
           <a href="https://stripe.com/privacy">its privacy policy</a>.
