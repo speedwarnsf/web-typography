@@ -217,12 +217,15 @@ Markup only, no change to layout:
   server-rendering marker (`#__next`, `#__NEXT_DATA__`, `self.__next_f`,
   `#___gatsby`, `[data-framer-hydrate-v2]`, `astro-island`,
   `[data-server-rendered]`, or a React root already on the document, the
-  body or a child of the body) the first composition waits for the load
-  event, then the framework's own signal (React: a root and a fiber on each
-  server-rendered target or an ancestor; Astro: no `astro-island[ssr]` left,
-  apart from `client:visible` and `client:media` islands; Vue 2: no
-  `[data-server-rendered]` left), then one idle callback, capped at 10 s
-  after load. Without a marker the timing is 4.3's.
+  body or a child of the body) the first composition waits for the
+  framework's own signal (React: a root and a fiber on each server-rendered
+  target or an ancestor; Astro: no `astro-island[ssr]` left, apart from
+  `client:visible` and `client:media` islands; Vue 2: no
+  `[data-server-rendered]` left), then one idle callback, the whole wait
+  capped at 10 s from the loader's start. It does not wait for the load
+  event once the framework has hydrated; under
+  `data-typeset-defer="hydration"` with no React root yet, it waits for the
+  load event first. Without a marker the timing is 4.3's.
 - **The CDN default file.** The package's `jsdelivr` and `unpkg` fields
   point at `dist/auto.js`, the automatic loader. In 4.3 the bare
   `https://cdn.jsdelivr.net/npm/typeset.us` URL served
@@ -268,9 +271,12 @@ Markup only, no change to layout:
 
 ### Known limitations
 
-- A marked page whose framework never hydrates composes 10 s after load,
-  and so does one where a third-party script adds paragraphs inside a React
-  root before DOMContentLoaded. Wix pages carry no marker in the list and
+- A marked page whose framework never hydrates composes 10 s after the
+  loader starts, and so does one where a third-party script adds paragraphs
+  inside a React root before DOMContentLoaded. In Chromium and WebKit the
+  first composition still comes no earlier than the load event, as in 4.3:
+  `mount()` waits for `document.fonts.ready`, which they resolve only at
+  load (Firefox before it). Wix pages carry no marker in the list and
   keep 4.3's timing unless they add `data-typeset-defer="hydration"`, which
   waits for React only when its root exists by the load event.
   `[data-framer-hydrate-v2]` has not been checked on a live Framer site.

@@ -6,11 +6,13 @@
  *
  * On a page with a server-rendering marker, or with
  * data-typeset-defer="hydration" on the loader's script, the first
- * composition waits for the load event, then for the framework's own signal
- * where one is known, then for one idle callback (a timer where there are
- * none), all capped at HYDRATION_CAP_MS after load. data-typeset-defer="none"
- * keeps 4.3's timing: compose at DOMContentLoaded. Without a marker the timing
- * is 4.3's too. */
+ * composition waits for the framework's own signal where one is known (or,
+ * where none is yet, for the load event), then for one idle callback (a timer
+ * where there are none), the whole wait capped at HYDRATION_CAP_MS from the
+ * loader's call. data-typeset-defer="none" keeps 4.3's timing: compose at
+ * DOMContentLoaded. Without a marker the timing is 4.3's too. (mount() then
+ * waits for document.fonts.ready, which Chromium and WebKit resolve only at
+ * the load event.) */
 import { trackWork } from './settled';
 
 /** Next.js (pages and app router), Gatsby, Framer, Astro islands and Vue 2
@@ -74,22 +76,38 @@ export function afterHydration(doc: Document, selector: string, defer: string | 
   const reactMarked = nextData || !!doc.querySelector(REACT_MARKERS);
   // whenSettled() waits for this too.
   const untrack = trackWork(() => true);
+  // The whole wait, the load event included, is capped from here. Capped
+  // from the load event, a marked page that never hydrated composed 10 s
+  // after its load, however late that came (an image or an iframe still
+  // loading, a stalled request).
+  const deadline = performance.now() + HYDRATION_CAP_MS;
   return new Promise<void>(resolve => {
+    let loaded = doc.readyState === 'complete', finished = false;
+    let timer: number | undefined;
     const done = () => { untrack(); resolve(); };
-    const loaded = () => {
-      const deadline = performance.now() + HYDRATION_CAP_MS;
+    const finish = () => {
+      finished = true;
+      view.clearTimeout(timer);
+      view.removeEventListener('load', onLoad);
+      const left = Math.max(1, deadline - performance.now());
+      if (typeof view.requestIdleCallback === 'function') view.requestIdleCallback(done, { timeout: left });
+      else view.setTimeout(done, Math.min(left, POLL_MS));
+    };
+    const poll = () => {
+      if (finished) return;
       // Under data-typeset-defer="hydration" without a marker, a React root
       // present by the load event is waited for too.
       const react = reactMarked || reactRoots(doc).length > 0;
-      const poll = () => {
-        if (waiting(doc, server, react) && performance.now() < deadline) { view.setTimeout(poll, POLL_MS); return; }
-        const left = Math.max(1, deadline - performance.now());
-        if (typeof view.requestIdleCallback === 'function') view.requestIdleCallback(done, { timeout: left });
-        else view.setTimeout(done, Math.min(left, POLL_MS));
-      };
-      poll();
+      // Before the load event only the framework's own signal ends the wait:
+      // a marked page, or one with a React root, whose server HTML no longer
+      // waits for it. Without either (data-typeset-defer="hydration" and no
+      // React root yet), the load event is waited for, as a framework's
+      // scripts may not have run.
+      if (((loaded || marked || react) && !waiting(doc, server, react)) || performance.now() >= deadline) { finish(); return; }
+      timer = view.setTimeout(poll, Math.min(POLL_MS, Math.max(1, deadline - performance.now())));
     };
-    if (doc.readyState === 'complete') loaded();
-    else view.addEventListener('load', loaded, { once: true });
+    const onLoad = () => { loaded = true; view.clearTimeout(timer); poll(); };
+    if (!loaded) view.addEventListener('load', onLoad, { once: true });
+    poll();
   });
 }

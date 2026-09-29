@@ -174,23 +174,70 @@ for (const config of browsers) {
 // __reactContainer$ on the root when hydrateRoot() runs, __reactFiber$ on each
 // element once its subtree is hydrated (on an ancestor for HTML React never
 // hydrates, such as dangerouslySetInnerHTML). Real React 18 and 19 SSR pages
-// are the adoption hydration probe's.
-const SERVER = (/** @type {string} */ root) => '<html lang="en"><style>p{width:320px;font:20px/1.5 Georgia}</style><body>' + root
+// are the adoption hydration probe's. The hydration wait no longer waits for
+// the load event once hydration is seen, and is capped at 10 s from the
+// loader's start, not from load. A late load: the page is served from
+// PENDING_PAGE with an image whose request is held until release() (a page
+// set with setContent() reports load in Chromium with the image pending).
+// mount() then waits for document.fonts.ready, which Chromium and WebKit
+// resolve only at the load event; Firefox resolves it before.
+const PENDING_PAGE = 'http://typeset.test/page.html', PENDING_IMAGE = 'http://typeset.test/pending.gif';
+const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+/** @param {import('playwright').Page} page @param {string} html @returns {Promise<() => void>} a release of the held image, which lets the load event come */
+async function openPending(page, html) {
+  /** @type {import('playwright').Route[]} */
+  const held = [];
+  await page.route(PENDING_IMAGE, route => { held.push(route); });
+  await page.route(PENDING_PAGE, route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
+  await page.goto(PENDING_PAGE, { waitUntil: 'domcontentloaded' });
+  return () => { for (const route of held.splice(0)) route.fulfill({ contentType: 'image/gif', body: GIF }).catch(() => {}); };
+}
+const SERVER = (/** @type {string} */ root, pending = false) => '<html lang="en"><style>p{width:320px;font:20px/1.5 Georgia}</style><body>' + root
+  + (pending ? '<img src="' + PENDING_IMAGE + '" alt="" width="1" height="1">' : '')
   + '<p data-typeset>Your browser does not know what a sentence is. It does not know that a thought should not snap in half, or that a word left alone on a line looks abandoned.</p>'
   + '<div class="html"><p data-typeset>It fills each line until the words run out, and calls that typography, which it is not, and a compositor would not either.</p></div></div></body></html>';
+const composedAll = (/** @type {(string | null)[]} */ list) => list.every(o => o === 'composed:rich');
 for (const config of browsers) {
   const browser = await config.engine.launch({ executablePath: config.executablePath });
+  // Opened first and read after the other variants: a marked page that never
+  // hydrates, its load event at 11 s. Capped from load, it composed at 21 s.
+  const capLabel = 'package go.js hydration (#__next, never hydrated, load event at 11 s)';
+  let capRelease = () => {};
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let capTimer;
+  const capPage = await browser.newPage();
+  try {
+    capRelease = await openPending(capPage, SERVER('<div id="__next">', true));
+    await capPage.evaluate(content => {
+      const w = /** @type {any} */ (window);
+      const script = document.createElement('script');
+      script.textContent = content;
+      const start = performance.now();
+      document.head.append(script);
+      w.capResult = w.TypesetReady.then(() => ({ at: Math.round(performance.now() - start), state: document.readyState, outcomes: [...document.querySelectorAll('p[data-typeset]')].map(p => /** @type {HTMLElement} */ (p).dataset.tsOutcome || null) }));
+    }, await readFile(artifacts.go, 'utf8'));
+    capTimer = setTimeout(() => capRelease(), 11000);
+  } catch (error) {
+    errors.push({ browser: config.name, error: capLabel + ': ' + String(/** @type {Error} */ (error).stack || error) });
+  }
   try {
     for (const [loader, file] of [['package go.js', artifacts.go], ...(hasAuto ? [['package auto.js', artifacts.auto]] : [])]) {
       const content = await readFile(file, 'utf8');
-      for (const [variant, root, defer] of [['#__next', '<div id="__next">', ''], ['#__next, data-typeset-defer="none"', '<div id="__next">', 'none'], ['no marker, data-typeset-defer="hydration"', '<div id="app">', 'hydration']]) {
+      for (const [variant, root, defer, pending] of /** @type {[string, string, string, boolean][]} */ ([['#__next', '<div id="__next">', '', false], ['#__next, load event pending', '<div id="__next">', '', true], ['#__next, data-typeset-defer="none"', '<div id="__next">', 'none', false], ['no marker, data-typeset-defer="hydration"', '<div id="app">', 'hydration', false]])) {
         const label = `${loader} hydration (${variant})`;
         /** @param {string} what @param {unknown} pass @param {unknown} [detail] */
         const check = (what, pass, detail) => checks.push({ browser: config.name, label: `${label}: ${what}`, pass: !!pass, ...(pass ? {} : { detail }) });
         const page = await browser.newPage();
         page.setDefaultTimeout(20000);
+        let release = () => {};
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
+        let releaseTimer;
         try {
-          await page.setContent(SERVER(root));
+          if (pending) {
+            release = await openPending(page, SERVER(root, true));
+            // The load event comes at about 1.5 s, after hydration (700 ms).
+            releaseTimer = setTimeout(() => release(), 1500);
+          } else await page.setContent(SERVER(root));
           const r = await page.evaluate(async ({ content, defer }) => {
             const w = /** @type {any} */ (window);
             const sleep = (/** @type {number} */ ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -201,7 +248,10 @@ for (const config of browsers) {
             script.textContent = content;
             const start = performance.now();
             document.head.append(script);
-            const ready = w.TypesetReady.then(() => performance.now() - start);
+            /** @type {string | null} */
+            let stateAtReady = null, fontsState = null;
+            document.fonts.ready.then(() => { fontsState = document.readyState; });
+            const ready = w.TypesetReady.then(() => { stateAtReady = document.readyState; return performance.now() - start; });
             const settled = w.Typeset.whenSettled().then((/** @type {{ settled: boolean }} */ s) => ({ ...s, at: performance.now() - start, outcomes: outcomes() }));
             await sleep(400);
             const beforeRoot = outcomes();
@@ -213,24 +263,40 @@ for (const config of browsers) {
             /** @type {any} */ (paragraphs[0])['__reactFiber$e3'] = {};
             /** @type {any} */ (document.querySelector('.html'))['__reactFiber$e3'] = {};
             const readyAt = await Promise.race([ready, sleep(3000).then(() => null)]);
-            return { beforeRoot, beforeFiber, hydratedAt, readyAt, settled: await settled, after: outcomes() };
+            return { beforeRoot, beforeFiber, hydratedAt, readyAt, stateAtReady, fontsState, settled: await settled, after: outcomes() };
           }, { content, defer });
-          const composed = (/** @type {(string | null)[]} */ list) => list.every(o => o === 'composed:rich');
+          const composed = composedAll;
           const untouched = (/** @type {(string | null)[]} */ list) => list.every(o => o === null);
-          if (variant === '#__next') {
+          if (!defer) {
             check('nothing is composed before React hydrates, with the root marked or not', untouched(r.beforeRoot) && untouched(r.beforeFiber), r);
             check('composes once each server-rendered paragraph, or its ancestor, is hydrated', r.readyAt !== null && r.readyAt > r.hydratedAt && composed(r.after), r);
             check('whenSettled() waits for the hydration wait and the composition', r.settled.settled === true && r.settled.at > r.hydratedAt && composed(r.settled.outcomes), r.settled);
+            if (pending) check('composes before the load event where document.fonts.ready resolves before it (Firefox; Chromium and WebKit resolve it at load)', r.fontsState !== 'interactive' || r.stateAtReady === 'interactive', r);
           } else {
             check('composes without waiting for hydration', r.readyAt !== null && r.readyAt < 400 && composed(r.beforeRoot), r);
             check('whenSettled() resolves once composed', r.settled.settled === true && composed(r.settled.outcomes), r.settled);
           }
         } catch (error) {
           errors.push({ browser: config.name, error: label + ': ' + String(/** @type {Error} */ (error).stack || error) });
-        } finally { await page.close(); }
+        } finally {
+          clearTimeout(releaseTimer);
+          release();
+          await page.close();
+        }
       }
     }
-  } finally { await browser.close(); }
+    try {
+      const cap = await capPage.evaluate(() => Promise.race([/** @type {any} */ (window).capResult, new Promise(resolve => setTimeout(() => resolve(null), 15000))]));
+      const pass = cap !== null && cap.at >= 9900 && cap.at < 12000 && composedAll(cap.outcomes);
+      checks.push({ browser: config.name, label: `${capLabel}: composes by 12 s, the 10 s cap running from the loader's start (Chromium and WebKit at load, as document.fonts.ready waits for it)`, pass, ...(pass ? {} : { detail: cap }) });
+    } catch (error) {
+      errors.push({ browser: config.name, error: capLabel + ': ' + String(/** @type {Error} */ (error).stack || error) });
+    }
+  } finally {
+    clearTimeout(capTimer);
+    capRelease();
+    await browser.close();
+  }
 }
 
 const failures = checks.filter(c => !c.pass);
