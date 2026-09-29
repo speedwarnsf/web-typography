@@ -10,7 +10,7 @@ Hashes for every published version live in
 
 ---
 
-## 4.4.0 - Unreleased
+## 4.4.0 - 2026-09-29
 
 4.4.0 is a minor release of 4.3: the adoption fixes. It guards against a
 freeze that user-generated text could cause, reads more `lang` spellings,
