@@ -368,7 +368,7 @@ I need it?" list has a languages row.
 - Size budgets and the unpacked-package cap are raised to the measured
   figures, with the reasons recorded.
 
-## 4.3.2 - Unreleased
+## 4.3.2 - 2026-09-29
 
 4.3.2 is a patch release of 4.3.1: no API, option, outcome code or default
 changed. It fixes how slowly the React adapters caught up with off-screen

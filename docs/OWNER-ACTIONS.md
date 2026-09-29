@@ -151,14 +151,11 @@ Checked 2026-09-29.
     npm view 'typeset.us@>=4.0.0 <4.3.0' deprecated
     ```
 
-- **Publishing access still allows tokens.** After the first release with
-  provenance: npmjs.com > typeset.us > Settings > Publishing access >
-  "Require two-factor authentication and disallow tokens", so only the
-  workflow can publish.
-- **Two publish tokens from 2026-07-09 are active, and one is in
-  `~/.npmrc`.** `npm token list`, then `npm token revoke <id>` for each,
-  and delete the `//registry.npmjs.org/:_authToken=` line from `~/.npmrc`,
-  so no script or agent running as the owner can publish.
+- **Done 2026-09-29: publishing access allows no tokens.** npmjs.com >
+  typeset.us > Settings > Publishing access is "Require two-factor
+  authentication and disallow bypass 2fa tokens", and the account's
+  publish tokens were revoked, so only release.yml (trusted publishing,
+  environment `npm`, owner approval) can publish.
 
 ### Vercel
 
