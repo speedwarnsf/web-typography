@@ -98,7 +98,15 @@ try {
   // react.cjs), and SUPPORT.md's and MIGRATION.md's notes on them. Before
   // that on-screen rule the branch measured 1,899,954 B, 46 B under the old
   // limit, so the limit moves to 1.91 MB rather than any fix being dropped.
-  check('unpacked package is under 1.91 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1910000, packed.unpackedSize);
+  // The 4.4 adoption fixes (E1) took it to 1.94 MB (1,936,451 B, +33,544 B
+  // over 4.3.1's 1,902,907 B, 87 files): the run budget, the markers'
+  // stylesheet with its inline fallback, the copy option and the clipped
+  // audit item in each of the six engine bundles (+2.0 to +3.4 KB each),
+  // react.js (+0.9 KB) and both source maps (+2.2 KB each), their
+  // declarations (lifecycle.d.ts and .d.cts +1.8 KB each), the marker rules
+  // in dist/styles.css (+958 B), and capabilities.json, OUTCOMES.md and
+  // README.md (+2.3 KB together).
+  check('unpacked package is under 1.94 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1940000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];
