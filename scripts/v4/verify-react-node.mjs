@@ -65,8 +65,8 @@ for (const [major, types] of /** @type {const} */ ([['18', join(env.modules, '@t
   await mkdir(join(consumer, 'node_modules/typeset.us'), { recursive: true });
   await cp(declarations, join(consumer, 'node_modules/typeset.us/dist'), { recursive: true });
   await copyFile('packages/typeset-v4/package.json', join(consumer, 'node_modules/typeset.us/package.json'));
-  for (const [entry, body] of /** @type {const} */ ([['auto', 'const c = await window.TypesetReady; c.refresh(); window.Typeset.auditJSON();'],
-    ['go', 'const c = await window.TypesetReady; c.disconnect(); window.Typeset.auditJSON();'], ['global', 'window.Typeset.typeset(document.body);']])) {
+  for (const [entry, body] of /** @type {const} */ ([['auto', 'const c = await window.TypesetReady; c.refresh(); window.Typeset.auditJSON(); const s: boolean = (await window.Typeset.whenSettled({ timeout: 5000 })).settled; void s;'],
+    ['go', 'const c = await window.TypesetReady; c.disconnect(); window.Typeset.auditJSON();'], ['opt-in', 'const c = await window.TypesetReady; c.refresh(); await window.Typeset.whenSettled();'], ['global', 'window.Typeset.typeset(document.body);']])) {
     await writeFile(join(consumer, `${entry}.ts`), `import 'typeset.us/${entry}';\n${body}\nexport {};\n`);
     await writeFile(join(consumer, `tsconfig.${entry}.json`), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, skipLibCheck: false, target: 'es2022', module: 'esnext', moduleResolution: 'bundler', lib: ['es2022', 'dom'], types: [] }, files: [`${entry}.ts`] }, null, 2));
     const run = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(consumer, `tsconfig.${entry}.json`)], { encoding: 'utf8', timeout: 120000 });

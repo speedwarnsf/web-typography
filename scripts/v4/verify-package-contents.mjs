@@ -61,7 +61,13 @@ try {
   check('exports ./auto -> dist/auto.js with the loader globals\' types (go.d.ts), packed', pkg.exports?.['./auto']?.default === './dist/auto.js' && pkg.exports?.['./auto']?.types === './dist/go.d.ts'
     && files.has('dist/auto.js') && files.has('dist/go.d.ts') && pkg.typesVersions?.['*']?.auto?.[0] === 'dist/go.d.ts', { auto: pkg.exports?.['./auto'], typesVersions: pkg.typesVersions });
   check('dist/auto.js is side-effectful (never tree-shaken away)', pkg.sideEffects?.includes('./dist/auto.js'), pkg.sideEffects);
-  check('bare jsDelivr and unpkg URLs serve the browser global, not CommonJS', pkg.jsdelivr === './dist/typeset.global.js' && pkg.unpkg === './dist/typeset.global.js' && files.has('dist/typeset.global.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // 4.4: a bare CDN URL does what a newcomer expects, the automatic loader
+  // (4.3 served the API-only browser global, which composes nothing).
+  check('bare jsDelivr and unpkg URLs serve the automatic loader (dist/auto.js), not CommonJS', pkg.jsdelivr === './dist/auto.js' && pkg.unpkg === './dist/auto.js' && files.has('dist/auto.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // ./opt-in names what ./go does (compose only [data-typeset]); ./go stays
+  // as a deprecated alias of the same file until at least 5.0.
+  check('exports ./opt-in and ./go resolve to the same file and types (dist/go.js, go.d.ts), packed', ['./opt-in', './go'].every(entry => pkg.exports?.[entry]?.default === './dist/go.js' && pkg.exports?.[entry]?.types === './dist/go.d.ts')
+    && files.has('dist/go.js') && pkg.typesVersions?.['*']?.['opt-in']?.[0] === 'dist/go.d.ts' && pkg.typesVersions?.['*']?.go?.[0] === 'dist/go.d.ts', { optIn: pkg.exports?.['./opt-in'], go: pkg.exports?.['./go'], typesVersions: pkg.typesVersions });
   const siteGo = artifacts.siteGo;
   if (files.has('dist/auto.js')) {
     const [auto, site] = await Promise.all([readFile(`${staged.dir}/dist/auto.js`), readFile(siteGo)]);

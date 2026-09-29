@@ -11,9 +11,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/typeset.release.d.ts",
-  "jsdelivr": "./dist/typeset.global.js",
-  "unpkg": "./dist/typeset.global.js",
-  "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"], "global": ["dist/global.d.ts"], "go": ["dist/go.d.ts"], "auto": ["dist/go.d.ts"] } },
+  "jsdelivr": "./dist/auto.js",
+  "unpkg": "./dist/auto.js",
+  "typesVersions": { "*": { "react": ["dist/typeset.release.react.d.ts"], "global": ["dist/global.d.ts"], "go": ["dist/go.d.ts"], "opt-in": ["dist/go.d.ts"], "auto": ["dist/go.d.ts"] } },
   "exports": {
     ".": {
       "import": { "types": "./dist/typeset.release.d.ts", "default": "./dist/index.js" },
@@ -25,6 +25,7 @@
       "default": { "types": "./dist/typeset.release.react.d.ts", "default": "./dist/react.js" }
     },
     "./global": { "types": "./dist/global.d.ts", "default": "./dist/typeset.global.js" },
+    "./opt-in": { "types": "./dist/go.d.ts", "default": "./dist/go.js" },
     "./go": { "types": "./dist/go.d.ts", "default": "./dist/go.js" },
     "./auto": { "types": "./dist/go.d.ts", "default": "./dist/auto.js" },
     "./styles.css": "./dist/styles.css",
