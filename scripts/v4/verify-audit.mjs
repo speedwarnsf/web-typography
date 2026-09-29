@@ -13,6 +13,7 @@
 //    after "a.m." or "No." ending a sentence. A line starting with an elided
 //    word (’n’, ’90s) is not line-initial punctuation.
 //  - The JSON shape and schemaVersion stay those of 4.2.0.
+//  - Text clipped on purpose (ellipsis, line clamp) is a review item (4.4).
 // (regressed-vs-native is checked against every golden cell by verify-golden.)
 import { readFile, writeFile } from 'node:fs/promises';
 import { browsers } from './browsers.mjs';
@@ -133,6 +134,22 @@ for (const { name, engine, executablePath } of browsers) {
     });
     check('no overflow error for a hanging indent (native, excluded, single-line)', hanging.hanging.length === 0 && hanging.lines.every(n => n >= 2), hanging);
     check('real overflow is still an error', hanging.real.length === 1, hanging);
+
+    // Text cut off on purpose, with an ellipsis or a line clamp, is the
+    // author's layout: a clipped review item, not an overflow error, so the
+    // gate passes (4.4; 4.3 failed it). Real overflow is still an error.
+    await tab.setContent(page(`<p id="ellip" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${corpus[15]}</p>`
+      + '<p id="clamp" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">Supercalifragilisticexpialidociousandmoreofit overflows its measure inside a two-line clamp.</p>'
+      + '<p id="o1" style="width:120px">Supercalifragilisticexpialidocious overflows its measure.</p>'));
+    await tab.addScriptTag({ content: subject });
+    const clipped = await tab.evaluate(() => {
+      for (const id of ['ellip', 'clamp', 'o1']) window.Typeset.typeset(/** @type {HTMLElement} */ (document.getElementById(id)));
+      const summary = (/** @type {string} */ selector) => { const json = window.Typeset.auditJSON(selector); return { pass: json.pass, errors: json.errors, issues: json.issues.map((/** @type {any} */ issue) => issue.severity + ' ' + issue.type) }; };
+      return { ellip: summary('#ellip'), clamp: summary('#clamp'), real: summary('#o1'), detail: window.Typeset.auditJSON('#ellip').issues.map((/** @type {any} */ issue) => issue.detail) };
+    });
+    check('an ellipsis clipped on purpose (nowrap, hidden, ellipsis) passes with one clipped review item', clipped.ellip.pass && clipped.ellip.errors === 0 && JSON.stringify(clipped.ellip.issues) === '["review clipped"]', clipped);
+    check('a line clamp clipping a long word is a clipped review item, not an overflow error', clipped.clamp.issues.includes('review clipped') && !clipped.clamp.issues.includes('error overflow'), clipped);
+    check('overflow without clipping is still an error', clipped.real.issues.includes('error overflow') && !clipped.real.pass, clipped);
   } catch (error) { report.errors.push({ browser: name, error: String(/** @type {Error} */ (error).stack) }); }
   finally { await browser.close(); }
 }

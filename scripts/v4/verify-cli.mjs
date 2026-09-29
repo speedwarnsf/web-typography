@@ -62,6 +62,7 @@ const server = http.createServer((req, res) => {
   if (req.url === '/long-loader') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/go.js" data-typeset-selector="article p" defer></script>')); return; }
   if (req.url === '/long-mount') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(longPage('<script src="/typeset.js"></script><script>Typeset.mount(document, "article p");</script>')); return; }
   if (req.url === '/style.css') { res.writeHead(200, { 'content-type': 'text/css' }); res.end(css); return; }
+  if (req.url === '/ellipsis') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(plain + `<p id="ellip" data-typeset style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${corpus[15].replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p><script src="/go.js" defer></script></body></html>`); return; }
   const managed = req.url?.endsWith('managed') ? '<script src="/go.js" data-typeset-smart-quotes="en" data-typeset-optical-hanging="true" defer></script>' : '';
   if (req.url?.startsWith('/strict')) { res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': STRICT }); res.end(strict + managed + '</body></html>'); return; }
   res.writeHead(200, { 'content-type': 'text/html' });
@@ -113,6 +114,17 @@ try {
       const pass = result.code === expected && output?.pass === false;
       checks.push({ label, pass, exitCode: result.code, ...(pass ? {} : { detail }) });
     }
+  }
+  // Text the page clips on purpose with an ellipsis is a review item and the
+  // gate passes (4.4; 4.3 reported an overflow error and exit 1).
+  {
+    const result = await invoke(['--url', `${base}/ellipsis`, '--widths', '320']);
+    let output = null;
+    try { output = JSON.parse(result.stdout); } catch {}
+    /** @type {{ type: string, severity: string, target: string }[]} */
+    const issues = output?.reports?.[0]?.issues ?? [];
+    const pass = result.code === 0 && output?.pass === true && issues.some(issue => issue.type === 'clipped' && issue.severity === 'review' && issue.target === '#ellip') && !issues.some(issue => issue.type === 'overflow');
+    checks.push({ label: 'a paragraph clipped with an ellipsis is a clipped review item, and the audit passes', pass, exitCode: result.code, ...(pass ? {} : { detail: { issues, stderr: result.stderr.slice(0, 300) } }) });
   }
 } catch (error) {
   errors.push({ error: String(/** @type {Error} */ (error).stack || error) });

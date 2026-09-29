@@ -770,11 +770,20 @@ export function auditReport(selector = defaults): AuditReport {
     }
     const layout = measureForAudit(element);
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
-    if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
+    const style = getComputedStyle(element);
+    if (layout.overflow > 0.75) {
+      // Text cut off on purpose (overflow hidden or clip with an ellipsis or
+      // a line clamp) is the author's layout: a review item, not an error.
+      const clips = ['hidden', 'clip'].includes(style.overflowX) || ['hidden', 'clip'].includes(style.overflowY);
+      const clamp = parseInt(style.getPropertyValue('-webkit-line-clamp'), 10) > 0;
+      if (clips && (/ellipsis/.test(style.textOverflow) || clamp)) {
+        add('clipped', 'review', layout.overflow.toFixed(2) + 'px clipped on purpose (overflow: ' + (['hidden', 'clip'].includes(style.overflowX) ? style.overflowX : style.overflowY)
+          + (clamp ? ', -webkit-line-clamp: ' + style.getPropertyValue('-webkit-line-clamp') : ', text-overflow: ellipsis') + ')');
+      } else add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
+    }
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
     // Composed while left-aligned, then justified: every generated break now
     // ends a line that takes the last-line alignment.
-    const style = getComputedStyle(element);
     if (outcome.startsWith('composed') && breaksChangeAlignment(style)) {
       add('alignment-lost', 'error', 'text-align: ' + style.textAlign + (style.textAlignLast && style.textAlignLast !== 'auto' ? ', text-align-last: ' + style.textAlignLast : '')
         + ' cannot apply to composed lines, which each end in a generated break');
