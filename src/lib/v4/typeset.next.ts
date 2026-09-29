@@ -1300,21 +1300,24 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     // Reads only. A write here that changed any observed size would make every
     // engine report "ResizeObserver loop completed with undelivered notifications".
     let widened = false;
-    // A mutation this layout already shows, with its record still queued: an
-    // outside change, whatever else composed. WebKit delivers the records of
-    // a mutation an about:blank page makes in its same-origin iframe after
-    // that frame's ResizeObserver callbacks. Counted as our own, an author's
-    // width change kept lines composed for the old width. The records are
-    // handled in the next task, since nothing here may write.
-    const queued = observer.takeRecords();
-    if (queued.length) {
-      if (queued.some(outside)) triggeredSince = true;
-      late = late.concat(queued);
-      if (lateTimer === undefined) lateTimer = setTimeout(() => { lateTimer = undefined; if (!stopped) drain(); }, 0);
+    // Only our compositions, as far as the signals delivered so far tell. A
+    // mutation this layout already shows may still have its record queued:
+    // WebKit delivers the records of a mutation an about:blank page makes in
+    // its same-origin iframe after that frame's ResizeObserver callbacks.
+    // Counted as our own, an author's width change kept lines composed for
+    // the old width. Queued records, this controller's and the lifecycle
+    // hub's (in mount(body) only the hub observes <head>), are outside
+    // changes; they are handled in the next task, since nothing here may
+    // write.
+    if (composedSince && !triggeredSince) {
+      const queued = observer.takeRecords();
+      if (queued.length) {
+        if (queued.some(outside)) triggeredSince = true;
+        late = late.concat(queued);
+        if (lateTimer === undefined) lateTimer = setTimeout(() => { lateTimer = undefined; if (!stopped) drain(); }, 0);
+      }
+      if (!triggeredSince && signalQueued(doc)) triggeredSince = true;
     }
-    // The same for a stylesheet change: in mount(body) only the lifecycle
-    // hub observes <head>.
-    if (signalQueued(doc)) triggeredSince = true;
     const own = composedSince && !triggeredSince;
     composedSince = triggeredSince = false;
     for (const entry of entries) {

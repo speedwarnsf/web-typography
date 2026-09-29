@@ -206,11 +206,23 @@ function start(doc: Document): Hub {
     if (styles) { notify(hub, client => client.styles?.()); armFonts(doc); }
   };
   const observer = new MutationObserver(handle);
+  // Records taken from the queue (see signalQueued), handled in the next
+  // task, and whether any is a signal: every controller whose
+  // ResizeObserver delivers in this frame asks, and the first takes them.
+  let taken: MutationRecord[] = [], signalled = false;
+  let takenTimer: ReturnType<typeof setTimeout> | undefined;
   hub.take = () => {
     const records = observer.takeRecords();
-    if (!records.length) return false;
-    setTimeout(() => { if (hubs.get(doc) === hub) handle(records); }, 0);
-    return records.some(record => signal(record) !== '');
+    if (records.length) {
+      taken = taken.concat(records);
+      if (records.some(record => signal(record) !== '')) signalled = true;
+      if (takenTimer === undefined) takenTimer = setTimeout(() => {
+        const batch = taken;
+        taken = []; signalled = false; takenTimer = undefined;
+        if (hubs.get(doc) === hub) handle(batch);
+      }, 0);
+    }
+    return signalled;
   };
   if (doc.documentElement) observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class'] });
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: ['media', 'disabled', 'href', 'rel'] });
@@ -243,8 +255,8 @@ function start(doc: Document): Hub {
  * laid out, but not yet delivered to the hub's MutationObserver. WebKit
  * delivers the records of a mutation that an about:blank page makes in its
  * same-origin iframe after that frame's ResizeObserver callbacks, which call
- * this; the records are taken and delivered in the next task, since those
- * callbacks must not write. */
+ * this. The records are taken and handled in the next task, since those
+ * callbacks must not write; until then every caller is told of them. */
 export function signalQueued(doc: Document): boolean {
   return hubs.get(doc)?.take() ?? false;
 }
