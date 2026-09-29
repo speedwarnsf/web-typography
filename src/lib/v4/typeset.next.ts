@@ -14,6 +14,7 @@ import { exceedsRunBudget, languageOf, languageWeakEnding } from './break-opport
 import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
+import { trackWork } from './settled';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, signalQueued, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
@@ -1574,10 +1575,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   });
   observe();
   const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized, translation: translationChanged });
+  // For whenSettled(): fonts still to arrive, work queued, a resize settling,
+  // or records and a reveal waiting for their task or frame.
+  const untrack = trackWork(() => !stopped && (!fontsReady || pending.size > 0 || resizing.size > 0 || settleTimer !== undefined || lateTimer !== undefined || shownFrame !== 0));
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
       stopped = true;
+      untrack();
       if (timer !== undefined) clearTimeout(timer);
       if (idle !== undefined) cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();

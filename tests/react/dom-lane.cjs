@@ -50,6 +50,10 @@ console.error = (...args) => { out.consoleErrors.push(args.map(String).join(' ')
     const text = document.getElementById('text'), rich = document.getElementById('rich');
     out.rendered = { text: text?.textContent, rich: rich?.textContent, textOutcome: text?.dataset.tsOutcome, richOutcome: rich?.dataset.tsOutcome, richLink: !!rich?.querySelector('a[href="#x"]') };
     out.refs = { text: textRef.current === text, rich: richRef.current === rich };
+    // whenSettled() (4.4) resolves at once where nothing can be composed.
+    const settleStart = Date.now();
+    const settled = await Promise.all([core.whenSettled(), adapters.whenSettled()]);
+    out.settled = { core: settled[0] && settled[0].settled, react: settled[1] && settled[1].settled, ms: Date.now() - settleStart };
     await React.act(async () => { root.render(React.cloneElement(tree)); });
     await React.act(async () => { root.render(React.createElement('div', null, React.createElement(adapters.TypesetText, { id: 'text', lang: 'en', text: 'Updated text.' }))); });
     out.updated = document.getElementById('text')?.textContent;

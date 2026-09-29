@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { TypesetText, TypesetRichText } from '../../src/lib/v4/typeset.release.react';
+import { TypesetText, TypesetRichText, whenSettled } from '../../src/lib/v4/typeset.release.react';
 
 const { useState, useDeferredValue, Suspense, StrictMode, startTransition, Fragment } = React;
 const Activity = (React as any).Activity || (React as any).unstable_Activity;
@@ -23,6 +23,7 @@ const rich = (i: number) => [h(Fragment, { key: 'a' }, 'Before you close the day
 const results: Record<string, number> = {};
 const w = window as any;
 w.__results = results;
+w.whenSettled = whenSettled;
 const counted = (id: string) => (result: { outcome: string }) => { results[id] = (results[id] || 0) + 1; w.__lastResult = w.__lastResult || {}; w.__lastResult[id] = result; };
 
 interface BlocksProps { n: number; kind: 'both' | 'text' | 'rich' | 'labels' | 'plain'; inlineKeep?: boolean; tick: number; onResult?: boolean; width?: number | string; labels?: boolean; priority?: string }

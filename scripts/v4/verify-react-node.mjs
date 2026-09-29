@@ -99,6 +99,7 @@ for (const major of ['18', '19']) {
     check(`${lane}: the text stays readable, links and emphasis included`, seen.rendered?.text === text && seen.rendered?.rich === 'Hello world, with a link.' && seen.rendered?.richLink && seen.updated === 'Updated text.', seen.rendered);
     check(`${lane}: both adapters report native:environment, to the DOM and onResult`, seen.rendered?.textOutcome === 'native:environment' && seen.rendered?.richOutcome === 'native:environment'
       && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'text' && r[1] === 'native:environment') && seen.results?.some((/** @type {string[]} */ r) => r[0] === 'rich' && r[1] === 'native:environment'), { rendered: seen.rendered, results: seen.results });
+    check(`${lane}: whenSettled() from typeset.us and typeset.us/react resolves { settled: true } at once`, seen.settled?.core === true && seen.settled?.react === true && seen.settled.ms < 200, seen.settled);
     check(`${lane}: refs resolve to the host elements`, seen.refs?.text && seen.refs?.rich, seen.refs);
     check(`${lane}: typeset(), mount() and auditJSON() report native:environment and do not throw`, seen.typeset === 'native:environment' && seen.mount === 'native:environment' && seen.audit === 'boolean', seen);
     check(`${lane}: no console errors`, !seen.consoleErrors.length, seen.consoleErrors.slice(0, 4));

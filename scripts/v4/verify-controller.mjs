@@ -16,6 +16,9 @@ for (const { name, engine, executablePath } of browsers) {
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       const until = async test => { const start = performance.now(); while (!test()) { if (performance.now() - start > 5000) throw new Error('Controller update timed out'); await wait(20); } };
       const controller = api.mount(scope, 'p', { density: 'editorial' });
+      // whenSettled() (4.4) covers the first composition as ready does.
+      const first = await api.whenSettled();
+      check('whenSettled() resolves { settled: true } once the mount has composed', first.settled === true && p.dataset.tsOutcome === 'composed:rich', first);
       await controller.ready;
       check('initial composition', p.dataset.tsOutcome === 'composed:rich');
       await wait(150); const settled = controller.stats.passes; await wait(150);
@@ -48,7 +51,19 @@ for (const { name, engine, executablePath } of browsers) {
       const oldParent = inserted.parentElement; inserted.remove(); await wait(80); const beforeInsert = controller.stats.passes; oldParent.append(inserted);
       await until(() => controller.stats.passes > beforeInsert && inserted.dataset.tsOutcome === 'composed:rich');
       check('removed and reinserted nodes survive', inserted.textContent === replacement);
+      // whenSettled() waits out a width change's settle (RESIZE_SETTLE_MS)
+      // and the recomposition; a timeout shorter than that reports false.
+      p.style.width = '260px';
+      const early = await api.whenSettled({ timeout: 40 });
+      const resized = await api.whenSettled();
+      const settledHtml = scope.innerHTML, settledPasses = controller.stats.passes;
+      await wait(300);
+      check('whenSettled({ timeout: 40 }) during a resize settle resolves { settled: false }', early.settled === false, early);
+      check('whenSettled() after a width change resolves once it is recomposed, and nothing changes after', resized.settled === true && api.measureLayout(p).width === 260 && p.dataset.tsOutcome === 'composed:rich'
+        && scope.innerHTML === settledHtml && controller.stats.passes === settledPasses, { resized, width: api.measureLayout(p).width, outcome: p.dataset.tsOutcome, passes: [settledPasses, controller.stats.passes] });
       controller.disconnect();
+      const idle = await api.whenSettled({ timeout: 1000 });
+      check('whenSettled() after disconnect() resolves { settled: true }', idle.settled === true, idle);
       check('disconnect restores source and removes generated output', p.textContent === replacement && !scope.querySelector('[data-ts-break]'));
       const stoppedPasses = controller.stats.passes; p.style.width = '270px'; await wait(100);
       check('disconnect stops observers', controller.stats.passes === stoppedPasses);

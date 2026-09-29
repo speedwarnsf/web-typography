@@ -37,6 +37,7 @@ for (const major of majors) {
   bundles[major] = result.outputFiles[0].text;
 }
 const instrument = await readFile('tests/react/instrument.js', 'utf8');
+const lateFont = await readFile('lab/fraunces-latin-variable.woff2');
 const html = '<!doctype html><html lang="en"><head><style>body{margin:16px;font:18px/1.45 Georgia,serif}.col{display:flex;flex-direction:column;align-items:flex-start}.blk{margin:0 0 10px}.big .blk{font-size:21px}</style></head><body><div id="root"></div><script src="/app.js"></script></body></html>';
 
 const report = { ...await releaseIdentity(), react: majors, browsers: /** @type {Record<string, string>} */ ({}), checks: /** @type {{ browser: string, label: string, pass: boolean, detail?: unknown }[]} */ ([]), errors: /** @type {{ browser: string, error: string }[]} */ ([]), timings: /** @type {Record<string, unknown>} */ ({}) };
@@ -105,9 +106,14 @@ for (const config of selected) {
       page.setDefaultTimeout(20000);
       page.on('pageerror', error => report.errors.push({ browser: config.name, error: prefix + error.message }));
       await page.addInitScript(instrument);
-      await page.route('http://react.test/**', route => route.request().url().endsWith('/app.js')
-        ? route.fulfill({ contentType: 'text/javascript', body: bundles[major] })
-        : route.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
+      await page.route('http://react.test/**', async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundles[major] });
+        // whenSettled(): mount() from the dist's own ESM entry, and a web font that arrives late.
+        if (path.startsWith('/dist/')) return route.fulfill({ contentType: path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream', body: await readFile(join(artifacts.dist, path.slice(6))) });
+        if (path === '/late.woff2') { await new Promise(r => setTimeout(r, 400)); return route.fulfill({ contentType: 'font/woff2', body: lateFont }); }
+        return route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+      });
       await page.goto('http://react.test/index.html');
       await page.waitForFunction(() => /** @type {any} */ (window).booted);
       check('fixture runs the expected React', await page.evaluate(() => /** @type {any} */ (window).T.version) === (major === '18' ? '18.3.1' : '19.2.3'));
@@ -340,6 +346,43 @@ for (const config of selected) {
       check('30 fast mount/unmount cycles leave no observers or listeners', clean(leaks.cycled), leaks.cycled);
       const warnings = await page.evaluate(() => /** @type {any} */ (window).__inst.warnings);
       check('no React warnings or console errors', warnings.length === 0, warnings.slice(0, 5));
+
+      // whenSettled() (4.4): TypesetText and TypesetRichText hosts, on screen
+      // and offscreen, beside a mount() paragraph from another copy of the
+      // engine (dist/index.js), with a web font that arrives 400 ms late. Once
+      // it resolves every host has its outcome and the page holds still.
+      // Last on this page: the second engine copy adds its own per-document listeners.
+      const settle = await page.evaluate(async () => {
+        const w = /** @type {any} */ (window);
+        w.T.render('none');
+        const url = '/dist/index.js';
+        const core = await import(/* @vite-ignore */ url);
+        const face = new FontFace('LateFixture', 'url(/late.woff2)', { weight: '100 900' });
+        document.fonts.add(face);
+        const root = /** @type {HTMLElement} */ (document.getElementById('root'));
+        root.style.fontFamily = 'LateFixture, Georgia, serif';
+        const plain = document.createElement('p');
+        plain.id = 'settle-plain'; plain.className = 'blk'; plain.style.cssText = 'width:330px;font-family:LateFixture, Georgia, serif';
+        plain.textContent = 'A paragraph composed by mount() while the React adapters compose theirs, waiting like them for a web font that arrives late.';
+        document.body.append(plain);
+        const started = performance.now();
+        w.T.render('blocks', { n: 30, kind: 'both' });
+        const controller = core.mount(document.body, '#settle-plain');
+        void face.load();
+        const [react, engine] = await Promise.all([w.whenSettled(), core.whenSettled()]);
+        const hosts = Array.from(document.querySelectorAll('.blk'), el => ({ id: el.id, outcome: /** @type {HTMLElement} */ (el).dataset.tsOutcome || null }));
+        w.__settleController = controller;
+        return { react, engine, ms: Math.round(performance.now() - started), font: face.status, hosts, html: document.body.innerHTML };
+      });
+      const shotA = await page.screenshot();
+      await page.waitForTimeout(500);
+      const shotB = await page.screenshot();
+      const htmlAfter = await page.evaluate(() => document.body.innerHTML);
+      const missing = settle.hosts.filter((/** @type {any} */ h) => !h.outcome);
+      check('whenSettled() from typeset.us/react and typeset.us resolves { settled: true } after the late font, with every adapter host and the mount() paragraph given an outcome', settle.react?.settled === true && settle.engine?.settled === true && settle.font === 'loaded' && settle.ms >= 400 && settle.hosts.length === 61 && missing.length === 0,
+        { react: settle.react, engine: settle.engine, ms: settle.ms, font: settle.font, hosts: settle.hosts.length, missing: missing.slice(0, 5) });
+      check('after whenSettled() the page holds still: two screenshots 500 ms apart are identical, and so is the DOM', shotA.equals(shotB) && htmlAfter === settle.html, { screenshots: shotA.equals(shotB), dom: htmlAfter === settle.html });
+      await page.evaluate(() => { const w = /** @type {any} */ (window); w.__settleController?.disconnect(); w.T.render('none'); });
       await page.close();
     }
   } catch (error) {
