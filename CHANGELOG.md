@@ -368,6 +368,12 @@ I need it?" list has a languages row.
 
 ### Development
 
+- The Node smart-quotes timing check (120 KB under 50 ms) is reported, not
+  enforced, on GitHub's hosted runners: it measured 51.1 ms once in the
+  v4.3.2 release run (36644238293, attempt 2). The WebKit and Firefox
+  browser checks and every run on the calibration machine still enforce
+  the linear-time bound.
+
 - CI runs on pull requests and master pushes only, and a newer push cancels
   the run it supersedes; the nightly run of the committed release artifacts
   moves to Mondays, and Dependabot opens its updates monthly.
