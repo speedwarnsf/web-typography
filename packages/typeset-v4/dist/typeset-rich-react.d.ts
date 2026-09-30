@@ -18,15 +18,6 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
     spacing?: Options['spacing'];
     tracking?: Options['tracking'];
     contour?: Options['contour'];
-    /** Default: Options.coverage's. `'core'` leaves native what 4.3.1 left
-     * native (other Latin-script languages, time, dfn, kbd, ins, visually
-     * hidden text, sup and sub); `'extended'` composes them. */
-    coverage?: Options['coverage'];
-    /** Default `true`: copying composed text puts the source on the clipboard,
-     * without the generated line breaks. `false` leaves copying to the
-     * browser, whose copied text then has a line break at every composed line
-     * end (Options.copy). */
-    copy?: Options['copy'];
     /** 'auto' (default) composes in the commit only what is on screen, within
      * a small time budget, and the rest before its first paint or in idle
      * time. 'sync' composes in the commit, as 4.2 did, for hero text.

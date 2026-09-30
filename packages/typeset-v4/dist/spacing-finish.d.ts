@@ -17,9 +17,6 @@ export declare function planSpacingFinish(element: HTMLElement, layout: LayoutMe
 /** Empty, noninteractive markers change advances, never source characters.
  * An empty inline span keeps its horizontal margin without becoming an atomic
  * inline: inline-block made Chromium drop the adjacent word space from its
- * accessibility tree ('careful notes' read as 'carefulnotes'). Only the
- * advance is per marker. The rest is the same for every marker and comes from
- * the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where that
- * sheet cannot apply, see markerRules) writes it on the marker, as 4.3 did. */
-export declare function spacingMarkerStyle(px: number, inline: boolean): Record<string, string>;
+ * accessibility tree ('careful notes' read as 'carefulnotes'). */
+export declare function spacingMarkerStyle(px: number): Record<string, string>;
 export declare function spacingVerified(element: HTMLElement, plan: SpacingPlan, after: LayoutMetrics): boolean;

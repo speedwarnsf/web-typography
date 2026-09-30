@@ -3,4 +3,4 @@ import type { ParagraphLine } from './typeset.cjs';
 export declare function finishedContour(element: HTMLElement, words: readonly {
     index: number;
     text: string;
-}[], measure: number, cache?: Map<string, number>, hidden?: (offset: number) => boolean): (lines: ParagraphLine[]) => number[];
+}[], measure: number, cache?: Map<string, number>): (lines: ParagraphLine[]) => number[];

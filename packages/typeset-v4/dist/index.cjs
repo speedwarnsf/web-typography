@@ -47,8 +47,7 @@ __export(typeset_release_exports, {
   typeset: () => typeset2,
   typesetAll: () => typesetAll2,
   typesetHeading: () => typesetHeading,
-  typesetText: () => typesetText,
-  whenSettled: () => whenSettled
+  typesetText: () => typesetText
 });
 module.exports = __toCommonJS(typeset_release_exports);
 
@@ -1792,24 +1791,6 @@ function inlineBoxInsets(style) {
   };
 }
 
-// src/lib/v4/hidden-inline.ts
-function hiddenInline(element) {
-  const found = [];
-  for (const el of element.querySelectorAll("*")) {
-    if (el.hasAttribute("data-ts-break") || el.hasAttribute("data-ts-track") || found.some((atom) => atom.contains(el))) continue;
-    if (paintsNothing(el)) found.push(el);
-  }
-  return found;
-}
-function paintsNothing(el) {
-  if (el.getAttribute("aria-hidden") === "true") return Array.from(el.getClientRects()).every((rect) => rect.width === 0);
-  const cs = getComputedStyle(el);
-  if (cs.position !== "absolute" && cs.position !== "fixed") return false;
-  const box = el.getBoundingClientRect();
-  return box.width <= 1 && box.height <= 1 && ["hidden", "clip"].includes(cs.overflowX) && ["hidden", "clip"].includes(cs.overflowY);
-}
-var withinHidden = (node, hidden) => hidden.some((el) => el.contains(node));
-
 // src/lib/v4/layout-metrics.ts
 var graphemeSegmenter;
 var graphemes = () => graphemeSegmenter ??= new Intl.Segmenter(void 0, { granularity: "grapheme" });
@@ -1867,12 +1848,11 @@ function measure(element, authorIndent) {
       };
     }
   }
-  const hidden = element.firstElementChild ? hiddenInline(element) : [];
   let node;
   while (node = walker.nextNode()) {
     const nodeOffset = sourceOffset;
     sourceOffset += node.textContent?.length || 0;
-    if (node.parentElement?.closest('script, style, [hidden], [aria-hidden="true"]') || hidden.length && withinHidden(node, hidden)) continue;
+    if (node.parentElement?.closest('script, style, [hidden], [aria-hidden="true"]')) continue;
     for (const match of (node.textContent || "").matchAll(/\S+/gu)) {
       range.setStart(node, match.index);
       range.setEnd(node, match.index + match[0].length);
@@ -1916,7 +1896,7 @@ function measure(element, authorIndent) {
     }
   }
   for (const inline of element.querySelectorAll("*")) {
-    if (inline.hasAttribute("data-ts-break") || inline.closest('[hidden], [aria-hidden="true"]') || hidden.length && withinHidden(inline, hidden)) continue;
+    if (inline.hasAttribute("data-ts-break") || inline.closest('[hidden], [aria-hidden="true"]')) continue;
     const style = getComputedStyle(inline);
     if (style.display !== "inline") continue;
     const insets = inlineBoxInsets(style);
@@ -2047,11 +2027,6 @@ function planSpacingFinish(element, layout, measuredSpaces = /* @__PURE__ */ new
   }
   const point = (at, end = false) => runs.find((run) => end ? run.start < at && run.end >= at : run.start <= at && run.end > at);
   const range = element.ownerDocument.createRange();
-  const hidden = element.firstElementChild ? hiddenInline(element) : [];
-  const edges = hidden.flatMap((atom) => {
-    const inside = runs.filter((run) => atom.contains(run.node));
-    return inside.length ? [inside[0].start, inside[inside.length - 1].end] : [];
-  });
   const measured = [];
   for (const line of layout.lines.slice(0, -1)) {
     const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));
@@ -2060,7 +2035,6 @@ function planSpacingFinish(element, layout, measuredSpaces = /* @__PURE__ */ new
       const start2 = line.sourceStart + space.index, end = start2 + space[0].length;
       const a = point(start2), b = point(end, true);
       if (!a || !b || !a.node.parentElement) return result("native:spacing-measurement");
-      if (hidden.length && (withinHidden(a.node, hidden) || edges.includes(start2) || edges.includes(end))) continue;
       range.setStart(a.node, start2 - a.start);
       range.setEnd(b.node, end - b.start);
       const style = getComputedStyle(a.node.parentElement);
@@ -2080,8 +2054,7 @@ function planSpacingFinish(element, layout, measuredSpaces = /* @__PURE__ */ new
   }
   return result(adjustments.length ? "applied" : "unchanged", adjustments);
 }
-function spacingMarkerStyle(px, inline) {
-  if (!inline) return { marginLeft: px + "px" };
+function spacingMarkerStyle(px) {
   return {
     display: "inline",
     position: "static",
@@ -2090,9 +2063,7 @@ function spacingMarkerStyle(px, inline) {
     height: "0px",
     minWidth: "0px",
     minHeight: "0px",
-    marginTop: "0px",
-    marginRight: "0px",
-    marginBottom: "0px",
+    margin: "0px",
     marginLeft: px + "px",
     padding: "0px",
     border: "0px",
@@ -2123,7 +2094,7 @@ function spacingVerified(element, plan, after) {
 }
 
 // src/lib/v4/finished-contour.ts
-function finishedContour(element, words, measure2, cache = /* @__PURE__ */ new Map(), hidden = () => false) {
+function finishedContour(element, words, measure2, cache = /* @__PURE__ */ new Map()) {
   const source = element.textContent || "";
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const runs = [];
@@ -2133,7 +2104,7 @@ function finishedContour(element, words, measure2, cache = /* @__PURE__ */ new M
     runs.push({ start: offset, end: offset + text.length, node: text });
     offset += text.length;
   }
-  const spaces = Array.from(source.matchAll(/[\t\n\r \u00a0\u202f]+/gu)).filter((match) => !hidden(match.index)).map((match) => {
+  const spaces = Array.from(source.matchAll(/[\t\n\r \u00a0\u202f]+/gu), (match) => {
     const run = runs.find((run2) => run2.start <= match.index && run2.end > match.index);
     const parent = run?.node.parentElement;
     const width = parent ? naturalSpace(element, getComputedStyle(parent), match[0].replace(/[\t\n\r ]+/g, " "), cache) : 0;
@@ -2911,54 +2882,6 @@ var Rules = class {
   }
 };
 
-// src/lib/v4/language.ts
-var names = {
-  english: "en",
-  french: "fr",
-  "fran\xE7ais": "fr",
-  francais: "fr",
-  german: "de",
-  deutsch: "de",
-  spanish: "es",
-  "espa\xF1ol": "es",
-  espanol: "es",
-  portuguese: "pt",
-  "portugu\xEAs": "pt",
-  portugues: "pt",
-  italian: "it",
-  italiano: "it",
-  dutch: "nl",
-  nederlands: "nl"
-};
-function normalized(tag) {
-  const parts = (tag?.trim() ?? "").replace(/[.@].*$/u, "").replace(/_/g, "-").split("-");
-  parts[0] = names[parts[0].toLowerCase()] ?? parts[0];
-  return parts.join("-");
-}
-function languageOf(tag) {
-  const text = normalized(tag);
-  if (!text) return "und";
-  try {
-    const locale = new Intl.Locale(text);
-    return locale.script && locale.script !== "Latn" ? "unsupported" : locale.language || "und";
-  } catch {
-    return "invalid";
-  }
-}
-function latinTag(tag) {
-  const text = normalized(tag);
-  if (!text) return true;
-  try {
-    return new Intl.Locale(text).maximize().script === "Latn";
-  } catch {
-    return true;
-  }
-}
-
-// src/lib/v4/coverage.ts
-var COVERAGE_DEFAULT = "core";
-var extendedCoverage = (coverage) => (coverage ?? COVERAGE_DEFAULT) === "extended";
-
 // src/lib/v4/break-opportunities.ts
 var UNICODE_VERSION = "17.0.0";
 var profiles = {
@@ -2972,51 +2895,29 @@ function graphemeSegmenter2(language) {
   if (!segmenter2) segmenters.set(language, segmenter2 = new Intl.Segmenter(language, { granularity: "grapheme" }));
   return segmenter2;
 }
-var RUN_BUDGET = 500;
-var certainBreak = /(?<=[\p{L}\p{N}] +)(?=\p{L})/u;
-function runLength(text) {
-  let length = 0;
-  for (const char of text) if (char !== " " && char !== "	" && char !== "\n" && char !== "\r" && char !== "\f") length++;
-  return length;
-}
-function exceedsRunBudget(source) {
-  if (source.length <= RUN_BUDGET || !source.split(certainBreak).some((piece) => piece.length > RUN_BUDGET)) return false;
-  let start2 = 0;
-  for (const { position } of new Rules().breaks(source.replace(/[\t\r\n]/g, " "))) {
-    if (runLength(source.slice(start2, position)) > RUN_BUDGET) return true;
-    start2 = position;
+function languageOf(tag) {
+  if (!tag?.trim()) return "und";
+  try {
+    const locale = new Intl.Locale(tag);
+    return locale.script && locale.script !== "Latn" ? "unsupported" : locale.language || "und";
+  } catch {
+    return "invalid";
   }
-  return runLength(source.slice(start2)) > RUN_BUDGET;
 }
 function languageWeakEnding(word2, language) {
   if (language === "en") return isWeakEnding(word2);
   if (!profiles[language]) return false;
-  const normalized2 = word2.normalize("NFC").toLocaleLowerCase(language === "und" ? void 0 : language).replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
-  return profiles[language]?.has(normalized2) ?? false;
-}
-var latinOrShared = /[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
-var borrowed = /[\p{Script=Greek}\p{Script=Cyrillic}]/u;
-function latinText(source) {
-  let run = 0, any = false;
-  for (const char of source) {
-    if (borrowed.test(char)) {
-      if (/\p{L}/u.test(char) && ++run > 3) return false;
-      any = true;
-    } else if (!latinOrShared.test(char)) return false;
-    else if (!/\p{M}/u.test(char)) run = 0;
-  }
-  return !any || /\p{Script=Latin}/u.test(source);
+  const normalized = word2.normalize("NFC").toLocaleLowerCase(language === "und" ? void 0 : language).replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+  return profiles[language]?.has(normalized) ?? false;
 }
 function analyzeBreaks(source, options = {}) {
-  const declared = languageOf(options.language);
-  const extended = extendedCoverage(options.coverage);
-  const language = extended && declared === "invalid" ? "und" : declared;
+  const language = languageOf(options.language);
   const result = { unicode: UNICODE_VERSION, language, outcome: "supported", units: [], opportunities: [] };
-  if (!["und", "en", "fr", "de", "es"].includes(language) && !(extended && latinTag(options.language))) {
+  if (!["und", "en", "fr", "de", "es"].includes(language)) {
     result.outcome = "native:language";
     return result;
   }
-  if (!latinText(source) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
+  if ([...source].some((c) => !/[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u.test(c)) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
     result.outcome = "native:script";
     return result;
   }
@@ -3029,9 +2930,9 @@ function analyzeBreaks(source, options = {}) {
     return result;
   }
   if (options.outcomeOnly) return result;
-  const normalized2 = source.replace(/[\t\r\n]/g, " ");
+  const normalized = source.replace(/[\t\r\n]/g, " ");
   const graphemes3 = /* @__PURE__ */ new Set([source.length, ...Array.from(graphemeSegmenter2(language).segment(source), (g) => g.index)]);
-  const positions = [...new Rules().breaks(normalized2)].map((b) => b.position).filter((pos) => {
+  const positions = [...new Rules().breaks(normalized)].map((b) => b.position).filter((pos) => {
     if (!graphemes3.has(pos)) return false;
     if (pos < source.length && /[\u00a0\u202f\u2060\ufeff\u2011]/u.test(source[pos - 1] + source[pos])) return false;
     if (options.hyphens === "none" && /[-\u2010]$/.test(source.slice(0, pos))) return false;
@@ -3289,8 +3190,8 @@ function planOpticalHanging(element, layout) {
   });
   return unmeasurable ? { outcome: "native:hanging-font", hangs: [] } : { outcome: hangs.length ? clipped ? "applied:partial" : "applied" : clipped ? "native:hanging-clipped" : "unchanged", hangs };
 }
-function opticalMarkerStyle(px, inline) {
-  return spacingMarkerStyle(-px, inline);
+function opticalMarkerStyle(px) {
+  return spacingMarkerStyle(-px);
 }
 function opticalVerified(element, before, after, hangs) {
   const markers = Array.from(element.querySelectorAll("[data-ts-hang]"));
@@ -3331,6 +3232,1022 @@ function canMaintain(doc) {
   return !!view && typeof view.MutationObserver === "function" && typeof view.ResizeObserver === "function" && segmenter() && geometry(view);
 }
 var ENVIRONMENT_OUTCOME = "native:environment";
+
+// src/lib/v4/rich-text.ts
+var BREAK_ATTRIBUTE = "data-ts-break";
+var inlineTags = /* @__PURE__ */ new Set(["A", "B", "STRONG", "EM", "I", "SPAN", "SMALL", "U", "S", "DEL", "MARK", "ABBR", "CITE", "CODE"]);
+var wordPattern = /[^\s\u00a0\u202f]+(?:[\u00a0\u202f][^\s\u00a0\u202f]+)*/gu;
+function richLayoutVerified(plan, after) {
+  const starts = [plan.source.search(/\S/u), ...plan.breaks];
+  const ends2 = [...plan.breaks.map((at) => plan.source.slice(0, at).trimEnd().length), plan.source.trimEnd().length];
+  return after.lines.length === plan.widths.length && after.overflow <= 0.5 && after.lines.every((line, index) => line.sourceStart === starts[index] && line.sourceEnd === ends2[index] && line.width <= after.width + 0.5);
+}
+function textRuns(element) {
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const runs = [];
+  let node;
+  let offset = 0;
+  while (node = walker.nextNode()) {
+    const length = node.textContent?.length || 0;
+    runs.push({ node, start: offset, end: offset + length });
+    offset += length;
+  }
+  return runs;
+}
+function pointAt(runs, offset, end = false) {
+  const run = runs.find((r) => end ? r.end >= offset && r.start < offset : r.start <= offset && r.end > offset) || runs.at(-1);
+  return run ? { node: run.node, offset: Math.max(0, Math.min(run.end - run.start, offset - run.start)) } : null;
+}
+function selectionBookmark(element) {
+  const selection = element.ownerDocument.getSelection();
+  if (!selection?.anchorNode || !selection.focusNode || !element.contains(selection.anchorNode) && !element.contains(selection.focusNode)) return () => {
+  };
+  const capture = (node, offset) => {
+    if (!element.contains(node)) return { node, offset };
+    const range = element.ownerDocument.createRange();
+    range.selectNodeContents(element);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  };
+  const anchor = capture(selection.anchorNode, selection.anchorOffset);
+  const focus = capture(selection.focusNode, selection.focusOffset);
+  return () => {
+    const runs = textRuns(element);
+    const a = typeof anchor === "number" ? pointAt(runs, anchor) : anchor;
+    const f = typeof focus === "number" ? pointAt(runs, focus) : focus;
+    if (a?.node.isConnected && f?.node.isConnected) selection.setBaseAndExtent(a.node, a.offset, f.node, f.offset);
+  };
+}
+function inlineStyle(element) {
+  const style = element.style, names = Array.from({ length: style.length }, (_, i) => style[i]);
+  const mixed = new Set(names.map((name) => style.getPropertyPriority(name))).size > 1;
+  return {
+    hadAttribute: element.hasAttribute("style"),
+    cssText: style.cssText,
+    longhands: mixed ? new Map(names.map((name) => [name, [style.getPropertyValue(name), style.getPropertyPriority(name)]])) : null
+  };
+}
+function restoreInlineStyle(element, saved) {
+  const style = element.style;
+  if (!saved.hadAttribute) removeStyleAttribute(element);
+  else if (!saved.longhands) {
+    if (style.cssText !== saved.cssText) style.cssText = saved.cssText;
+  } else {
+    for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.longhands.has(name)) style.removeProperty(name);
+    for (const [name, [value, priority]] of saved.longhands) {
+      if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
+    }
+  }
+}
+function removeStyleAttribute(element) {
+  const attribute = element.getAttributeNode("style");
+  if (attribute) element.removeAttributeNode(attribute);
+}
+function override(element, properties) {
+  const saved = inlineStyle(element);
+  for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, "important");
+  return () => restoreInlineStyle(element, saved);
+}
+function breaksChangeAlignment(style) {
+  const side = (value) => value === "start" ? "left" : value === "end" ? "right" : value;
+  const align = side(style.textAlign);
+  if (align === "justify" || align === "justify-all") return true;
+  const last = style.textAlignLast || "auto";
+  return last !== "auto" && side(last) !== align;
+}
+function unsupported(element) {
+  for (const el of [element, ...element.querySelectorAll("*")]) {
+    if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+    if (el !== element && !inlineTags.has(el.tagName)) return "native:rich-element";
+    if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return "native:rich-excluded";
+    const cs = getComputedStyle(el);
+    if (cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb" || el !== element && cs.unicodeBidi !== "normal" || cs.visibility !== "visible") return "native:rich-direction";
+    if (cs.whiteSpace !== "normal" && !(el !== element && cs.whiteSpace === "nowrap") || !preservesAdvances(cs) || cs.textIndent !== "0px") return "native:rich-whitespace";
+    if (el !== element && (cs.display !== "inline" || cs.position !== "static" || cs.verticalAlign !== "baseline")) return "native:rich-layout";
+    if (el !== element && !inlineBoxInsets(cs).supported) return "native:rich-box";
+    for (const pseudo of ["::before", "::after"]) {
+      const content = getComputedStyle(el, pseudo).content;
+      if (content && content !== "none" && content !== "normal" && content !== '""') return "native:rich-decorated";
+    }
+  }
+  return null;
+}
+function planRichText(element, options = {}, nativeLayout, spaceWidths) {
+  const source = element.textContent || "";
+  if (!canCompose(element.ownerDocument)) {
+    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: "" };
+  }
+  const markers = Array.from(element.querySelectorAll("[" + BREAK_ATTRIBUTE + "]"));
+  const restoreMarkers = markers.map((marker) => override(marker, { display: "none" }));
+  const tracking = Array.from(element.querySelectorAll("[data-ts-track]"));
+  restoreMarkers.push(...tracking.map((wrapper) => override(wrapper, { "letter-spacing": "inherit", "word-spacing": "inherit" })));
+  try {
+    const before = !markers.length && nativeLayout ? nativeLayout : measureLayout(element);
+    const search = [];
+    const result = (outcome, breaks2 = [], widths = [], constraint) => ({
+      source,
+      before,
+      outcome,
+      breaks: breaks2,
+      widths,
+      ...constraint && { constraint },
+      styleSignature: outcome === "composed:rich" ? richFingerprint(element) : "",
+      ...search.length && { search }
+    });
+    const lang = element.closest("[lang]")?.getAttribute("lang");
+    if (source.length > 12e3) return result("native:budget");
+    const unicode = options.lineBreaks === "unicode";
+    const fits = before.lines.length === 1 && before.overflow <= 0.5;
+    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits }) : null;
+    if (analysis && analysis.outcome !== "supported") return result(analysis.outcome);
+    if (!unicode && (lang && !/^en(?:-|$)/i.test(lang) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return result("native:language");
+    if (unicode) for (const el of [element, ...element.querySelectorAll("*")]) {
+      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+      if (languageOf(el.closest("[lang]")?.getAttribute("lang")) !== analysis.language) return result("native:mixed-language");
+      const cs = getComputedStyle(el);
+      if (cs.hyphens === "auto") return result("native:auto-hyphens");
+      if (cs.wordBreak !== "normal" || !["auto", "normal"].includes(cs.lineBreak) || !["normal", "break-word"].includes(cs.overflowWrap)) return result("native:break-policy");
+    }
+    if (getComputedStyle(element).display === "inline") return result("native:inline");
+    const reason = unsupported(element);
+    if (reason) return result(reason);
+    if (!before.width || !before.lines.length) return result("unmeasurable");
+    if (before.lines.length === 1 && before.overflow <= 0.5) return result("native:fits");
+    if (breaksChangeAlignment(getComputedStyle(element))) return result("native:justify");
+    if (options.mode === "ui") return result("native:ui");
+    const runs = textRuns(element);
+    const words = analysis?.units || Array.from(source.matchAll(wordPattern)).flatMap((word2) => {
+      if (/[\u00a0\u202f]/u.test(word2[0])) return [{ text: word2[0], index: word2.index, hyphen: false }];
+      const parts = [];
+      let cursor = 0;
+      for (const match of word2[0].matchAll(/(?<=\p{L})[-\u2010\u2013\u2014](?=\p{L})/gu)) {
+        const end = match.index + 1;
+        const point = pointAt(runs, word2.index + end - 1);
+        if (/[-\u2010]/u.test(match[0]) && point?.node.parentElement && getComputedStyle(point.node.parentElement).hyphens === "none") continue;
+        parts.push({ text: word2[0].slice(cursor, end), index: word2.index + cursor, hyphen: true });
+        cursor = end;
+      }
+      parts.push({ text: word2[0].slice(cursor), index: word2.index + cursor, hyphen: false });
+      return parts;
+    });
+    if (words.length > 500 || source.length > 12e3) return result("native:budget");
+    const noWrapRuns = [];
+    for (const run of runs) {
+      if (getComputedStyle(run.node.parentElement).whiteSpace !== "nowrap") continue;
+      const previous = noWrapRuns.at(-1);
+      if (previous?.end === run.start) previous.end = run.end;
+      else noWrapRuns.push({ start: run.start, end: run.end });
+    }
+    for (let i = words.length - 2; i >= 0; i--) {
+      const end = words[i].index + words[i].text.length;
+      const next = words[i + 1];
+      if (noWrapRuns.some((run) => run.start <= end && run.end > next.index)) {
+        words[i].text = source.slice(words[i].index, next.index + next.text.length);
+        words[i].hyphen = next.hyphen;
+        words.splice(i + 1, 1);
+      }
+    }
+    if (unicode) {
+      for (let i = words.length - 2; i >= 0; i--) {
+        const point = pointAt(runs, words[i].index + words[i].text.length - 1);
+        if (words[i].hyphen && point?.node.parentElement && getComputedStyle(point.node.parentElement).hyphens === "none") {
+          const next = words[i + 1];
+          words[i].text = source.slice(words[i].index, next.index + next.text.length);
+          words[i].hyphen = next.hyphen;
+          words.splice(i + 1, 1);
+        }
+      }
+    }
+    const range = element.ownerDocument.createRange();
+    const leadingInsets = /* @__PURE__ */ new Map(), trailingInsets = /* @__PURE__ */ new Map();
+    for (const el of element.querySelectorAll("*")) {
+      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+      const insets = inlineBoxInsets(getComputedStyle(el));
+      if (!insets.left && !insets.right) continue;
+      const children = runs.filter((run) => el.contains(run.node));
+      if (!children.length) continue;
+      const start2 = children[0].start, end = children.at(-1).end;
+      leadingInsets.set(start2, (leadingInsets.get(start2) || 0) + insets.left);
+      trailingInsets.set(end, (trailingInsets.get(end) || 0) + insets.right);
+    }
+    const restoreWhiteSpace = [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE)).map((el) => override(el, { "white-space": "nowrap", "text-wrap": "nowrap" }));
+    let edges;
+    try {
+      edges = words.map((word2) => {
+        const a = pointAt(runs, word2.index);
+        const b = pointAt(runs, word2.index + word2.text.length, true);
+        if (!a || !b) throw new Error("Unmapped rich text");
+        range.setStart(a.node, a.offset);
+        range.setEnd(b.node, b.offset);
+        const rect = range.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+      });
+    } finally {
+      restoreWhiteSpace.reverse().forEach((restore2) => restore2());
+    }
+    const tokens = words.map((word2) => {
+      if (analysis) return tokenForUnit(word2, analysis.language);
+      const token = tokenize(word2.text, () => 0)[0];
+      if (word2.hyphen) token.protectedCompound = false;
+      return token;
+    });
+    const content = tokens;
+    if (content.length !== words.length || !edges.length) return result("native:rich-tokens");
+    content.forEach((token, i) => {
+      token.width = edges[i].right - edges[i].left;
+    });
+    const nativeSpans = new Map(before.lines.map((line) => [line.sourceStart + ":" + line.sourceEnd, line]));
+    const measureRange = (start2, end) => {
+      const last = words[end - 1];
+      const width = edges[end - 1].right - edges[start2].left + (leadingInsets.get(words[start2].index) || 0) + (trailingInsets.get(last.index + last.text.length) || 0);
+      if (width <= before.width || width > before.width + 0.5) return width;
+      const witness = nativeSpans.get(words[start2].index + ":" + (last.index + last.text.length));
+      return witness && witness.width <= before.width + 0.5 && Math.abs(witness.width - width) <= 0.5 ? Math.min(before.width, witness.width) : width;
+    };
+    const breakPenalty = (end) => words[end - 1].hyphen ? 1600 : 0;
+    const title = options.mode === "title" || options.mode === "heading" || !options.mode && /^H[1-6]$/.test(element.tagName);
+    const clamp = parseInt(getComputedStyle(element).getPropertyValue("-webkit-line-clamp"), 10);
+    const openerRepair = options.density !== "compact" && (!analysis || analysis.language === "en") && before.lines.slice(0, -1).some((line) => strandedOpener(line.text));
+    const keepSplit = keptPhrases(words.map((word2) => word2.text), options.keep).some(({ start: start2, end }) => {
+      const from = words[start2].index, to = words[end - 1].index + words[end - 1].text.length;
+      return before.lines.slice(0, -1).some((line) => line.sourceEnd > from && line.sourceEnd < to);
+    });
+    const allowance = !title && (before.lastSingleton || options.density === "editorial" || openerRepair || keepSplit && options.density !== "compact") ? 1 : 0;
+    const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
+    const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
+    const contourWidths = !title && options.contour === "finished" && ["left", "start"].includes(getComputedStyle(element).textAlign) ? finishedContour(element, words, before.width, spaceWidths) : void 0;
+    const onSearch = (evidence) => {
+      search.push(evidence);
+    };
+    let lines = title ? composeTitle(tokens, before.width, () => 0, {
+      ...options,
+      maxLines,
+      measureRange,
+      breakPenalty,
+      ...analysis && analysis.language !== "en" && { weakEnding: (word2) => languageWeakEnding(word2, analysis.language) }
+    }) : composeParagraph(tokens, before.width, before.width / (fontSize * 0.5), {
+      maxLines,
+      candidateBar: 1,
+      measureRange,
+      breakPenalty,
+      englishLexical: !analysis || analysis.language === "en",
+      contourWidths,
+      onSearch,
+      allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
+      keep: options.keep
+    });
+    if (analysis?.language === "en" && lines) {
+      const texts = words.map((word2) => word2.text);
+      const groups = englishPhraseGroups(texts, before.width, measureRange);
+      const costs = phraseBreakCosts(texts, groups, title);
+      const attachmentCost = (composition) => {
+        let end2 = 0;
+        return composition.slice(0, -1).reduce((sum, line) => {
+          end2 += line.tokens.length;
+          return sum + costs[end2];
+        }, 0);
+      };
+      const originalCost = attachmentCost(lines);
+      if (originalCost > 0) {
+        const phrasedPenalty = (end2) => breakPenalty(end2) + costs[end2];
+        const phrased = title ? composeTitle(tokens, before.width, () => 0, { ...options, maxLines, measureRange, breakPenalty: phrasedPenalty }) : composeParagraph(tokens, before.width, before.width / (fontSize * 0.5), {
+          maxLines,
+          candidateBar: 1,
+          measureRange,
+          breakPenalty: phrasedPenalty,
+          englishLexical: true,
+          contourWidths,
+          onSearch,
+          allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
+          keep: options.keep
+        });
+        const wordCounts = (composition) => {
+          let end2 = 0;
+          return composition.map((line) => {
+            const start2 = end2;
+            end2 += line.tokens.length;
+            const last = words[end2 - 1];
+            return source.slice(words[start2].index, last.index + last.text.length).trim().split(/\s+/u).length;
+          });
+        };
+        if (phrased && attachmentCost(phrased) < originalCost) {
+          const originalWords = wordCounts(lines), proposedWords = wordCounts(phrased);
+          let originalEnd = 0;
+          const repairsName = lines.slice(0, -1).some((line) => {
+            originalEnd += line.tokens.length;
+            return groups.some((group) => group.kind === "name" && group.start < originalEnd && group.end > originalEnd);
+          });
+          const nameTail = repairsName && proposedWords.at(-1) === 1 && phrased.at(-1).width >= before.width * 0.4;
+          const stranded = title && (proposedWords[0] === 1 && originalWords[0] > 1 || !nameTail && proposedWords.at(-1) === 1 && originalWords.at(-1) > 1 || !nameTail && proposedWords.filter((n) => n === 1).length > originalWords.filter((n) => n === 1).length);
+          if (!stranded) lines = phrased;
+        }
+      }
+      let end = 0;
+      const chosenEnds = lines.map((line) => {
+        end += line.tokens.length;
+        return words[end - 1].index + words[end - 1].text.length;
+      });
+      if (!title && options.density !== "editorial" && !keepSplit && before.lines.length <= maxLines && retainSentenceLayout(source, before, chosenEnds)) return result("native:sentence-aligned");
+      if (!title && options.density !== "editorial" && !keepSplit && before.lines.length <= maxLines && retainParagraphRhythm(source, before, lines.map((line) => line.width))) return result("native:paragraph-rhythm");
+    }
+    if (!lines) {
+      const limit = before.width + (title ? 0.25 : 0);
+      const requiredWidth = Math.max(...content.map((_, i) => measureRange(i, i + 1)));
+      const minimum = Array(content.length + 1).fill(Infinity);
+      minimum[content.length] = 0;
+      for (let start2 = content.length - 1; start2 >= 0; start2--) {
+        for (let end = start2 + 1; end <= content.length; end++) {
+          if (measureRange(start2, end) <= limit) minimum[start2] = Math.min(minimum[start2], 1 + minimum[end]);
+        }
+      }
+      return result("native:no-candidate", [], [], {
+        kind: requiredWidth > limit ? "unbreakable-run" : minimum[0] > maxLines ? "line-budget" : "search",
+        availableWidth: before.width,
+        requiredWidth,
+        minimumLines: Number.isFinite(minimum[0]) ? minimum[0] : null,
+        maxLines: Number.isFinite(maxLines) ? maxLines : null
+      });
+    }
+    let index = 0;
+    const breaks = lines.slice(0, -1).map((line) => {
+      index += line.tokens.length;
+      return words[index].index;
+    });
+    return result("composed:rich", breaks, lines.map((line) => line.width));
+  } finally {
+    restoreMarkers.reverse().forEach((restore2) => restore2());
+  }
+}
+var liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+var regions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
+function flatParent(element) {
+  const slot = element.assignedSlot;
+  if (slot) return slot;
+  if (element.parentElement) return element.parentElement;
+  const root = element.parentNode;
+  return root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE && root.host ? root.host : null;
+}
+function inLiveRegion(element) {
+  for (let region = element; region; region = flatParent(region)) {
+    const live = region.getAttribute("aria-live")?.trim().toLowerCase();
+    if (live) return live !== "off";
+    if ((region.hasAttribute("role") || region.localName === "output") && region.matches(liveRoles)) return true;
+  }
+  return false;
+}
+function liveText(element) {
+  if (inLiveRegion(element)) return true;
+  for (const region of element.querySelectorAll(regions)) if (inLiveRegion(region)) return true;
+  for (const host of element.querySelectorAll("*")) {
+    const shadow = host.shadowRoot;
+    if (shadow) {
+      for (const slot of shadow.querySelectorAll("slot")) if (inLiveRegion(slot)) return true;
+    }
+  }
+  return false;
+}
+function breakReplacesSpace(source, offset) {
+  return offset > 0 && /\s/u.test(source[offset - 1]);
+}
+var engineText = /* @__PURE__ */ new WeakSet();
+function shieldWhitespace(element) {
+  const shields = [];
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const spaces = [];
+  while (walker.nextNode()) if (walker.currentNode.length && !/\S/u.test(walker.currentNode.data)) spaces.push(walker.currentNode);
+  const emptyBeside = (node, forward) => {
+    let at = node;
+    for (let steps = 0; steps < 16; steps++) {
+      const sibling = forward ? at.nextSibling : at.previousSibling;
+      if (!sibling) {
+        if (!at.parentNode || at.parentNode === element) return false;
+        at = at.parentNode;
+        continue;
+      }
+      at = sibling;
+      if (sibling.nodeType === Node.COMMENT_NODE || sibling.nodeType === Node.ELEMENT_NODE && !sibling.firstChild && !["BR", "WBR", "IMG", "INPUT"].includes(sibling.tagName) && getComputedStyle(sibling).display === "inline") continue;
+      return sibling.nodeType === Node.TEXT_NODE && !sibling.length;
+    }
+    return false;
+  };
+  for (const space of spaces) {
+    for (const forward of [false, true]) {
+      if (!emptyBeside(space, forward)) continue;
+      const shield = element.ownerDocument.createElement("wbr");
+      shield.setAttribute(BREAK_ATTRIBUTE, "");
+      shield.setAttribute("aria-hidden", "true");
+      shield.dataset.tsShield = "";
+      if (forward) space.after(shield);
+      else space.before(shield);
+      shields.push(shield);
+    }
+  }
+  return shields;
+}
+function positional(node) {
+  const before = node.previousSibling;
+  return !before || before.nodeType === Node.COMMENT_NODE && before.data.startsWith("?lit$");
+}
+function afterComment(node) {
+  return node.previousSibling?.nodeType === Node.COMMENT_NODE && !positional(node);
+}
+function reactOwned(node) {
+  return Object.keys(node).some((key) => key.startsWith("__reactFiber$"));
+}
+function releaseSplits(element, splits, written) {
+  for (const { head, parts, expected } of splits) {
+    const edited = !element.contains(head) || head.data !== expected[0] || !!written?.has(head);
+    for (const tail of parts.slice(1)) {
+      if (!element.contains(tail)) continue;
+      if (!edited) head.appendData(tail.data);
+      tail.remove();
+    }
+  }
+}
+function rejoinSplits(element, splits) {
+  for (const { head, parts, expected } of splits) {
+    if (parts.length < 2 || !parts.every((part, i) => part.parentNode === head.parentNode && element.contains(part) && part.data === expected[i])) continue;
+    let adjacent = true;
+    for (let i = 1; i < parts.length && adjacent; i++) {
+      let node = parts[i - 1].nextSibling;
+      while (node && node !== parts[i] && node.nodeType === Node.TEXT_NODE && !node.length) node = node.nextSibling;
+      adjacent = node === parts[i];
+    }
+    if (!adjacent) continue;
+    head.data = expected.join("");
+    for (const tail of parts.slice(1)) tail.remove();
+  }
+}
+function elementStartingAt(host, text) {
+  let outer2 = text, found = null;
+  for (let parent = text.parentNode; parent && parent !== host && parent.nodeType === Node.ELEMENT_NODE; parent = parent.parentNode) {
+    let before = outer2.previousSibling;
+    while (before && (before.nodeType === Node.COMMENT_NODE || before.nodeType === Node.TEXT_NODE && !before.length)) before = before.previousSibling;
+    if (before) break;
+    outer2 = found = parent;
+  }
+  return found;
+}
+var wrapOverrides = /* @__PURE__ */ new WeakMap();
+function renderRichText(element, breaks, hangs = [], spaces = []) {
+  const restoreSelection = selectionBookmark(element);
+  const hadStyle = element.hasAttribute("style");
+  const wrapStyle = element.style.getPropertyValue("text-wrap-style");
+  const wrapPriority = element.style.getPropertyPriority("text-wrap-style");
+  if (breaks.length) {
+    element.style.setProperty("text-wrap-style", "auto", "important");
+    wrapOverrides.set(element, { value: wrapStyle, priority: wrapPriority });
+  }
+  const runs = textRuns(element);
+  const source = element.textContent || "";
+  const markers = [];
+  const splits = /* @__PURE__ */ new Map();
+  const insertions = [
+    ...breaks.map((offset) => ({ offset, px: 0, spacing: false })),
+    ...hangs.map((hang) => ({ ...hang, spacing: false })),
+    ...spaces.map((space) => ({ ...space, spacing: true }))
+  ].sort((a, b) => b.offset - a.offset || b.px - a.px);
+  for (const { offset, px, spacing } of insertions) {
+    const point = pointAt(runs, offset);
+    if (!point) continue;
+    const head = point.node;
+    if (spacing && point.offset && head.previousSibling?.nodeType === Node.COMMENT_NODE && !/\S/u.test(head.data.slice(0, point.offset))) point.offset = 0;
+    const marker = element.ownerDocument.createElement(px ? "span" : "br");
+    marker.setAttribute(BREAK_ATTRIBUTE, "");
+    if (px || !breakReplacesSpace(source, offset)) marker.setAttribute("aria-hidden", "true");
+    if (spacing) {
+      marker.dataset.tsSpace = String(offset);
+      Object.assign(marker.style, spacingMarkerStyle(px));
+    } else if (px) {
+      marker.dataset.tsHang = String(offset);
+      Object.assign(marker.style, opticalMarkerStyle(px));
+    } else marker.style.setProperty("display", "var(--ts-break-display, inline)", "important");
+    const opening = !px && !spacing && point.offset === 0 && !engineText.has(head) ? elementStartingAt(element, head) : null;
+    if (opening) opening.before(marker);
+    else if (point.offset === 0 && !engineText.has(head) && afterComment(head)) head.previousSibling.before(marker);
+    else if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
+    else {
+      const tail = head.splitText(point.offset);
+      engineText.add(tail);
+      const split = splits.get(head) || { head, parts: [head], expected: [] };
+      split.parts.splice(1, 0, tail);
+      splits.set(head, split);
+      tail.before(marker);
+    }
+    markers.push(marker);
+  }
+  for (const split of splits.values()) split.expected = split.parts.map((part) => part.data);
+  if (splits.size) markers.push(...shieldWhitespace(element));
+  restoreSelection();
+  const releaseCopy = preserveRichCopy(element);
+  let released = false;
+  return {
+    nodes: [element, ...element.querySelectorAll("*"), ...textRuns(element).map((r) => r.node)],
+    heads: new Set(splits.keys()),
+    cleanup(written) {
+      if (released) return;
+      released = true;
+      const restoreSelection2 = selectionBookmark(element);
+      markers.forEach((marker) => marker.remove());
+      if (spaces.length) element.querySelectorAll("[data-ts-break][data-ts-space]").forEach((marker) => marker.remove());
+      if (breaks.length) element.querySelectorAll("[" + BREAK_ATTRIBUTE + "]").forEach((marker) => marker.remove());
+      releaseSplits(element, splits.values(), written);
+      if (breaks.length) wrapOverrides.delete(element);
+      if (breaks.length && element.style.getPropertyValue("text-wrap-style") === "auto" && element.style.getPropertyPriority("text-wrap-style") === "important") {
+        if (!hadStyle && element.style.length === 1) removeStyleAttribute(element);
+        else if (wrapStyle) element.style.setProperty("text-wrap-style", wrapStyle, wrapPriority);
+        else element.style.removeProperty("text-wrap-style");
+        if (!hadStyle && !element.style.length) removeStyleAttribute(element);
+      }
+      releaseCopy();
+      restoreSelection2();
+    },
+    rejoin() {
+      if (released) return;
+      released = true;
+      rejoinSplits(element, splits.values());
+      if (breaks.length) wrapOverrides.delete(element);
+      releaseCopy();
+    }
+  };
+}
+var unrendered = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"]);
+function hiddenFromCopy(element) {
+  if (unrendered.has(element.tagName) || element.tagName === "INPUT" && element.type === "hidden") return true;
+  const rendered2 = typeof element.checkVisibility === "function" ? element.checkVisibility() : element.getClientRects().length > 0;
+  return !rendered2 && getComputedStyle(element).display !== "contents";
+}
+function visibleContents(range, each) {
+  const fragment = range.cloneContents();
+  const root = range.commonAncestorContainer;
+  const visibility = /* @__PURE__ */ new Map();
+  const visibleText = (text) => {
+    const parent = text.parentElement;
+    if (!parent) return true;
+    if (!visibility.has(parent)) {
+      const cs = getComputedStyle(parent);
+      visibility.set(parent, cs.visibility === "visible" && cs.getPropertyValue("content-visibility") !== "hidden");
+    }
+    return visibility.get(parent);
+  };
+  if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+    if (!visibleText(root)) fragment.replaceChildren();
+    return fragment;
+  }
+  const doc = range.startContainer.ownerDocument;
+  const sources = [];
+  const walker = doc.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ALL,
+    { acceptNode: (node) => range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+  );
+  while (walker.nextNode()) sources.push(walker.currentNode);
+  const clones = [];
+  const cloneWalker = doc.createTreeWalker(fragment, NodeFilter.SHOW_ALL);
+  while (cloneWalker.nextNode()) clones.push(cloneWalker.currentNode);
+  if (sources.length !== clones.length) return null;
+  for (let i = 0; i < sources.length; i++) {
+    const source = sources[i], clone = clones[i];
+    if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
+    const hidden = source.nodeType === Node.ELEMENT_NODE ? hiddenFromCopy(source) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
+    if (!hidden) {
+      if (each && source.nodeType === Node.ELEMENT_NODE) each(source, clone);
+      continue;
+    }
+    clone.remove();
+    while (i + 1 < sources.length && source.contains(sources[i + 1])) i++;
+  }
+  return fragment;
+}
+function renderedText(source, range, root) {
+  const blank = (start2) => {
+    const outside = root.ownerDocument.createRange();
+    outside.selectNodeContents(root);
+    if (start2) outside.setEnd(range.startContainer, range.startOffset);
+    else outside.setStart(range.endContainer, range.endOffset);
+    return !/[^ \t\n\r\f]/.test(outside.toString());
+  };
+  let text = source.replace(/[ \t\n\r\f]+/g, " ");
+  if (text.startsWith(" ") && blank(true)) text = text.slice(1);
+  if (text.endsWith(" ") && blank(false)) text = text.slice(0, -1);
+  return text.replace(/\u00a0/g, " ");
+}
+var copyRoots = /* @__PURE__ */ new WeakMap();
+function preserveRichCopy(element) {
+  const doc = element.ownerDocument;
+  let roots = copyRoots.get(doc);
+  if (!roots) {
+    roots = /* @__PURE__ */ new WeakMap();
+    copyRoots.set(doc, roots);
+    const registered = roots;
+    doc.addEventListener("copy", (event) => {
+      if (event.defaultPrevented || !event.clipboardData) return;
+      const target = event.target;
+      if (target?.nodeType === Node.ELEMENT_NODE && target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
+      const selection = doc.getSelection();
+      if (!selection?.rangeCount || selection.isCollapsed) return;
+      const ranges = Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i));
+      const containingRoot = (range) => {
+        let root = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+        while (root && !(registered.has(root) && root.contains(range.endContainer))) root = root.parentElement;
+        return root;
+      };
+      const affected = ranges.some((range) => {
+        if (containingRoot(range)) return true;
+        const common = range.commonAncestorContainer;
+        const parent = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
+        return Array.from(parent?.querySelectorAll("*") || []).some((el) => registered.has(el) && range.intersectsNode(el));
+      });
+      if (!affected) return;
+      const fragments = ranges.map((range) => visibleContents(range, (source, clone) => {
+        const saved = wrapOverrides.get(source), style = clone.style;
+        if (!saved || !style || style.getPropertyValue("text-wrap-style") !== "auto" || style.getPropertyPriority("text-wrap-style") !== "important") return;
+        if (saved.value) style.setProperty("text-wrap-style", saved.value, saved.priority);
+        else style.removeProperty("text-wrap-style");
+        if (!style.length) clone.removeAttribute("style");
+      }));
+      const sourceText = fragments[0]?.textContent ?? null;
+      const html = fragments.some((fragment) => !fragment) ? "" : fragments.map((fragment) => {
+        fragment.querySelectorAll("[" + BREAK_ATTRIBUTE + "]").forEach((marker) => marker.remove());
+        fragment.querySelectorAll("[data-ts-track]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
+        for (const el of fragment.querySelectorAll("*")) {
+          for (const attribute of ["data-ts-outcome", "data-typeset-done", "data-ts-quotes", "data-ts-hanging", "data-ts-spacing", "data-ts-tracking", "data-ts-stale", "data-typeset-react", "data-typeset-react-rich"]) el.removeAttribute(attribute);
+          if (el.localName === "a" && el.namespaceURI === "http://www.w3.org/1999/xhtml" && el.hasAttribute("href")) {
+            try {
+              el.setAttribute("href", new URL(el.getAttribute("href"), doc.baseURI).href);
+            } catch {
+            }
+          }
+        }
+        const container = doc.createElement("div");
+        container.append(fragment);
+        return container.innerHTML;
+      }).join("");
+      let text;
+      const single = ranges.length === 1 ? containingRoot(ranges[0]) : null;
+      if (single && sourceText !== null) text = renderedText(sourceText, ranges[0], single);
+      else {
+        const restore2 = Array.from(doc.querySelectorAll("[" + BREAK_ATTRIBUTE + "]")).filter((marker) => ranges.some((range) => range.intersectsNode(marker))).map((marker) => override(marker, { display: "none" }));
+        try {
+          text = selection.toString().replace(/\u00a0/g, " ");
+        } finally {
+          restore2.forEach((undo) => undo());
+        }
+      }
+      event.clipboardData.setData("text/plain", text);
+      if (html) event.clipboardData.setData("text/html", html);
+      event.preventDefault();
+    });
+  }
+  roots.set(element, (roots.get(element) || 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = (roots.get(element) || 1) - 1;
+    if (count) roots.set(element, count);
+    else roots.delete(element);
+  };
+}
+function richFingerprint(element) {
+  return [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE) && !el.hasAttribute("data-ts-track")).map((el) => {
+    const cs = getComputedStyle(el);
+    return [
+      cs.font,
+      cs.fontFeatureSettings,
+      cs.fontVariationSettings,
+      cs.fontOpticalSizing,
+      cs.fontKerning,
+      cs.fontVariant,
+      cs.fontSizeAdjust,
+      cs.fontSynthesis,
+      cs.textRendering,
+      cs.lineHeight,
+      cs.letterSpacing,
+      cs.wordSpacing,
+      cs.textTransform,
+      cs.whiteSpace,
+      cs.hyphens,
+      cs.wordBreak,
+      cs.lineBreak,
+      cs.overflowWrap,
+      el.getAttribute("lang"),
+      cs.display,
+      cs.direction,
+      cs.unicodeBidi,
+      cs.verticalAlign,
+      cs.transform,
+      cs.visibility,
+      cs.paddingInline,
+      cs.marginInline,
+      cs.borderInlineWidth,
+      cs.color,
+      cs.backgroundColor,
+      cs.textDecoration,
+      cs.textShadow,
+      getComputedStyle(el, "::before").content,
+      getComputedStyle(el, "::after").content
+    ].join("|");
+  }).join(";");
+}
+
+// src/lib/v4/smart-quotes.ts
+var elision = /^(?:\d{2}s\b|tis\b|twas\b|em\b|cause\b|til\b)/iu;
+var loose = /^(?:bout|round|nuff)\b/iu;
+var nPairs = /* @__PURE__ */ new Set([
+  "rock",
+  "rhythm",
+  "fish",
+  "salt",
+  "pick",
+  "shake",
+  "surf",
+  "drag",
+  "grab",
+  "meet",
+  "stop",
+  "park",
+  "cash",
+  "wash",
+  "rip",
+  "plug",
+  "spick",
+  "bump",
+  "nip",
+  "scratch",
+  "peel",
+  "lock",
+  "snack",
+  "bread",
+  "mix"
+]);
+var nPairLongest = Math.max(...[...nPairs].map((word2) => word2.length));
+function pairWordBefore(text, index) {
+  let end = index;
+  while (end > 0 && /\s/u.test(text[end - 1])) end--;
+  let start2 = end;
+  while (start2 > 0 && end - start2 <= nPairLongest) {
+    const low = text.charCodeAt(start2 - 1);
+    if (low >= 56320 && low <= 57343 && start2 > 1 && /^\p{L}$/u.test(text.slice(start2 - 2, start2))) start2 -= 2;
+    else if (/\p{L}/u.test(text[start2 - 1])) start2--;
+    else break;
+  }
+  return start2 < end && end - start2 <= nPairLongest && nPairs.has(text.slice(start2, end).toLowerCase());
+}
+var sentenceEnd = /[.!?](?:\s|$)/gu;
+var closer = /[\p{L}\p{N}.,!?]['\u2019](?![\p{L}\p{N}])/gu;
+function laterCloser(text) {
+  let end = -1, close = -1, quote = 0;
+  return (index) => {
+    if (end <= index) {
+      sentenceEnd.lastIndex = index + 1;
+      end = sentenceEnd.exec(text)?.index ?? text.length;
+    }
+    if (close <= index) {
+      closer.lastIndex = index + 1;
+      close = closer.exec(text)?.index ?? text.length;
+      quote = closer.lastIndex ? closer.lastIndex - 1 : close;
+    }
+    return quote < end;
+  };
+}
+function smartQuotes(text) {
+  let doubleOpen = false;
+  let singleOpen = false;
+  let out = "";
+  let before = "";
+  const closesLater = laterCloser(text);
+  const put = (char) => {
+    out += char;
+    before = char;
+  };
+  for (let index = 0; index < text.length; index++) {
+    const quote = text[index];
+    if (!/["'\u201c\u201d\u2018\u2019]/u.test(quote)) {
+      put(quote);
+      continue;
+    }
+    if (quote === "\u201C") doubleOpen = true;
+    else if (quote === "\u201D") doubleOpen = false;
+    else if (quote === "\u2018") singleOpen = true;
+    if (quote !== '"' && quote !== "'") {
+      put(quote);
+      continue;
+    }
+    const after = text[index + 1] || "";
+    const opening = !before || /[\s([{\u2014\u2013\u201c\u2018]/u.test(before);
+    if (quote === '"') {
+      if (opening && after && !/\s/u.test(after)) {
+        doubleOpen = true;
+        put("\u201C");
+      } else if (/\d/u.test(before) && !doubleOpen) put(quote);
+      else {
+        doubleOpen = false;
+        put("\u201D");
+      }
+      continue;
+    }
+    const rest = text.slice(index + 1);
+    if (/\p{L}/u.test(before) && /\p{L}/u.test(after)) put("\u2019");
+    else if (opening && (elision.test(rest) || loose.test(rest) && !closesLater(index) || /^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && pairWordBefore(text, index))) put("\u2019");
+    else if (opening && after && !/\s/u.test(after)) {
+      singleOpen = true;
+      put("\u2018");
+    } else if (/\d/u.test(before) && !singleOpen) put(quote);
+    else {
+      singleOpen = false;
+      put("\u2019");
+    }
+  }
+  return out;
+}
+function applySmartQuotes(element) {
+  const skip = 'code, pre, kbd, samp, input, textarea, script, style, [data-no-typeset], [contenteditable]:not([contenteditable="false"])';
+  const lang = element.closest("[lang]")?.getAttribute("lang");
+  if (lang && !/^en(?:-|$)/i.test(lang) || element.matches(skip) || element.querySelector(skip) || [...element.querySelectorAll("[lang]")].some((el) => !/^en(?:-|$)/i.test(el.getAttribute("lang") || ""))) {
+    return { outcome: "native:quotes-scope", restore: () => {
+    } };
+  }
+  const source = element.textContent || "";
+  const educated = smartQuotes(source);
+  const edits = [];
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let node;
+  let offset = 0;
+  while (node = walker.nextNode()) {
+    const text = node;
+    const output = educated.slice(offset, offset + text.length);
+    offset += text.length;
+    if (output !== text.data) {
+      edits.push({ node: text, source: text.data, output });
+      text.data = output;
+    }
+  }
+  return { outcome: edits.length ? "applied" : "unchanged", restore: () => {
+    for (const edit of edits) if (element.contains(edit.node) && edit.node.data === edit.output) edit.node.data = edit.source;
+  } };
+}
+
+// src/lib/v4/tracking-finish.ts
+var TRACK_ATTRIBUTE = "data-ts-track";
+var MAX_TRACKING_EM = 0.01;
+var resolvedSpacing = (value) => value === "normal" ? 0 : /^-?(?:\d+\.?\d*|\.\d+)px$/u.test(value) ? parseFloat(value) : NaN;
+function textRuns2(element) {
+  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const runs = [];
+  let node, offset = 0;
+  while (node = walker.nextNode()) {
+    const text = node;
+    runs.push({ node: text, start: offset, end: offset + text.length });
+    offset += text.length;
+  }
+  return runs;
+}
+var graphemeSegmenter3;
+var graphemes2 = () => graphemeSegmenter3 ??= new Intl.Segmenter(void 0, { granularity: "grapheme" });
+function planTrackingFinish(element, layout, targets) {
+  const result = (outcome, runs2 = []) => ({ outcome, runs: runs2, before: layout, targets });
+  const style = getComputedStyle(element);
+  if (style.direction !== "ltr" || style.writingMode !== "horizontal-tb" || !["left", "start"].includes(style.textAlign)) return result("native:tracking-layout");
+  const source = element.textContent || "", texts = textRuns2(element);
+  const segmenter2 = graphemes2();
+  const runs = [];
+  let unsupported2 = false, held = false;
+  for (const [line, box] of layout.lines.slice(0, -1).entries()) {
+    const desired = targets[line] - box.width;
+    if (!Number.isFinite(desired) || Math.abs(desired) < 0.25) continue;
+    if ([...box.text].some((char) => /\p{L}/u.test(char) && !/\p{Script=Latin}/u.test(char))) {
+      unsupported2 = true;
+      continue;
+    }
+    if (texts.some((text) => text.start < box.sourceEnd && text.end > box.sourceStart && heldAfterComment(text.node))) {
+      held = true;
+      continue;
+    }
+    const pieces = [];
+    for (const text of texts) {
+      const start2 = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
+      if (end <= start2 || text.node.parentElement?.closest("code, kbd, samp")) continue;
+      const parent = text.node.parentElement;
+      if (!parent) continue;
+      const cs = getComputedStyle(parent), fontSize = parseFloat(cs.fontSize);
+      const letterSpacing = resolvedSpacing(cs.letterSpacing), wordSpacing = resolvedSpacing(cs.wordSpacing);
+      if (!(fontSize > 0) || !Number.isFinite(letterSpacing) || !Number.isFinite(wordSpacing)) return result("native:tracking-measurement");
+      const count = [...segmenter2.segment(source.slice(start2, end))].filter((part) => !/^\s+$/u.test(part.segment)).length;
+      const previous = pieces.at(-1);
+      let adjacent = previous?.last.nextSibling || null;
+      while (adjacent?.nodeType === Node.ELEMENT_NODE && (adjacent.hasAttribute("data-ts-space") || adjacent.hasAttribute("data-ts-shield")) || adjacent?.nodeType === Node.TEXT_NODE && !adjacent.length) adjacent = adjacent.nextSibling;
+      if (previous && adjacent === text.node && previous.end === start2) {
+        previous.end = end;
+        previous.count += count;
+        previous.last = text.node;
+      } else pieces.push({ start: start2, end, line, px: 0, fontSize, letterSpacing, wordSpacing, last: text.node, count });
+    }
+    const capacity = pieces.reduce((sum, run) => sum + run.count * run.fontSize, 0);
+    if (!capacity) continue;
+    const em = Math.max(-MAX_TRACKING_EM, Math.min(MAX_TRACKING_EM, desired / capacity));
+    for (const { last: _last, count, ...run } of pieces) if (count) runs.push({ ...run, px: run.fontSize * em });
+  }
+  if (runs.length > 256) return result("native:tracking-budget");
+  return result(runs.length ? "applied" : unsupported2 ? "native:tracking-script" : held ? "native:tracking-comment" : "unchanged", runs);
+}
+var heldAfterComment = (node) => node.length > 0 && !engineText.has(node) && afterComment(node) && !reactOwned(node);
+function trackingStyle(run) {
+  return {
+    all: "unset",
+    display: "inline",
+    letterSpacing: run.letterSpacing + run.px + "px",
+    // CSS tracking also affects spaces. Compensate so the word-space finish
+    // retains its measured 80-133% envelope instead of paying for tracking twice.
+    wordSpacing: run.wordSpacing - run.px + "px"
+  };
+}
+function renderTracking(element, plan) {
+  const restoreSelection = selectionBookmark(element), texts = textRuns2(element);
+  const splits = /* @__PURE__ */ new Map();
+  const split = (head, at) => {
+    const tail = head.splitText(at);
+    engineText.add(tail);
+    const record = splits.get(head) || { head, parts: [head], expected: [] };
+    record.parts.splice(1, 0, tail);
+    splits.set(head, record);
+    return tail;
+  };
+  for (const run of [...plan.runs].reverse()) {
+    const a = texts.find((text) => text.start <= run.start && text.end > run.start);
+    const b = texts.find((text) => text.start < run.end && text.end >= run.end);
+    if (!a || !b || a.node.parentNode !== b.node.parentNode) continue;
+    const end = run.end - b.start;
+    if (end < b.node.length) split(b.node, end);
+    const first = run.start > a.start ? split(a.node, run.start - a.start) : a.node;
+    const last = a.node === b.node ? first : b.node;
+    const nodes = [];
+    for (let node = first; node; node = node.nextSibling) {
+      nodes.push(node);
+      if (node === last) break;
+    }
+    let wrapper = null;
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE && !engineText.has(node) && (!node.length || afterComment(node) || positional(node) || reactOwned(node))) {
+        if (!node.length || heldAfterComment(node)) {
+          wrapper = null;
+          continue;
+        }
+        const piece = split(node, 0);
+        if (!wrapper || wrapper.nextSibling !== piece) {
+          wrapper = trackingWrapper(element, run);
+          piece.before(wrapper);
+        }
+        wrapper.append(piece);
+        continue;
+      }
+      if (!wrapper || wrapper.nextSibling !== node) {
+        wrapper = trackingWrapper(element, run);
+        node.before(wrapper);
+      }
+      wrapper.append(node);
+    }
+  }
+  for (const record of splits.values()) record.expected = record.parts.map((part) => part.data);
+  const shields = splits.size ? shieldWhitespace(element) : [];
+  restoreSelection();
+  const releaseCopy = preserveRichCopy(element);
+  let released = false;
+  return { nodes: [element], heads: new Set(splits.keys()), cleanup(written) {
+    if (released) return;
+    released = true;
+    const restoreSelection2 = selectionBookmark(element);
+    shields.forEach((shield) => shield.remove());
+    element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
+    releaseSplits(element, splits.values(), written);
+    releaseCopy();
+    restoreSelection2();
+  }, rejoin() {
+    if (released) return;
+    released = true;
+    rejoinSplits(element, splits.values());
+    releaseCopy();
+  } };
+}
+function trackingWrapper(element, run) {
+  const wrapper = element.ownerDocument.createElement("span");
+  wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
+  Object.assign(wrapper.style, trackingStyle(run));
+  return wrapper;
+}
+function trackingVerified(element, plan, after) {
+  const wrappers = Array.from(element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]"));
+  if (new Set(wrappers.map((wrapper) => wrapper.getAttribute(TRACK_ATTRIBUTE))).size !== plan.runs.length || after.lines.length !== plan.before.lines.length || Math.abs(after.width - plan.before.width) > 0.5 || after.overflow > Math.max(0.5, plan.before.overflow)) return false;
+  if (wrappers.some((wrapper) => {
+    const run = plan.runs.find((run2) => run2.start === Number(wrapper.getAttribute(TRACK_ATTRIBUTE)));
+    const cs = getComputedStyle(wrapper);
+    return !run || Math.abs(parseFloat(cs.letterSpacing) - run.letterSpacing - run.px) > 1e-3 || Math.abs(parseFloat(cs.wordSpacing) - run.wordSpacing + run.px) > 1e-3 || cs.display !== "inline" || cs.position !== "static" || cs.visibility !== "visible" || ["::before", "::after"].some((pseudo) => !["none", "normal", '""', ""].includes(getComputedStyle(wrapper, pseudo).content));
+  })) return false;
+  return after.lines.every((line, index) => {
+    const before = plan.before.lines[index], adjusted = plan.runs.some((run) => run.line === index);
+    return line.sourceStart === before.sourceStart && line.sourceEnd === before.sourceEnd && Math.abs(line.left - before.left) <= 0.5 && Math.abs(line.top - before.top) <= 0.5 && Math.abs(line.bottom - before.bottom) <= 0.5 && (adjusted ? Math.abs(plan.targets[index] - line.width) < Math.abs(plan.targets[index] - before.width) - 0.02 : Math.abs(line.width - before.width) <= 0.5);
+  });
+}
 
 // src/lib/v4/lifecycle.ts
 var hubs = /* @__PURE__ */ new WeakMap();
@@ -3583,7 +4500,7 @@ function subscribe(doc, client) {
     }
   };
 }
-var LIFECYCLE_CSS = "@layer typeset-markers{:is([data-ts-space],[data-ts-hang])[data-ts-break]{display:inline!important;position:static!important;float:none!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;margin-top:0!important;margin-right:0!important;margin-bottom:0!important;padding:0!important;border:0!important;box-shadow:none!important;outline:none!important;transform:none!important;font-size:0!important;line-height:0!important;vertical-align:baseline!important;pointer-events:none!important}}[data-ts-track]:not(#_):not(#_):not(#_){all:unset;display:inline}[data-ts-stale]{--ts-break-display:none}[data-ts-stale] :is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}[data-ts-stale] [data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}[data-ts-stale]>.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}@media print{:root{--ts-break-display:none}:is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}[data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}}";
+var LIFECYCLE_CSS = "[data-ts-stale]{--ts-break-display:none}[data-ts-stale] :is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}[data-ts-stale] [data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}[data-ts-stale]>.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}@media print{:root{--ts-break-display:none}:is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}[data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}}";
 var sheets = /* @__PURE__ */ new WeakMap();
 function installLifecycleStyles(doc, element) {
   const known = sheets.get(doc);
@@ -3614,18 +4531,6 @@ function lifecycleStylesFor(element) {
   } catch {
   }
 }
-function markerRules(element, install = true) {
-  const doc = element.ownerDocument;
-  if (install) installLifecycleStyles(doc, element);
-  const sheet = sheets.get(doc);
-  if (!sheet) return false;
-  const root = element.getRootNode();
-  try {
-    return (root.nodeType === 9 || root.nodeType === 11) && root.adoptedStyleSheets.includes(sheet);
-  } catch {
-    return false;
-  }
-}
 function ensureLifecycleStyles(doc) {
   const sheet = sheets.get(doc);
   if (!sheet) return;
@@ -3633,1112 +4538,6 @@ function ensureLifecycleStyles(doc) {
     if (!doc.adoptedStyleSheets.includes(sheet)) doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
   } catch {
   }
-}
-
-// src/lib/v4/rich-text.ts
-var BREAK_ATTRIBUTE = "data-ts-break";
-var inlineTags = /* @__PURE__ */ new Set(["A", "B", "STRONG", "EM", "I", "SPAN", "SMALL", "U", "S", "DEL", "MARK", "ABBR", "CITE", "CODE"]);
-var extendedTags = /* @__PURE__ */ new Set(["TIME", "DFN", "KBD", "INS", "SUP", "SUB"]);
-var wordPattern = /[^\s\u00a0\u202f]+(?:[\u00a0\u202f][^\s\u00a0\u202f]+)*/gu;
-function richLayoutVerified(plan, after) {
-  const { source, hidden = [] } = plan;
-  const shown = (at) => /\S/u.test(source[at]) && !hidden.some(([start2, end]) => at >= start2 && at < end);
-  const first = (from) => {
-    let at = from;
-    while (at < source.length && !shown(at)) at++;
-    return at;
-  };
-  const last = (to) => {
-    let at = to;
-    while (at > 0 && !shown(at - 1)) at--;
-    return at;
-  };
-  const starts = [first(0), ...plan.breaks.map(first)];
-  const ends2 = [...plan.breaks.map(last), last(source.length)];
-  return after.lines.length === plan.widths.length && after.overflow <= 0.5 && after.lines.every((line, index) => line.sourceStart === starts[index] && line.sourceEnd === ends2[index] && line.width <= after.width + 0.5);
-}
-function textRuns(element) {
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const runs = [];
-  let node;
-  let offset = 0;
-  while (node = walker.nextNode()) {
-    const length = node.textContent?.length || 0;
-    runs.push({ node, start: offset, end: offset + length });
-    offset += length;
-  }
-  return runs;
-}
-function pointAt(runs, offset, end = false) {
-  const run = runs.find((r) => end ? r.end >= offset && r.start < offset : r.start <= offset && r.end > offset) || runs.at(-1);
-  return run ? { node: run.node, offset: Math.max(0, Math.min(run.end - run.start, offset - run.start)) } : null;
-}
-function selectionBookmark(element) {
-  const selection = element.ownerDocument.getSelection();
-  if (!selection?.anchorNode || !selection.focusNode || !element.contains(selection.anchorNode) && !element.contains(selection.focusNode)) return () => {
-  };
-  const capture = (node, offset) => {
-    if (!element.contains(node)) return { node, offset };
-    const range = element.ownerDocument.createRange();
-    range.selectNodeContents(element);
-    range.setEnd(node, offset);
-    return range.toString().length;
-  };
-  const anchor = capture(selection.anchorNode, selection.anchorOffset);
-  const focus = capture(selection.focusNode, selection.focusOffset);
-  return () => {
-    const runs = textRuns(element);
-    const a = typeof anchor === "number" ? pointAt(runs, anchor) : anchor;
-    const f = typeof focus === "number" ? pointAt(runs, focus) : focus;
-    if (a?.node.isConnected && f?.node.isConnected) selection.setBaseAndExtent(a.node, a.offset, f.node, f.offset);
-  };
-}
-function inlineStyle(element) {
-  const style = element.style, names2 = Array.from({ length: style.length }, (_, i) => style[i]);
-  const mixed = new Set(names2.map((name) => style.getPropertyPriority(name))).size > 1;
-  return {
-    hadAttribute: element.hasAttribute("style"),
-    cssText: style.cssText,
-    longhands: mixed ? new Map(names2.map((name) => [name, [style.getPropertyValue(name), style.getPropertyPriority(name)]])) : null
-  };
-}
-function restoreInlineStyle(element, saved) {
-  const style = element.style;
-  if (!saved.hadAttribute) removeStyleAttribute(element);
-  else if (!saved.longhands) {
-    if (style.cssText !== saved.cssText) style.cssText = saved.cssText;
-  } else {
-    for (const name of Array.from({ length: style.length }, (_, i) => style[i])) if (!saved.longhands.has(name)) style.removeProperty(name);
-    for (const [name, [value, priority]] of saved.longhands) {
-      if (style.getPropertyValue(name) !== value || style.getPropertyPriority(name) !== priority) style.setProperty(name, value, priority);
-    }
-  }
-}
-function removeStyleAttribute(element) {
-  const attribute = element.getAttributeNode("style");
-  if (attribute) element.removeAttributeNode(attribute);
-}
-function override(element, properties) {
-  const saved = inlineStyle(element);
-  for (const [key, value] of Object.entries(properties)) element.style.setProperty(key, value, "important");
-  return () => restoreInlineStyle(element, saved);
-}
-function breaksChangeAlignment(style) {
-  const side = (value) => value === "start" ? "left" : value === "end" ? "right" : value;
-  const align = side(style.textAlign);
-  if (align === "justify" || align === "justify-all") return true;
-  const last = style.textAlignLast || "auto";
-  return last !== "auto" && side(last) !== align;
-}
-function raised(el, cs) {
-  if (cs.verticalAlign === "super" || cs.verticalAlign === "sub") return cs.position === "static";
-  return (el.tagName === "SUP" || el.tagName === "SUB") && cs.verticalAlign === "baseline" && cs.position === "relative" && ["auto", "0px"].includes(cs.left) && ["auto", "0px"].includes(cs.right);
-}
-function unsupported(element, extended = false, hidden = []) {
-  for (const el of [element, ...element.querySelectorAll("*")]) {
-    if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some((atom) => atom.contains(el))) continue;
-    if (el !== element && !inlineTags.has(el.tagName) && !(extended && extendedTags.has(el.tagName))) return "native:rich-element";
-    if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return "native:rich-excluded";
-    const cs = getComputedStyle(el);
-    if (cs.direction !== "ltr" || cs.writingMode !== "horizontal-tb" || el !== element && cs.unicodeBidi !== "normal" || cs.visibility !== "visible") return "native:rich-direction";
-    if (cs.whiteSpace !== "normal" && !(el !== element && cs.whiteSpace === "nowrap") || !preservesAdvances(cs) || cs.textIndent !== "0px") return "native:rich-whitespace";
-    if (el !== element && (cs.display !== "inline" || (cs.position !== "static" || cs.verticalAlign !== "baseline") && !(extended && raised(el, cs)))) return "native:rich-layout";
-    if (el !== element && !inlineBoxInsets(cs).supported) return "native:rich-box";
-    for (const pseudo of ["::before", "::after"]) {
-      const content = getComputedStyle(el, pseudo).content;
-      if (content && content !== "none" && content !== "normal" && content !== '""') return "native:rich-decorated";
-    }
-  }
-  return null;
-}
-function planRichText(element, options = {}, nativeLayout, spaceWidths) {
-  const source = element.textContent || "";
-  if (!canCompose(element.ownerDocument)) {
-    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: "" };
-  }
-  if (exceedsRunBudget(source)) {
-    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: "native:run-budget", breaks: [], widths: [], styleSignature: "" };
-  }
-  const markers = Array.from(element.querySelectorAll("[" + BREAK_ATTRIBUTE + "]"));
-  const restoreMarkers = markers.map((marker) => override(marker, { display: "none" }));
-  const tracking = Array.from(element.querySelectorAll("[data-ts-track]"));
-  restoreMarkers.push(...tracking.map((wrapper) => override(wrapper, { "letter-spacing": "inherit", "word-spacing": "inherit" })));
-  try {
-    const before = !markers.length && nativeLayout ? nativeLayout : measureLayout(element);
-    const search = [];
-    let hiddenRanges = [];
-    const result = (outcome, breaks2 = [], widths = [], constraint) => ({
-      source,
-      before,
-      outcome,
-      breaks: breaks2,
-      widths,
-      ...constraint && { constraint },
-      styleSignature: outcome === "composed:rich" ? richFingerprint(element) : "",
-      ...search.length && { search },
-      ...hiddenRanges.length && { hidden: hiddenRanges }
-    });
-    const lang = element.closest("[lang]")?.getAttribute("lang");
-    if (source.length > 12e3) return result("native:budget");
-    const unicode = options.lineBreaks === "unicode";
-    const fits = before.lines.length === 1 && before.overflow <= 0.5;
-    const extended = unicode && extendedCoverage(options.coverage);
-    const hidden = extended ? hiddenInline(element) : [];
-    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits, coverage: options.coverage }) : null;
-    if (analysis && analysis.outcome !== "supported") return result(analysis.outcome);
-    if (!unicode && (lang && !/^en(?:-|$)/i.test(lang) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return result("native:language");
-    if (unicode) for (const el of [element, ...element.querySelectorAll("*")]) {
-      if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some((atom) => atom.contains(el))) continue;
-      const tag = el.closest("[lang]")?.getAttribute("lang");
-      if (languageOf(tag) !== analysis.language && !(extended && latinTag(tag))) return result("native:mixed-language");
-      const cs = getComputedStyle(el);
-      if (cs.hyphens === "auto") return result("native:auto-hyphens");
-      if (cs.wordBreak !== "normal" || !["auto", "normal"].includes(cs.lineBreak) || !["normal", "break-word"].includes(cs.overflowWrap)) return result("native:break-policy");
-    }
-    if (getComputedStyle(element).display === "inline") return result("native:inline");
-    const reason = unsupported(element, extended, hidden);
-    if (reason) return result(reason);
-    if (!before.width || !before.lines.length) return result("unmeasurable");
-    if (before.lines.length === 1 && before.overflow <= 0.5) return result("native:fits");
-    if (breaksChangeAlignment(getComputedStyle(element))) return result("native:justify");
-    if (options.mode === "ui") return result("native:ui");
-    const runs = textRuns(element);
-    const words = analysis?.units || Array.from(source.matchAll(wordPattern)).flatMap((word2) => {
-      if (/[\u00a0\u202f]/u.test(word2[0])) return [{ text: word2[0], index: word2.index, hyphen: false }];
-      const parts = [];
-      let cursor = 0;
-      for (const match of word2[0].matchAll(/(?<=\p{L})[-\u2010\u2013\u2014](?=\p{L})/gu)) {
-        const end = match.index + 1;
-        const point = pointAt(runs, word2.index + end - 1);
-        if (/[-\u2010]/u.test(match[0]) && point?.node.parentElement && getComputedStyle(point.node.parentElement).hyphens === "none") continue;
-        parts.push({ text: word2[0].slice(cursor, end), index: word2.index + cursor, hyphen: true });
-        cursor = end;
-      }
-      parts.push({ text: word2[0].slice(cursor), index: word2.index + cursor, hyphen: false });
-      return parts;
-    });
-    hiddenRanges = hidden.map((atom) => {
-      const inside = runs.filter((run) => atom.contains(run.node));
-      return [inside[0]?.start ?? 0, inside.at(-1)?.end ?? 0];
-    }).filter(([start2, end]) => end > start2);
-    const inHidden = (at) => hiddenRanges.some(([start2, end]) => at >= start2 && at < end);
-    if (hiddenRanges.length) {
-      const join = (i) => {
-        const next = words[i + 1];
-        words[i].text = source.slice(words[i].index, next.index + next.text.length);
-        words[i].hyphen = next.hyphen;
-        words.splice(i + 1, 1);
-      };
-      for (let i = words.length - 1; i > 0; i--) if (inHidden(words[i].index)) join(i - 1);
-      if (words.length > 1 && inHidden(words[0].index)) join(0);
-    }
-    if (words.length > 500 || source.length > 12e3) return result("native:budget");
-    const noWrapRuns = [];
-    for (const run of runs) {
-      if (getComputedStyle(run.node.parentElement).whiteSpace !== "nowrap") continue;
-      const previous = noWrapRuns.at(-1);
-      if (previous?.end === run.start) previous.end = run.end;
-      else noWrapRuns.push({ start: run.start, end: run.end });
-    }
-    for (let i = words.length - 2; i >= 0; i--) {
-      const end = words[i].index + words[i].text.length;
-      const next = words[i + 1];
-      if (noWrapRuns.some((run) => run.start <= end && run.end > next.index)) {
-        words[i].text = source.slice(words[i].index, next.index + next.text.length);
-        words[i].hyphen = next.hyphen;
-        words.splice(i + 1, 1);
-      }
-    }
-    if (unicode) {
-      for (let i = words.length - 2; i >= 0; i--) {
-        const point = pointAt(runs, words[i].index + words[i].text.length - 1);
-        if (words[i].hyphen && point?.node.parentElement && getComputedStyle(point.node.parentElement).hyphens === "none") {
-          const next = words[i + 1];
-          words[i].text = source.slice(words[i].index, next.index + next.text.length);
-          words[i].hyphen = next.hyphen;
-          words.splice(i + 1, 1);
-        }
-      }
-    }
-    const range = element.ownerDocument.createRange();
-    const leadingInsets = /* @__PURE__ */ new Map(), trailingInsets = /* @__PURE__ */ new Map();
-    for (const el of element.querySelectorAll("*")) {
-      if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some((atom) => atom.contains(el))) continue;
-      const insets = inlineBoxInsets(getComputedStyle(el));
-      if (!insets.left && !insets.right) continue;
-      const children = runs.filter((run) => el.contains(run.node));
-      if (!children.length) continue;
-      const start2 = children[0].start, end = children.at(-1).end;
-      leadingInsets.set(start2, (leadingInsets.get(start2) || 0) + insets.left);
-      trailingInsets.set(end, (trailingInsets.get(end) || 0) + insets.right);
-    }
-    const restoreWhiteSpace = [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE)).map((el) => override(el, { "white-space": "nowrap", "text-wrap": "nowrap" }));
-    restoreWhiteSpace.push(...hidden.map((atom) => override(atom, { display: "none" })));
-    let edges;
-    try {
-      edges = words.map((word2) => {
-        const a = pointAt(runs, word2.index);
-        const b = pointAt(runs, word2.index + word2.text.length, true);
-        if (!a || !b) throw new Error("Unmapped rich text");
-        range.setStart(a.node, a.offset);
-        range.setEnd(b.node, b.offset);
-        const rect = range.getBoundingClientRect();
-        return { left: rect.left, right: rect.right };
-      });
-    } finally {
-      restoreWhiteSpace.reverse().forEach((restore2) => restore2());
-    }
-    const tokens = words.map((word2) => {
-      if (analysis) return tokenForUnit(word2, analysis.language);
-      const token = tokenize(word2.text, () => 0)[0];
-      if (word2.hyphen) token.protectedCompound = false;
-      return token;
-    });
-    const content = tokens;
-    if (content.length !== words.length || !edges.length) return result("native:rich-tokens");
-    content.forEach((token, i) => {
-      token.width = edges[i].right - edges[i].left;
-    });
-    const nativeSpans = new Map(before.lines.map((line) => [line.sourceStart + ":" + line.sourceEnd, line]));
-    const measureRange = (start2, end) => {
-      const last = words[end - 1];
-      const width = edges[end - 1].right - edges[start2].left + (leadingInsets.get(words[start2].index) || 0) + (trailingInsets.get(last.index + last.text.length) || 0);
-      if (width <= before.width || width > before.width + 0.5) return width;
-      const witness = nativeSpans.get(words[start2].index + ":" + (last.index + last.text.length));
-      return witness && witness.width <= before.width + 0.5 && Math.abs(witness.width - width) <= 0.5 ? Math.min(before.width, witness.width) : width;
-    };
-    const breakPenalty = (end) => words[end - 1].hyphen ? 1600 : 0;
-    const title = options.mode === "title" || options.mode === "heading" || !options.mode && /^H[1-6]$/.test(element.tagName);
-    const clamp = parseInt(getComputedStyle(element).getPropertyValue("-webkit-line-clamp"), 10);
-    const openerRepair = options.density !== "compact" && (!analysis || analysis.language === "en") && before.lines.slice(0, -1).some((line) => strandedOpener(line.text));
-    const keepSplit = keptPhrases(words.map((word2) => word2.text), options.keep).some(({ start: start2, end }) => {
-      const from = words[start2].index, to = words[end - 1].index + words[end - 1].text.length;
-      return before.lines.slice(0, -1).some((line) => line.sourceEnd > from && line.sourceEnd < to);
-    });
-    const allowance = !title && (before.lastSingleton || options.density === "editorial" || openerRepair || keepSplit && options.density !== "compact") ? 1 : 0;
-    const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
-    const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
-    const contourWidths = !title && options.contour === "finished" && ["left", "start"].includes(getComputedStyle(element).textAlign) ? finishedContour(element, words, before.width, spaceWidths, inHidden) : void 0;
-    const onSearch = (evidence) => {
-      search.push(evidence);
-    };
-    let lines = title ? composeTitle(tokens, before.width, () => 0, {
-      ...options,
-      maxLines,
-      measureRange,
-      breakPenalty,
-      ...analysis && analysis.language !== "en" && { weakEnding: (word2) => languageWeakEnding(word2, analysis.language) }
-    }) : composeParagraph(tokens, before.width, before.width / (fontSize * 0.5), {
-      maxLines,
-      candidateBar: 1,
-      measureRange,
-      breakPenalty,
-      englishLexical: !analysis || analysis.language === "en",
-      contourWidths,
-      onSearch,
-      allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
-      keep: options.keep
-    });
-    if (analysis?.language === "en" && lines) {
-      const texts = words.map((word2) => word2.text);
-      const groups = englishPhraseGroups(texts, before.width, measureRange);
-      const costs = phraseBreakCosts(texts, groups, title);
-      const attachmentCost = (composition) => {
-        let end2 = 0;
-        return composition.slice(0, -1).reduce((sum, line) => {
-          end2 += line.tokens.length;
-          return sum + costs[end2];
-        }, 0);
-      };
-      const originalCost = attachmentCost(lines);
-      if (originalCost > 0) {
-        const phrasedPenalty = (end2) => breakPenalty(end2) + costs[end2];
-        const phrased = title ? composeTitle(tokens, before.width, () => 0, { ...options, maxLines, measureRange, breakPenalty: phrasedPenalty }) : composeParagraph(tokens, before.width, before.width / (fontSize * 0.5), {
-          maxLines,
-          candidateBar: 1,
-          measureRange,
-          breakPenalty: phrasedPenalty,
-          englishLexical: true,
-          contourWidths,
-          onSearch,
-          allowOrphan: before.lastSingleton && (words.length < 2 || measureRange(words.length - 2, words.length) > before.width),
-          keep: options.keep
-        });
-        const wordCounts = (composition) => {
-          let end2 = 0;
-          return composition.map((line) => {
-            const start2 = end2;
-            end2 += line.tokens.length;
-            const last = words[end2 - 1];
-            return source.slice(words[start2].index, last.index + last.text.length).trim().split(/\s+/u).length;
-          });
-        };
-        if (phrased && attachmentCost(phrased) < originalCost) {
-          const originalWords = wordCounts(lines), proposedWords = wordCounts(phrased);
-          let originalEnd = 0;
-          const repairsName = lines.slice(0, -1).some((line) => {
-            originalEnd += line.tokens.length;
-            return groups.some((group) => group.kind === "name" && group.start < originalEnd && group.end > originalEnd);
-          });
-          const nameTail = repairsName && proposedWords.at(-1) === 1 && phrased.at(-1).width >= before.width * 0.4;
-          const stranded = title && (proposedWords[0] === 1 && originalWords[0] > 1 || !nameTail && proposedWords.at(-1) === 1 && originalWords.at(-1) > 1 || !nameTail && proposedWords.filter((n) => n === 1).length > originalWords.filter((n) => n === 1).length);
-          if (!stranded) lines = phrased;
-        }
-      }
-      let end = 0;
-      const chosenEnds = lines.map((line) => {
-        end += line.tokens.length;
-        return words[end - 1].index + words[end - 1].text.length;
-      });
-      if (!title && options.density !== "editorial" && !keepSplit && before.lines.length <= maxLines && retainSentenceLayout(source, before, chosenEnds)) return result("native:sentence-aligned");
-      if (!title && options.density !== "editorial" && !keepSplit && before.lines.length <= maxLines && retainParagraphRhythm(source, before, lines.map((line) => line.width))) return result("native:paragraph-rhythm");
-    }
-    if (!lines) {
-      const limit = before.width + (title ? 0.25 : 0);
-      const requiredWidth = Math.max(...content.map((_, i) => measureRange(i, i + 1)));
-      const minimum = Array(content.length + 1).fill(Infinity);
-      minimum[content.length] = 0;
-      for (let start2 = content.length - 1; start2 >= 0; start2--) {
-        for (let end = start2 + 1; end <= content.length; end++) {
-          if (measureRange(start2, end) <= limit) minimum[start2] = Math.min(minimum[start2], 1 + minimum[end]);
-        }
-      }
-      return result("native:no-candidate", [], [], {
-        kind: requiredWidth > limit ? "unbreakable-run" : minimum[0] > maxLines ? "line-budget" : "search",
-        availableWidth: before.width,
-        requiredWidth,
-        minimumLines: Number.isFinite(minimum[0]) ? minimum[0] : null,
-        maxLines: Number.isFinite(maxLines) ? maxLines : null
-      });
-    }
-    let index = 0;
-    const breaks = lines.slice(0, -1).map((line) => {
-      index += line.tokens.length;
-      return words[index].index;
-    });
-    return result("composed:rich", breaks, lines.map((line) => line.width));
-  } finally {
-    restoreMarkers.reverse().forEach((restore2) => restore2());
-  }
-}
-var liveRoles = '[role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
-var regions = '[aria-live], [role~="status" i], [role~="alert" i], [role~="log" i], [role~="marquee" i], [role~="timer" i], output';
-function flatParent(element) {
-  const slot = element.assignedSlot;
-  if (slot) return slot;
-  if (element.parentElement) return element.parentElement;
-  const root = element.parentNode;
-  return root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE && root.host ? root.host : null;
-}
-function inLiveRegion(element) {
-  for (let region = element; region; region = flatParent(region)) {
-    const live = region.getAttribute("aria-live")?.trim().toLowerCase();
-    if (live) return live !== "off";
-    if ((region.hasAttribute("role") || region.localName === "output") && region.matches(liveRoles)) return true;
-  }
-  return false;
-}
-function liveText(element) {
-  if (inLiveRegion(element)) return true;
-  for (const region of element.querySelectorAll(regions)) if (inLiveRegion(region)) return true;
-  for (const host of element.querySelectorAll("*")) {
-    const shadow = host.shadowRoot;
-    if (shadow) {
-      for (const slot of shadow.querySelectorAll("slot")) if (inLiveRegion(slot)) return true;
-    }
-  }
-  return false;
-}
-function breakReplacesSpace(source, offset) {
-  return offset > 0 && /\s/u.test(source[offset - 1]);
-}
-var engineText = /* @__PURE__ */ new WeakSet();
-function shieldWhitespace(element) {
-  const shields = [];
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const spaces = [];
-  while (walker.nextNode()) if (walker.currentNode.length && !/\S/u.test(walker.currentNode.data)) spaces.push(walker.currentNode);
-  const emptyBeside = (node, forward) => {
-    let at = node;
-    for (let steps = 0; steps < 16; steps++) {
-      const sibling = forward ? at.nextSibling : at.previousSibling;
-      if (!sibling) {
-        if (!at.parentNode || at.parentNode === element) return false;
-        at = at.parentNode;
-        continue;
-      }
-      at = sibling;
-      if (sibling.nodeType === Node.COMMENT_NODE || sibling.nodeType === Node.ELEMENT_NODE && !sibling.firstChild && !["BR", "WBR", "IMG", "INPUT"].includes(sibling.tagName) && getComputedStyle(sibling).display === "inline") continue;
-      return sibling.nodeType === Node.TEXT_NODE && !sibling.length;
-    }
-    return false;
-  };
-  for (const space of spaces) {
-    for (const forward of [false, true]) {
-      if (!emptyBeside(space, forward)) continue;
-      const shield = element.ownerDocument.createElement("wbr");
-      shield.setAttribute(BREAK_ATTRIBUTE, "");
-      shield.setAttribute("aria-hidden", "true");
-      shield.dataset.tsShield = "";
-      if (forward) space.after(shield);
-      else space.before(shield);
-      shields.push(shield);
-    }
-  }
-  return shields;
-}
-function positional(node) {
-  const before = node.previousSibling;
-  return !before || before.nodeType === Node.COMMENT_NODE && before.data.startsWith("?lit$");
-}
-function afterComment(node) {
-  return node.previousSibling?.nodeType === Node.COMMENT_NODE && !positional(node);
-}
-function reactOwned(node) {
-  return Object.keys(node).some((key) => key.startsWith("__reactFiber$"));
-}
-function releaseSplits(element, splits, written) {
-  for (const { head, parts, expected } of splits) {
-    const edited = !element.contains(head) || head.data !== expected[0] || !!written?.has(head);
-    for (const tail of parts.slice(1)) {
-      if (!element.contains(tail)) continue;
-      if (!edited) head.appendData(tail.data);
-      tail.remove();
-    }
-  }
-}
-function rejoinSplits(element, splits) {
-  for (const { head, parts, expected } of splits) {
-    if (parts.length < 2 || !parts.every((part, i) => part.parentNode === head.parentNode && element.contains(part) && part.data === expected[i])) continue;
-    let adjacent = true;
-    for (let i = 1; i < parts.length && adjacent; i++) {
-      let node = parts[i - 1].nextSibling;
-      while (node && node !== parts[i] && node.nodeType === Node.TEXT_NODE && !node.length) node = node.nextSibling;
-      adjacent = node === parts[i];
-    }
-    if (!adjacent) continue;
-    head.data = expected.join("");
-    for (const tail of parts.slice(1)) tail.remove();
-  }
-}
-function elementStartingAt(host, text) {
-  let outer2 = text, found = null;
-  for (let parent = text.parentNode; parent && parent !== host && parent.nodeType === Node.ELEMENT_NODE; parent = parent.parentNode) {
-    let before = outer2.previousSibling;
-    while (before && (before.nodeType === Node.COMMENT_NODE || before.nodeType === Node.TEXT_NODE && !before.length)) before = before.previousSibling;
-    if (before) break;
-    outer2 = found = parent;
-  }
-  return found;
-}
-var wrapOverrides = /* @__PURE__ */ new WeakMap();
-function renderRichText(element, breaks, hangs = [], spaces = [], copy = true) {
-  const restoreSelection = selectionBookmark(element);
-  const hadStyle = element.hasAttribute("style");
-  const wrapStyle = element.style.getPropertyValue("text-wrap-style");
-  const wrapPriority = element.style.getPropertyPriority("text-wrap-style");
-  if (breaks.length) {
-    element.style.setProperty("text-wrap-style", "auto", "important");
-    wrapOverrides.set(element, { value: wrapStyle, priority: wrapPriority });
-  }
-  const runs = textRuns(element);
-  const source = element.textContent || "";
-  const markers = [];
-  const splits = /* @__PURE__ */ new Map();
-  const inline = (hangs.length || spaces.length) && !markerRules(element);
-  const insertions = [
-    ...breaks.map((offset) => ({ offset, px: 0, spacing: false })),
-    ...hangs.map((hang) => ({ ...hang, spacing: false })),
-    ...spaces.map((space) => ({ ...space, spacing: true }))
-  ].sort((a, b) => b.offset - a.offset || b.px - a.px);
-  for (const { offset, px, spacing } of insertions) {
-    const point = pointAt(runs, offset);
-    if (!point) continue;
-    const head = point.node;
-    if (spacing && point.offset && head.previousSibling?.nodeType === Node.COMMENT_NODE && !/\S/u.test(head.data.slice(0, point.offset))) point.offset = 0;
-    const marker = element.ownerDocument.createElement(px ? "span" : "br");
-    marker.setAttribute(BREAK_ATTRIBUTE, "");
-    if (px || !breakReplacesSpace(source, offset)) marker.setAttribute("aria-hidden", "true");
-    if (spacing) {
-      marker.dataset.tsSpace = String(offset);
-      Object.assign(marker.style, spacingMarkerStyle(px, !!inline));
-    } else if (px) {
-      marker.dataset.tsHang = String(offset);
-      Object.assign(marker.style, opticalMarkerStyle(px, !!inline));
-    } else marker.style.setProperty("display", "var(--ts-break-display, inline)", "important");
-    const opening = !px && !spacing && point.offset === 0 && !engineText.has(head) ? elementStartingAt(element, head) : null;
-    if (opening) opening.before(marker);
-    else if (point.offset === 0 && !engineText.has(head) && afterComment(head)) head.previousSibling.before(marker);
-    else if (point.offset === 0 && (engineText.has(head) || !positional(head))) head.before(marker);
-    else {
-      const tail = head.splitText(point.offset);
-      engineText.add(tail);
-      const split = splits.get(head) || { head, parts: [head], expected: [] };
-      split.parts.splice(1, 0, tail);
-      splits.set(head, split);
-      tail.before(marker);
-    }
-    markers.push(marker);
-  }
-  for (const split of splits.values()) split.expected = split.parts.map((part) => part.data);
-  if (splits.size) markers.push(...shieldWhitespace(element));
-  restoreSelection();
-  const releaseCopy = copy ? preserveRichCopy(element) : () => {
-  };
-  let released = false;
-  return {
-    nodes: [element, ...element.querySelectorAll("*"), ...textRuns(element).map((r) => r.node)],
-    heads: new Set(splits.keys()),
-    cleanup(written) {
-      if (released) return;
-      released = true;
-      const restoreSelection2 = selectionBookmark(element);
-      markers.forEach((marker) => marker.remove());
-      if (spaces.length) element.querySelectorAll("[data-ts-break][data-ts-space]").forEach((marker) => marker.remove());
-      if (breaks.length) element.querySelectorAll("[" + BREAK_ATTRIBUTE + "]").forEach((marker) => marker.remove());
-      releaseSplits(element, splits.values(), written);
-      if (breaks.length) wrapOverrides.delete(element);
-      if (breaks.length && element.style.getPropertyValue("text-wrap-style") === "auto" && element.style.getPropertyPriority("text-wrap-style") === "important") {
-        if (!hadStyle && element.style.length === 1) removeStyleAttribute(element);
-        else if (wrapStyle) element.style.setProperty("text-wrap-style", wrapStyle, wrapPriority);
-        else element.style.removeProperty("text-wrap-style");
-        if (!hadStyle && !element.style.length) removeStyleAttribute(element);
-      }
-      releaseCopy();
-      restoreSelection2();
-    },
-    rejoin() {
-      if (released) return;
-      released = true;
-      rejoinSplits(element, splits.values());
-      if (breaks.length) wrapOverrides.delete(element);
-      releaseCopy();
-    }
-  };
-}
-var unrendered = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"]);
-function hiddenFromCopy(element) {
-  if (unrendered.has(element.tagName) || element.tagName === "INPUT" && element.type === "hidden") return true;
-  const rendered2 = typeof element.checkVisibility === "function" ? element.checkVisibility() : element.getClientRects().length > 0;
-  return !rendered2 && getComputedStyle(element).display !== "contents";
-}
-function visibleContents(range, each) {
-  const fragment = range.cloneContents();
-  const root = range.commonAncestorContainer;
-  const visibility = /* @__PURE__ */ new Map();
-  const visibleText = (text) => {
-    const parent = text.parentElement;
-    if (!parent) return true;
-    if (!visibility.has(parent)) {
-      const cs = getComputedStyle(parent);
-      visibility.set(parent, cs.visibility === "visible" && cs.getPropertyValue("content-visibility") !== "hidden");
-    }
-    return visibility.get(parent);
-  };
-  if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
-    if (!visibleText(root)) fragment.replaceChildren();
-    return fragment;
-  }
-  const doc = range.startContainer.ownerDocument;
-  const sources2 = [];
-  const walker = doc.createTreeWalker(
-    root,
-    NodeFilter.SHOW_ALL,
-    { acceptNode: (node) => range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-  );
-  while (walker.nextNode()) sources2.push(walker.currentNode);
-  const clones = [];
-  const cloneWalker = doc.createTreeWalker(fragment, NodeFilter.SHOW_ALL);
-  while (cloneWalker.nextNode()) clones.push(cloneWalker.currentNode);
-  if (sources2.length !== clones.length) return null;
-  for (let i = 0; i < sources2.length; i++) {
-    const source = sources2[i], clone = clones[i];
-    if (source.nodeType !== clone.nodeType || source.nodeName !== clone.nodeName) return null;
-    const hidden = source.nodeType === Node.ELEMENT_NODE ? hiddenFromCopy(source) : source.nodeType === Node.TEXT_NODE && !visibleText(source);
-    if (!hidden) {
-      if (each && source.nodeType === Node.ELEMENT_NODE) each(source, clone);
-      continue;
-    }
-    clone.remove();
-    while (i + 1 < sources2.length && source.contains(sources2[i + 1])) i++;
-  }
-  return fragment;
-}
-function renderedText(source, range, root) {
-  const blank = (start2) => {
-    const outside = root.ownerDocument.createRange();
-    outside.selectNodeContents(root);
-    if (start2) outside.setEnd(range.startContainer, range.startOffset);
-    else outside.setStart(range.endContainer, range.endOffset);
-    return !/[^ \t\n\r\f]/.test(outside.toString());
-  };
-  let text = source.replace(/[ \t\n\r\f]+/g, " ");
-  if (text.startsWith(" ") && blank(true)) text = text.slice(1);
-  if (text.endsWith(" ") && blank(false)) text = text.slice(0, -1);
-  return text.replace(/\u00a0/g, " ");
-}
-var copyRoots = /* @__PURE__ */ new WeakMap();
-function preserveRichCopy(element) {
-  const doc = element.ownerDocument;
-  let roots = copyRoots.get(doc);
-  if (!roots) {
-    roots = /* @__PURE__ */ new WeakMap();
-    copyRoots.set(doc, roots);
-    const registered = roots;
-    doc.addEventListener("copy", (event) => {
-      if (event.defaultPrevented || !event.clipboardData) return;
-      const target = event.target;
-      if (target?.nodeType === Node.ELEMENT_NODE && target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
-      const selection = doc.getSelection();
-      if (!selection?.rangeCount || selection.isCollapsed) return;
-      const ranges = Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i));
-      const containingRoot = (range) => {
-        let root = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
-        while (root && !(registered.has(root) && root.contains(range.endContainer))) root = root.parentElement;
-        return root;
-      };
-      const affected = ranges.some((range) => {
-        if (containingRoot(range)) return true;
-        const common = range.commonAncestorContainer;
-        const parent = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
-        return Array.from(parent?.querySelectorAll("*") || []).some((el) => registered.has(el) && range.intersectsNode(el));
-      });
-      if (!affected) return;
-      const fragments = ranges.map((range) => visibleContents(range, (source, clone) => {
-        const saved = wrapOverrides.get(source), style = clone.style;
-        if (!saved || !style || style.getPropertyValue("text-wrap-style") !== "auto" || style.getPropertyPriority("text-wrap-style") !== "important") return;
-        if (saved.value) style.setProperty("text-wrap-style", saved.value, saved.priority);
-        else style.removeProperty("text-wrap-style");
-        if (!style.length) clone.removeAttribute("style");
-      }));
-      const sourceText = fragments[0]?.textContent ?? null;
-      const html = fragments.some((fragment) => !fragment) ? "" : fragments.map((fragment) => {
-        fragment.querySelectorAll("[" + BREAK_ATTRIBUTE + "]").forEach((marker) => marker.remove());
-        fragment.querySelectorAll("[data-ts-track]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
-        for (const el of fragment.querySelectorAll("*")) {
-          for (const attribute of ["data-ts-outcome", "data-typeset-done", "data-ts-quotes", "data-ts-hanging", "data-ts-spacing", "data-ts-tracking", "data-ts-stale", "data-typeset-react", "data-typeset-react-rich"]) el.removeAttribute(attribute);
-          if (el.localName === "a" && el.namespaceURI === "http://www.w3.org/1999/xhtml" && el.hasAttribute("href")) {
-            try {
-              el.setAttribute("href", new URL(el.getAttribute("href"), doc.baseURI).href);
-            } catch {
-            }
-          }
-        }
-        const container = doc.createElement("div");
-        container.append(fragment);
-        return container.innerHTML;
-      }).join("");
-      let text;
-      const single = ranges.length === 1 ? containingRoot(ranges[0]) : null;
-      if (single && sourceText !== null) text = renderedText(sourceText, ranges[0], single);
-      else {
-        const restore2 = Array.from(doc.querySelectorAll("[" + BREAK_ATTRIBUTE + "]")).filter((marker) => ranges.some((range) => range.intersectsNode(marker))).map((marker) => override(marker, { display: "none" }));
-        try {
-          text = selection.toString().replace(/\u00a0/g, " ");
-        } finally {
-          restore2.forEach((undo) => undo());
-        }
-      }
-      event.clipboardData.setData("text/plain", text);
-      if (html) event.clipboardData.setData("text/html", html);
-      event.preventDefault();
-    });
-  }
-  roots.set(element, (roots.get(element) || 0) + 1);
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    const count = (roots.get(element) || 1) - 1;
-    if (count) roots.set(element, count);
-    else roots.delete(element);
-  };
-}
-function richFingerprint(element) {
-  return [element, ...element.querySelectorAll("*")].filter((el) => !el.hasAttribute(BREAK_ATTRIBUTE) && !el.hasAttribute("data-ts-track")).map((el) => {
-    const cs = getComputedStyle(el);
-    return [
-      cs.font,
-      cs.fontFeatureSettings,
-      cs.fontVariationSettings,
-      cs.fontOpticalSizing,
-      cs.fontKerning,
-      cs.fontVariant,
-      cs.fontSizeAdjust,
-      cs.fontSynthesis,
-      cs.textRendering,
-      cs.lineHeight,
-      cs.letterSpacing,
-      cs.wordSpacing,
-      cs.textTransform,
-      cs.whiteSpace,
-      cs.hyphens,
-      cs.wordBreak,
-      cs.lineBreak,
-      cs.overflowWrap,
-      el.getAttribute("lang"),
-      cs.display,
-      cs.direction,
-      cs.unicodeBidi,
-      cs.verticalAlign,
-      cs.transform,
-      cs.visibility,
-      cs.paddingInline,
-      cs.marginInline,
-      cs.borderInlineWidth,
-      cs.color,
-      cs.backgroundColor,
-      cs.textDecoration,
-      cs.textShadow,
-      getComputedStyle(el, "::before").content,
-      getComputedStyle(el, "::after").content
-    ].join("|");
-  }).join(";");
-}
-
-// src/lib/v4/smart-quotes.ts
-var elision = /^(?:\d{2}s\b|tis\b|twas\b|em\b|cause\b|til\b)/iu;
-var loose = /^(?:bout|round|nuff)\b/iu;
-var nPairs = /* @__PURE__ */ new Set([
-  "rock",
-  "rhythm",
-  "fish",
-  "salt",
-  "pick",
-  "shake",
-  "surf",
-  "drag",
-  "grab",
-  "meet",
-  "stop",
-  "park",
-  "cash",
-  "wash",
-  "rip",
-  "plug",
-  "spick",
-  "bump",
-  "nip",
-  "scratch",
-  "peel",
-  "lock",
-  "snack",
-  "bread",
-  "mix"
-]);
-var nPairLongest = Math.max(...[...nPairs].map((word2) => word2.length));
-function pairWordBefore(text, index) {
-  let end = index;
-  while (end > 0 && /\s/u.test(text[end - 1])) end--;
-  let start2 = end;
-  while (start2 > 0 && end - start2 <= nPairLongest) {
-    const low = text.charCodeAt(start2 - 1);
-    if (low >= 56320 && low <= 57343 && start2 > 1 && /^\p{L}$/u.test(text.slice(start2 - 2, start2))) start2 -= 2;
-    else if (/\p{L}/u.test(text[start2 - 1])) start2--;
-    else break;
-  }
-  return start2 < end && end - start2 <= nPairLongest && nPairs.has(text.slice(start2, end).toLowerCase());
-}
-var sentenceEnd = /[.!?](?:\s|$)/gu;
-var closer = /[\p{L}\p{N}.,!?]['\u2019](?![\p{L}\p{N}])/gu;
-function laterCloser(text) {
-  let end = -1, close = -1, quote = 0;
-  return (index) => {
-    if (end <= index) {
-      sentenceEnd.lastIndex = index + 1;
-      end = sentenceEnd.exec(text)?.index ?? text.length;
-    }
-    if (close <= index) {
-      closer.lastIndex = index + 1;
-      close = closer.exec(text)?.index ?? text.length;
-      quote = closer.lastIndex ? closer.lastIndex - 1 : close;
-    }
-    return quote < end;
-  };
-}
-function smartQuotes(text) {
-  let doubleOpen = false;
-  let singleOpen = false;
-  let out = "";
-  let before = "";
-  const closesLater = laterCloser(text);
-  const put = (char) => {
-    out += char;
-    before = char;
-  };
-  for (let index = 0; index < text.length; index++) {
-    const quote = text[index];
-    if (!/["'\u201c\u201d\u2018\u2019]/u.test(quote)) {
-      put(quote);
-      continue;
-    }
-    if (quote === "\u201C") doubleOpen = true;
-    else if (quote === "\u201D") doubleOpen = false;
-    else if (quote === "\u2018") singleOpen = true;
-    if (quote !== '"' && quote !== "'") {
-      put(quote);
-      continue;
-    }
-    const after = text[index + 1] || "";
-    const opening = !before || /[\s([{\u2014\u2013\u201c\u2018]/u.test(before);
-    if (quote === '"') {
-      if ((!before || /\s/u.test(before)) && (!after || /\s/u.test(after))) put(quote);
-      else if (opening && after && !/\s/u.test(after)) {
-        doubleOpen = true;
-        put("\u201C");
-      } else if (!doubleOpen) put(quote);
-      else {
-        doubleOpen = false;
-        put("\u201D");
-      }
-      continue;
-    }
-    const rest = text.slice(index + 1);
-    if (/\p{L}/u.test(before) && /\p{L}/u.test(after)) put("\u2019");
-    else if (opening && (elision.test(rest) || loose.test(rest) && !closesLater(index) || /^n(?=['\u2019]?(?:\s|$))/iu.test(rest) && pairWordBefore(text, index))) put("\u2019");
-    else if (opening && after && !/\s/u.test(after)) {
-      singleOpen = true;
-      put("\u2018");
-    } else if (/\d/u.test(before) && !singleOpen) put(quote);
-    else {
-      singleOpen = false;
-      put("\u2019");
-    }
-  }
-  return out;
-}
-function englishScope(tag, declared) {
-  const language = languageOf(tag);
-  return language === "en" || !declared && language === "und";
-}
-function applySmartQuotes(element, declared = false) {
-  const skip = 'code, pre, kbd, samp, input, textarea, script, style, [data-no-typeset], [contenteditable]:not([contenteditable="false"])';
-  if (!englishScope(element.closest("[lang]")?.getAttribute("lang"), declared) || element.matches(skip) || element.querySelector(skip) || [...element.querySelectorAll("[lang]")].some((el) => languageOf(el.getAttribute("lang")) !== "en")) {
-    return { outcome: "native:quotes-scope", restore: () => {
-    } };
-  }
-  const source = element.textContent || "";
-  const educated = smartQuotes(source);
-  const edits = [];
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  let node;
-  let offset = 0;
-  while (node = walker.nextNode()) {
-    const text = node;
-    const output = educated.slice(offset, offset + text.length);
-    offset += text.length;
-    if (output !== text.data) {
-      edits.push({ node: text, source: text.data, output });
-      text.data = output;
-    }
-  }
-  return { outcome: edits.length ? "applied" : "unchanged", restore: () => {
-    for (const edit of edits) if (element.contains(edit.node) && edit.node.data === edit.output) edit.node.data = edit.source;
-  } };
-}
-
-// src/lib/v4/settled.ts
-var KEY = /* @__PURE__ */ Symbol.for("typeset.us/work");
-var SETTLE_TIMEOUT_MS = 1e4;
-var POLL_MS = 50;
-function sources() {
-  const shared = globalThis;
-  return shared[KEY] || (shared[KEY] = /* @__PURE__ */ new Set());
-}
-function trackWork(busy) {
-  const set = sources();
-  set.add(busy);
-  return () => {
-    set.delete(busy);
-  };
-}
-function whenSettled(options = {}) {
-  const doc = typeof document === "undefined" ? void 0 : document;
-  const view = doc?.defaultView;
-  if (!doc || !view || !canMaintain(doc) || !canCompose(doc)) return Promise.resolve({ settled: true });
-  const timeout = typeof options.timeout === "number" && options.timeout >= 0 ? options.timeout : SETTLE_TIMEOUT_MS;
-  const start2 = performance.now();
-  const busy = () => doc.readyState === "loading" || doc.fonts?.status === "loading" || [...sources()].some((source) => source());
-  return new Promise((resolve) => {
-    let quiet = 0;
-    const next = () => view.setTimeout(step, Math.max(0, Math.min(POLL_MS, timeout - (performance.now() - start2))));
-    const step = () => {
-      if (busy()) quiet = 0;
-      else if (++quiet >= 2) {
-        resolve({ settled: true });
-        return;
-      }
-      if (performance.now() - start2 >= timeout) {
-        resolve({ settled: !busy() });
-        return;
-      }
-      next();
-    };
-    next();
-  });
-}
-
-// src/lib/v4/tracking-finish.ts
-var TRACK_ATTRIBUTE = "data-ts-track";
-var MAX_TRACKING_EM = 0.01;
-var resolvedSpacing = (value) => value === "normal" ? 0 : /^-?(?:\d+\.?\d*|\.\d+)px$/u.test(value) ? parseFloat(value) : NaN;
-function textRuns2(element) {
-  const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const runs = [];
-  let node, offset = 0;
-  while (node = walker.nextNode()) {
-    const text = node;
-    runs.push({ node: text, start: offset, end: offset + text.length });
-    offset += text.length;
-  }
-  return runs;
-}
-var graphemeSegmenter3;
-var graphemes2 = () => graphemeSegmenter3 ??= new Intl.Segmenter(void 0, { granularity: "grapheme" });
-function planTrackingFinish(element, layout, targets) {
-  const result = (outcome, runs2 = []) => ({ outcome, runs: runs2, before: layout, targets });
-  const style = getComputedStyle(element);
-  if (style.direction !== "ltr" || style.writingMode !== "horizontal-tb" || !["left", "start"].includes(style.textAlign)) return result("native:tracking-layout");
-  const source = element.textContent || "", texts = textRuns2(element);
-  const segmenter2 = graphemes2();
-  const hidden = element.firstElementChild ? hiddenInline(element) : [];
-  const runs = [];
-  let unsupported2 = false, held = false;
-  for (const [line, box] of layout.lines.slice(0, -1).entries()) {
-    const desired = targets[line] - box.width;
-    if (!Number.isFinite(desired) || Math.abs(desired) < 0.25) continue;
-    if ([...box.text].some((char) => /\p{L}/u.test(char) && !/\p{Script=Latin}/u.test(char))) {
-      unsupported2 = true;
-      continue;
-    }
-    if (texts.some((text) => text.start < box.sourceEnd && text.end > box.sourceStart && heldAfterComment(text.node))) {
-      held = true;
-      continue;
-    }
-    const pieces = [];
-    for (const text of texts) {
-      const start2 = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
-      if (end <= start2 || text.node.parentElement?.closest("code, kbd, samp") || hidden.length && withinHidden(text.node, hidden)) continue;
-      const parent = text.node.parentElement;
-      if (!parent) continue;
-      const cs = getComputedStyle(parent), fontSize = parseFloat(cs.fontSize);
-      const letterSpacing = resolvedSpacing(cs.letterSpacing), wordSpacing = resolvedSpacing(cs.wordSpacing);
-      if (!(fontSize > 0) || !Number.isFinite(letterSpacing) || !Number.isFinite(wordSpacing)) return result("native:tracking-measurement");
-      const count = [...segmenter2.segment(source.slice(start2, end))].filter((part) => !/^\s+$/u.test(part.segment)).length;
-      const previous = pieces.at(-1);
-      let adjacent = previous?.last.nextSibling || null;
-      while (adjacent?.nodeType === Node.ELEMENT_NODE && (adjacent.hasAttribute("data-ts-space") || adjacent.hasAttribute("data-ts-shield")) || adjacent?.nodeType === Node.TEXT_NODE && !adjacent.length) adjacent = adjacent.nextSibling;
-      if (previous && adjacent === text.node && previous.end === start2) {
-        previous.end = end;
-        previous.count += count;
-        previous.last = text.node;
-      } else pieces.push({ start: start2, end, line, px: 0, fontSize, letterSpacing, wordSpacing, last: text.node, count });
-    }
-    const capacity = pieces.reduce((sum, run) => sum + run.count * run.fontSize, 0);
-    if (!capacity) continue;
-    const em = Math.max(-MAX_TRACKING_EM, Math.min(MAX_TRACKING_EM, desired / capacity));
-    for (const { last: _last, count, ...run } of pieces) if (count) runs.push({ ...run, px: run.fontSize * em });
-  }
-  if (runs.length > 256) return result("native:tracking-budget");
-  return result(runs.length ? "applied" : unsupported2 ? "native:tracking-script" : held ? "native:tracking-comment" : "unchanged", runs);
-}
-var heldAfterComment = (node) => node.length > 0 && !engineText.has(node) && afterComment(node) && !reactOwned(node);
-function trackingStyle(run, inline) {
-  const spacing = {
-    letterSpacing: run.letterSpacing + run.px + "px",
-    // CSS tracking also affects spaces. Compensate so the word-space finish
-    // retains its measured 80-133% envelope instead of paying for tracking twice.
-    wordSpacing: run.wordSpacing - run.px + "px"
-  };
-  return inline ? { all: "unset", display: "inline", ...spacing } : spacing;
-}
-function renderTracking(element, plan, copy = true) {
-  const restoreSelection = selectionBookmark(element), texts = textRuns2(element);
-  const inline = !markerRules(element);
-  const splits = /* @__PURE__ */ new Map();
-  const split = (head, at) => {
-    const tail = head.splitText(at);
-    engineText.add(tail);
-    const record = splits.get(head) || { head, parts: [head], expected: [] };
-    record.parts.splice(1, 0, tail);
-    splits.set(head, record);
-    return tail;
-  };
-  for (const run of [...plan.runs].reverse()) {
-    const a = texts.find((text) => text.start <= run.start && text.end > run.start);
-    const b = texts.find((text) => text.start < run.end && text.end >= run.end);
-    if (!a || !b || a.node.parentNode !== b.node.parentNode) continue;
-    const end = run.end - b.start;
-    if (end < b.node.length) split(b.node, end);
-    const first = run.start > a.start ? split(a.node, run.start - a.start) : a.node;
-    const last = a.node === b.node ? first : b.node;
-    const nodes = [];
-    for (let node = first; node; node = node.nextSibling) {
-      nodes.push(node);
-      if (node === last) break;
-    }
-    let wrapper = null;
-    for (const node of nodes) {
-      if (node.nodeType === Node.TEXT_NODE && !engineText.has(node) && (!node.length || afterComment(node) || positional(node) || reactOwned(node))) {
-        if (!node.length || heldAfterComment(node)) {
-          wrapper = null;
-          continue;
-        }
-        const piece = split(node, 0);
-        if (!wrapper || wrapper.nextSibling !== piece) {
-          wrapper = trackingWrapper(element, run, inline);
-          piece.before(wrapper);
-        }
-        wrapper.append(piece);
-        continue;
-      }
-      if (!wrapper || wrapper.nextSibling !== node) {
-        wrapper = trackingWrapper(element, run, inline);
-        node.before(wrapper);
-      }
-      wrapper.append(node);
-    }
-  }
-  for (const record of splits.values()) record.expected = record.parts.map((part) => part.data);
-  const shields = splits.size ? shieldWhitespace(element) : [];
-  restoreSelection();
-  const releaseCopy = copy ? preserveRichCopy(element) : () => {
-  };
-  let released = false;
-  return { nodes: [element], heads: new Set(splits.keys()), cleanup(written) {
-    if (released) return;
-    released = true;
-    const restoreSelection2 = selectionBookmark(element);
-    shields.forEach((shield) => shield.remove());
-    element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]").forEach((wrapper) => wrapper.replaceWith(...wrapper.childNodes));
-    releaseSplits(element, splits.values(), written);
-    releaseCopy();
-    restoreSelection2();
-  }, rejoin() {
-    if (released) return;
-    released = true;
-    rejoinSplits(element, splits.values());
-    releaseCopy();
-  } };
-}
-function trackingWrapper(element, run, inline) {
-  const wrapper = element.ownerDocument.createElement("span");
-  wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
-  Object.assign(wrapper.style, trackingStyle(run, inline));
-  return wrapper;
-}
-function trackingVerified(element, plan, after) {
-  const wrappers = Array.from(element.querySelectorAll("[" + TRACK_ATTRIBUTE + "]"));
-  if (new Set(wrappers.map((wrapper) => wrapper.getAttribute(TRACK_ATTRIBUTE))).size !== plan.runs.length || after.lines.length !== plan.before.lines.length || Math.abs(after.width - plan.before.width) > 0.5 || after.overflow > Math.max(0.5, plan.before.overflow)) return false;
-  if (wrappers.some((wrapper) => {
-    const run = plan.runs.find((run2) => run2.start === Number(wrapper.getAttribute(TRACK_ATTRIBUTE)));
-    const cs = getComputedStyle(wrapper);
-    return !run || Math.abs(parseFloat(cs.letterSpacing) - run.letterSpacing - run.px) > 1e-3 || Math.abs(parseFloat(cs.wordSpacing) - run.wordSpacing + run.px) > 1e-3 || cs.display !== "inline" || cs.position !== "static" || cs.visibility !== "visible" || ["::before", "::after"].some((pseudo) => !["none", "normal", '""', ""].includes(getComputedStyle(wrapper, pseudo).content));
-  })) return false;
-  return after.lines.every((line, index) => {
-    const before = plan.before.lines[index], adjusted = plan.runs.some((run) => run.line === index);
-    return line.sourceStart === before.sourceStart && line.sourceEnd === before.sourceEnd && Math.abs(line.left - before.left) <= 0.5 && Math.abs(line.top - before.top) <= 0.5 && Math.abs(line.bottom - before.bottom) <= 0.5 && (adjusted ? Math.abs(plan.targets[index] - line.width) < Math.abs(plan.targets[index] - before.width) - 0.02 : Math.abs(line.width - before.width) <= 0.5);
-  });
 }
 
 // src/lib/v4/validate.ts
@@ -4759,13 +4558,12 @@ function warn(message) {
 }
 var choices = {
   lineBreaks: ["unicode", "legacy"],
-  smartQuotes: ["en", "en-declared", false],
+  smartQuotes: ["en", false],
   contour: ["finished", "natural"],
   mode: ["body", "heading", "title", "ui"],
-  density: ["compact", "editorial"],
-  coverage: ["extended", "core"]
+  density: ["compact", "editorial"]
 };
-var booleans = ["opticalHanging", "spacing", "tracking", "copy", "headings"];
+var booleans = ["opticalHanging", "spacing", "tracking"];
 var list = (values) => values.map((value) => typeof value === "string" ? JSON.stringify(value) : String(value)).join(" or ").replace(/ or (?=.* or )/g, ", ");
 function checkOptions(api, options) {
   if (options === void 0) return;
@@ -4796,16 +4594,8 @@ function checkSelector(api, selector) {
 var mountOwners = /* @__PURE__ */ new WeakMap();
 var mountWaiters = /* @__PURE__ */ new WeakMap();
 
-// src/lib/v4/loader-notes.ts
-var NOTHING_TO_IMPROVE = /* @__PURE__ */ new Set(["native:fits", "native:empty", "native:sentence-aligned", "native:paragraph-rhythm"]);
-function commonest(elements) {
-  const counts = /* @__PURE__ */ new Map();
-  for (const el of elements) counts.set(el.dataset.tsOutcome, (counts.get(el.dataset.tsOutcome) || 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1])[0];
-}
-
 // src/lib/v4/typeset.next.ts
-var VERSION = "4.4.0";
+var VERSION = "4.3.2";
 var states = /* @__PURE__ */ new WeakMap();
 function staleSplit(element, state, record, written) {
   if (record.type === "characterData") {
@@ -4922,7 +4712,7 @@ function transformOnly(a, b) {
   return a.slice(a.indexOf(",", a.indexOf(",") + 1)) === b.slice(b.indexOf(",", b.indexOf(",") + 1));
 }
 function optionsKey(options) {
-  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour, options.copy, options.coverage]);
+  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
 }
 function signature(el, options, layout = layoutKey(el)) {
   return el.innerHTML + "\0" + layout + "\0" + optionsKey(options);
@@ -5136,9 +4926,9 @@ function typeset(element, options = {}) {
   if (liveText(element)) {
     if (states.has(element)) restore(element);
     if (options.text !== void 0) {
-      const curled = options.smartQuotes === "en" || options.smartQuotes === "en-declared" ? smartQuotes(options.text) : options.text;
+      const curled = options.smartQuotes === "en" ? smartQuotes(options.text) : options.text;
       const lang2 = element.closest("[lang]")?.getAttribute("lang");
-      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = englishScope(lang2, options.smartQuotes === "en-declared") ? curled : options.text;
+      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = !lang2 || /^en(?:-|$)/i.test(lang2) ? curled : options.text;
       authorTexts.set(element, options.text);
     }
     return { outcome: "native:live-region", mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
@@ -5176,20 +4966,18 @@ function typeset(element, options = {}) {
   }
   const rawMarkup = element.innerHTML;
   const restoreQuoteSelection = selectionBookmark(element);
-  const quotes = options.smartQuotes === "en" || options.smartQuotes === "en-declared" ? applySmartQuotes(element, options.smartQuotes === "en-declared") : void 0;
+  const quotes = options.smartQuotes === "en" ? applySmartQuotes(element) : void 0;
   restoreQuoteSelection();
   const source = element.textContent || "";
   const originalMarkup = element.innerHTML;
   const nodes = Array.from(element.childNodes);
   const hadStyle = element.hasAttribute("style");
   const styles = { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize };
-  const overlong = visible && exceedsRunBudget(source);
-  const before = visible && !overlong ? measureLayout(element) : emptyMetrics();
+  const before = visible ? measureLayout(element) : emptyMetrics();
   let rich;
   let search;
   let fingerprinted;
   const spaceWidths = /* @__PURE__ */ new Map();
-  const copy = options.copy !== false;
   const finish = (outcome, constraint) => {
     let optical;
     let spacing;
@@ -5207,7 +4995,7 @@ function typeset(element, options = {}) {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
-        spacing = renderRichText(element, [], [], plan.adjustments, copy);
+        spacing = renderRichText(element, [], [], plan.adjustments);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !spacingVerified(element, plan, measureLayout(element))) {
           spacing.cleanup();
           spacing = void 0;
@@ -5223,7 +5011,7 @@ function typeset(element, options = {}) {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.tracking = plan.outcome;
       if (plan.runs.length) {
-        tracking = renderTracking(element, plan, copy);
+        tracking = renderTracking(element, plan);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !trackingVerified(element, plan, measureLayout(element))) {
           tracking.cleanup();
           tracking = void 0;
@@ -5238,7 +5026,7 @@ function typeset(element, options = {}) {
       const plan = planOpticalHanging(element, layout2);
       features.hanging = plan.outcome;
       if (plan.hangs.length) {
-        optical = renderRichText(element, [], plan.hangs, [], copy);
+        optical = renderRichText(element, [], plan.hangs);
         const after3 = measureLayout(element);
         if (!opticalVerified(element, layout2, after3, plan.hangs) || richFingerprint(element) !== fingerprint) {
           optical.cleanup();
@@ -5247,7 +5035,7 @@ function typeset(element, options = {}) {
         }
       }
     }
-    const after2 = visible && !overlong ? measureLayout(element) : emptyMetrics();
+    const after2 = visible ? measureLayout(element) : emptyMetrics();
     let widest = 0;
     if (outcome.startsWith("composed") && after2.lines.length) {
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
@@ -5291,7 +5079,6 @@ function typeset(element, options = {}) {
     return result;
   };
   if (!source.trim()) return finish("native:empty");
-  if (overlong) return finish("native:run-budget");
   const cs = getComputedStyle(element);
   const lang = element.closest("[lang]")?.getAttribute("lang");
   if (options.lineBreaks !== "unicode" && (lang && !/^en(?:-|$)/i.test(lang) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return finish("native:language");
@@ -5314,7 +5101,7 @@ function typeset(element, options = {}) {
     const plan = planRichText(element, { ...options, mode }, before, spaceWidths);
     search = plan.search;
     if (plan.outcome !== "composed:rich") return finish(plan.outcome, plan.constraint);
-    rich = renderRichText(element, plan.breaks, [], [], copy);
+    rich = renderRichText(element, plan.breaks);
     const after2 = measureLayout(element);
     if (!richLayoutVerified(plan, after2) || element.textContent !== source || richFingerprint(element) !== plan.styleSignature || !before.lastSingleton && after2.lastSingleton && mode === "body") {
       rich.cleanup();
@@ -5384,10 +5171,8 @@ function typeset(element, options = {}) {
   return finish("composed");
 }
 var isElement = (node) => node?.nodeType === 1;
-var headingScope = 'h1, h2, h3, h4, h5, h6, [role="heading" i]';
-var skipped = (el, options) => options.headings === false && !!el.closest(headingScope);
 function typesetAll(selector = defaults, options = {}) {
-  return Array.from(document.querySelectorAll(selector)).filter((el) => !skipped(el, options)).map((el) => typeset(el, options));
+  return Array.from(document.querySelectorAll(selector), (el) => typeset(el, options));
 }
 function lineReview(layout, language, english) {
   const review = [];
@@ -5412,8 +5197,6 @@ function lineReview(layout, language, english) {
 }
 function auditReport(selector = defaults) {
   const report = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
-  const decided = [], untagged = [];
-  let composedCount = 0;
   for (const element of document.querySelectorAll(selector)) {
     if (element.closest("[data-ts-generated], [data-ts-probe]")) continue;
     report.examined++;
@@ -5425,15 +5208,9 @@ function auditReport(selector = defaults) {
     }
     const layout = measureForAudit(element);
     const add = (type, severity, detail) => report.issues.push({ element, type, severity, detail });
-    const style = getComputedStyle(element);
-    if (layout.overflow > 0.75) {
-      const clips = ["hidden", "clip"].includes(style.overflowX) || ["hidden", "clip"].includes(style.overflowY);
-      const clamp = parseInt(style.getPropertyValue("-webkit-line-clamp"), 10) > 0;
-      if (clips && (/ellipsis/.test(style.textOverflow) || clamp)) {
-        add("clipped", "review", layout.overflow.toFixed(2) + "px clipped on purpose (overflow: " + (["hidden", "clip"].includes(style.overflowX) ? style.overflowX : style.overflowY) + (clamp ? ", -webkit-line-clamp: " + style.getPropertyValue("-webkit-line-clamp") : ", text-overflow: ellipsis") + ")");
-      } else add("overflow", "error", layout.overflow.toFixed(2) + "px outside content box");
-    }
+    if (layout.overflow > 0.75) add("overflow", "error", layout.overflow.toFixed(2) + "px outside content box");
     if (element.querySelector(".ts-line .ts-line")) add("nested-output", "error", "Generated lines contain generated lines");
+    const style = getComputedStyle(element);
     if (outcome.startsWith("composed") && breaksChangeAlignment(style)) {
       add("alignment-lost", "error", "text-align: " + style.textAlign + (style.textAlignLast && style.textAlignLast !== "auto" ? ", text-align-last: " + style.textAlignLast : "") + " cannot apply to composed lines, which each end in a generated break");
     }
@@ -5461,11 +5238,6 @@ function auditReport(selector = defaults) {
     const state = states.get(element);
     const language = languageOf(element.closest("[lang]")?.getAttribute("lang"));
     const english = language === "en" || language === "und" && !!state?.english;
-    if (element.dataset.tsOutcome) decided.push(element);
-    if (outcome.startsWith("composed")) {
-      composedCount++;
-      if (language === "und" && !english) untagged.push(element);
-    }
     const review = lineReview(layout, language, english);
     for (const item of review) add(item.type, "review", item.detail);
     const current = !!state && state.output === element.textContent;
@@ -5481,14 +5253,6 @@ function auditReport(selector = defaults) {
     }
     if (!layout.lines.length && (element.textContent || "").trim()) add("unmeasurable", "review", "No visible line boxes");
     if (outcome === "unprocessed") add("unprocessed", "review", "No engine decision recorded");
-  }
-  if (untagged.length) {
-    report.issues.push({ element: untagged[0], type: "untagged", severity: "review", detail: untagged.length + " composed element" + (untagged.length === 1 ? " declares" : "s declare") + ' no language, so English line-end preferences are off; add lang="en" to <html> if the text is English' });
-  }
-  const declined = decided.filter((element) => !NOTHING_TO_IMPROVE.has(element.dataset.tsOutcome));
-  if (!composedCount && declined.length) {
-    const [outcome, count] = commonest(declined);
-    report.issues.push({ element: declined[0], type: "uncomposed", severity: "review", detail: "None of the " + decided.length + " element" + (decided.length === 1 ? "" : "s") + " with an outcome was composed; most common: " + outcome + " \xD7" + count + " (OUTCOMES.md says why)" });
   }
   return report;
 }
@@ -5535,7 +5299,7 @@ function auditJSON(selector = defaults) {
   };
 }
 var CONTENT = 1;
-var KEY2 = 2;
+var KEY = 2;
 var VERIFY = 4;
 var RELEASE = 8;
 var RESIZE_SETTLE_MS = 100;
@@ -5553,7 +5317,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
   if (!canMaintain(doc)) {
     const scope = Array.from(root.querySelectorAll(selector));
     if (isElement(root) && root.matches(selector)) scope.unshift(root);
-    for (const el of scope) if (!el.closest(excluded) && !skipped(el, options)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    for (const el of scope) if (!el.closest(excluded)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
     return { ready: Promise.resolve(), refresh() {
     }, disconnect() {
     }, stats: { passes: 0, compositions: 0, maxBatchMs: 0, overlappingTargets: 0 } };
@@ -5586,7 +5350,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     resolveReady = resolve;
   });
   const within = (el) => el === root || root.contains(el);
-  const eligible = (el) => within(el) && el.matches(selector) && !el.closest(excluded) && !skipped(el, options) && !liveText(el);
+  const eligible = (el) => within(el) && el.matches(selector) && !el.closest(excluded) && !liveText(el);
   const stopWaiting = (el) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -5633,7 +5397,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     if (isElement(root) && scope.contains(root)) scope = root;
     const elements = Array.from(scope.querySelectorAll(selector));
     if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter((el) => within(el) && !el.closest(excluded) && !skipped(el, options) && !el.closest("[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line") && !liveText(el));
+    return elements.filter((el) => within(el) && !el.closest(excluded) && !el.closest("[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line") && !liveText(el));
   };
   const viewport = nearObserver(doc, (entries) => {
     let near = false;
@@ -5644,7 +5408,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
       if (deferred.has(el)) {
         if (!entry.isIntersecting) continue;
         deferred.delete(el);
-        enqueue(el, KEY2, true);
+        enqueue(el, KEY, true);
       }
       viewport?.unobserve(el);
       if (entry.isIntersecting && pending.has(el)) near = true;
@@ -5682,7 +5446,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
         const ended = () => {
           animating.delete(animation);
           if (stopped) return;
-          for (const block of set) if (owned.has(block)) recheck(block, KEY2);
+          for (const block of set) if (owned.has(block)) recheck(block, KEY);
           schedule();
         };
         animation.finished.then(ended, ended);
@@ -5721,10 +5485,10 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
         continue;
       }
       pending.delete(el);
-      process2(el, KEY2);
+      process2(el, KEY);
     }
     guard(later);
-    for (const el of later) enqueue(el, KEY2, true);
+    for (const el of later) enqueue(el, KEY, true);
     observe();
   };
   const guard = (elements) => {
@@ -5749,7 +5513,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     for (const el of resizing) {
       if (!owned.has(el)) continue;
       const box = el.getBoundingClientRect();
-      if (!viewport || box.bottom > -height && box.top < 2 * height) enqueue(el, KEY2, true);
+      if (!viewport || box.bottom > -height && box.top < 2 * height) enqueue(el, KEY, true);
       else {
         deferred.add(el);
         viewport.observe(el);
@@ -5819,8 +5583,8 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
       if (resizing.has(el)) continue;
       if (revealing && hidden.has(el) && rendered(el)) {
         if (onScreen(el)) shown.push(el);
-        else revealed(el, KEY2);
-      } else recheck(el, KEY2);
+        else revealed(el, KEY);
+      } else recheck(el, KEY);
     }
     if (shown.length) composeNow(shown);
     for (let el = target2.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) enqueue(el, CONTENT);
@@ -6079,7 +5843,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
       pending.delete(el);
       if (job & RELEASE) releaseWaiting(el);
       if ((resizing.has(el) || deferred.has(el) || fontsLoading && !nearby.has(el)) && !(job & CONTENT)) continue;
-      if (job & (CONTENT | KEY2 | VERIFY)) {
+      if (job & (CONTENT | KEY | VERIFY)) {
         nearby.delete(el);
         viewport?.unobserve(el);
         process2(el, job);
@@ -6096,7 +5860,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     if (stopped) return;
     triggeredSince = true;
     discover();
-    for (const el of owned) recheck(el, KEY2 | VERIFY);
+    for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
   };
   const resized = () => {
@@ -6117,27 +5881,27 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
     guard(changed);
     for (const el of changed) resizeStarted(el);
     if (changed.length) settleLater();
-    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY2, visible.includes(el));
+    for (const el of owned) if (!resizing.has(el)) enqueue(el, KEY, visible.includes(el));
     schedule();
   };
   const fontsChanged = () => {
     triggeredSince = true;
     if (stopped) return;
     discover();
-    for (const el of owned) recheck(el, KEY2 | VERIFY);
+    for (const el of owned) recheck(el, KEY | VERIFY);
     schedule();
   };
   const metricsChanged = (target2) => {
     triggeredSince = true;
     if (stopped) return;
-    for (const el of ownedWithin(target2)) recheck(el, KEY2);
-    for (let el = target2.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) recheck(el, KEY2);
+    for (const el of ownedWithin(target2)) recheck(el, KEY);
+    for (let el = target2.parentElement; el && within(el); el = el.parentElement) if (owned.has(el)) recheck(el, KEY);
     schedule();
   };
   const stylesChanged = () => {
     triggeredSince = true;
     if (stopped) return;
-    for (const el of owned) recheck(el, KEY2);
+    for (const el of owned) recheck(el, KEY);
     schedule();
   };
   const translationChanged = (active) => {
@@ -6153,7 +5917,7 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
   const visibilityChanged = (target2) => {
     triggeredSince = true;
     if (stopped) return;
-    for (const el of ownedWithin(target2)) recheck(el, KEY2);
+    for (const el of ownedWithin(target2)) recheck(el, KEY);
     schedule();
   };
   (doc.fonts?.ready ?? Promise.resolve()).then(() => {
@@ -6168,14 +5932,12 @@ function mount(target = document, selectorOrOptions, maybeOptions = {}) {
   });
   observe();
   const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized, translation: translationChanged });
-  const untrack = trackWork(() => !stopped && (!fontsReady || pending.size > 0 || resizing.size > 0 || settleTimer !== void 0 || lateTimer !== void 0 || shownFrame !== 0));
   return {
     ready,
     refresh,
     stats,
     disconnect(restoreContent = true) {
       stopped = true;
-      untrack();
       if (timer !== void 0) clearTimeout(timer);
       if (idle !== void 0) cancelIdleCallback(idle);
       observer.disconnect();
@@ -6242,7 +6004,6 @@ var OUTCOMES = [
   "native:react-component",
   // Left as the browser set it: Typeset could not improve it safely.
   "native:budget",
-  "native:run-budget",
   "native:no-candidate",
   "native:line-budget",
   "native:quality",
@@ -6262,12 +6023,12 @@ function styleProseLists(root) {
   const lists = [...root.querySelectorAll("ul")];
   if (root.nodeType === 1 && root.localName === "ul" && root.namespaceURI === "http://www.w3.org/1999/xhtml") lists.unshift(root);
   const owned = [];
-  let skipped2 = 0;
+  let skipped = 0;
   for (const list2 of lists) {
     const cs = getComputedStyle(list2);
     const items = [...list2.children];
     if (list2.closest('nav, [role="navigation"], [role="menu"], [role="menubar"], [role="tablist"], [data-no-typeset]') || cs.display !== "block" || cs.listStyleType === "none" || cs.listStyleImage !== "none" || !items.length || items.some((item) => item.namespaceURI !== "http://www.w3.org/1999/xhtml" || item.tagName !== "LI" || getComputedStyle(item).display !== "list-item")) {
-      skipped2++;
+      skipped++;
       continue;
     }
     const owner = owners.get(list2) || { count: 0, hadClass: list2.classList.contains("ts-styled"), hadAttribute: list2.hasAttribute("class") };
@@ -6277,7 +6038,7 @@ function styleProseLists(root) {
     owned.push(list2);
   }
   let released = false;
-  return { styled: owned.length, skipped: skipped2, restore() {
+  return { styled: owned.length, skipped, restore() {
     if (released) return;
     released = true;
     for (const list2 of owned) {

@@ -4,8 +4,7 @@ import { planRichText } from './rich-text.cjs';
 import type { RichPlan } from './rich-text.cjs';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities.cjs';
 import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes.cjs';
-import type { Coverage } from './coverage.cjs';
-export declare const VERSION = "4.4.0";
+export declare const VERSION = "4.3.2";
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 /**
  * Composition options. Defaults are those of the typeset.us package entry
@@ -19,12 +18,9 @@ export interface Options {
      * kept for comparison; it is not identical to 3.x. */
     lineBreaks?: 'legacy' | 'unicode';
     /** Default `false`. `'en'` converts straight quotes and apostrophes to curly
-     * ones in English text: declared English, or untagged (quotes only; same
-     * length, so offsets and copying stay aligned). `'en-declared'` converts
-     * them only where the element or an ancestor declares English (the auto
-     * loader's default), so an untagged German or French page keeps its
-     * quotes. Changes the copied text. */
-    smartQuotes?: 'en' | 'en-declared' | false;
+     * ones in declared-English text (quotes only; same length, so offsets and
+     * copying stay aligned). Changes the copied text. */
+    smartQuotes?: 'en' | false;
     /** Default `false`. `true` hangs opening punctuation and measured capitals
      * into the left margin, reversibly, when the glyph fits inside any clip. */
     opticalHanging?: boolean;
@@ -61,27 +57,6 @@ export interface Options {
      * clause opener. `'compact'`: one more line only to repair a one-word last
      * line. `'editorial'`: one more line allowed for better phrasing. */
     density?: 'compact' | 'editorial';
-    /** Default `'core'`, which composes what 4.3.1 composed. `'extended'`
-     * opts in to composing more: text declared in any Latin-script language
-     * (neutral line-end preferences, as for untagged text), paragraphs with a
-     * descendant declared in another Latin-script language, `time`, `dfn`,
-     * `kbd`, `ins`, visually hidden text, and `sup` and `sub`, which `'core'`
-     * leaves native. Also `data-typeset-coverage`. */
-    coverage?: Coverage;
-    /** Default `true`. `false` makes mount(), typesetAll() and the loaders
-     * (`data-typeset-headings="false"`) leave h1 to h6, `role="heading"` and
-     * anything inside them untouched, with no outcome written: a composed
-     * heading that wraps has a line break inside it, which a screen reader may
-     * read as two items (not yet checked by ear). typeset() composes the
-     * element it is given. */
-    headings?: boolean;
-    /** Default `true`: a document copy handler puts the source text on the
-     * clipboard, without the generated line breaks (and, for rich text, the
-     * markup without engine markers). `false` leaves this element's copying to
-     * the browser, whose copied text then has a line break at every composed
-     * line end. The handler is installed only when some composed element has
-     * copy on, and it yields to any copy handler the page registered first. */
-    copy?: boolean;
     /** Current author text. Framework adapters pass this on updates. */
     text?: string;
 }

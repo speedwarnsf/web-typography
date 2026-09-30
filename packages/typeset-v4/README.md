@@ -51,7 +51,7 @@ items to review.
 if it ever did.
 
 ```html
-<script src="https://typeset.us/go@4.4.0.js" integrity="sha384-OPixflfJwk7LTcwv7u1n3T6ratxF6EeTJXn3D/TnLw9bCV2qkIVogco3QFZj6l5D" crossorigin="anonymous" defer></script>
+<script src="https://typeset.us/go@4.4.0.js" integrity="sha384-FILLED-BY-RELEASE-CUT" crossorigin="anonymous" defer></script>
 ```
 
 It sets paragraphs, list items, headings, captions and table cells, with

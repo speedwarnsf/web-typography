@@ -8,16 +8,13 @@ import {
   canCompose,
   canMaintain,
   contentWidth,
-  englishScope,
   ensureLifecycleStyles,
   finishTargets,
   installLifecycleStyles,
-  languageOf,
   lifecycleStylesFor,
   linesExtent,
   liveText,
   markTranslated,
-  markerRules,
   measureLayout,
   mountOwners,
   movedOnly,
@@ -41,13 +38,11 @@ import {
   spacingVerified,
   styleMutation,
   subscribe,
-  trackWork,
   trackingStyle,
   trackingVerified,
   translationActive,
-  typeset,
-  whenSettled
-} from "./shared-ZG454IVU.js";
+  typeset
+} from "./shared-ZMDLO7Q4.js";
 
 // src/lib/v4/typeset.release.react.tsx
 import { createElement as createElement3, forwardRef as forwardRef3 } from "react";
@@ -246,7 +241,6 @@ function createRegistry(doc) {
   let started = false;
   let windowWidth = win?.innerWidth ?? 0;
   let unsubscribe;
-  let untrack;
   const supported = () => canMaintain(doc) && canCompose(doc);
   const visible = (el) => {
     const rect = el.getBoundingClientRect();
@@ -688,7 +682,6 @@ function createRegistry(doc) {
       if (entries.size) check();
     });
     armFonts(doc);
-    untrack = trackWork(() => pending.size > 0 || resizing.size > 0 || settle !== void 0 || staleQueued);
   }
   function stop() {
     started = false;
@@ -698,8 +691,6 @@ function createRegistry(doc) {
     mutations = observer = viewport = null;
     unsubscribe?.();
     unsubscribe = void 0;
-    untrack?.();
-    untrack = void 0;
     clearTimeout(settle);
     settle = void 0;
     pending.clear();
@@ -781,7 +772,7 @@ function quoteTreeSupported(children) {
   let supported = true;
   Children2.forEach(children, (child) => {
     if (!isValidElement2(child)) return;
-    if (child.props.lang && languageOf(child.props.lang) !== "en" || child.props["data-no-typeset"] !== void 0 || typeof child.type === "string" && !["a", "b", "strong", "em", "i", "span", "small", "u", "s", "del", "mark", "abbr", "cite"].includes(child.type) || !quoteTreeSupported(child.props.children)) supported = false;
+    if (child.props.lang && !/^en(?:-|$)/i.test(child.props.lang) || child.props["data-no-typeset"] !== void 0 || typeof child.type === "string" && !["a", "b", "strong", "em", "i", "span", "small", "u", "s", "del", "mark", "abbr", "cite"].includes(child.type) || !quoteTreeSupported(child.props.children)) supported = false;
   });
   return supported;
 }
@@ -801,7 +792,7 @@ function trackingForTree(plan, children) {
   visit(children);
   return { ...plan, runs };
 }
-function renderChildren(children, breaks, hangs, spaces, tracks, educate, inline) {
+function renderChildren(children, breaks, hangs, spaces, tracks, educate) {
   let offset = 0;
   const source = quoteSource(children);
   const educated = educate ? smartQuotes(source) : null;
@@ -852,7 +843,7 @@ function renderChildren(children, breaks, hangs, spaces, tracks, educate, inline
       let active;
       let tracked = [];
       const flush = () => {
-        if (active && tracked.length) pieces.push(createElement("span", { key: "track-" + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active, inline) }, ...tracked));
+        if (active && tracked.length) pieces.push(createElement("span", { key: "track-" + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active) }, ...tracked));
         active = void 0;
         tracked = [];
       };
@@ -872,8 +863,8 @@ function renderChildren(children, breaks, hangs, spaces, tracks, educate, inline
           cursor = local;
           continue;
         }
-        if (optical.has(stop)) append(createElement("span", { key: "hang-" + stop, [BREAK_ATTRIBUTE]: "", "data-ts-hang": String(stop), "aria-hidden": true, style: opticalMarkerStyle(optical.get(stop), inline) }), stop, true);
-        if (spacing.has(stop)) append(createElement("span", { key: "space-" + stop, [BREAK_ATTRIBUTE]: "", "data-ts-space": String(stop), "aria-hidden": true, style: spacingMarkerStyle(spacing.get(stop), inline) }), stop);
+        if (optical.has(stop)) append(createElement("span", { key: "hang-" + stop, [BREAK_ATTRIBUTE]: "", "data-ts-hang": String(stop), "aria-hidden": true, style: opticalMarkerStyle(optical.get(stop)) }), stop, true);
+        if (spacing.has(stop)) append(createElement("span", { key: "space-" + stop, [BREAK_ATTRIBUTE]: "", "data-ts-space": String(stop), "aria-hidden": true, style: spacingMarkerStyle(spacing.get(stop)) }), stop);
         cursor = local;
       }
       append(text.slice(cursor), start + cursor);
@@ -976,9 +967,6 @@ var RichText = class extends Component {
      * translator is filling. Unlike mount(), the adapter cannot remove the
      * breaks it rendered. */
     this.frozen = false;
-    /** Markers carry their shared declarations inline: the engine's stylesheet
-     * did not reach the host when it was last rendered (see markerRules). */
-    this.inlineMarkers = false;
     this.recompose = () => {
       const el = this.host.current;
       if (!this.mounted || !el || this.frozen) return;
@@ -1018,7 +1006,7 @@ var RichText = class extends Component {
     const el = this.host.current;
     if (!el || this.entry?.element === el) return;
     this.unbind();
-    this.releaseCopy = this.props.copy === false ? void 0 : preserveRichCopy(el);
+    this.releaseCopy = preserveRichCopy(el);
     const entry = {
       element: el,
       priority: this.props.priority ?? "auto",
@@ -1089,10 +1077,6 @@ var RichText = class extends Component {
       if (this.refCleanup) this.refCleanup();
       else assignRef(previous.forwardedRef, null);
       this.refCleanup = assignRef(this.props.forwardedRef, this.host.current);
-    }
-    if (previous.copy === false !== (this.props.copy === false) && this.entry) {
-      this.releaseCopy?.();
-      this.releaseCopy = this.props.copy === false ? void 0 : preserveRichCopy(this.entry.element);
     }
     if (!restoreSelection) return;
     restoreSelection();
@@ -1167,13 +1151,12 @@ var RichText = class extends Component {
     if (!callback || !plan) return;
     const props = this.props;
     const mode = props.mode || el.dataset.typesetMode || (el.closest("h1,h2,h3,h4,h5,h6") ? "title" : "body");
-    const educate = (props.smartQuotes === "en" || props.smartQuotes === "en-declared") && englishScope(props.lang, true) && quoteTreeSupported(props.children);
+    const educate = props.smartQuotes === "en" && /^en(?:-|$)/i.test(props.lang || "") && quoteTreeSupported(props.children);
     const result = {
-      // Nothing was measured for these; a long unbreakable run is not read now either.
       outcome: plan.outcome,
       mode,
       before: plan.before,
-      after: plan.outcome === ENVIRONMENT_OUTCOME || plan.outcome === "native:run-budget" ? plan.before : measureLayout(el),
+      after: plan.outcome === ENVIRONMENT_OUTCOME ? plan.before : measureLayout(el),
       changed: !!(plan.breaks.length || plan.hangs?.length || plan.spacing?.adjustments.length || plan.tracking?.runs.length),
       durationMs: performance.now() - started,
       ...plan.constraint && { constraint: plan.constraint },
@@ -1192,10 +1175,10 @@ var RichText = class extends Component {
     this.unbind();
   }
   render() {
-    const { children, as = "p", mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, coverage: _coverage, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
+    const { children, as = "p", mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
-    const educate = (quotes === "en" || quotes === "en-declared") && englishScope(this.props.lang, true) && quoteTreeSupported(children);
+    const educate = quotes === "en" && /^en(?:-|$)/i.test(this.props.lang || "") && quoteTreeSupported(children);
     if (quotes === "en" && !this.props.lang && !warnedQuotesLang && development()) {
       warnedQuotesLang = true;
       console.warn('TypesetRichText: smartQuotes="en" needs lang="en" (or en-*) on the component itself; quotes are left as written.');
@@ -1212,10 +1195,7 @@ var RichText = class extends Component {
       "data-ts-spacing": _spacing === false ? "off" : plan?.spacing?.outcome || "native:spacing-uncomposed",
       "data-ts-tracking": _tracking === false || _spacing === false ? "off" : plan?.tracking?.outcome || "native:tracking-uncomposed"
     };
-    const markers = !!(shown?.hangs?.length || shown?.spacing?.adjustments.length || shown?.tracking?.runs.length);
-    if (markers && this.host.current) this.inlineMarkers = !markerRules(this.host.current, false);
-    const inline = markers && this.inlineMarkers;
-    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate, inline));
+    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate));
     if (!educate) return createElement(as, props, children);
     const educated = educateNodes(children, smartQuotes(quoteSource(children)), { offset: 0 });
     return Array.isArray(educated) ? createElement(as, props, ...educated) : createElement(as, props, educated);
@@ -1227,7 +1207,7 @@ var TypesetRichText = /* @__PURE__ */ forwardRef(function TypesetRichText2(props
 
 // src/lib/v4/typeset-react.tsx
 var useClientLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
-var TypesetText = /* @__PURE__ */ forwardRef2(function TypesetText2({ text, as = "p", mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging, spacing, tracking, contour, copy, coverage, priority = "auto", onResult, ...attributes }, forwarded) {
+var TypesetText = /* @__PURE__ */ forwardRef2(function TypesetText2({ text, as = "p", mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging, spacing, tracking, contour, priority = "auto", onResult, ...attributes }, forwarded) {
   const ref = useRef(null);
   const refCleanup = useRef(void 0);
   const setHost = useCallback((node) => {
@@ -1240,12 +1220,11 @@ var TypesetText = /* @__PURE__ */ forwardRef2(function TypesetText2({ text, as =
     }
   }, [forwarded]);
   const [initialText] = useState(text);
-  const curled = (smartQuotes2 === "en" || smartQuotes2 === "en-declared") && englishScope(attributes.lang, smartQuotes2 === "en-declared");
-  const quotes = smartQuotes2 === "en-declared" && !curled ? false : smartQuotes2;
-  const options = useRef({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage };
+  const options = useRef({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging, spacing, tracking, contour });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: smartQuotes2, opticalHanging, spacing, tracking, contour };
   const report = useRef(onResult);
   report.current = onResult;
+  const curled = smartQuotes2 === "en" && (!attributes.lang || /^en(?:-|$)/i.test(attributes.lang));
   const native = useRef("");
   native.current = curled ? smartQuotes(text) : text;
   const entry = useRef(null);
@@ -1327,7 +1306,7 @@ var TypesetText = /* @__PURE__ */ forwardRef2(function TypesetText2({ text, as =
     }
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, "force", true);
-  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes2, opticalHanging, spacing, tracking, contour, copy, coverage]);
+  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes2, opticalHanging, spacing, tracking, contour]);
   return createElement2(as, { ...attributes, ref: setHost, "data-typeset-react": "" }, curled ? smartQuotes(initialText) : initialText);
 });
 
@@ -1340,6 +1319,5 @@ var TypesetRichText3 = /* @__PURE__ */ forwardRef3(function TypesetRichText4(pro
 });
 export {
   TypesetRichText3 as TypesetRichText,
-  TypesetText3 as TypesetText,
-  whenSettled
+  TypesetText3 as TypesetText
 };

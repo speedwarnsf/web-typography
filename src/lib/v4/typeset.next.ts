@@ -25,7 +25,7 @@ import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus
 import type { Coverage } from './coverage';
 import { commonest, NOTHING_TO_IMPROVE } from './loader-notes';
 
-export const VERSION = '4.4.0';
+export const VERSION = '4.3.2';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 /**
  * Composition options. Defaults are those of the typeset.us package entry

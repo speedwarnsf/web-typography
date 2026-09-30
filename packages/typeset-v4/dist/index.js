@@ -26,9 +26,8 @@ import {
   typeset,
   typesetAll,
   typesetHeading,
-  typesetText,
-  whenSettled
-} from "./shared-ZG454IVU.js";
+  typesetText
+} from "./shared-ZMDLO7Q4.js";
 
 // src/lib/v4/outcomes.ts
 var OUTCOMES = [
@@ -68,7 +67,6 @@ var OUTCOMES = [
   "native:react-component",
   // Left as the browser set it: Typeset could not improve it safely.
   "native:budget",
-  "native:run-budget",
   "native:no-candidate",
   "native:line-budget",
   "native:quality",
@@ -179,6 +177,5 @@ export {
   typeset2 as typeset,
   typesetAll2 as typesetAll,
   typesetHeading,
-  typesetText,
-  whenSettled
+  typesetText
 };

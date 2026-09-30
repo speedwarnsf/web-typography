@@ -20,14 +20,8 @@ export interface RichPlan {
     styleSignature: string;
     constraint?: RichConstraint;
     search?: ParagraphSearchEvidence[];
-    /** Source ranges of visually hidden text (see hiddenInline), which takes
-     * no room on a line: no break falls inside one, and lines are verified by
-     * the text they show. */
-    hidden?: [number, number][];
 }
-/** Verify every chosen source span and width, not just the number of lines.
- * A line starts at its first shown character and ends after its last one;
- * white space and visually hidden text (plan.hidden) show nothing. */
+/** Verify every chosen source span and width, not just the number of lines. */
 export declare function richLayoutVerified(plan: RichPlan, after: LayoutMetrics): boolean;
 /** Preserve forward/backward selections, including selections crossing the host. */
 export declare function selectionBookmark(element: HTMLElement): () => void;
@@ -130,9 +124,7 @@ export interface RichOutput {
  * there and left empty, or the framework's next write would land on the
  * marker and be lost. Nor between a comment and the node after it (see
  * afterComment): such a marker goes before the comment. */
-export declare function renderRichText(element: HTMLElement, breaks: readonly number[], hangs?: readonly OpticalHang[], spaces?: readonly SpaceAdjustment[], copy?: boolean): RichOutput;
-/** Source copying is independent of visual line breaks. Respect site handlers.
- * The document's handler is added with the first element registered here;
- * an element composed with copy: false is never registered. */
+export declare function renderRichText(element: HTMLElement, breaks: readonly number[], hangs?: readonly OpticalHang[], spaces?: readonly SpaceAdjustment[]): RichOutput;
+/** Source copying is independent of visual line breaks. Respect site handlers. */
 export declare function preserveRichCopy(element: HTMLElement): () => void;
 export declare function richFingerprint(element: HTMLElement): string;

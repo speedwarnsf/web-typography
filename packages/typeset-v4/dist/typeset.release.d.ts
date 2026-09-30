@@ -4,8 +4,6 @@ export { smartQuotes } from './smart-quotes.js';
 export { OUTCOMES } from './outcomes.js';
 export type { Outcome, FeatureStatus, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes.js';
 export { styleProseLists } from './prose-lists.js';
-export { whenSettled } from './settled.js';
-export type { SettleOptions, Settled } from './settled.js';
 export type { ListStyleResult } from './prose-lists.js';
 export { composeParagraph, finalValidate, linesOverflow, linesStarved, renderFrozenLines, shapeExactLines, tokenize } from './typeset.js';
 export declare function typeset(element: HTMLElement, options?: Options): Result;

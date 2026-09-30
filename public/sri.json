@@ -1,5 +1,5 @@
 {
-  "version": "4.4.0",
+  "version": "4.3.2",
   "note": "Integrity hashes for immutable files only. go.js, go@<major>.js, typeset.min.js and typeset.esm.js change with each release and have none; pin a versioned file instead.",
   "files": {
     "go@3.3.2.js": "sha384-iD519/Mn5x4DgOt4ym7opBt1/IHQQKBHBHGO2baemcdSIt6DwxdGpwVAOc2JSAzs",
@@ -12,17 +12,14 @@
     "go@4.3.0.js": "sha384-yHVZ46QyyOffm12e72GsBgkcZ96FcCaqK7POZ5/BGDkmfjEZ1dLV81vmBvCusTUX",
     "go@4.3.1.js": "sha384-PQvP42IgERdCbNk9MWI9BkD7n+k1WbL6ImFN3cAMbXQq25PhdJynmVXQM0UB3ksB",
     "go@4.3.2.js": "sha384-lxBBmiFU9S5dJ4exDhuRiIgowKTCB9G0yTovlBDNrlyhsHH6ACHvGLdfehhy+e6b",
-    "go@4.4.0.js": "sha384-OPixflfJwk7LTcwv7u1n3T6ratxF6EeTJXn3D/TnLw9bCV2qkIVogco3QFZj6l5D",
     "typeset@4.3.0.esm.js": "sha384-TaoE59ij5qrYNs0GMtz6oPqx4hg6BlF8nScdn0ElHSUgV7k/CpaMvK9pK2bVWGeX",
     "typeset@4.3.0.min.js": "sha384-UpMGaEQD8W99qPv1sdVVrY6qhOY3GD1PPlkngLNdzl68jkEVuYOgtCRfSdsfu0bl",
     "typeset@4.3.1.esm.js": "sha384-bXp+NEF1C7VJv7DsrAOJw9S1E5PylaFTqCMfwCd307sMWSN+47ma4wO2h34agVzD",
     "typeset@4.3.1.min.js": "sha384-miyVOFLV0/kLXA8p1KQEgTbgJU2cIQbCiVrZRuriXGhZzMQBdQXFKTnFJ6MPLSJV",
     "typeset@4.3.2.esm.js": "sha384-tc21liJ++gs5E8I2c/XWwe8vynebhJxRvQB+kPS7ww1LhbcIMGYE88e+gvjCmq+r",
-    "typeset@4.3.2.min.js": "sha384-BZ5tDxElUqnkv0okiyEacoApZSK5KF1KR6RLmv39y5HidBprRYVxvZArBjrSZMkf",
-    "typeset@4.4.0.esm.js": "sha384-BawD/9xWMD3Ya8QMSSyAOjkIQevTRH24hG/+FkXr469iIwGhrfr820DM/jq8cFEI",
-    "typeset@4.4.0.min.js": "sha384-MWyMUgOC+rZ4LSvgYSEHX3oUHx/d/i218zOuE9Od/TU055eynn1LZe0VLrMpbWEf"
+    "typeset@4.3.2.min.js": "sha384-BZ5tDxElUqnkv0okiyEacoApZSK5KF1KR6RLmv39y5HidBprRYVxvZArBjrSZMkf"
   },
-  "snippet": "<script src=\"https://typeset.us/go@4.4.0.js\" integrity=\"sha384-OPixflfJwk7LTcwv7u1n3T6ratxF6EeTJXn3D/TnLw9bCV2qkIVogco3QFZj6l5D\" crossorigin=\"anonymous\" defer></script>",
+  "snippet": "<script src=\"https://typeset.us/go@4.3.2.js\" integrity=\"sha384-lxBBmiFU9S5dJ4exDhuRiIgowKTCB9G0yTovlBDNrlyhsHH6ACHvGLdfehhy+e6b\" crossorigin=\"anonymous\" defer></script>",
   "advisories": [
     {
       "id": null,

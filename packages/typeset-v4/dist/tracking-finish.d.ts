@@ -19,11 +19,7 @@ export interface TrackingPlan {
 }
 /** A bounded residual finish: chosen breaks and existing word spaces stay fixed. */
 export declare function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, targets: number[]): TrackingPlan;
-/** A wrapper's own letter and word spacing. `all: unset` and display come
- * from the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where
- * that sheet cannot apply, see markerRules) writes them on the wrapper, as 4.3
- * did. */
-export declare function trackingStyle(run: TrackingRun, inline: boolean): Record<string, string>;
+export declare function trackingStyle(run: TrackingRun): Record<string, string>;
 /** Wrap contiguous text runs and space markers, never author elements.
  * An author Text node that a framework finds by position (Solid, Lit; see
  * positional) or removes through its parent (React) stays where it is: its
@@ -35,5 +31,5 @@ export declare function trackingStyle(run: TrackingRun, inline: boolean): Record
  * wrapper as in 4.2: frameworks that hold them write to them in place, and
  * some (Solid) skip a write when the node's text already equals the new
  * value, which an emptied node would always do for ''. */
-export declare function renderTracking(element: HTMLElement, plan: TrackingPlan, copy?: boolean): RichOutput;
+export declare function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput;
 export declare function trackingVerified(element: HTMLElement, plan: TrackingPlan, after: LayoutMetrics): boolean;
