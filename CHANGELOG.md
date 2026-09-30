@@ -241,7 +241,23 @@ Markup only, no change to layout:
   12 recoverable errors (#425, #418, #423) and 19.3.0 one (#418), as with
   4.3.0.
 - Off-screen React blocks on a page the browser stops giving idle periods,
-  from 4.3.2 (see 4.3.2 below).
+  from 4.3.2 (see 4.3.2 below), **without 4.3.2's delay after a restyle**.
+  4.3.2 also timed each idle callback out 50 ms of page time after the last
+  idle period, and a timeout that fired more than 20 ms late waited on
+  instead of composing. On hosted CI runners Chromium then left the one
+  block more than a viewport from the screen unwritten for over 300 ms
+  after an ancestor's class change (`verify-react`, 2 of 3 release runs of
+  4.3.2 and the first 4.4.0 PR run, against none in about 36 runs before).
+  With no idle periods and every timeout 30 ms late (an emulated busy
+  runner), the wait-on repeated every 31 ms and that block was still
+  unwritten 8 s on, where 4.3.1 wrote it at the 1 s timeout. The adapters
+  now wait for idle periods exactly as 4.3.1 did, up to 1 s with one block
+  composed on the timeout, and only a callback that fires on that timeout
+  with no idle period of any length in the last 50 ms moves the remaining
+  off-screen blocks to animation frames. `verify-scheduler`'s check (frames
+  and then idle periods stop): the 23 off-screen blocks compose again in
+  0.51 s in Chromium and 0.54 s in Firefox (4.3.2: 0.17 and 0.19 s; 4.3.1:
+  44 s).
 
 ### Known limitations
 
@@ -261,11 +277,12 @@ Markup only, no change to layout:
   up** (the trade-off of 4.3.2's fix). When the browser gives no idle
   periods because a script fills every frame, `TypesetText` and
   `TypesetRichText` compose their off-screen blocks in animation frames, up
-  to 12 ms of each. Chromium at 4x CPU slowdown and 120 Hz, a script filling
-  every frame: for about 1.3 s the page ran at 66 to 75 fps instead of 92,
-  and frames over 20 ms went from 2 or 3 to 31 to 39, with no new long
-  tasks. 4.3.1 kept those frames but left 21 of the 23 off-screen blocks
-  stale 3 s later.
+  to 12 ms of each, once an idle callback has waited its full 1 s. Chromium
+  at 4x CPU slowdown and 120 Hz, a script filling every frame, measured with
+  4.3.2 (which switched after 50 ms): for about 1.3 s the page ran at 66 to
+  75 fps instead of 92, and frames over 20 ms went from 2 or 3 to 31 to 39,
+  with no new long tasks. 4.3.1 kept those frames but left 21 of the 23
+  off-screen blocks stale 3 s later.
 - `::after` link icons still leave their paragraph native, under both
   `coverage` values.
 - 4.3's other known limitations stand; SUPPORT.md lists them.
