@@ -75,7 +75,27 @@ export declare function subscribe(doc: Document, client: LifecycleClient): () =>
  * --ts-break-display drives every generated break, [data-ts-stale] shows a
  * block's native wrapping while its composition waits to be redone, and print
  * wraps natively at the paper's width. dist/styles.css ships the same rules
- * for engines without constructable stylesheets. */
+ * for engines without constructable stylesheets.
+ *
+ * First, the declarations every spacing and hanging marker and every
+ * tracking wrapper shares, which 4.3 wrote into each one's style attribute:
+ * 18 per marker, and a wrapper's all: unset, which browsers serialize as
+ * every longhand (5 to 8 KB per wrapper). Only the per-marker value stays
+ * inline: a marker's margin-left, a wrapper's letter-spacing and
+ * word-spacing. The markers' rules are !important in a named cascade layer,
+ * which page CSS reaches no more easily than it reached the inline
+ * declarations: an unlayered !important rule, which beat those, loses to a
+ * layered one. The wrappers' rule is not important, as their inline
+ * declarations were not: an !important all: unset would also hide their
+ * inline spacing from page !important rules (the WCAG text-spacing
+ * override) and the stale and print rules below, which must reach it. Its
+ * three :not(#_) outweigh any selector with fewer than three ids, so
+ * ordinary page rules do not reach a wrapper, as they did not reach its
+ * inline all: unset. Where this sheet cannot apply (no constructable
+ * stylesheets), markers carry the same declarations inline, as in 4.3 (see
+ * markerRules). Breaks keep their one inline declaration: !important
+ * inline, it is the one thing no rule can override. One literal, not a
+ * concatenation of constants, so bundlers can drop it with the functions. */
 export declare const LIFECYCLE_CSS: string;
 /** One constructable stylesheet per document: no <style> element, so a strict
  * style-src policy is not involved. Skipped where unsupported. A page that
@@ -88,6 +108,11 @@ export declare function installLifecycleStyles(doc: Document, element?: Element)
  * gets the same sheet adopted by that root, or stale mode and the print
  * rules would not apply to it. Installs nothing new. */
 export declare function lifecycleStylesFor(element: Element): void;
+/** Whether the engine's marker rules (in LIFECYCLE_CSS) reach markers inside this
+ * element: the lifecycle sheet is installed, first if need be, and adopted by
+ * the element's document or shadow root. When they do not, markers carry
+ * their shared declarations inline. With `install` false, only reads. */
+export declare function markerRules(element: Element, install?: boolean): boolean;
 /** Put an installed lifecycle sheet back if the page's own assignment to
  * document.adoptedStyleSheets removed it. Installs nothing new. */
 export declare function ensureLifecycleStyles(doc: Document): void;
