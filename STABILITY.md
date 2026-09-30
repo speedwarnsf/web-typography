@@ -34,14 +34,14 @@ behind an option, off by default, or waits for a major version.
 
 ## Installing so nothing changes under you
 
-- npm: `npm i -E typeset.us@4.3.2` saves the exact version. A caret range
-  (`^4.3.2`) takes minor releases automatically, including their listed
+- npm: `npm i -E typeset.us@4.4.0` saves the exact version. A caret range
+  (`^4.4.0`) takes minor releases automatically, including their listed
   rendering changes.
 - Script tag: use the pinned loader with its integrity hash, from
   https://typeset.us/sri.json:
 
   ```html
-  <script src="https://typeset.us/go@4.3.2.js" integrity="sha384-lxBBmiFU9S5dJ4exDhuRiIgowKTCB9G0yTovlBDNrlyhsHH6ACHvGLdfehhy+e6b" crossorigin="anonymous" defer></script>
+  <script src="https://typeset.us/go@4.4.0.js" integrity="sha384-OPixflfJwk7LTcwv7u1n3T6ratxF6EeTJXn3D/TnLw9bCV2qkIVogco3QFZj6l5D" crossorigin="anonymous" defer></script>
   ```
 
 - `go@4.js` follows the latest 4.x release. `go.js` is for trying Typeset
@@ -51,7 +51,13 @@ behind an option, off by default, or waits for a major version.
 ## Cadence and support
 
 - At most one minor release every two to four weeks; patches as needed.
-- The previous minor line gets security fixes (see SECURITY.md); 4.2.x does
-  now.
+- The 4.x line gets bug and security fixes until at least 2027-09-30,
+  whenever 5.0 ships. Fixes land in the latest 4.x minor.
+- When a minor release ships, the minor before it gets security fixes for
+  60 days after that release date, then none. 4.2.x gets security fixes
+  until 2026-11-26, 60 days after 4.3.0 reached npm; it also has the
+  screen-reader defect 4.3 fixed, so upgrade.
+- SECURITY.md lists the supported versions and how to report a
+  vulnerability.
 - Anything deprecated is announced in the CHANGELOG at least one minor
   release before a major version removes it.

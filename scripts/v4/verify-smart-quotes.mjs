@@ -7,6 +7,8 @@
 //    key letter ('n') and a quotation that opens with 'round or 'bout still
 //    open with a left quote. 4.2's results for '90s, 'Tis, 'em, primes such
 //    as 5'10" and possessives are kept, and the shipped corpora change nowhere.
+//    4.4: a double quote with space on both sides (French spaced quotes) or
+//    with no quotation to close (width="100") stays straight.
 // 2. Server rendering: TypesetText curled quotes only on the client, so server
 //    HTML, no-JS readers and crawlers kept straight quotes and the glyphs
 //    swapped after hydration. Its server HTML now has them, and hydration in
@@ -61,6 +63,17 @@ const TABLE = [
   ['"Read \'the notes\'," she said.', '“Read ‘the notes’,” she said.'],
   ['"1984" and don\'t -- change... this.', '“1984” and don’t -- change... this.'],
   ["'single' stays single", '‘single’ stays single'],
+  // 4.4: a double quote with space on both sides, or with no quotation to
+  // close, stays straight (4.3.1 in brackets).
+  ['Set width="100" here', 'Set width="100" here'], // (width=”100")
+  ['Il a dit : " Bonjour "', 'Il a dit : " Bonjour "'], // (: ” Bonjour ”)
+  ['the `aria-live="polite"` value', 'the `aria-live="polite"` value'], // (=”polite”)
+  ['said:"hello" twice', 'said:"hello" twice'], // (:”hello”)
+  ['"Hello," she said.', '“Hello,” she said.'],
+  ['He is 5\'10" tall; the screen is 27" wide.', 'He is 5\'10" tall; the screen is 27" wide.'],
+  ["Rock 'n' roll in the '90s", 'Rock ’n’ roll in the ’90s'],
+  ['"Room 101" is open', '“Room 101” is open'],
+  ['"', '"'], // (”)
 ];
 for (const [input, expected] of TABLE) {
   const output = smartQuotes(input);
@@ -105,10 +118,11 @@ for (const [name, unit, count] of LARGE) {
   check(`education time: 120 KB of ${JSON.stringify(name)} (${input.length.toLocaleString('en-US')} characters) under 50 ms`, ms < 50, { ms: Math.round(ms * 10) / 10 });
 }
 {
-  // The same output as the release candidate's function (4f1815c), on a
-  // million random texts built from quotes, elisions, pair words, sentence
-  // ends, spaces and letters and digits in and out of the BMP, and on the
-  // corpora and the docs' paragraphs, as written and with straight quotes.
+  // The same output as a plain reference (4.3's release candidate function,
+  // 4f1815c, with 4.4's double-quote rules), on a million random texts built
+  // from quotes, elisions, pair words, sentence ends, spaces and letters and
+  // digits in and out of the BMP, and on the corpora and the docs'
+  // paragraphs, as written and with straight quotes.
   /** @param {string} text */
   const reference = text => {
     const elision = /^(?:\d{2}s\b|tis\b|twas\b|em\b|cause\b|til\b)/iu;
@@ -145,8 +159,9 @@ for (const [name, unit, count] of LARGE) {
       const after = text[index + 1] || '';
       const opening = !before || /[\s([{\u2014\u2013\u201c\u2018]/u.test(before);
       if (quote === '"') {
-        if (opening && after && !/\s/u.test(after)) { doubleOpen = true; out += '\u201c'; }
-        else if (/\d/u.test(before) && !doubleOpen) out += quote;
+        if ((!before || /\s/u.test(before)) && (!after || /\s/u.test(after))) out += quote;
+        else if (opening && after && !/\s/u.test(after)) { doubleOpen = true; out += '\u201c'; }
+        else if (!doubleOpen) out += quote;
         else { doubleOpen = false; out += '\u201d'; }
         continue;
       }
@@ -186,7 +201,7 @@ for (const [name, unit, count] of LARGE) {
     if (expected !== text) curled++;
     if (expected !== actual && differ++ < 3) examples.push({ input: text.slice(0, 200), expected: expected.slice(0, 200), actual: actual.slice(0, 200) });
   }
-  check(`education matches the release candidate on ${texts.length.toLocaleString('en-US')} random texts and ${corpus.length.toLocaleString('en-US')} corpus and docs paragraphs`,
+  check(`education matches the reference on ${texts.length.toLocaleString('en-US')} random texts and ${corpus.length.toLocaleString('en-US')} corpus and docs paragraphs`,
     texts.length >= 1_000_000 && corpus.length > 1000 && curled > 500_000 && differ === 0, { random: texts.length, corpus: corpus.length, curled, differ, examples });
 }
 {

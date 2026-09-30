@@ -18,8 +18,8 @@ const html = `<!doctype html><html lang="en"><body style="margin:0;font:17px/1.4
 
 // Each misuse and the warning it must print once.
 const misuses = [
-  ['{ smartQuotes: true }', '[typeset] smartQuotes must be "en" or false (received true)'],
-  ['{ smartQuotes: "EN" }', '[typeset] smartQuotes must be "en" or false (received "EN")'],
+  ['{ smartQuotes: true }', '[typeset] smartQuotes must be "en", "en-declared" or false (received true)'],
+  ['{ smartQuotes: "EN" }', '[typeset] smartQuotes must be "en", "en-declared" or false (received "EN")'],
   ['{ spacing: "false" }', '[typeset] spacing must be true or false (received "false")'],
   ['{ tracking: 1 }', '[typeset] tracking must be true or false (received 1)'],
   ['{ opticalHanging: "yes" }', '[typeset] opticalHanging must be true or false (received "yes")'],
@@ -72,6 +72,28 @@ for (const { name, engine, executablePath } of browsers) {
       await page.evaluate(options => { const el = document.getElementById('scratch'); const value = (0, eval)('(' + options + ')'); window.Typeset.typeset(el, value); window.Typeset.restore(el); window.Typeset.typeset(el, value); window.Typeset.restore(el); }, options);
       await page.waitForTimeout(20);
       record(name, `typeset(el, ${options}) warns once: ${expected}`, warnings.length === 1 && warnings[0] === expected, warnings);
+    }
+    // copy (4.4) is a known boolean option: true and false compose without a
+    // warning, another value warns once.
+    warnings.length = 0;
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); for (const copy of [false, true]) { window.Typeset.typeset(el, { copy }); window.Typeset.restore(el); } });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { copy: false }) and { copy: true } log no warning', warnings.length === 0, [...warnings]);
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); window.Typeset.typeset(el, { copy: 'no' }); window.Typeset.restore(el); });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { copy: "no" }) warns once: copy must be true or false', warnings.length === 1 && warnings[0] === '[typeset] copy must be true or false (received "no")', [...warnings]);
+    // 4.4's options: coverage ('extended' or 'core'), headings (a boolean)
+    // and smartQuotes 'en-declared' compose without a warning; other values
+    // warn once each.
+    warnings.length = 0;
+    await page.evaluate(() => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); for (const options of [{ coverage: 'core' }, { coverage: 'extended' }, { headings: false }, { headings: true }, { smartQuotes: 'en-declared' }]) { window.Typeset.typeset(el, options); window.Typeset.restore(el); } });
+    await page.waitForTimeout(20);
+    record(name, 'typeset(el, { coverage: "core" | "extended" }), { headings: true | false } and { smartQuotes: "en-declared" } log no warning', warnings.length === 0, [...warnings]);
+    for (const [options, expected] of [['{ coverage: "full" }', '[typeset] coverage must be "extended" or "core" (received "full")'], ['{ headings: "no" }', '[typeset] headings must be true or false (received "no")']]) {
+      warnings.length = 0;
+      await page.evaluate(options => { const el = /** @type {HTMLElement} */ (document.getElementById('scratch')); const value = (0, eval)('(' + options + ')'); for (let i = 0; i < 2; i++) { window.Typeset.typeset(el, value); window.Typeset.restore(el); } }, options);
+      await page.waitForTimeout(20);
+      record(name, `typeset(el, ${options}) warns once: ${expected}`, warnings.length === 1 && warnings[0] === expected, [...warnings]);
     }
     // Keys named like Object.prototype members (an options object parsed
     // from JSON) warn like any unknown key and stop no later warning.

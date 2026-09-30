@@ -22,12 +22,13 @@ function warn(message: string): void {
 
 const choices: Record<string, readonly unknown[]> = {
   lineBreaks: ['unicode', 'legacy'],
-  smartQuotes: ['en', false],
+  smartQuotes: ['en', 'en-declared', false],
   contour: ['finished', 'natural'],
   mode: ['body', 'heading', 'title', 'ui'],
   density: ['compact', 'editorial'],
+  coverage: ['extended', 'core'],
 };
-const booleans = ['opticalHanging', 'spacing', 'tracking'];
+const booleans = ['opticalHanging', 'spacing', 'tracking', 'copy', 'headings'];
 const list = (values: readonly unknown[]) => values.map(value => typeof value === 'string' ? JSON.stringify(value) : String(value)).join(' or ').replace(/ or (?=.* or )/g, ', ');
 
 export function checkOptions(api: string, options: unknown): void {

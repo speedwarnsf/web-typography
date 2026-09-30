@@ -282,7 +282,12 @@ try {
   check('RELEASING.md says master must hold what the published docs link at blob/master before tagging', new Set(linked).size >= 5 && /Merge the release branch into `master` and push `master` before you tag/.test(releasing)
     && [...new Set(linked)].every(path => releasing.includes(path.replace(/^docs\/security\/advisory-.*$/, 'advisory'))), { linked: [...new Set(linked)] });
   const security = await readFile('SECURITY.md', 'utf8');
-  check('SECURITY.md names supported versions, private reporting and response targets', /\| 4\.3\.x \|/.test(security) && /\| 4\.2\.x \| Security fixes only \|/.test(security) && /security\/advisories\/new/.test(security) && /3 business days/.test(security));
+  // The support window is dated: the line's end, the previous minor's end,
+  // and the 60-day rule that sets it. Email comes first: it works whether or
+  // not the repository has private vulnerability reporting switched on.
+  check('SECURITY.md names supported versions with dated windows, email and private reporting, and response targets', /\| 4\.3\.x \|/.test(security) && /\| 4\.2\.x \| Security fixes only, until \d{4}-\d{2}-\d{2}\b/.test(security)
+    && /4\.x\s+line\s+gets\s+bug\s+and\s+security\s+fixes\s+until\s+at\s+least\s+\d{4}-\d{2}-\d{2}/.test(security) && /security\s+fixes for 60 days/.test(security)
+    && /dyork@typeset\.us[\s\S]*security\/advisories\/new/.test(security) && /3 business days/.test(security));
   const packaged = await readFile('packages/typeset-v4/SECURITY.md', 'utf8').catch(() => '');
   check('packages/typeset-v4/SECURITY.md is the repository SECURITY.md', packaged === security);
   const pkg = JSON.parse(await readFile('packages/typeset-v4/package.json', 'utf8'));

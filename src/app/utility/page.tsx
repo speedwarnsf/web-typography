@@ -31,7 +31,7 @@ export default function UtilityPage() {
             The web wasn't built for typographers. Browsers fill each line until the words run out: short words like &ldquo;a&rdquo; and &ldquo;the&rdquo; get stranded at line ends, thoughts snap mid-phrase, and without <code>text-wrap: pretty</code> (Firefox has none) a single word can be left alone on the last line.
           </p>
           <p>
-            <strong>Typeset</strong> chooses where the lines of a paragraph, heading or list item break, keeps links and styling exactly as authored, and checks every result after it renders. It sets horizontal, left-to-right Latin-script text in English, French, German and Spanish; anything it cannot improve safely keeps the browser&rsquo;s own layout, and says why. It does not hyphenate or justify.
+            <strong>Typeset</strong> chooses where the lines of a paragraph, heading or list item break, keeps links and styling exactly as authored, and checks every result after it renders. It sets horizontal, left-to-right Latin-script text, with line-end preferences for English, French, German and Spanish; anything it cannot improve safely keeps the browser&rsquo;s own layout, and says why. It does not hyphenate or justify.
           </p>
           <div className="relative z-50 isolate mt-4">
             <EssayModal />

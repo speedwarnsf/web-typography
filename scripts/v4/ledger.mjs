@@ -173,6 +173,8 @@ export async function verifyLedger({ versions, bases = ledgerBases(), network = 
   const checks = [];
   const check = (/** @type {string} */ label, /** @type {unknown} */ pass, /** @type {unknown} */ detail) => { checks.push({ label, pass: !!pass, ...(pass ? {} : { detail }) }); };
   const ledger = await readLedger();
+  /** @type {Record<string, unknown>} */
+  const withdrawnVersions = JSON.parse(await readFile(new URL('./withdrawn.json', import.meta.url), 'utf8')).versions ?? {};
   const selected = versions ?? Object.keys(ledger.releases);
   for (const version of selected) {
     const entry = ledger.releases[version];
@@ -209,7 +211,9 @@ export async function verifyLedger({ versions, bases = ledgerBases(), network = 
       const commit = git(['rev-parse', '--verify', '-q', `refs/tags/${entry.git.tag}^{commit}`]);
       if (commit) check(`${version}: tag ${entry.git.tag} still names ${entry.git.commit.slice(0, 12)}`, commit === entry.git.commit, { actual: commit });
     }
-    if (network && entry.npm) {
+    if (network && entry.npm && withdrawnVersions[version]) {
+      check(`${version}: withdrawn before publication, so not on npm (scripts/v4/withdrawn.json)`, true);
+    } else if (network && entry.npm) {
       try {
         const out = execFileSync('npm', ['view', entry.npm.spec, 'dist', '--json', ...(npmCache ? ['--cache', npmCache] : [])], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 });
         const dist = JSON.parse(out);

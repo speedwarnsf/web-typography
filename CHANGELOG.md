@@ -10,7 +10,390 @@ Hashes for every published version live in
 
 ---
 
+## 4.4.0 - 2026-09-29
+
+4.4.0 is a minor release of 4.3: the adoption fixes. It guards against a
+freeze that user-generated text could cause, reads more `lang` spellings,
+curls quotes only where they can be quotation marks, waits for a
+server-rendered page to hydrate before composing it, and adds
+`whenSettled()` for visual tests. New options `copy`, `coverage` and
+`headings`, a `smartQuotes` value `'en-declared'`, the loader attributes that
+go with them and `data-typeset-defer`, the export `typeset.us/opt-in`, one
+outcome code (`native:run-budget`, 43 in all) and three audit review items
+(`clipped`, `untagged`, `uncomposed`). It also carries 4.3.2's fix for
+off-screen React blocks (see 4.3.2 below). Nothing is removed.
+
+**The coverage additions are opt-in.** The default is `coverage: 'core'`,
+which composes what 4.3.1 composed, so an existing site keeps 4.3's output
+apart from the defect fixes under "Rendering changes". Other Latin-script
+languages and more inline markup compose only with `coverage: 'extended'`,
+`data-typeset-coverage="extended"` on the loaders or the adapters'
+`coverage` prop (see Added). STABILITY.md keeps 4.3's rule, that a minor
+release changes default rendering only to fix a verified defect, so
+composing the additions by default was declined for 4.4.0.
+
+### Rendering changes
+
+`scripts/v4/verify-golden.mjs` against the published 4.3.1 build, with
+4.4.0's defaults, with the new coverage corpus (`tests/v4-corpus-4.4.json`,
+47 cases at the same four widths and two fonts, 376 cells per engine).
+Chromium 149, WebKit 26.5, Firefox 151:
+
+| Engine | Existing cells changed | Coverage cells changed | Coverage cells composed, 4.3.1 / 4.4.0 |
+| --- | --- | --- | --- |
+| Chromium | 0 of 3,932 | 104 of 376 | 55 / 103 |
+| WebKit | 0 of 3,932 | 104 of 376 | 54 / 102 |
+| Firefox | 0 of 3,932 | 104 of 376 | 63 / 111 |
+
+Every changed cell is one of the defect fixes below; none is unexplained:
+long runs 40, language spellings 24, Greek letters 24, quotes 16. Every
+coverage-addition cell (13 language and 9 inline cases, 176 cells per
+engine) is identical to 4.3.1 under the default. In the existing corpus,
+2,117, 2,104 and 2,119 cells per engine differ only in marker style
+attributes, with identical line boxes and marker geometry (the stylesheet
+change below).
+
+Defect fixes, on by default and under both `coverage` values:
+
+- **A paragraph with more than 500 code points between two break
+  opportunities keeps the browser's layout before anything is measured**
+  (`native:run-budget`). WebKit's `Range.getClientRects()` costs the length
+  of the line a range is on, so measuring such a run cost its square, and a
+  paragraph well under the 12,000-character budget froze the tab. `typeset()`
+  at 600 px, 18px Georgia, 4.3.1 to 4.4: 11,000 closing quotes and a letter
+  took 24,842 ms to 18 ms in WebKit 26.5 (Chromium 29 to 19 ms, Firefox 33
+  to 24 ms); 11,000 letters, a hyphen and a letter 9,904 ms to 8 ms (Chromium
+  1,328 to 7 ms, Firefox 156 to 10 ms). Runs of 499 and 500 are composed as
+  before; 501 is declined. No opt-out: it is a safety limit, and the browser
+  wraps such runs (with `overflow-wrap: break-word`, at the measure). Golden:
+  the five long-run cases over the limit (40 cells per engine) go from
+  `native:no-candidate` to `native:run-budget`.
+- **Language tags in other spellings are read as the language they name.**
+  `lang="en_US"` (and `en_US.UTF-8`, `EN_us`, `en_GB`), `english`,
+  `English`, `Deutsch`, `francais`, `español` and the other unambiguous names
+  for en, fr, de, es, pt, it and nl left every block `native:language`. They
+  now compose exactly as `en-US`, `en`, `en-GB`, `de`, `fr` and `es` do
+  (24 cells per engine, outcome and markup identical to 4.3.1's composition
+  of the same paragraph under the standard tag). Smart quotes and the audit
+  read them the same way.
+- **Up to three Greek or Cyrillic letters in a row inside Latin text.**
+  "5 μg/mL", "α-synuclein", "ΔG" and "ПЦР" compose; 4.3 declined the whole
+  paragraph as `native:script` for one such letter. A Greek sentence, a
+  Cyrillic word or four such letters in a row still decline. "5 μg" is bound
+  like "5 mg".
+- **Quotes that cannot be quotation marks stay straight.** A double quote
+  with white space or the text's edge on both sides (French spaced quotes:
+  `Il a dit : " Bonjour "` became `: ” Bonjour ”`), or with no open
+  quotation to close (`width="100"` became `width=”100"`), is left as it is.
+  `"Hello," she said.`, primes (`5'10"`, `27"`) and elisions (`Rock 'n'
+  roll in the '90s`) are curled as in 4.3.1.
+- **The automatic loader curls quotes only in text declared English.** Its
+  default is now `smartQuotes: 'en-declared'`, so an untagged German or
+  French page keeps its quotes (`Er sagte: "Hallo Welt"` stays straight).
+  `data-typeset-smart-quotes="en"` restores 4.3's behaviour, in which
+  untagged text counts as English; an explicit npm `smartQuotes: 'en'` keeps
+  its meaning.
+
+Markup only, no change to layout:
+
+- **Marker styles move to the engine's stylesheet.** Spacing and hanging
+  markers carry only `margin-left` inline, and tracking wrappers only
+  `letter-spacing` and `word-spacing`; their shared declarations are in the
+  engine's constructable stylesheet and `dist/styles.css` (markers'
+  `!important` rules in the `typeset-markers` cascade layer, wrappers'
+  `all: unset` in an id-weighted rule), and inline as in 4.3 where
+  constructable stylesheets are missing. A page's unlayered `!important`
+  rule no longer reaches a marker's shared declarations. Per composed
+  paragraph (85 corpus paragraphs, 375 px, 18px Georgia), style attribute
+  bytes went from 21,991 to 690 in Chromium, 26,192 to 700 in WebKit and
+  18,389 to 672 in Firefox, and outerHTML from about 23.7, 27.9 and 20.1 KB
+  to 2.4 KB; element counts are unchanged. The /pairing-cards PNG export
+  (html2canvas-pro, which does not copy adopted sheets) renders identical
+  cards.
+
+### Added
+
+- **`whenSettled(options?: { timeout?: number }): Promise<{ settled:
+  boolean }>`**, from `typeset.us`, `typeset.us/react` and
+  `window.Typeset` (types `SettleOptions`, `Settled`). It resolves
+  `{ settled: true }` once every `mount()` controller and every React
+  adapter host has its outcome, no composition work is queued or timed, no
+  web font is loading and a loader waiting for hydration has composed, at
+  two checks 50 ms apart; `{ settled: false }` if work remains at the
+  timeout (default 10 s). Under jsdom and happy-dom it resolves at once.
+  Engine copies on one page share one list of work.
+- **`copy` option** (default `true`). `false` leaves an element's copying to
+  the browser, whose copied text then has a line break at every composed
+  line end; the document copy handler is installed only when some composed
+  element has copy on. `data-typeset-copy="false"` on the loaders,
+  `copy={false}` on the adapters.
+- **`coverage` option** (`'core'`, the default, or `'extended'`),
+  `data-typeset-coverage` on the loaders, the adapters' `coverage` prop.
+  `'core'` composes what 4.3.1 composed. `'extended'` opts in to the two
+  additions below, paragraphs 4.3.1 left native: on the coverage corpus it
+  changes 280 of 376 cells per engine from 4.3.1, and composes 278, 276 and
+  286 of them in Chromium, WebKit and Firefox (4.3.1: 55, 54 and 63).
+- **Other Latin-script languages, opt-in** (`coverage: 'extended'`). Any
+  `lang` whose likely script is Latin (pt, pt-BR, it, nl, pl, sv, tr, vi,
+  fil, sw, ht, sr-Latn and so on) composes with neutral line-end
+  preferences, as untagged text does; an unreadable tag (`{{ page.lang }}`) counts as untagged. ar, he, ja, zh, th,
+  hi, ko, el and Cyrillic sr still decline, and so does Latin text under a
+  non-Latin tag. A descendant in another Latin-script language
+  (`<span lang="es">`, `lang="en-GB"` inside untagged text) is part of the
+  paragraph and set with the block's preferences; a Japanese phrase still
+  leaves it `native:mixed-language`. 128 language cells per engine change
+  with it.
+- **More inline markup, opt-in** (`coverage: 'extended'`). `time`, `dfn`,
+  `kbd` and `ins`; `sup` and `sub`, `vertical-align: super` and `sub`, and a
+  `sup` raised with `position: relative` (normalize.css, Tailwind
+  preflight), measured in place with the rendered lines verifying the plan; visually hidden text
+  (the sr-only pattern, clip-path variants included) and `aria-hidden`
+  elements with no width, as zero-width atoms that no generated break falls
+  inside and that measurement, spacing and tracking leave out. A word space
+  beside such text keeps its natural width, so Chromium's accessibility
+  tree reads the words on either side as it does natively. 71, 70 and 71 of
+  the 72 inline cells per engine compose (Chromium, WebKit, Firefox). Still
+  native: `br`, `img`, `svg`, `q`, `bdi`, a visible `aria-hidden` icon,
+  `::after` link icons, soft hyphens, `hyphens: auto` and
+  `vertical-align: top`. One recorded trade-off: a footnote `sup` at 240 px
+  in Georgia composes with the lines 4.3.1 gives the same paragraph without
+  it (4 weak line ends against native's 3).
+- **`headings` option** (default `true`). `headings: false` and
+  `data-typeset-headings="false"` make `mount()`, `typesetAll()` and the
+  loaders leave `h1` to `h6`, `[role=heading]` and anything inside them
+  untouched, with no outcome written; `typeset(el)` still composes the
+  element it is given. For organisations that need an accessibility
+  sign-off: a heading split by a `<br>` may be read as two items by iOS
+  VoiceOver, which has not yet been checked by ear.
+- **`smartQuotes: 'en-declared'`**: English quotes only where the element or
+  an ancestor declares `en` or `en-*`. With `TypesetText` and
+  `TypesetRichText` it needs `lang` on the component.
+- **Loader attribute `data-typeset-defer`**: `"hydration"` makes the first
+  composition wait for hydration without a framework marker; `"none"`
+  composes at DOMContentLoaded, as 4.3 did, even with one.
+- **Export `typeset.us/opt-in`**: the opt-in loader (`dist/go.js`), which
+  composes only `[data-typeset]` or `data-typeset-selector`.
+- **Outcome `native:run-budget`** (43 outcomes).
+- **Audit review items** `clipped` (below), `untagged` (composed text with no
+  `lang`, so English line-end preferences are off) and `uncomposed` (nothing
+  in scope composed, for a reason other than nothing to improve; this
+  includes `native:environment` under jsdom). `pass` is unchanged.
+  `typeset-audit` prints one `typeset-audit: warning:` line on stderr for
+  `uncomposed`, with the same exit code.
+- **Loader notes.** After the first pass each loader logs at most two
+  `console.info` lines, never a warning or an error: that English line-end
+  preferences are off because composed text has no `lang`, and that none of
+  the N matched blocks was composed, with the most common outcome.
+
+### Changed
+
+- **Hydration timing (automatic and opt-in loaders).** On a page with a
+  server-rendering marker (`#__next`, `#__NEXT_DATA__`, `self.__next_f`,
+  `#___gatsby`, `[data-framer-hydrate-v2]`, `astro-island`,
+  `[data-server-rendered]`, or a React root already on the document, the
+  body or a child of the body) the first composition waits for the
+  framework's own signal (React: a root and a fiber on each server-rendered
+  target or an ancestor; Astro: no `astro-island[ssr]` left, apart from
+  `client:visible` and `client:media` islands; Vue 2: no
+  `[data-server-rendered]` left), then one idle callback, the whole wait
+  capped at 10 s from the loader's start. It does not wait for the load
+  event once the framework has hydrated; under
+  `data-typeset-defer="hydration"` with no React root yet, it waits for the
+  load event first. Without a marker the timing is 4.3's.
+- **The CDN default file.** The package's `jsdelivr` and `unpkg` fields
+  point at `dist/auto.js`, the automatic loader. In 4.3 the bare
+  `https://cdn.jsdelivr.net/npm/typeset.us` URL served
+  `dist/typeset.global.js`, which composes nothing by itself.
+- **Audit: text clipped on purpose is a review item.** An element whose
+  overflow is `hidden` or `clip` with `text-overflow: ellipsis` or
+  `-webkit-line-clamp` gets a `clipped` review item instead of an `overflow`
+  error, so an audit that failed only on intentional truncation now passes.
+- The automatic loader's smart-quote default (see Rendering changes).
+- capabilities.json: `whenSettled`, `hydration`, `entryPoints`, `coverage`,
+  `headings`, `languageTags`, `otherLatinLanguages`, the quote rules and
+  `websiteLoader.cdnDefault` (`dist/auto.js`).
+- OUTCOMES.md: `native:language`, `native:mixed-language`,
+  `native:rich-element`, `native:rich-excluded` and `native:rich-layout`
+  say what composes under the default, `coverage: 'core'`, and what
+  `'extended'` adds.
+- The site's `tsconfig.json` leaves `packages/typeset-v4/dist` and
+  `public/releases` out of its type check.
+
+### Deprecated
+
+- **`typeset.us/go`**: the same file and types as `typeset.us/opt-in`, kept
+  as an alias and removed no sooner than 5.0.
+
+### Fixed
+
+- A WebKit freeze of tens of seconds on a paragraph with a long unbreakable
+  run under the 12,000-character budget, such as a hostile comment on a page
+  with the script tag (see Rendering changes).
+- The audit's false `overflow` error on intentional ellipsis truncation.
+- **React hydration errors and a discarded server render** on
+  server-rendered pages that hydrate after the loader composes (Next.js,
+  Gatsby, Framer and other React SSR with a marker). Probe (Chromium,
+  candidate `auto.js`, an SSR article hydrated with `hydrateRoot` 300 ms
+  after the client script runs): with `<div id="__next">`, React 18.2.0 and
+  19.3.0 logged 0 errors, kept the server node and composed after
+  hydration (47 breaks). Without a marker, or with
+  `data-typeset-defer="none"`, the 4.3 timing stands and React 18.2.0 logs
+  12 recoverable errors (#425, #418, #423) and 19.3.0 one (#418), as with
+  4.3.0.
+- Off-screen React blocks on a page the browser stops giving idle periods,
+  from 4.3.2 (see 4.3.2 below), **without 4.3.2's delay after a restyle**.
+  4.3.2 also timed each idle callback out 50 ms of page time after the last
+  idle period, and a timeout that fired more than 20 ms late waited on
+  instead of composing. On hosted CI runners Chromium then left the one
+  block more than a viewport from the screen unwritten for over 300 ms
+  after an ancestor's class change (`verify-react`, 2 of 3 release runs of
+  4.3.2 and the first 4.4.0 PR run, against none in about 36 runs before).
+  With no idle periods and every timeout 30 ms late (an emulated busy
+  runner), the wait-on repeated every 31 ms and that block was still
+  unwritten 8 s on, where 4.3.1 wrote it at the 1 s timeout. The adapters
+  now wait for idle periods exactly as 4.3.1 did, up to 1 s with one block
+  composed on the timeout, and only a callback that fires on that timeout
+  with no idle period of any length in the last 50 ms moves the remaining
+  off-screen blocks to animation frames. `verify-scheduler`'s check (frames
+  and then idle periods stop): the 23 off-screen blocks compose again in
+  0.51 s in Chromium and 0.54 s in Firefox (4.3.2: 0.17 and 0.19 s; 4.3.1:
+  44 s).
+
+### Known limitations
+
+- A marked page whose framework never hydrates composes 10 s after the
+  loader starts, and so does one where a third-party script adds paragraphs
+  inside a React root before DOMContentLoaded. In Chromium and WebKit the
+  first composition still comes no earlier than the load event, as in 4.3:
+  `mount()` waits for `document.fonts.ready`, which they resolve only at
+  load (Firefox before it). Wix pages carry no marker in the list and
+  keep 4.3's timing unless they add `data-typeset-defer="hydration"`, which
+  waits for React only when its root exists by the load event.
+  `[data-framer-hydrate-v2]` has not been checked on a live Framer site.
+- `whenSettled()` does not wait for hosts React has not mounted yet (a
+  pending Suspense boundary), for a finite CSS animation to end, or for
+  off-screen blocks a resize left until they are scrolled near.
+- **Off-screen React blocks can cost a busy page frames while they catch
+  up** (the trade-off of 4.3.2's fix). When the browser gives no idle
+  periods because a script fills every frame, `TypesetText` and
+  `TypesetRichText` compose their off-screen blocks in animation frames, up
+  to 12 ms of each, once an idle callback has waited its full 1 s. Chromium
+  at 4x CPU slowdown and 120 Hz, a script filling every frame, measured with
+  4.3.2 (which switched after 50 ms): for about 1.3 s the page ran at 66 to
+  75 fps instead of 92, and frames over 20 ms went from 2 or 3 to 31 to 39,
+  with no new long tasks. 4.3.1 kept those frames but left 21 of the 23
+  off-screen blocks stale 3 s later.
+- `::after` link icons still leave their paragraph native, under both
+  `coverage` values.
+- 4.3's other known limitations stand; SUPPORT.md lists them.
+
+### Size
+
+gzip -9 (Node 24 zlib; the tree-shaken rows are esbuild bundles importing one
+entry point), the published 4.3.1 against 4.4.0:
+
+| Entry | 4.3.1 | 4.4.0 | Change |
+| --- | --- | --- | --- |
+| `go@<version>.js` / `dist/go.js` | 56,467 | 59,941 | +3,474 (+6.2%) |
+| `dist/auto.js` | 56,476 | 59,935 | +3,459 (+6.1%) |
+| `typeset.global.js` | 56,122 | 58,770 | +2,648 (+4.7%) |
+| `react.js` and its chunk | 54,083 | 56,603 | +2,520 (+4.7%) |
+| `mount` only | 50,361 | 52,357 | +1,996 (+4.0%) |
+| `TypesetText` only | 50,489 | 52,631 | +2,142 (+4.2%) |
+| `TypesetRichText` only | 46,820 | 48,797 | +1,977 (+4.2%) |
+| `typeset()` only | 44,294 | 45,961 | +1,667 (+3.8%) |
+| `analyzeBreaks()` only | 14,522 | 14,916 | +394 (+2.7%) |
+| `smartQuotes()` only | 1,544 | 1,556 | +12 (+0.8%) |
+| `TypesetText`, no tree-shaking | 63,169 | 66,175 | +3,006 (+4.8%) |
+
+`whenSettled()` alone is 1,429 bytes. The unpacked npm package grows from
+1,902,907 bytes to 2,068,719 (97 files).
+
+### Website (typeset.us, not the package)
+
+These shipped to master with pull request #12 and deploy with the site, not
+with this release: `/privacy` and `/.well-known/security.txt`; a `/docs` hub;
+`/help`, the Stripe page moved to `/sponsor` with `/support` redirecting
+there (308); only pinned install lines, with jsDelivr as an equal option,
+and `/fix` flagging unpinned loaders; a hydration warning on the Framer and
+Wix install pages; the demo pages and the homepage manifesto recomposing
+when their width changes; no visit notifications to a public ntfy topic.
+
+These are on this release's branch and deploy with the site when it merges,
+since they describe 4.4.0: each install page says under its install line
+what the loader does by default; the Framer and Wix pages describe the
+hydration wait (Wix: add `data-typeset-defer="hydration"`); /faq answers page
+language, hydration errors and user-generated text, and gives the
+find-in-page, translation and reader-view measurements; the homepage's "Do
+I need it?" list has a languages row.
+
+### Documentation
+
+- The package README warns at the script tag about `lang` (on 42 test
+  paragraphs at 375 px, stranded short words fell from 59 to 7 with
+  `lang="en"` and only to 36 untagged), user-generated text and
+  server-rendered React; gives each install method's defaults in one table
+  and a load-after-idle recipe; and says what composed text does to
+  find-in-page and Text Fragment links (43 of 60 five-word phrases found at
+  375 px, 52 of 60 at 768 px), reader views (Firefox 35 of 40) and
+  translation (Google 3 of 9; Safari's and Firefox's translators untested).
+- STABILITY.md and SECURITY.md date the support window: 4.x gets bug and
+  security fixes until at least 2027-09-30; when a minor ships, the one
+  before it gets security fixes for 60 days (4.2.x until 2026-11-26).
+  SECURITY.md lists the email first, as private vulnerability reporting is
+  off.
+- SUPPORT.md gives the run-budget timings and names the new development
+  warnings (`copy`, `headings`, `coverage` and the three `smartQuotes`
+  values). Its hydration-wait limitation says that in Chromium and WebKit
+  the first composition comes no earlier than the load event (from 4.3),
+  and it gives the off-screen catch-up's cost to a busy page.
+- ROADMAP.md says what 4.4 shipped and moves the rest to later in 4.x; the
+  choice of default coverage waits for 5.0.
+- MIGRATION.md is "Moving to 4.4.0": what changes from 4.3 (the loader's
+  quote default, coverage, the run budget, the hydration wait,
+  `whenSettled()`, `./opt-in` and the CDN default file, the audit's review
+  items, marker styles and sizes), with the 4.2.0 steps kept below it.
+  SUPPORT.md and for-agents.md describe 4.4.0: every new option, loader
+  attribute, outcome and review item, with language claims qualified by
+  `coverage`, and the three limitations 4.3.1 said were planned for 4.4
+  marked as not addressed.
+- The package README has a "Visual tests" section (`whenSettled()` with
+  Playwright and a Storybook play function), a preview with
+  `npx typeset-audit --apply` before installing, the `overflow-x: clip` and
+  `priority="sync"` workarounds, `spacing: false` as the low-element mode and
+  the hosted loader's lack of an uptime guarantee.
+- The npm description says "tested in Chromium, WebKit and Firefox".
+- The internal launch and candidate notes moved out of the repository, and
+  docs/OWNER-ACTIONS.md is a maintainer checklist that says what is done.
+
+### Development
+
+- The Node smart-quotes timing check (120 KB under 50 ms) is reported, not
+  enforced, on GitHub's hosted runners: it measured 51.1 ms once in the
+  v4.3.2 release run (36644238293, attempt 2). The WebKit and Firefox
+  browser checks and every run on the calibration machine still enforce
+  the linear-time bound.
+
+- CI runs on pull requests and master pushes only, and a newer push cancels
+  the run it supersedes; the nightly run of the committed release artifacts
+  moves to Mondays, and Dependabot opens its updates monthly.
+- `verify-golden` reports the coverage corpus apart (`coverage`, and with
+  `--subject-options '{"coverage":"extended"}'` a `coverage-default` pass),
+  holds the coverage additions to 4.3.1's output in any pass on `'core'`,
+  and counts marker-style-only cells as `styleMoved`; the corpus has a
+  `reference` field for tag spellings.
+- New suite `verify-coverage`: tag spellings, 23 declared languages,
+  descendants, scripts, a 30-case inline matrix, quotes and headings, each
+  against the published 4.3.1, under `coverage: 'extended'` and under
+  `'core'`, which the default must match, in three engines.
+  `verify-native-ax` gains a coverage fixture, composed with
+  `coverage: 'extended'`.
+- Size budgets and the unpacked-package cap are raised to the measured
+  figures, with the reasons recorded.
+
 ## 4.3.2 - 2026-09-29
+
+**Withdrawn before publication.** 4.3.2 was cut and tagged (v4.3.2, fc7f84e) but never published to npm: its release verification failed in 4 of 5 hosted runs on `verify-react`'s "a real ancestor style change still recomposes every block", because the idle-starvation change below let one off-screen React block recompose after the check's 300 ms quiet window on a loaded runner. 4.4.0 carries the corrected change. `scripts/v4/withdrawn.json` records the withdrawal, and `verify-ledger --network` skips 4.3.2's registry check.
 
 4.3.2 is a patch release of 4.3.1: no API, option, outcome code or default
 changed. It fixes how slowly the React adapters caught up with off-screen
@@ -50,23 +433,24 @@ composes.
   periods: 4.3.1 took 44 s to compose again the 23 off-screen blocks left
   native in Chromium (19 still native at 5 s), 4.3.2 0.2 s.
 
+### Known limitations
+
+- **Off-screen React blocks can cost a busy page frames while they catch
+  up** (the trade-off of this fix). When the browser gives no idle
+  periods because a script fills every frame, `TypesetText` and
+  `TypesetRichText` compose their off-screen blocks in animation frames, up
+  to 12 ms of each. Chromium at 4x CPU slowdown and 120 Hz, a script filling
+  every frame: for about 1.3 s the page ran at 66 to 75 fps instead of 92,
+  and frames over 20 ms went from 2 or 3 to 31 to 39, with no new long
+  tasks. 4.3.1 kept those frames but left 21 of the 23 off-screen blocks
+  stale 3 s later.
+
 ### Development
 
 - `verify-scheduler` gains "React adapters, frames and then idle periods
   stopping: every offscreen block left native composes again within 5 s",
   in Chromium and Firefox (WebKit has no `requestIdleCallback`; the
   adapters use a timer there).
-
-### Known limitations
-
-- **The catch-up spends frame time when a script fills every frame.**
-  Measured once in Chromium at 4x CPU on a 120 Hz display, with a
-  requestAnimationFrame loop doing 10 ms of work a frame: after a width
-  change, 4.3.2 composed the 23 off-screen blocks in about 1.3 s, spending
-  up to 12 ms of each frame on them (92 fps fell to 66-75, frames over 20 ms
-  rose from 2-3 to 31-39, no new long task). 4.3.1 kept those frames free
-  but left 21 of the 23 blocks native at 3 s. On a 60 Hz display the same
-  work leaves idle time, and the catch-up waits for it.
 
 ## 4.3.1 - 2026-09-29
 

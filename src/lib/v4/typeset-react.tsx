@@ -9,7 +9,7 @@ import { assignRef, layoutKey, transformOnly } from './adapter-keys';
 import { ENVIRONMENT_OUTCOME } from './environment';
 import { rendered } from './lifecycle';
 import type { TypesetAdapterProps } from './typeset-rich-react';
-import { smartQuotes as educate } from './smart-quotes';
+import { englishScope, smartQuotes as educate } from './smart-quotes';
 import { linesExtent } from './layout-metrics';
 import { selectionBookmark } from './rich-text';
 export { TypesetRichText } from './typeset-rich-react';
@@ -29,7 +29,7 @@ const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useL
  * Inline interactive children belong outside this plain-text adapter. A ref
  * resolves to the host element.
  */
-export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, priority = 'auto', onResult, ...attributes }, forwarded) {
+export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextProps>(function TypesetText({ text, as = 'p', mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, coverage, priority = 'auto', onResult, ...attributes }, forwarded) {
   const ref = useRef<HTMLElement | null>(null);
   const refCleanup = useRef<(() => void) | undefined>(undefined);
   // A classic callback ref (node, then null), which React 18 and 19 both
@@ -40,15 +40,19 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     else { if (refCleanup.current) refCleanup.current(); else assignRef(forwarded, null); refCleanup.current = undefined; }
   }, [forwarded]);
   const [initialText] = useState(text);
-  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour });
-  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour };
-  const report = useRef(onResult);
-  report.current = onResult;
   // Curl quotes during render, so server HTML, no-JS readers and crawlers get
   // them and hydration matches. Education is idempotent; typeset() still owns
-  // later text. An ancestor's lang is invisible here, so only a missing or
-  // English lang prop qualifies, as the DOM path's scope check would allow.
-  const curled = smartQuotes === 'en' && (!attributes.lang || /^en(?:-|$)/i.test(attributes.lang));
+  // later text. An ancestor's lang is invisible here, so only the lang prop
+  // counts: English, or with 'en' also none, as the DOM path's scope check
+  // would allow. 'en-declared' therefore needs lang on the component, and
+  // without it typeset() is not asked for quotes either: they would change
+  // after hydration.
+  const curled = (smartQuotes === 'en' || smartQuotes === 'en-declared') && englishScope(attributes.lang, smartQuotes === 'en-declared');
+  const quotes = smartQuotes === 'en-declared' && !curled ? false : smartQuotes;
+  const options = useRef<Options>({ text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage });
+  options.current = { text, mode, keep, maxLines, density, lineBreaks, smartQuotes: quotes, opticalHanging, spacing, tracking, contour, copy, coverage };
+  const report = useRef(onResult);
+  report.current = onResult;
   // The text as it shows before composition: educated like the server HTML.
   const native = useRef('');
   native.current = curled ? educate(text) : text;
@@ -126,6 +130,6 @@ export const TypesetText = /* @__PURE__ */ forwardRef<HTMLElement, TypesetTextPr
     if (first.current) { first.current = false; return; }
     const current = entry.current;
     if (current) adapterRegistry(current.element.ownerDocument).request(current, 'force', true);
-  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour]);
+  }, [text, mode, keepKey, maxLines, density, lineBreaks, smartQuotes, opticalHanging, spacing, tracking, contour, copy, coverage]);
   return createElement(as, { ...attributes, ref: setHost, 'data-typeset-react': '' }, curled ? educate(initialText) : initialText);
 });

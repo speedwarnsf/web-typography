@@ -1,6 +1,8 @@
 import type { LayoutMetrics } from './layout-metrics';
 import { afterComment, engineText, positional, preserveRichCopy, reactOwned, rejoinSplits, releaseSplits, selectionBookmark, shieldWhitespace } from './rich-text';
 import type { RichOutput, SplitRecord } from './rich-text';
+import { markerRules } from './lifecycle';
+import { hiddenInline, withinHidden } from './hidden-inline';
 
 export const TRACK_ATTRIBUTE = 'data-ts-track';
 export const MAX_TRACKING_EM = .01;
@@ -31,6 +33,8 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
   if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb' || !['left', 'start'].includes(style.textAlign)) return result('native:tracking-layout');
   const source = element.textContent || '', texts = textRuns(element);
   const segmenter = graphemes();
+  // Visually hidden text takes no room: tracking it would change no line.
+  const hidden = element.firstElementChild ? hiddenInline(element) : [];
   const runs: TrackingRun[] = [];
   let unsupported = false, held = false;
   for (const [line, box] of layout.lines.slice(0, -1).entries()) {
@@ -47,7 +51,7 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
     const pieces: (TrackingRun & { last: Text; count: number })[] = [];
     for (const text of texts) {
       const start = Math.max(box.sourceStart, text.start), end = Math.min(box.sourceEnd, text.end);
-      if (end <= start || text.node.parentElement?.closest('code, kbd, samp')) continue;
+      if (end <= start || text.node.parentElement?.closest('code, kbd, samp') || (hidden.length && withinHidden(text.node, hidden))) continue;
       const parent = text.node.parentElement;
       if (!parent) continue;
       const cs = getComputedStyle(parent), fontSize = parseFloat(cs.fontSize);
@@ -77,11 +81,16 @@ export function planTrackingFinish(element: HTMLElement, layout: LayoutMetrics, 
  * whole and unwrapped (see afterComment). */
 const heldAfterComment = (node: Text): boolean => node.length > 0 && !engineText.has(node) && afterComment(node) && !reactOwned(node);
 
-export function trackingStyle(run: TrackingRun): Record<string, string> {
-  return { all: 'unset', display: 'inline', letterSpacing: run.letterSpacing + run.px + 'px',
+/** A wrapper's own letter and word spacing. `all: unset` and display come
+ * from the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where
+ * that sheet cannot apply, see markerRules) writes them on the wrapper, as 4.3
+ * did. */
+export function trackingStyle(run: TrackingRun, inline: boolean): Record<string, string> {
+  const spacing = { letterSpacing: run.letterSpacing + run.px + 'px',
     // CSS tracking also affects spaces. Compensate so the word-space finish
     // retains its measured 80-133% envelope instead of paying for tracking twice.
     wordSpacing: run.wordSpacing - run.px + 'px' };
+  return inline ? { all: 'unset', display: 'inline', ...spacing } : spacing;
 }
 
 /** Wrap contiguous text runs and space markers, never author elements.
@@ -95,8 +104,9 @@ export function trackingStyle(run: TrackingRun): Record<string, string> {
  * wrapper as in 4.2: frameworks that hold them write to them in place, and
  * some (Solid) skip a write when the node's text already equals the new
  * value, which an emptied node would always do for ''. */
-export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOutput {
+export function renderTracking(element: HTMLElement, plan: TrackingPlan, copy = true): RichOutput {
   const restoreSelection = selectionBookmark(element), texts = textRuns(element);
+  const inline = !markerRules(element);
   const splits = new Map<Text, SplitRecord>();
   const split = (head: Text, at: number) => {
     const tail = head.splitText(at);
@@ -121,18 +131,18 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
         // its text; or, after a comment (not React's), leave it whole.
         if (!(node as Text).length || heldAfterComment(node as Text)) { wrapper = null; continue; }
         const piece = split(node as Text, 0);
-        if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run); piece.before(wrapper); }
+        if (!wrapper || wrapper.nextSibling !== piece) { wrapper = trackingWrapper(element, run, inline); piece.before(wrapper); }
         wrapper.append(piece);
         continue;
       }
-      if (!wrapper || wrapper.nextSibling !== node) { wrapper = trackingWrapper(element, run); node.before(wrapper); }
+      if (!wrapper || wrapper.nextSibling !== node) { wrapper = trackingWrapper(element, run, inline); node.before(wrapper); }
       wrapper.append(node);
     }
   }
   for (const record of splits.values()) record.expected = record.parts.map(part => part.data);
   const shields = splits.size ? shieldWhitespace(element) : [];
   restoreSelection();
-  const releaseCopy = preserveRichCopy(element);
+  const releaseCopy = copy ? preserveRichCopy(element) : () => {};
   let released = false;
   return { nodes: [element], heads: new Set(splits.keys()), cleanup(written) {
     if (released) return;
@@ -151,10 +161,10 @@ export function renderTracking(element: HTMLElement, plan: TrackingPlan): RichOu
   } };
 }
 
-function trackingWrapper(element: HTMLElement, run: TrackingRun): HTMLElement {
+function trackingWrapper(element: HTMLElement, run: TrackingRun, inline: boolean): HTMLElement {
   const wrapper = element.ownerDocument.createElement('span');
   wrapper.setAttribute(TRACK_ATTRIBUTE, String(run.start));
-  Object.assign(wrapper.style, trackingStyle(run));
+  Object.assign(wrapper.style, trackingStyle(run, inline));
   return wrapper;
 }
 

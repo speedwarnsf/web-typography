@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { INSTALL_ORDER, PLATFORMS, SNIPPET } from '@/lib/platforms';
-import { EVERGREEN_NOTE, HOSTING_NOTE, JSDELIVR_SNIPPET, NPM_INSTALL, PINNED_VERSION } from '@/lib/install-snippet';
+import { EVERGREEN_NOTE, HOSTING_NOTE, JSDELIVR_SNIPPET, LOADER_DEFAULTS, NPM_INSTALL, PINNED_VERSION } from '@/lib/install-snippet';
 import '../install/install.css';
 
 export const metadata: Metadata = {
@@ -33,6 +33,7 @@ export default function InstallIndex() {
         after — it reads your page, confirms the script is installed, and
         re-sets your opening paragraph both ways.
       </p>
+      <p className="in-fine">{LOADER_DEFAULTS}</p>
       {JSDELIVR_SNIPPET && (
         <>
           <p className="in-label">The same file from npm via jsDelivr</p>

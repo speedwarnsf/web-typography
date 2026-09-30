@@ -6,6 +6,18 @@
  * packages/typeset-v4/OUTCOMES.md and docs/outcomes.md.
  */
 import type { Outcome, FEATURE_STATUSES } from './outcomes';
+import { COVERAGE_DEFAULT } from './coverage';
+
+/** How rows name extended coverage. It follows COVERAGE_DEFAULT, so if that
+ * default changes, npm run docs:outcomes regenerates
+ * OUTCOMES.md without editing these rows. */
+const EXTENDED = COVERAGE_DEFAULT === 'extended' ? "with coverage: 'extended' (the default)" : "with coverage: 'extended'";
+const LANGUAGE = COVERAGE_DEFAULT === 'core'
+  ? "The declared language is not English, French, German or Spanish (with lineBreaks: legacy, not English). With coverage: 'extended', only a language written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic) is left native. A lang such as en_US, en_US.UTF-8 or english is read as the language it names."
+  : "The declared language is written in a script other than Latin (Arabic, Hebrew, Chinese, Japanese, Korean, Thai, Hindi, Greek, Serbian in Cyrillic). With coverage: 'core', also any language but English, French, German and Spanish; with lineBreaks: legacy, any language but English. A lang such as en_US, en_US.UTF-8 or english is read as the language it names.";
+const MIXED_LANGUAGE = COVERAGE_DEFAULT === 'core'
+  ? "Part of the block declares a different language (a Spanish phrase in English), or, with coverage: 'extended', a language written in another script (a Japanese phrase in English)."
+  : "Part of the block declares a language written in another script (a Japanese phrase in English), or, with coverage: 'core', any different language.";
 
 export type OutcomeGroup = 'composed' | 'nothing to improve' | 'unsupported content' | "couldn't improve safely" | 'not processed';
 export interface OutcomeRow {
@@ -35,9 +47,9 @@ export const OUTCOME_DOCS = {
   'native:sentence-aligned': { group: 'nothing to improve', expected: true, meaning: "The browser's lines already end at sentence or clause boundaries, so they were kept.", action: 'None.' },
   'native:paragraph-rhythm': { group: 'nothing to improve', expected: true, meaning: "The browser's rag was as good as the best candidate, so it was kept.", action: "None. density: 'editorial' lets Typeset use one more line for phrasing." },
 
-  'native:language': { group: 'unsupported content', expected: true, meaning: 'The declared language is not English, French, German or Spanish (or, with lineBreaks: legacy, not English).', action: 'None; set lang correctly. Other languages are left to the browser.' },
-  'native:mixed-language': { group: 'unsupported content', expected: true, meaning: 'Part of the block declares a different language.', action: 'None, or split the block by language.' },
-  'native:script': { group: 'unsupported content', expected: true, meaning: 'The text contains non-Latin script or bidirectional controls.', action: 'None. Typeset composes Latin-script text only.' },
+  'native:language': { group: 'unsupported content', expected: true, meaning: LANGUAGE, action: COVERAGE_DEFAULT === 'core' ? 'None; set lang correctly. coverage: \'extended\' composes other Latin-script languages; other scripts are left to the browser.' : 'None; set lang correctly. Other scripts are left to the browser.' },
+  'native:mixed-language': { group: 'unsupported content', expected: true, meaning: MIXED_LANGUAGE, action: 'None, or split the block by language.' },
+  'native:script': { group: 'unsupported content', expected: true, meaning: 'The text contains non-Latin script or bidirectional controls. Greek and Cyrillic letters in runs of up to three inside Latin text (5 μg, α-synuclein, ΔG) are allowed.', action: 'None. Typeset composes Latin-script text only.' },
   'native:direction': { group: 'unsupported content', expected: true, meaning: 'The element is right-to-left or vertical.', action: 'None. RTL and vertical text are not supported.' },
   'native:transformed': { group: 'unsupported content', expected: true, meaning: 'The element or an ancestor is scaled, rotated, skewed or zoomed, so measured widths would not match what is drawn. A composition made before an ancestor transform is kept (lines do not move); this outcome is for text first composed while one applied.', action: 'None while it animates: mount() and the React adapters compose the text when the transition or animation ends. For a lasting transform, remove it or leave the text native.' },
   'native:decorated': { group: 'unsupported content', expected: true, meaning: 'The element has ::before or ::after content that shares its lines.', action: 'Move the decoration outside the text box, or leave it native.' },
@@ -51,17 +63,18 @@ export const OUTCOME_DOCS = {
   'native:ui': { group: 'unsupported content', expected: true, meaning: "mode: 'ui' (or data-typeset-mode=\"ui\") marks interface text, which is never composed.", action: 'None.' },
   'native:justify': { group: 'unsupported content', expected: true, meaning: 'The text is justified (text-align: justify or justify-all), or its text-align-last differs from text-align, and it runs to more than one line. A generated break ends its line, so every composed line would take the last-line alignment.', action: 'None; justified text is left to the browser. Set text-align: start (with the default text-align-last) to have it composed.' },
   'native:live-region': { group: 'unsupported content', expected: true, meaning: 'The element is inside a live region, or contains one (a result count or a "saved" status inside a paragraph): the nearest region has an aria-live value other than "off" (an empty one counts as absent), or role status, alert, log, marquee or timer, or is an <output>, without aria-live="off". Screen readers announce every change there, so Typeset never measures, breaks or rewrites it. Regions in open shadow roots count, such as a toast that wraps a <slot> in role="status".', action: 'None. If the element is not really a live region, remove the role or set aria-live="off". A role set through ElementInternals or in a closed shadow root cannot be seen: mark that text data-no-typeset.' },
-  'native:rich-element': { group: 'unsupported content', expected: true, meaning: 'The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code), such as an image, button or nested block.', action: 'None, or compose the text blocks inside it separately.' },
-  'native:rich-excluded': { group: 'unsupported content', expected: true, meaning: 'The block contains hidden, aria-hidden, editable or data-no-typeset content.', action: 'None.' },
+  'native:rich-element': { group: 'unsupported content', expected: true, meaning: `The block contains an element other than inline text markup (a, b, strong, em, i, span, small, u, s, del, mark, abbr, cite, code, and, ${EXTENDED}, time, dfn, kbd, ins, sup and sub), such as an image, a line break, button or nested block.`, action: 'None, or compose the text blocks inside it separately.' },
+  'native:rich-excluded': { group: 'unsupported content', expected: true, meaning: `The block contains hidden, aria-hidden, editable or data-no-typeset content. ${EXTENDED[0].toUpperCase() + EXTENDED.slice(1)}, visually hidden text (the sr-only pattern) and aria-hidden elements with no width take no room and are composed around.`, action: 'None.' },
   'native:rich-direction': { group: 'unsupported content', expected: true, meaning: 'An inline element changes direction, bidi or writing mode, or is not visible.', action: 'None.' },
   'native:rich-whitespace': { group: 'unsupported content', expected: true, meaning: 'The block or its inline markup is indented (any text-indent, including a first-line indent such as p + p { text-indent: 1.5em } and a hanging indent), preserves whitespace, or changes text advances (a transform).', action: 'None; indented paragraphs keep the browser\'s layout.' },
-  'native:rich-layout': { group: 'unsupported content', expected: true, meaning: 'An inline element is not a plain inline box (inline-block, positioned, or not on the baseline).', action: 'None.' },
+  'native:rich-layout': { group: 'unsupported content', expected: true, meaning: `An inline element is not a plain inline box (inline-block, positioned, or not on the baseline). ${EXTENDED[0].toUpperCase() + EXTENDED.slice(1)}, raised text is measured in place: vertical-align super or sub, and sup or sub raised with position: relative and a top offset (normalize.css).`, action: 'None.' },
   'native:rich-box': { group: 'unsupported content', expected: true, meaning: 'An inline element has negative padding, borders or margins, or box-decoration-break: clone.', action: 'None.' },
   'native:rich-decorated': { group: 'unsupported content', expected: true, meaning: 'An inline element has ::before or ::after content.', action: 'None.' },
   'native:rich-tokens': { group: 'unsupported content', expected: false, meaning: 'The words could not be matched to text positions in the markup.', action: 'Report it with auditJSON output; this should be rare.' },
   'native:react-component': { group: 'unsupported content', expected: true, meaning: 'TypesetRichText has a custom component child, whose rendering React owns.', action: 'Use host elements (a, strong, em, span) inside TypesetRichText.' },
 
   'native:budget': { group: "couldn't improve safely", expected: true, meaning: 'The block is longer than the composition budget (500 words or 12,000 characters).', action: 'None; very long blocks are left to the browser.' },
+  'native:run-budget': { group: "couldn't improve safely", expected: true, meaning: 'Some run of more than 500 characters has no line-break opportunity (a long string of one punctuation mark, letters with no space, text joined by no-break spaces). Measuring such a run costs the square of its length in WebKit (about 37 s for 11,000 closing quotes), so the block is declined before anything is measured; result.before and result.after hold no lines. Prose has no such runs; user-generated text can.', action: 'None; the browser wraps it. On containers of user-generated text, overflow-wrap: break-word lets the browser wrap such a run at the measure.' },
   'native:no-candidate': { group: "couldn't improve safely", expected: false, meaning: 'No arrangement of the allowed breaks fits the width and line limits. result.constraint says why: an unbreakable run wider than the box, a line budget, or the search.', action: 'Read result.constraint; widen the box, allow overflow-wrap: break-word, or raise maxLines.' },
   'native:line-budget': { group: "couldn't improve safely", expected: true, meaning: 'Every candidate needs more lines than allowed (maxLines, or the native line count plus the body allowance).', action: "None, or raise maxLines or use density: 'editorial'." },
   'native:quality': { group: "couldn't improve safely", expected: true, meaning: 'The composed result would have created a one-word last line the browser did not have, so it was discarded.', action: 'None.' },
@@ -84,7 +97,7 @@ export const FEATURE_DOCS = {
     'enabled': 'TypesetRichText converts quotes during render (React reports this before layout).',
     'applied': 'Straight quotes were converted to curly quotes.',
     'unchanged': 'There were no straight quotes to convert.',
-    'native:quotes-scope': 'Quotes were left alone: the block or part of it declares a language other than English, or it contains code, pre, kbd, samp, form fields, or excluded or editable content.',
+    'native:quotes-scope': 'Quotes were left alone: the block or part of it declares a language other than English, or, with smartQuotes: \'en-declared\' (the auto loader\'s default), declares none; or it contains code, pre, kbd, samp, form fields, or excluded or editable content.',
   },
   hanging: {
     'off': 'opticalHanging was not requested.',

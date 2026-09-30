@@ -1,5 +1,6 @@
 import type { LayoutMetrics } from './layout-metrics';
 import { finishSpaceDeltas } from './space-policy';
+import { hiddenInline, withinHidden } from './hidden-inline';
 
 export interface SpaceAdjustment { offset: number; px: number; naturalPx: number; line: number }
 export interface SpacingPlan {
@@ -52,6 +53,16 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
   }
   const point = (at: number, end = false) => runs.find(run => end ? run.start < at && run.end >= at : run.start <= at && run.end > at);
   const range = element.ownerDocument.createRange();
+  // A space in visually hidden text takes no room on its line. A space right
+  // before or after hidden text keeps its natural width too: a marker there
+  // leaves a white-space-only text node beside the hidden (out-of-flow) box,
+  // which Chromium drops from its accessibility tree ("hours on" read as
+  // "hourson").
+  const hidden = element.firstElementChild ? hiddenInline(element) : [];
+  const edges = hidden.flatMap(atom => {
+    const inside = runs.filter(run => atom.contains(run.node));
+    return inside.length ? [inside[0].start, inside[inside.length - 1].end] : [];
+  });
   const measured: { offset: number; naturalPx: number; available: number }[][] = [];
   for (const line of layout.lines.slice(0, -1)) {
     const spaces = Array.from(source.slice(line.sourceStart, line.sourceEnd).matchAll(/[\t\n\r \u00a0\u202f]+/gu));
@@ -60,6 +71,7 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
       const start = line.sourceStart + space.index!, end = start + space[0].length;
       const a = point(start), b = point(end, true);
       if (!a || !b || !a.node.parentElement) return result('native:spacing-measurement');
+      if (hidden.length && (withinHidden(a.node, hidden) || edges.includes(start) || edges.includes(end))) continue;
       range.setStart(a.node, start - a.start); range.setEnd(b.node, end - b.start);
       const style = getComputedStyle(a.node.parentElement);
       const available = range.getBoundingClientRect().width;
@@ -82,10 +94,17 @@ export function planSpacingFinish(element: HTMLElement, layout: LayoutMetrics, m
 /** Empty, noninteractive markers change advances, never source characters.
  * An empty inline span keeps its horizontal margin without becoming an atomic
  * inline: inline-block made Chromium drop the adjacent word space from its
- * accessibility tree ('careful notes' read as 'carefulnotes'). */
-export function spacingMarkerStyle(px: number): Record<string, string> {
+ * accessibility tree ('careful notes' read as 'carefulnotes'). Only the
+ * advance is per marker. The rest is the same for every marker and comes from
+ * the engine's stylesheet (LIFECYCLE_CSS in lifecycle.ts); `inline` (where that
+ * sheet cannot apply, see markerRules) writes it on the marker, as 4.3 did. */
+export function spacingMarkerStyle(px: number, inline: boolean): Record<string, string> {
+  if (!inline) return { marginLeft: px + 'px' };
+  // Longhands for the margin: React warns when a style object that changes
+  // between renders (here, when the sheet stops applying) mixes a shorthand
+  // with one of its longhands.
   return { display: 'inline', position: 'static', float: 'none', width: '0px', height: '0px', minWidth: '0px', minHeight: '0px',
-    margin: '0px', marginLeft: px + 'px', padding: '0px', border: '0px', boxShadow: 'none', outline: 'none', transform: 'none',
+    marginTop: '0px', marginRight: '0px', marginBottom: '0px', marginLeft: px + 'px', padding: '0px', border: '0px', boxShadow: 'none', outline: 'none', transform: 'none',
     fontSize: '0px', lineHeight: '0', verticalAlign: 'baseline', pointerEvents: 'none' };
 }
 

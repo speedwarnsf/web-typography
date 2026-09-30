@@ -12,7 +12,8 @@ import type { AdapterEntry, Priority } from './adapter-registry';
 export type { Priority } from './adapter-registry';
 import type { RichPlan } from './rich-text';
 import type { Mode, Options, Result } from './typeset.next';
-import { smartQuotes } from './smart-quotes';
+import { englishScope, smartQuotes } from './smart-quotes';
+import { languageOf } from './language';
 import { planOpticalHanging, opticalMarkerStyle, opticalVerified } from './optical-hanging';
 import type { LayoutMetrics } from './layout-metrics';
 import type { OpticalHang } from './optical-hanging';
@@ -21,7 +22,7 @@ import type { SpaceAdjustment, SpacingPlan } from './spacing-finish';
 import { planTrackingFinish, trackingStyle, trackingVerified, TRACK_ATTRIBUTE } from './tracking-finish';
 import type { TrackingPlan, TrackingRun } from './tracking-finish';
 import { finishTargets } from './space-policy';
-import { printing, rendered } from './lifecycle';
+import { markerRules, printing, rendered } from './lifecycle';
 
 /** Host elements the adapters render. The engine decides at run time what it
  * composes: an inline host such as a default label reports native:inline. */
@@ -42,6 +43,15 @@ export interface TypesetAdapterProps extends Omit<HTMLAttributes<HTMLElement>, '
   spacing?: Options['spacing'];
   tracking?: Options['tracking'];
   contour?: Options['contour'];
+  /** Default: Options.coverage's. `'core'` leaves native what 4.3.1 left
+   * native (other Latin-script languages, time, dfn, kbd, ins, visually
+   * hidden text, sup and sub); `'extended'` composes them. */
+  coverage?: Options['coverage'];
+  /** Default `true`: copying composed text puts the source on the clipboard,
+   * without the generated line breaks. `false` leaves copying to the
+   * browser, whose copied text then has a line break at every composed line
+   * end (Options.copy). */
+  copy?: Options['copy'];
   /** 'auto' (default) composes in the commit only what is on screen, within
    * a small time budget, and the rest before its first paint or in idle
    * time. 'sync' composes in the commit, as 4.2 did, for hero text.
@@ -73,7 +83,7 @@ function quoteTreeSupported(children: ReactNode): boolean {
   let supported = true;
   Children.forEach(children, child => {
     if (!isValidElement<{ children?: ReactNode; lang?: string; 'data-no-typeset'?: unknown }>(child)) return;
-    if ((child.props.lang && !/^en(?:-|$)/i.test(child.props.lang)) || child.props['data-no-typeset'] !== undefined
+    if ((child.props.lang && languageOf(child.props.lang) !== 'en') || child.props['data-no-typeset'] !== undefined
       || (typeof child.type === 'string' && !['a', 'b', 'strong', 'em', 'i', 'span', 'small', 'u', 's', 'del', 'mark', 'abbr', 'cite'].includes(child.type))
       || !quoteTreeSupported(child.props.children)) supported = false;
   });
@@ -97,7 +107,9 @@ function trackingForTree(plan: TrackingPlan, children: ReactNode): TrackingPlan 
   return { ...plan, runs };
 }
 
-function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean): ReactNode {
+/** `inline`: markers carry their shared declarations themselves, where the
+ * engine's stylesheet does not reach the host (see markerRules). */
+function renderChildren(children: ReactNode, breaks: Set<number>, hangs: OpticalHang[], spaces: SpaceAdjustment[], tracks: TrackingRun[], educate: boolean, inline: boolean): ReactNode {
   let offset = 0;
   const source = quoteSource(children);
   const educated = educate ? smartQuotes(source) : null;
@@ -146,7 +158,7 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
       let active: TrackingRun | undefined;
       let tracked: ReactNode[] = [];
       const flush = () => {
-        if (active && tracked.length) pieces.push(createElement('span', { key: 'track-' + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active) }, ...tracked));
+        if (active && tracked.length) pieces.push(createElement('span', { key: 'track-' + active.start, [TRACK_ATTRIBUTE]: String(active.start), style: trackingStyle(active, inline) }, ...tracked));
         active = undefined; tracked = [];
       };
       const append = (piece: ReactNode, at: number, marker = false) => {
@@ -162,8 +174,8 @@ function renderChildren(children: ReactNode, breaks: Set<number>, hangs: Optical
         // Exposed where it stands in for the collapsed space; see renderRichText.
         if (breaks.has(stop) && (stop === offset || !moved.has(stop))) append(createElement('br', { key: 'break-' + stop, [BREAK_ATTRIBUTE]: '', 'aria-hidden': breakReplacesSpace(source, stop) ? undefined : true, style: breakStyle }), stop, true);
         if (stop === offset) { cursor = local; continue; }
-        if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!) }), stop, true);
-        if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!) }), stop);
+        if (optical.has(stop)) append(createElement('span', { key: 'hang-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-hang': String(stop), 'aria-hidden': true, style: opticalMarkerStyle(optical.get(stop)!, inline) }), stop, true);
+        if (spacing.has(stop)) append(createElement('span', { key: 'space-' + stop, [BREAK_ATTRIBUTE]: '', 'data-ts-space': String(stop), 'aria-hidden': true, style: spacingMarkerStyle(spacing.get(stop)!, inline) }), stop);
         cursor = local;
       }
       append(text.slice(cursor), start + cursor); flush();
@@ -257,6 +269,9 @@ class RichText extends Component<RichProps, State> {
    * translator is filling. Unlike mount(), the adapter cannot remove the
    * breaks it rendered. */
   private frozen = false;
+  /** Markers carry their shared declarations inline: the engine's stylesheet
+   * did not reach the host when it was last rendered (see markerRules). */
+  private inlineMarkers = false;
 
   static getDerivedStateFromProps(props: RichProps, state: State): Partial<State> | null {
     const key = childrenKey(props.children);
@@ -271,7 +286,7 @@ class RichText extends Component<RichProps, State> {
     const el = this.host.current;
     if (!el || this.entry?.element === el) return;
     this.unbind();
-    this.releaseCopy = preserveRichCopy(el);
+    this.releaseCopy = this.props.copy === false ? undefined : preserveRichCopy(el);
     const entry: AdapterEntry = {
       element: el, priority: this.props.priority ?? 'auto',
       // Outside a commit the whole plan-and-finish chain runs synchronously
@@ -328,6 +343,11 @@ class RichText extends Component<RichProps, State> {
     if (previous.forwardedRef !== this.props.forwardedRef && this.host.current) {
       if (this.refCleanup) this.refCleanup(); else assignRef(previous.forwardedRef, null);
       this.refCleanup = assignRef(this.props.forwardedRef, this.host.current);
+    }
+    // copy={false} leaves this host's copying to the browser.
+    if ((previous.copy === false) !== (this.props.copy === false) && this.entry) {
+      this.releaseCopy?.();
+      this.releaseCopy = this.props.copy === false ? undefined : preserveRichCopy(this.entry.element);
     }
     if (!restoreSelection) return;
     restoreSelection();
@@ -408,9 +428,10 @@ class RichText extends Component<RichProps, State> {
     if (!callback || !plan) return;
     const props = this.props;
     const mode: Mode = props.mode || (el.dataset.typesetMode as Mode | undefined) || (el.closest('h1,h2,h3,h4,h5,h6') ? 'title' : 'body');
-    const educate = props.smartQuotes === 'en' && /^en(?:-|$)/i.test(props.lang || '') && quoteTreeSupported(props.children);
+    const educate = (props.smartQuotes === 'en' || props.smartQuotes === 'en-declared') && englishScope(props.lang, true) && quoteTreeSupported(props.children);
     const result: Result = {
-      outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME ? plan.before : measureLayout(el),
+      // Nothing was measured for these; a long unbreakable run is not read now either.
+      outcome: plan.outcome, mode, before: plan.before, after: plan.outcome === ENVIRONMENT_OUTCOME || plan.outcome === 'native:run-budget' ? plan.before : measureLayout(el),
       changed: !!(plan.breaks.length || plan.hangs?.length || plan.spacing?.adjustments.length || plan.tracking?.runs.length),
       durationMs: performance.now() - started,
       ...(plan.constraint && { constraint: plan.constraint }), ...(plan.search && { search: plan.search }),
@@ -466,10 +487,13 @@ class RichText extends Component<RichProps, State> {
     this.setState({ plan, stale: false });
   };
   render(): ReactElement {
-    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
+    const { children, as = 'p', mode: _mode, keep: _keep, maxLines: _maxLines, density: _density, lineBreaks: _lineBreaks, smartQuotes: quotes, opticalHanging: _optical, spacing: _spacing, tracking: _tracking, contour: _contour, copy: _copy, coverage: _coverage, priority: _priority, onResult: _onResult, forwardedRef: _ref, ...attributes } = this.props;
     const plan = this.state.plan;
     const shown = this.state.stale ? null : plan;
-    const educate = quotes === 'en' && /^en(?:-|$)/i.test(this.props.lang || '') && quoteTreeSupported(children);
+    // Education happens during render, where an ancestor's lang is
+    // invisible: lang on the component must declare English, for 'en' and
+    // 'en-declared' alike.
+    const educate = (quotes === 'en' || quotes === 'en-declared') && englishScope(this.props.lang, true) && quoteTreeSupported(children);
     if (quotes === 'en' && !this.props.lang && !warnedQuotesLang && development()) {
       warnedQuotesLang = true;
       // Education happens during render, where an ancestor's lang is invisible.
@@ -480,7 +504,13 @@ class RichText extends Component<RichProps, State> {
       'data-ts-hanging': _optical ? plan?.hanging || 'native:hanging-uncomposed' : undefined,
       'data-ts-spacing': _spacing === false ? 'off' : plan?.spacing?.outcome || 'native:spacing-uncomposed',
       'data-ts-tracking': _tracking === false || _spacing === false ? 'off' : plan?.tracking?.outcome || 'native:tracking-uncomposed' };
-    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate));
+    // Read only: the registry installs the sheet, and puts it back if the
+    // page drops it. React 19's strict mode renders again while the host ref
+    // is detached; the last answer stands then.
+    const markers = !!(shown?.hangs?.length || shown?.spacing?.adjustments.length || shown?.tracking?.runs.length);
+    if (markers && this.host.current) this.inlineMarkers = !markerRules(this.host.current, false);
+    const inline = markers && this.inlineMarkers;
+    if (supportedTree(children)) return createElement(as, props, renderChildren(children, new Set(shown?.breaks || []), shown?.hangs || [], shown?.spacing?.adjustments || [], shown?.tracking?.runs || [], educate, inline));
     if (!educate) return createElement(as, props, children);
     // Kept native (native:react-component), still with the quotes asked for.
     const educated = educateNodes(children, smartQuotes(quoteSource(children)), { offset: 0 });

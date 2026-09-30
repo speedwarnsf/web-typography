@@ -1,0 +1,354 @@
+{
+ "note": "Constructions the 4.4 adoption fixes change, composed by verify-golden at every corpus width and font and reported apart from the 4.2/4.3 corpus (the \"coverage\" variant), against the release 4.4 is measured against (4.3.1). class: A, no change to default output expected; B, a verified-defect fix on by default; C, a coverage addition (paragraphs 4.3 left native). expect: the outcome this build must report, where one is required. lang: the element's lang (\"\" is untagged; absent means the page's lang=\"en\"). reference: for a lang in another spelling, the tag it spells; the coverage baseline also composes the case under it, and the build must match that composition. Long runs stay short enough that the 4.3.1 baseline measures them in about a second in WebKit. E1 added the corpus with the long-run cases; E2 added the language, script, inline and quote cases after them.",
+ "cases": [
+  {
+   "id": "run-499-letters",
+   "group": "long-run",
+   "class": "B",
+   "html": "A code was pasted here: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx and the note went on to explain what it meant."
+  },
+  {
+   "id": "run-501-letters",
+   "group": "long-run",
+   "class": "B",
+   "html": "A code was pasted here: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx and the note went on to explain what it meant.",
+   "expect": "native:run-budget"
+  },
+  {
+   "id": "run-600-closing-quotes",
+   "group": "long-run",
+   "class": "B",
+   "html": "Someone replied with ””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””””x and nothing else in the whole comment.",
+   "expect": "native:run-budget"
+  },
+  {
+   "id": "run-600-letters-hyphen",
+   "group": "long-run",
+   "class": "B",
+   "html": "The profile name read aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x and the page kept loading below it.",
+   "expect": "native:run-budget"
+  },
+  {
+   "id": "run-600-spaced-openers",
+   "group": "long-run",
+   "class": "B",
+   "html": "A reply that is only brackets: ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( and then the thread continues.",
+   "expect": "native:run-budget"
+  },
+  {
+   "id": "run-600-nbsp",
+   "group": "long-run",
+   "class": "B",
+   "html": "A caption joined by no-break spaces: ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;ab&nbsp;end of caption.",
+   "expect": "native:run-budget"
+  },
+  {
+   "id": "run-url-with-slashes",
+   "group": "long-run",
+   "class": "B",
+   "html": "The full address is https://example.org/section0/section1/section2/section3/section4/section5/section6/section7/section8/section9/section10/section11/section12/section13/section14/section15/section16/section17/section18/section19/section20/section21/section22/section23/section24/section25/section26/section27/section28/section29/section30/section31/section32/section33/section34/section35/section36/section37/section38/section39/section40/section41/section42/section43/section44/section45/section46/section47/section48/section49/section50/section51/section52/section53/section54/section55/section56/section57/section58/section59 and it is long but breaks at each slash."
+  },
+  {
+   "id": "lang-en_US",
+   "group": "lang",
+   "class": "B",
+   "lang": "en_US",
+   "reference": "en-US",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-english",
+   "group": "lang",
+   "class": "B",
+   "lang": "english",
+   "reference": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-en-GB",
+   "group": "lang",
+   "class": "A",
+   "lang": "en-GB",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-pt",
+   "group": "lang",
+   "class": "C",
+   "lang": "pt",
+   "html": "A clínica oferece testes gratuitos aos sábados, e os resultados chegam por mensagem de texto em até dois dias. Traga um documento com foto e chegue alguns minutos antes do horário marcado."
+  },
+  {
+   "id": "lang-pt-BR",
+   "group": "lang",
+   "class": "C",
+   "lang": "pt-BR",
+   "html": "O posto de saúde oferece vacinas gratuitas para toda a família durante a semana, e não é preciso marcar horário. Leve a carteira de vacinação e um documento com foto."
+  },
+  {
+   "id": "lang-it",
+   "group": "lang",
+   "class": "C",
+   "lang": "it",
+   "html": "La clinica offre test gratuiti il sabato mattina, e i risultati arrivano con un messaggio entro due giorni. Porta un documento d’identità e arriva qualche minuto prima dell’appuntamento."
+  },
+  {
+   "id": "lang-nl",
+   "group": "lang",
+   "class": "C",
+   "lang": "nl",
+   "html": "De kliniek biedt op zaterdag gratis tests aan, en de uitslag komt binnen twee dagen per sms. Neem een identiteitsbewijs mee en kom een paar minuten voor je afspraak."
+  },
+  {
+   "id": "lang-vi",
+   "group": "lang",
+   "class": "C",
+   "lang": "vi",
+   "html": "Phòng khám cung cấp xét nghiệm miễn phí vào thứ Bảy, và kết quả được gửi qua tin nhắn trong vòng hai ngày. Hãy mang theo giấy tờ tùy thân và đến sớm vài phút trước giờ hẹn."
+  },
+  {
+   "id": "lang-sr-Latn",
+   "group": "lang",
+   "class": "C",
+   "lang": "sr-Latn",
+   "html": "Klinika nudi besplatno testiranje subotom, a rezultati stižu porukom u roku od dva dana. Ponesite ličnu kartu i dođite nekoliko minuta pre zakazanog termina."
+  },
+  {
+   "id": "lang-es-descendant-en",
+   "group": "lang",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Staff greet every visitor with <span lang=\"es\">bienvenidos a la clínica</span> and a printed guide in both languages."
+  },
+  {
+   "id": "lang-en_US-posix",
+   "group": "lang",
+   "class": "B",
+   "lang": "en_US.UTF-8",
+   "reference": "en-US",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-pl",
+   "group": "lang",
+   "class": "C",
+   "lang": "pl",
+   "html": "Przychodnia oferuje bezpłatne badania w soboty, a wyniki przychodzą wiadomością tekstową w ciągu dwóch dni. Zabierz dokument ze zdjęciem i przyjdź kilka minut przed wizytą, aby recepcja mogła cię zarejestrować."
+  },
+  {
+   "id": "lang-sw",
+   "group": "lang",
+   "class": "C",
+   "lang": "sw",
+   "html": "Kliniki inatoa vipimo vya bure kila Jumamosi, na majibu hufika kwa ujumbe mfupi ndani ya siku mbili. Leta kitambulisho chenye picha na ufike dakika chache kabla ya miadi yako ili mapokezi wakusajili."
+  },
+  {
+   "id": "lang-ht",
+   "group": "lang",
+   "class": "C",
+   "lang": "ht",
+   "html": "Klinik la ofri tès gratis chak samdi, epi rezilta yo rive pa mesaj nan de jou. Pote yon pyès idantite ak foto epi vini kèk minit anvan randevou ou pou resepsyon an ka enskri ou."
+  },
+  {
+   "id": "lang-fil",
+   "group": "lang",
+   "class": "C",
+   "lang": "fil",
+   "html": "Nag-aalok ang klinika ng libreng pagsusuri tuwing Sabado, at dumarating ang resulta sa text message sa loob ng dalawang araw. Magdala ng ID na may larawan at dumating nang ilang minuto bago ang iyong appointment."
+  },
+  {
+   "id": "lang-invalid",
+   "group": "lang",
+   "class": "C",
+   "lang": "{{ page.lang }}",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "lang-sr-Cyrl",
+   "group": "lang",
+   "class": "A",
+   "lang": "sr",
+   "html": "Клиника нуди бесплатно тестирање суботом, а резултати стижу поруком у року од два дана. Понесите личну карту и дођите неколико минута пре заказаног термина."
+  },
+  {
+   "id": "lang-en-GB-descendant-untagged",
+   "group": "lang",
+   "class": "C",
+   "lang": "",
+   "html": "The guide says the clinic will <span lang=\"en-GB\">organise the queue by colour</span> on busy mornings, and staff hand out numbered cards at the door a few minutes before it opens."
+  },
+  {
+   "id": "lang-ja-descendant",
+   "group": "lang",
+   "class": "A",
+   "lang": "en",
+   "html": "The welcome sign at the clinic door reads <span lang=\"ja\">ようこそ</span> beside the English and Spanish greetings, and the front desk keeps a printed guide in each language."
+  },
+  {
+   "id": "script-microgram",
+   "group": "script",
+   "class": "B",
+   "lang": "en",
+   "html": "The usual starting dose is 5 μg/mL, given once a day with food, and the pharmacist will check the label with you before the first dose is taken at home."
+  },
+  {
+   "id": "script-alpha-synuclein",
+   "group": "script",
+   "class": "B",
+   "lang": "en",
+   "html": "Researchers measured α-synuclein in the samples from every clinic in the study and found the same pattern across the three sites they visited last spring."
+  },
+  {
+   "id": "script-delta",
+   "group": "script",
+   "class": "B",
+   "lang": "en",
+   "html": "The free energy change ΔG was negative for every reaction the students measured in the lab this week, and the report explains why in plain terms."
+  },
+  {
+   "id": "script-cyrillic-word",
+   "group": "script",
+   "class": "A",
+   "lang": "en",
+   "html": "The label on the box read Здравствуйте in large letters, and the pharmacist explained that it was a greeting printed for the families who read Russian."
+  },
+  {
+   "id": "script-greek-sentence",
+   "group": "script",
+   "class": "A",
+   "lang": "el",
+   "html": "Η κλινική προσφέρει δωρεάν εξετάσεις κάθε Σάββατο, και τα αποτελέσματα φτάνουν με μήνυμα μέσα σε δύο ημέρες."
+  },
+  {
+   "id": "inline-sup-footnote",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<sup>1</sup> Bring a photo ID and arrive a few minutes before your appointment so the front desk can check you in."
+  },
+  {
+   "id": "inline-sub-formula",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "Drink water through the day; plain H<sub>2</sub>O is the best choice for most people, and the nurse can suggest how much to aim for in hot weather."
+  },
+  {
+   "id": "inline-sup-normalize",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<sup style=\"font-size:75%;line-height:0;position:relative;vertical-align:baseline;top:-0.5em\">2</sup> Bring a photo ID and arrive a few minutes before your appointment."
+  },
+  {
+   "id": "inline-time",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The walk-in hours start at <time datetime=\"09:00\">9 a.m.</time> on weekdays and run until the last visitor has been seen, which is usually by early evening."
+  },
+  {
+   "id": "inline-kbd",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "To make the text on this page larger, press <kbd>Ctrl</kbd> and the plus key together, and press them again until the size feels comfortable to read."
+  },
+  {
+   "id": "inline-dfn-ins",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "A <dfn>walk-in visit</dfn> needs no appointment, and <ins>as of this month</ins> the clinic also takes walk-in visits for vaccines on Saturday mornings."
+  },
+  {
+   "id": "inline-sr-only-link-text",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. <a href=\"#hours\">Read more<span style=\"position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0\"> about testing hours</span></a> on the clinic page."
+  },
+  {
+   "id": "inline-sr-only-clip-path",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "Every visit is free, and the nurse will explain your results in person or by phone, whichever you prefer. <a href=\"#faq\">Questions<span style=\"border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;white-space:nowrap\"> about results</span></a> are answered on the help page."
+  },
+  {
+   "id": "inline-aria-hidden-empty",
+   "group": "inline",
+   "class": "C",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days.<span aria-hidden=\"true\"></span> Bring a photo ID and arrive a few minutes before your appointment."
+  },
+  {
+   "id": "inline-hidden-icon",
+   "group": "inline",
+   "class": "A",
+   "lang": "en",
+   "html": "The clinic on Market Street offers free testing on Saturdays, and results arrive by text message within two days. <a href=\"#map\"><span aria-hidden=\"true\">→</span> See the map</a> for parking and the bus stops nearest the entrance.",
+   "note": "A visible aria-hidden glyph stays native: 4.4 composes only hidden elements that take no room."
+  },
+  {
+   "id": "quotes-attribute-value",
+   "group": "quotes",
+   "class": "B",
+   "lang": "en",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "Set width=\"100\" here and the image will keep its shape on every screen the clinic uses in the waiting room and at the front desk."
+  },
+  {
+   "id": "quotes-french-spaced",
+   "group": "quotes",
+   "class": "B",
+   "lang": "en",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "Le guide cite la phrase suivante. Il a dit : \" Bonjour \" et la conversation a continué pendant une heure dans la salle d’attente de la clinique."
+  },
+  {
+   "id": "quotes-dialogue",
+   "group": "quotes",
+   "class": "A",
+   "lang": "en",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "\"Hello,\" she said, and the nurse at the front desk looked up from the schedule to ask whether she had an appointment that morning or had walked in."
+  },
+  {
+   "id": "quotes-primes",
+   "group": "quotes",
+   "class": "A",
+   "lang": "en",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "He is 5'10\" tall; the screen is 27\" wide, and the chart on the wall shows both measurements in centimeters for the families who prefer them."
+  },
+  {
+   "id": "quotes-elision",
+   "group": "quotes",
+   "class": "A",
+   "lang": "en",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "Rock 'n' roll in the '90s filled the old hall on Friday nights, and the clinic now uses the same room for its evening health talks every month."
+  },
+  {
+   "id": "quotes-german-untagged",
+   "group": "quotes",
+   "class": "B",
+   "lang": "",
+   "options": {
+    "smartQuotes": "en"
+   },
+   "html": "Er sagte: \"Hallo Welt\" und dann begann der Kurs über gesunde Ernährung, der jeden Dienstag im großen Saal der Klinik stattfindet."
+  }
+ ]
+}

@@ -3,14 +3,14 @@
   "size": {
     "tolerance": 0.02,
     "gzip": {
-      "mount-only": 49802,
-      "TypesetText-only": 49893,
-      "TypesetRichText-only": 46180,
-      "smartQuotes-only": 1544,
-      "react.js+shared": 53471,
-      "TypesetText-no-tree-shaking": 62192,
-      "go.js": 55913,
-      "typeset.global.js": 55573
+      "mount-only": 52262,
+      "TypesetText-only": 52416,
+      "TypesetRichText-only": 48562,
+      "smartQuotes-only": 1556,
+      "react.js+shared": 56150,
+      "TypesetText-no-tree-shaking": 65697,
+      "go.js": 59037,
+      "typeset.global.js": 58482
     },
     "raised": [
       {
@@ -208,6 +208,54 @@
           "TypesetText-no-tree-shaking": 62192,
           "go.js": 55913,
           "typeset.global.js": 55573
+        }
+      },
+      {
+        "by": "4.4 adoption fixes, E1: run budget, marker stylesheet, copy option, clipped audit item",
+        "reason": "Measured per commit on release/4.4.0 with the release recipe (Node 24 zlib), before = the 4.3.1 cut (244308d, whose sizes were within tolerance of the 4.3.0 budgets), on typeset.global.js (react.js+shared in parentheses): the run budget, a split at certain breaks with the Unicode rules only on long pieces, +227 B (+200); the markers' shared declarations moved into the engine's stylesheet, with the inline fallback kept for engines without constructable stylesheets, +359 B (+489); copy: false +57 B (+72); the clipped audit item +95 B (+0). In all +738 B (+761), 1.3% (1.4%); smartQuotes-only is unchanged. The stylesheet move takes about 21 KB of style attributes out of each composed paragraph at 375 px in Chromium (WebKit 25 KB, Firefox 18 KB): page weight in the DOM, not in the download. mount-only, TypesetText-only, TypesetRichText-only, react.js+shared, TypesetText-no-tree-shaking, go.js and typeset.global.js exceeded their 2% tolerance; the budgets now hold the measured sizes.",
+        "before": {
+          "mount-only": 50361,
+          "TypesetText-only": 50489,
+          "TypesetRichText-only": 46820,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 54083,
+          "TypesetText-no-tree-shaking": 63169,
+          "go.js": 56467,
+          "typeset.global.js": 56122
+        },
+        "after": {
+          "mount-only": 51005,
+          "TypesetText-only": 51157,
+          "TypesetRichText-only": 47399,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 54844,
+          "TypesetText-no-tree-shaking": 64027,
+          "go.js": 57213,
+          "typeset.global.js": 56860
+        }
+      },
+      {
+        "by": "4.4 adoption fixes, E2: coverage option, language tags, Greek and Cyrillic letters, inline markup, smart quotes, loader notes and audit items, headings option",
+        "reason": "Measured on the E2 candidate against E1's head (7e20d13) with the release recipe (Node 24 zlib): typeset.global.js +1,622 B (2.9%), react.js+shared +1,306 B (2.4%), go.js +1,824 B (3.2%, it also carries the loader notes), mount-only +1,257 B, TypesetText-only +1,259 B, TypesetRichText-only +1,163 B, TypesetText-no-tree-shaking +1,670 B; smartQuotes-only +12 B (the shared language reader). The code: lang normalisation (en_US, english) and the Latin-script test on a declared tag, the Greek and Cyrillic letter runs in the script gate, visually hidden text as zero-width atoms (planning, measurement, spacing and tracking skip it), sup, sub and raised text measured in place, the smartQuotes 'en-declared' value and the straight-quote rules, the untagged and uncomposed audit items, the loaders' two console notes, the headings and coverage options and their development checks. Seven entries exceeded the 2% tolerance; the budgets now hold the measured sizes.",
+        "before": {
+          "mount-only": 51005,
+          "TypesetText-only": 51157,
+          "TypesetRichText-only": 47399,
+          "smartQuotes-only": 1544,
+          "react.js+shared": 54844,
+          "TypesetText-no-tree-shaking": 64027,
+          "go.js": 57213,
+          "typeset.global.js": 56860
+        },
+        "after": {
+          "mount-only": 52262,
+          "TypesetText-only": 52416,
+          "TypesetRichText-only": 48562,
+          "smartQuotes-only": 1556,
+          "react.js+shared": 56150,
+          "TypesetText-no-tree-shaking": 65697,
+          "go.js": 59037,
+          "typeset.global.js": 58482
         }
       }
     ]

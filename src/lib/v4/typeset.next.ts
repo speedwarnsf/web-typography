@@ -4,16 +4,17 @@ import { composeTitle } from './title-layout';
 import { contentWidth, measureForAudit, measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import { inLiveRegion, liveText, planRichText, renderRichText, richFingerprint, selectionBookmark, richLayoutVerified, breaksChangeAlignment } from './rich-text';
-import { applySmartQuotes, smartQuotes } from './smart-quotes';
+import { applySmartQuotes, englishScope, smartQuotes } from './smart-quotes';
 import type { QuoteTransform } from './smart-quotes';
 import { planOpticalHanging, opticalVerified } from './optical-hanging';
 import type { RichOutput, RichPlan } from './rich-text';
 import { planSpacingFinish, spacingVerified } from './spacing-finish';
 export { analyzeBreaks, UNICODE_VERSION } from './break-opportunities';
-import { languageOf, languageWeakEnding } from './break-opportunities';
+import { exceedsRunBudget, languageOf, languageWeakEnding } from './break-opportunities';
 import { boundPair, boundaryBefore, strandedOpener } from './phrase-boundaries';
 import { preservesAdvances } from './geometry';
 import { finishTargets } from './space-policy';
+import { trackWork } from './settled';
 import { planTrackingFinish, renderTracking, trackingVerified } from './tracking-finish';
 import { armFonts, ensureLifecycleStyles, installLifecycleStyles, lifecycleStylesFor, markTranslated, movedOnly, nearObserver, printing, rendered, signalQueued, subscribe, translationActive } from './lifecycle';
 import { describe } from './validate';
@@ -21,8 +22,10 @@ import { describe } from './validate';
 import { mountOwners, mountWaiters } from './ownership';
 import { canCompose, canMaintain, ENVIRONMENT_OUTCOME } from './environment';
 import type { Outcome, QuoteStatus, HangingStatus, SpacingStatus, TrackingStatus } from './outcomes';
+import type { Coverage } from './coverage';
+import { commonest, NOTHING_TO_IMPROVE } from './loader-notes';
 
-export const VERSION = '4.3.2';
+export const VERSION = '4.4.0';
 export type Mode = 'body' | 'heading' | 'title' | 'ui';
 /**
  * Composition options. Defaults are those of the typeset.us package entry
@@ -36,9 +39,12 @@ export interface Options {
    * kept for comparison; it is not identical to 3.x. */
   lineBreaks?: 'legacy' | 'unicode';
   /** Default `false`. `'en'` converts straight quotes and apostrophes to curly
-   * ones in declared-English text (quotes only; same length, so offsets and
-   * copying stay aligned). Changes the copied text. */
-  smartQuotes?: 'en' | false;
+   * ones in English text: declared English, or untagged (quotes only; same
+   * length, so offsets and copying stay aligned). `'en-declared'` converts
+   * them only where the element or an ancestor declares English (the auto
+   * loader's default), so an untagged German or French page keeps its
+   * quotes. Changes the copied text. */
+  smartQuotes?: 'en' | 'en-declared' | false;
   /** Default `false`. `true` hangs opening punctuation and measured capitals
    * into the left margin, reversibly, when the glyph fits inside any clip. */
   opticalHanging?: boolean;
@@ -75,6 +81,27 @@ export interface Options {
    * clause opener. `'compact'`: one more line only to repair a one-word last
    * line. `'editorial'`: one more line allowed for better phrasing. */
   density?: 'compact' | 'editorial';
+  /** Default `'core'`, which composes what 4.3.1 composed. `'extended'`
+   * opts in to composing more: text declared in any Latin-script language
+   * (neutral line-end preferences, as for untagged text), paragraphs with a
+   * descendant declared in another Latin-script language, `time`, `dfn`,
+   * `kbd`, `ins`, visually hidden text, and `sup` and `sub`, which `'core'`
+   * leaves native. Also `data-typeset-coverage`. */
+  coverage?: Coverage;
+  /** Default `true`. `false` makes mount(), typesetAll() and the loaders
+   * (`data-typeset-headings="false"`) leave h1 to h6, `role="heading"` and
+   * anything inside them untouched, with no outcome written: a composed
+   * heading that wraps has a line break inside it, which a screen reader may
+   * read as two items (not yet checked by ear). typeset() composes the
+   * element it is given. */
+  headings?: boolean;
+  /** Default `true`: a document copy handler puts the source text on the
+   * clipboard, without the generated line breaks (and, for rich text, the
+   * markup without engine markers). `false` leaves this element's copying to
+   * the browser, whose copied text then has a line break at every composed
+   * line end. The handler is installed only when some composed element has
+   * copy on, and it yields to any copy handler the page registered first. */
+  copy?: boolean;
   /** Current author text. Framework adapters pass this on updates. */
   text?: string;
 }
@@ -233,7 +260,7 @@ function transformOnly(a: string, b: string): boolean {
   return a.slice(a.indexOf(',', a.indexOf(',') + 1)) === b.slice(b.indexOf(',', b.indexOf(',') + 1));
 }
 function optionsKey(options: Options): string {
-  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour]);
+  return JSON.stringify([options.mode, options.keep, options.maxLines, options.density, options.text, options.lineBreaks, options.smartQuotes, options.opticalHanging, options.spacing, options.tracking, options.contour, options.copy, options.coverage]);
 }
 function signature(el: HTMLElement, options: Options, layout = layoutKey(el)): string {
   return el.innerHTML + '\u0000' + layout + '\u0000' + optionsKey(options);
@@ -460,9 +487,9 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     if (options.text !== undefined) {
       // TypesetText curls quotes as it renders: that text is current, and a
       // new value is written educated as it would be outside a region.
-      const curled = options.smartQuotes === 'en' ? smartQuotes(options.text) : options.text;
+      const curled = options.smartQuotes === 'en' || options.smartQuotes === 'en-declared' ? smartQuotes(options.text) : options.text;
       const lang = element.closest('[lang]')?.getAttribute('lang');
-      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = !lang || /^en(?:-|$)/i.test(lang) ? curled : options.text;
+      if (element.textContent !== options.text && element.textContent !== curled) element.textContent = englishScope(lang, options.smartQuotes === 'en-declared') ? curled : options.text;
       authorTexts.set(element, options.text);
     }
     return { outcome: 'native:live-region', mode, before: emptyMetrics(), after: emptyMetrics(), changed: false, durationMs: performance.now() - started };
@@ -507,14 +534,17 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   }
   const rawMarkup = element.innerHTML;
   const restoreQuoteSelection = selectionBookmark(element);
-  const quotes = options.smartQuotes === 'en' ? applySmartQuotes(element) : undefined;
+  const quotes = options.smartQuotes === 'en' || options.smartQuotes === 'en-declared' ? applySmartQuotes(element, options.smartQuotes === 'en-declared') : undefined;
   restoreQuoteSelection();
   const source = element.textContent || '';
   const originalMarkup = element.innerHTML;
   const nodes = Array.from(element.childNodes);
   const hadStyle = element.hasAttribute('style');
   const styles = { textWrap: element.style.textWrap, inlineSize: element.style.inlineSize, maxInlineSize: element.style.maxInlineSize };
-  const before = visible ? measureLayout(element) : emptyMetrics();
+  // An unbreakable run too long to measure safely (see RUN_BUDGET): decline
+  // before reading a single box, so nothing here costs its square.
+  const overlong = visible && exceedsRunBudget(source);
+  const before = visible && !overlong ? measureLayout(element) : emptyMetrics();
   let rich: RichOutput | undefined;
   let search: RichPlan['search'];
   // The composition's style fingerprint as the last verification confirmed
@@ -523,6 +553,8 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
   // Natural word spaces measured for the contour serve the spacing finish.
   // Only within this call: a later call may see different fonts.
   const spaceWidths = new Map<string, number>();
+  // With copy: false the document copy handler leaves this element alone.
+  const copy = options.copy !== false;
   const finish = (outcome: string, constraint?: RichPlan['constraint']): Result => {
     let optical: RichOutput | undefined;
     let spacing: RichOutput | undefined;
@@ -537,7 +569,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.spacing = plan.outcome;
       if (plan.adjustments.length) {
-        spacing = renderRichText(element, [], [], plan.adjustments);
+        spacing = renderRichText(element, [], [], plan.adjustments, copy);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !spacingVerified(element, plan, measureLayout(element))) {
           spacing.cleanup(); spacing = undefined; features.spacing = 'native:spacing-verification';
         }
@@ -551,7 +583,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const fingerprint = fingerprinted ?? richFingerprint(element);
       features.tracking = plan.outcome;
       if (plan.runs.length) {
-        tracking = renderTracking(element, plan);
+        tracking = renderTracking(element, plan, copy);
         if (element.textContent !== source || richFingerprint(element) !== fingerprint || !trackingVerified(element, plan, measureLayout(element))) {
           tracking.cleanup(); tracking = undefined; features.tracking = 'native:tracking-verification';
         }
@@ -564,14 +596,14 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
       const plan = planOpticalHanging(element, layout);
       features.hanging = plan.outcome;
       if (plan.hangs.length) {
-        optical = renderRichText(element, [], plan.hangs);
+        optical = renderRichText(element, [], plan.hangs, [], copy);
         const after = measureLayout(element);
         if (!opticalVerified(element, layout, after, plan.hangs) || richFingerprint(element) !== fingerprint) {
           optical.cleanup(); optical = undefined; features.hanging = 'native:hanging-verification';
         }
       }
     }
-    const after = visible ? measureLayout(element) : emptyMetrics();
+    const after = visible && !overlong ? measureLayout(element) : emptyMetrics();
     let widest = 0;
     if (outcome.startsWith('composed') && after.lines.length) {
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
@@ -600,6 +632,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     return result;
   };
   if (!source.trim()) return finish('native:empty');
+  if (overlong) return finish('native:run-budget');
   const cs = getComputedStyle(element);
   const lang = element.closest('[lang]')?.getAttribute('lang');
   if (options.lineBreaks !== 'unicode' && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return finish('native:language');
@@ -622,7 +655,7 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
     const plan = planRichText(element, { ...options, mode }, before, spaceWidths);
     search = plan.search;
     if (plan.outcome !== 'composed:rich') return finish(plan.outcome, plan.constraint);
-    rich = renderRichText(element, plan.breaks);
+    rich = renderRichText(element, plan.breaks, [], [], copy);
     const after = measureLayout(element);
     if (!richLayoutVerified(plan, after) || element.textContent !== source || richFingerprint(element) !== plan.styleSignature
       || (!before.lastSingleton && after.lastSingleton && mode === 'body')) {
@@ -700,8 +733,12 @@ export function typeset(element: HTMLElement, options: Options = {}): Result {
 
 const isElement = (node: unknown): node is HTMLElement => (node as Node | null)?.nodeType === 1;
 
+/** Headings, and anything inside one, that headings: false leaves alone. */
+const headingScope = 'h1, h2, h3, h4, h5, h6, [role="heading" i]';
+const skipped = (el: Element, options: Options) => options.headings === false && !!el.closest(headingScope);
+
 export function typesetAll(selector = defaults, options: Options = {}): Result[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(selector), el => typeset(el, options));
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => !skipped(el, options)).map(el => typeset(el, options));
 }
 
 export interface AuditIssue { element: HTMLElement; type: string; severity: 'error' | 'review'; detail: string }
@@ -746,6 +783,10 @@ function lineReview(layout: LayoutMetrics, language: string, english: boolean): 
 
 export function auditReport(selector = defaults): AuditReport {
   const report: AuditReport = { examined: 0, outcomes: {}, features: { quotes: {}, hanging: {}, spacing: {}, tracking: {} }, issues: [] };
+  // For the scope's own review items (4.4): elements with an engine outcome,
+  // how many were composed, and composed ones set without a language.
+  const decided: HTMLElement[] = [], untagged: HTMLElement[] = [];
+  let composedCount = 0;
   for (const element of document.querySelectorAll<HTMLElement>(selector)) {
     if (element.closest('[data-ts-generated], [data-ts-probe]')) continue;
     report.examined++;
@@ -757,11 +798,20 @@ export function auditReport(selector = defaults): AuditReport {
     }
     const layout = measureForAudit(element);
     const add = (type: string, severity: 'error' | 'review', detail: string) => report.issues.push({ element, type, severity, detail });
-    if (layout.overflow > 0.75) add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
+    const style = getComputedStyle(element);
+    if (layout.overflow > 0.75) {
+      // Text cut off on purpose (overflow hidden or clip with an ellipsis or
+      // a line clamp) is the author's layout: a review item, not an error.
+      const clips = ['hidden', 'clip'].includes(style.overflowX) || ['hidden', 'clip'].includes(style.overflowY);
+      const clamp = parseInt(style.getPropertyValue('-webkit-line-clamp'), 10) > 0;
+      if (clips && (/ellipsis/.test(style.textOverflow) || clamp)) {
+        add('clipped', 'review', layout.overflow.toFixed(2) + 'px clipped on purpose (overflow: ' + (['hidden', 'clip'].includes(style.overflowX) ? style.overflowX : style.overflowY)
+          + (clamp ? ', -webkit-line-clamp: ' + style.getPropertyValue('-webkit-line-clamp') : ', text-overflow: ellipsis') + ')');
+      } else add('overflow', 'error', layout.overflow.toFixed(2) + 'px outside content box');
+    }
     if (element.querySelector('.ts-line .ts-line')) add('nested-output', 'error', 'Generated lines contain generated lines');
     // Composed while left-aligned, then justified: every generated break now
     // ends a line that takes the last-line alignment.
-    const style = getComputedStyle(element);
     if (outcome.startsWith('composed') && breaksChangeAlignment(style)) {
       add('alignment-lost', 'error', 'text-align: ' + style.textAlign + (style.textAlignLast && style.textAlignLast !== 'auto' ? ', text-align-last: ' + style.textAlignLast : '')
         + ' cannot apply to composed lines, which each end in a generated break');
@@ -795,6 +845,8 @@ export function auditReport(selector = defaults): AuditReport {
     const state = states.get(element);
     const language = languageOf(element.closest('[lang]')?.getAttribute('lang'));
     const english = language === 'en' || (language === 'und' && !!state?.english);
+    if (element.dataset.tsOutcome) decided.push(element);
+    if (outcome.startsWith('composed')) { composedCount++; if (language === 'und' && !english) untagged.push(element); }
     const review = lineReview(layout, language, english);
     for (const item of review) add(item.type, 'review', item.detail);
     const current = !!state && state.output === element.textContent;
@@ -815,6 +867,21 @@ export function auditReport(selector = defaults): AuditReport {
     }
     if (!layout.lines.length && (element.textContent || '').trim()) add('unmeasurable', 'review', 'No visible line boxes');
     if (outcome === 'unprocessed') add('unprocessed', 'review', 'No engine decision recorded');
+  }
+  // Composed text that declares no language gets neutral preferences: no
+  // English weak-word or phrase preferences. One item, on the first such element.
+  if (untagged.length) {
+    report.issues.push({ element: untagged[0], type: 'untagged', severity: 'review', detail: untagged.length + ' composed element' + (untagged.length === 1 ? ' declares' : 's declare')
+      + ' no language, so English line-end preferences are off; add lang="en" to <html> if the text is English' });
+  }
+  // Nothing in scope composed, for a reason other than nothing to improve
+  // (a language, markup, jsdom's native:environment): one item, with the
+  // most common reason. 4.3 passed such a page with no word.
+  const declined = decided.filter(element => !NOTHING_TO_IMPROVE.has(element.dataset.tsOutcome!));
+  if (!composedCount && declined.length) {
+    const [outcome, count] = commonest(declined);
+    report.issues.push({ element: declined[0], type: 'uncomposed', severity: 'review', detail: 'None of the ' + decided.length + ' element' + (decided.length === 1 ? '' : 's')
+      + ' with an outcome was composed; most common: ' + outcome + ' \u00d7' + count + ' (OUTCOMES.md says why)' });
   }
   return report;
 }
@@ -886,7 +953,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   if (!canMaintain(doc)) {
     const scope = Array.from(root.querySelectorAll<HTMLElement>(selector));
     if (isElement(root) && root.matches(selector)) scope.unshift(root);
-    for (const el of scope) if (!el.closest(excluded)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
+    for (const el of scope) if (!el.closest(excluded) && !skipped(el, options)) el.dataset.tsOutcome = ENVIRONMENT_OUTCOME;
     return { ready: Promise.resolve(), refresh() {}, disconnect() {}, stats: { passes: 0, compositions: 0, maxBatchMs: 0, overlappingTargets: 0 } };
   }
   const identity = Symbol('typeset-mount');
@@ -924,7 +991,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
   const within = (el: Node) => el === root || root.contains(el);
-  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !liveText(el);
+  const eligible = (el: HTMLElement) => within(el) && el.matches(selector) && !el.closest(excluded) && !skipped(el, options) && !liveText(el);
   const stopWaiting = (el: HTMLElement) => {
     const wake = blocked.get(el);
     if (!wake) return;
@@ -965,7 +1032,7 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
     if (isElement(root) && (scope as Node).contains(root as Node)) scope = root;
     const elements = Array.from(scope.querySelectorAll<HTMLElement>(selector));
     if (isElement(scope) && scope.matches(selector)) elements.unshift(scope);
-    return elements.filter(el => within(el) && !el.closest(excluded) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
+    return elements.filter(el => within(el) && !el.closest(excluded) && !skipped(el, options) && !el.closest('[data-ts-generated], [data-ts-probe], [data-ts-track], .ts-line') && !liveText(el));
   };
   // Within a viewport height of the window, or of the scroll container a
   // block scrolls in (see nearObserver).
@@ -1552,10 +1619,14 @@ export function mount(target: ParentNode | string = document, selectorOrOptions?
   });
   observe();
   const unsubscribe = subscribe(doc, { fonts: fontsChanged, metrics: metricsChanged, styles: stylesChanged, visibility: visibilityChanged, resize: resized, translation: translationChanged });
+  // For whenSettled(): fonts still to arrive, work queued, a resize settling,
+  // or records and a reveal waiting for their task or frame.
+  const untrack = trackWork(() => !stopped && (!fontsReady || pending.size > 0 || resizing.size > 0 || settleTimer !== undefined || lateTimer !== undefined || shownFrame !== 0));
   return {
     ready, refresh, stats,
     disconnect(restoreContent = true) {
       stopped = true;
+      untrack();
       if (timer !== undefined) clearTimeout(timer);
       if (idle !== undefined) cancelIdleCallback(idle);
       observer.disconnect(); resize?.disconnect(); viewport?.disconnect();

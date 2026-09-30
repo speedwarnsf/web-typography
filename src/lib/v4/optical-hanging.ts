@@ -63,8 +63,10 @@ export function planOpticalHanging(element: HTMLElement, layout: LayoutMetrics):
     : { outcome: hangs.length ? clipped ? 'applied:partial' : 'applied' : clipped ? 'native:hanging-clipped' : 'unchanged', hangs };
 }
 
-export function opticalMarkerStyle(px: number): Record<string, string> {
-  return spacingMarkerStyle(-px);
+/** A hanging marker is a spacing marker with a negative advance; `inline` as
+ * in spacingMarkerStyle. */
+export function opticalMarkerStyle(px: number, inline: boolean): Record<string, string> {
+  return spacingMarkerStyle(-px, inline);
 }
 
 export function opticalVerified(element: HTMLElement, before: LayoutMetrics, after: LayoutMetrics, hangs: OpticalHang[]): boolean {

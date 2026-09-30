@@ -303,8 +303,34 @@ export function subscribe(doc: Document, client: LifecycleClient): () => void {
  * --ts-break-display drives every generated break, [data-ts-stale] shows a
  * block's native wrapping while its composition waits to be redone, and print
  * wraps natively at the paper's width. dist/styles.css ships the same rules
- * for engines without constructable stylesheets. */
-export const LIFECYCLE_CSS = '[data-ts-stale]{--ts-break-display:none}'
+ * for engines without constructable stylesheets.
+ *
+ * First, the declarations every spacing and hanging marker and every
+ * tracking wrapper shares, which 4.3 wrote into each one's style attribute:
+ * 18 per marker, and a wrapper's all: unset, which browsers serialize as
+ * every longhand (5 to 8 KB per wrapper). Only the per-marker value stays
+ * inline: a marker's margin-left, a wrapper's letter-spacing and
+ * word-spacing. The markers' rules are !important in a named cascade layer,
+ * which page CSS reaches no more easily than it reached the inline
+ * declarations: an unlayered !important rule, which beat those, loses to a
+ * layered one. The wrappers' rule is not important, as their inline
+ * declarations were not: an !important all: unset would also hide their
+ * inline spacing from page !important rules (the WCAG text-spacing
+ * override) and the stale and print rules below, which must reach it. Its
+ * three :not(#_) outweigh any selector with fewer than three ids, so
+ * ordinary page rules do not reach a wrapper, as they did not reach its
+ * inline all: unset. Where this sheet cannot apply (no constructable
+ * stylesheets), markers carry the same declarations inline, as in 4.3 (see
+ * markerRules). Breaks keep their one inline declaration: !important
+ * inline, it is the one thing no rule can override. One literal, not a
+ * concatenation of constants, so bundlers can drop it with the functions. */
+export const LIFECYCLE_CSS = '@layer typeset-markers{'
+  + ':is([data-ts-space],[data-ts-hang])[data-ts-break]{display:inline!important;position:static!important;float:none!important;'
+  + 'width:0!important;height:0!important;min-width:0!important;min-height:0!important;margin-top:0!important;margin-right:0!important;'
+  + 'margin-bottom:0!important;padding:0!important;border:0!important;box-shadow:none!important;outline:none!important;transform:none!important;'
+  + 'font-size:0!important;line-height:0!important;vertical-align:baseline!important;pointer-events:none!important}}'
+  + '[data-ts-track]:not(#_):not(#_):not(#_){all:unset;display:inline}'
+  + '[data-ts-stale]{--ts-break-display:none}'
   + '[data-ts-stale] :is([data-ts-space],[data-ts-hang])[data-ts-break]{margin-left:0!important}'
   + '[data-ts-stale] [data-ts-track]{letter-spacing:inherit!important;word-spacing:inherit!important}'
   + '[data-ts-stale]>.ts-line[data-ts-generated]{display:inline!important;word-spacing:inherit!important}'
@@ -343,6 +369,18 @@ export function lifecycleStylesFor(element: Element): void {
   const sheet = root.nodeType === 11 && root.host ? sheets.get(element.ownerDocument) : null;
   if (!sheet) return;
   try { if (!root.adoptedStyleSheets.includes(sheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]; } catch { /* dist/styles.css */ }
+}
+/** Whether the engine's marker rules (in LIFECYCLE_CSS) reach markers inside this
+ * element: the lifecycle sheet is installed, first if need be, and adopted by
+ * the element's document or shadow root. When they do not, markers carry
+ * their shared declarations inline. With `install` false, only reads. */
+export function markerRules(element: Element, install = true): boolean {
+  const doc = element.ownerDocument;
+  if (install) installLifecycleStyles(doc, element);
+  const sheet = sheets.get(doc);
+  if (!sheet) return false;
+  const root = element.getRootNode() as Document | ShadowRoot;
+  try { return (root.nodeType === 9 || root.nodeType === 11) && root.adoptedStyleSheets.includes(sheet); } catch { return false; }
 }
 /** Put an installed lifecycle sheet back if the page's own assignment to
  * document.adoptedStyleSheets removed it. Installs nothing new. */

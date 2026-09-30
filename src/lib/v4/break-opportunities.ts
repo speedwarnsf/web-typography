@@ -1,6 +1,10 @@
 import { Rules } from '../../vendor/unicode-linebreak.js';
 import { tokenize, isWeakEnding } from './typeset';
 import type { Token } from './typeset';
+import { languageOf, latinTag } from './language';
+import { extendedCoverage } from './coverage';
+import type { Coverage } from './coverage';
+export { languageOf };
 
 export const UNICODE_VERSION = '17.0.0';
 const profiles: Record<string, ReadonlySet<string>> = {
@@ -23,13 +27,40 @@ export interface BreakAnalysis {
   units: BreakUnit[];
   opportunities: number[];
 }
-export function languageOf(tag: string | null | undefined): string {
-  if (!tag?.trim()) return 'und';
-  try {
-    const locale = new Intl.Locale(tag);
-    return locale.script && locale.script !== 'Latn' ? 'unsupported' : locale.language || 'und';
-  } catch { return 'invalid'; }
+/**
+ * The most code points (collapsible white space aside) a paragraph may hold
+ * between two line-break opportunities. Measuring reads each word's boxes,
+ * and WebKit's Range.getClientRects() takes time in proportion to the length
+ * of the line a range is on, so a longer unbreakable run costs the square of
+ * its length: 11,000 closing quotes and a letter took about 37 s in
+ * typeset() in WebKit, 11,000 letters, a hyphen and a letter about 15 s.
+ * Prose has no such runs; untrusted text (a comment, a profile) can. A block
+ * with one is declined as native:run-budget before anything is measured.
+ */
+export const RUN_BUDGET = 500;
+// A letter or digit, spaces, then a letter is always an opportunity (UAX #14
+// LB18: break after spaces; no earlier rule applies to these classes).
+const certainBreak = /(?<=[\p{L}\p{N}] +)(?=\p{L})/u;
+/** Code points that render: collapsible white space does not. */
+function runLength(text: string): number {
+  let length = 0;
+  for (const char of text) if (char !== ' ' && char !== '\t' && char !== '\n' && char !== '\r' && char !== '\f') length++;
+  return length;
 }
+/** Whether some stretch of `source` between two line-break opportunities
+ * holds more than RUN_BUDGET code points. Linear, and nearly free for
+ * prose: the Unicode rules run only where the text goes more than
+ * RUN_BUDGET characters without a space between letters. */
+export function exceedsRunBudget(source: string): boolean {
+  if (source.length <= RUN_BUDGET || !source.split(certainBreak).some(piece => piece.length > RUN_BUDGET)) return false;
+  let start = 0;
+  for (const { position } of new Rules().breaks(source.replace(/[\t\r\n]/g, ' '))) {
+    if (runLength(source.slice(start, position)) > RUN_BUDGET) return true;
+    start = position;
+  }
+  return runLength(source.slice(start)) > RUN_BUDGET;
+}
+
 export function languageWeakEnding(word: string, language: string): boolean {
   if (language === 'en') return isWeakEnding(word);
   if (!profiles[language]) return false;
@@ -38,13 +69,38 @@ export function languageWeakEnding(word: string, language: string): boolean {
   return profiles[language]?.has(normalized) ?? false;
 }
 
+const latinOrShared = /[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
+const borrowed = /[\p{Script=Greek}\p{Script=Cyrillic}]/u;
+/** Latin-script text: every character Latin, shared (digits, punctuation,
+ * spaces) or a combining mark, except that Greek and Cyrillic letters may
+ * appear in runs of at most three in text with Latin letters: a unit (5 μg),
+ * a variant (α-synuclein), a constant (Δ). A Greek or Cyrillic word or
+ * sentence still leaves the block native (native:script); 4.3 declined the
+ * block for a single such letter. */
+function latinText(source: string): boolean {
+  let run = 0, any = false;
+  for (const char of source) {
+    if (borrowed.test(char)) {
+      if (/\p{L}/u.test(char) && ++run > 3) return false;
+      any = true;
+    } else if (!latinOrShared.test(char)) return false;
+    else if (!/\p{M}/u.test(char)) run = 0;
+  }
+  return !any || /\p{Script=Latin}/u.test(source);
+}
+
 /** Unicode opportunities, conservatively tailored to horizontal Latin-script CSS.
  * This never inserts hyphens or treats a word boundary as a legal line break. */
-export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string; outcomeOnly?: boolean } = {}): BreakAnalysis {
-  const language = languageOf(options.language);
+export function analyzeBreaks(source: string, options: { language?: string | null; hyphens?: string; outcomeOnly?: boolean; coverage?: Coverage } = {}): BreakAnalysis {
+  const declared = languageOf(options.language);
+  // English, French, German and Spanish have preferences; untagged text is
+  // neutral. With extended coverage, any other language written in Latin
+  // script is neutral too, and an unreadable tag counts as none.
+  const extended = extendedCoverage(options.coverage);
+  const language = extended && declared === 'invalid' ? 'und' : declared;
   const result: BreakAnalysis = { unicode: UNICODE_VERSION, language, outcome: 'supported', units: [], opportunities: [] };
-  if (!['und', 'en', 'fr', 'de', 'es'].includes(language)) { result.outcome = 'native:language'; return result; }
-  if ([...source].some(c => !/[\p{Script_Extensions=Latin}\p{Script=Common}\p{Script=Inherited}]/u.test(c)) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
+  if (!['und', 'en', 'fr', 'de', 'es'].includes(language) && !(extended && latinTag(options.language))) { result.outcome = 'native:language'; return result; }
+  if (!latinText(source) || /[\u202a-\u202e\u2066-\u2069]/u.test(source)) {
     result.outcome = 'native:script'; return result;
   }
   if (source.includes('\u00ad')) { result.outcome = 'native:soft-hyphen'; return result; }

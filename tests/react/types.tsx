@@ -3,9 +3,11 @@
 // @types/react 18.3 and 19.2 and skipLibCheck off.
 import { createRef, useRef } from 'react';
 import type { ReactElement } from 'react';
-import { TypesetRichText, TypesetText } from 'typeset.us/react';
+import { TypesetRichText, TypesetText, whenSettled } from 'typeset.us/react';
 import type { Priority, TypesetRichTextProps, TypesetTag, TypesetTextProps } from 'typeset.us/react';
 import type { Result } from 'typeset.us';
+import { whenSettled as settledCore } from 'typeset.us';
+import type { Settled } from 'typeset.us';
 
 const objectRef = createRef<HTMLElement>();
 const onResult = (result: Result) => { void result.outcome; void result.features?.spacing; };
@@ -13,6 +15,12 @@ const tags: TypesetTag[] = ['p', 'h1', 'h6', 'span', 'div', 'li', 'blockquote', 
 const priority: Priority = 'sync';
 const props: TypesetTextProps = { text: 'A title', as: 'h2', mode: 'title', keep: ['New York'], priority, onResult };
 const richProps: TypesetRichTextProps = { children: 'Text', as: 'figcaption', smartQuotes: 'en' };
+// whenSettled() (4.4): the same promise from both entries.
+const settled: Promise<Settled> = whenSettled({ timeout: 5000 });
+void settled.then(({ settled: done }) => done satisfies boolean);
+void settledCore();
+// @ts-expect-error: the timeout is a number of milliseconds
+void whenSettled({ timeout: '5s' });
 
 export function Consumer(): ReactElement {
   const callback = useRef<HTMLElement | null>(null);

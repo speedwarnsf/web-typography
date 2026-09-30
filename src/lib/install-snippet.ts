@@ -37,5 +37,8 @@ export const LOADER_GZIP_KB: string = (release.loader.gzipBytes / 1000).toFixed(
 /** The unpinned loaders, named but never offered as a line to copy. */
 export const EVERGREEN_NOTE = 'The unpinned go.js and go@4.js follow each 4.x release and cannot carry an integrity hash, so use them only for local testing.';
 
+/** What the pinned loader does by default (4.4), said under each install line. */
+export const LOADER_DEFAULTS = 'It sets paragraphs, list items, headings, captions and table cells, with fine word and letter spacing, hanging punctuation, and curly quotes in text declared English. On a page a framework renders on the server (Next.js, Gatsby, Framer, Astro), it waits for the page to hydrate before it sets anything. Put lang="en" on your <html> tag if the page is in English: stranded words such as \u201ca\u201d and \u201cthe\u201d are kept off line ends only in text declared English (French, German and Spanish the same way). Anything it cannot improve keeps the browser\u2019s layout.';
+
 /** typeset.us hosting is a convenience; say so next to the lines that use it. */
 export const HOSTING_NOTE = 'typeset.us hosting has no uptime guarantee. For a strict Content Security Policy, or to keep every request on your own domain, install from npm and serve the file yourself.';

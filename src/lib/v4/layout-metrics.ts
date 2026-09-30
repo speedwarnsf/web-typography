@@ -1,4 +1,5 @@
 import { inlineBoxInsets } from './inline-box';
+import { hiddenInline, withinHidden } from './hidden-inline';
 
 export interface MeasuredLine {
   text: string;
@@ -90,11 +91,14 @@ function measure(element: HTMLElement, authorIndent: boolean): LayoutMetrics {
         overflow: Math.max(0, rect.right - right, left + indent - rect.left), firstSingleton: false, lastSingleton: false, rag: 0 };
     }
   }
+  // Visually hidden text (sr-only) is laid out in its own clipped box, off
+  // the lines: its words would read as another line, or widen one.
+  const hidden = element.firstElementChild ? hiddenInline(element) : [];
   let node: Node | null;
   while ((node = walker.nextNode())) {
     const nodeOffset = sourceOffset;
     sourceOffset += node.textContent?.length || 0;
-    if (node.parentElement?.closest('script, style, [hidden], [aria-hidden="true"]')) continue;
+    if (node.parentElement?.closest('script, style, [hidden], [aria-hidden="true"]') || (hidden.length && withinHidden(node, hidden))) continue;
     for (const match of (node.textContent || '').matchAll(/\S+/gu)) {
       range.setStart(node, match.index!);
       range.setEnd(node, match.index! + match[0].length);
@@ -149,7 +153,7 @@ function measure(element: HTMLElement, authorIndent: boolean): LayoutMetrics {
   // A text Range omits padding/borders at inline fragment edges. Include
   // those real boxes so composition and overflow checks account for code chips.
   for (const inline of element.querySelectorAll<HTMLElement>('*')) {
-    if (inline.hasAttribute('data-ts-break') || inline.closest('[hidden], [aria-hidden="true"]')) continue;
+    if (inline.hasAttribute('data-ts-break') || inline.closest('[hidden], [aria-hidden="true"]') || (hidden.length && withinHidden(inline, hidden))) continue;
     const style = getComputedStyle(inline);
     if (style.display !== 'inline') continue;
     const insets = inlineBoxInsets(style);

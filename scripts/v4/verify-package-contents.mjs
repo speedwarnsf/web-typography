@@ -41,7 +41,7 @@ try {
   // K8: people can find the package on npm and follow its links.
   const KEYWORDS = ['typography', 'line-breaking', 'line-break', 'text-wrap', 'text-wrap-pretty', 'orphans', 'widows', 'rag', 'knuth-plass', 'hanging-punctuation', 'smart-quotes', 'react', 'paragraph'];
   check('keywords cover the terms people search for', KEYWORDS.every(k => pkg.keywords?.includes(k)), { missing: KEYWORDS.filter(k => !pkg.keywords?.includes(k)) });
-  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, verified in Chrome, Safari and Firefox.', pkg.description);
+  check('description says what it does in plain words', pkg.description === 'Better line breaks for web text: no stranded short words or one-word last lines, links and styling intact, tested in Chromium, WebKit and Firefox.', pkg.description);
   check('repository.directory points npm and GitHub at packages/typeset-v4', pkg.repository?.directory === 'packages/typeset-v4' && /github\.com\/speedwarnsf\/web-typography/.test(pkg.repository?.url), pkg.repository);
   check('bugs.url is the issue tracker', pkg.bugs?.url === 'https://github.com/speedwarnsf/web-typography/issues', pkg.bugs);
   check('no engines field that would make Yarn refuse a browser library', !pkg.engines, pkg.engines);
@@ -61,7 +61,13 @@ try {
   check('exports ./auto -> dist/auto.js with the loader globals\' types (go.d.ts), packed', pkg.exports?.['./auto']?.default === './dist/auto.js' && pkg.exports?.['./auto']?.types === './dist/go.d.ts'
     && files.has('dist/auto.js') && files.has('dist/go.d.ts') && pkg.typesVersions?.['*']?.auto?.[0] === 'dist/go.d.ts', { auto: pkg.exports?.['./auto'], typesVersions: pkg.typesVersions });
   check('dist/auto.js is side-effectful (never tree-shaken away)', pkg.sideEffects?.includes('./dist/auto.js'), pkg.sideEffects);
-  check('bare jsDelivr and unpkg URLs serve the browser global, not CommonJS', pkg.jsdelivr === './dist/typeset.global.js' && pkg.unpkg === './dist/typeset.global.js' && files.has('dist/typeset.global.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // 4.4: a bare CDN URL does what a newcomer expects, the automatic loader
+  // (4.3 served the API-only browser global, which composes nothing).
+  check('bare jsDelivr and unpkg URLs serve the automatic loader (dist/auto.js), not CommonJS', pkg.jsdelivr === './dist/auto.js' && pkg.unpkg === './dist/auto.js' && files.has('dist/auto.js'), { jsdelivr: pkg.jsdelivr, unpkg: pkg.unpkg });
+  // ./opt-in names what ./go does (compose only [data-typeset]); ./go stays
+  // as a deprecated alias of the same file until at least 5.0.
+  check('exports ./opt-in and ./go resolve to the same file and types (dist/go.js, go.d.ts), packed', ['./opt-in', './go'].every(entry => pkg.exports?.[entry]?.default === './dist/go.js' && pkg.exports?.[entry]?.types === './dist/go.d.ts')
+    && files.has('dist/go.js') && pkg.typesVersions?.['*']?.['opt-in']?.[0] === 'dist/go.d.ts' && pkg.typesVersions?.['*']?.go?.[0] === 'dist/go.d.ts', { optIn: pkg.exports?.['./opt-in'], go: pkg.exports?.['./go'], typesVersions: pkg.typesVersions });
   const siteGo = artifacts.siteGo;
   if (files.has('dist/auto.js')) {
     const [auto, site] = await Promise.all([readFile(`${staged.dir}/dist/auto.js`), readFile(siteGo)]);
@@ -98,7 +104,45 @@ try {
   // react.cjs), and SUPPORT.md's and MIGRATION.md's notes on them. Before
   // that on-screen rule the branch measured 1,899,954 B, 46 B under the old
   // limit, so the limit moves to 1.91 MB rather than any fix being dropped.
-  check('unpacked package is under 1.91 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 1910000, packed.unpackedSize);
+  // The 4.4 adoption fixes (E1) took it to 1.94 MB (1,936,451 B, +33,544 B
+  // over 4.3.1's 1,902,907 B, 87 files): the run budget, the markers'
+  // stylesheet with its inline fallback, the copy option and the clipped
+  // audit item in each of the six engine bundles (+2.0 to +3.4 KB each),
+  // react.js (+0.9 KB) and both source maps (+2.2 KB each), their
+  // declarations (lifecycle.d.ts and .d.cts +1.8 KB each), the marker rules
+  // in dist/styles.css (+958 B), and capabilities.json, OUTCOMES.md and
+  // README.md (+2.3 KB together). E2 took it to 2.01 MB (2,003,354 B, 95
+  // files, +66,903 B over E1): language tags, Greek and Cyrillic letters,
+  // hidden inline text, sup and sub, the en-declared quotes, the audit items
+  // and loader notes, and the coverage and headings options in each engine
+  // bundle (+4.0 to +7.1 KB each) and both source maps (+6.5 and +7.4 KB),
+  // eight new declaration files (coverage, language, loader-notes and
+  // hidden-inline, .d.ts and .d.cts, 7.0 KB), the options' JSDoc in the
+  // other declarations, and capabilities.json, OUTCOMES.md and README.md
+  // (about +4 KB together). The E3 integration fixes added 19,878 B on E1
+  // (measured alone): the hydration wait in go.js and auto.js (+2.2 KB each,
+  // whenSettled() included) and go.js.map (+3.8 KB), whenSettled() and its
+  // work tracking in index.cjs, react.cjs and the ESM chunk (+1.7 KB each),
+  // typeset.global.js (+0.8 KB) and its map (+1.5 KB), settled.d.ts and
+  // .d.cts (+0.8 KB each), and capabilities.json's whenSettled, hydration and
+  // entry-point facts (+2.1 KB). The 4.4 adoption docs added 8,046 B on E1
+  // (measured alone): README.md's install warnings (user-generated text,
+  // server-rendered React, lang), its defaults table, idle-load recipe and
+  // find-in-page, reader-view and translation limits (+6,919 B), SUPPORT.md's
+  // run-budget timings and translator notes (+672 B) and SECURITY.md's dated
+  // support window (+455 B). Merged on release/4.4.0, with the README and
+  // SUPPORT.md naming 4.4.0 and its new warnings: 2,034,092 B, 97 files.
+  // The 4.4.0 docs review added 32,975 B of package text (file sizes against
+  // de8c204): MIGRATION.md's "Moving to 4.4.0" (+9,227 B), SUPPORT.md's
+  // coverage-qualified languages, hydration wait, whenSettled(), headings,
+  // copy, entry points and review items (+8,382 B), for-agents.md's 4.4.0
+  // contract (+6,104 B, packed twice, as itself and as AGENTS.md), the
+  // README's Visual tests section, audit preview and workarounds (+2,965 B),
+  // capabilities.json (+149 B) and OUTCOMES.md (+44 B). Measured with them:
+  // 2,067,743 B, 97 files. With the docs describing coverage: 'core' as the
+  // default (O1 declined), SUPPORT.md's hydration-wait and off-screen
+  // catch-up notes and the hydration cap (4a8bdfc): 2,068,719 B, 97 files.
+  check('unpacked package is under 2.08 MB (4.2.0: 2.57 MB)', packed.unpackedSize < 2080000, packed.unpackedSize);
   check('license is the SPDX expression "MIT AND Unicode-3.0"', pkg.license === 'MIT AND Unicode-3.0', pkg.license);
   check('THIRD-PARTY-LICENSES.txt and UNICODE-LICENSE.txt are packed', files.has('THIRD-PARTY-LICENSES.txt') && files.has('UNICODE-LICENSE.txt'), [...files.keys()].filter(f => f.endsWith('.txt')));
   const NOTICES = ['@license @cto.af/linebreak 4.0.3 (c) 2023-present Joe Hildebrand, MIT', '@license @cto.af/unicode-trie-runtime (c) 2023', '@license fflate (c) 2026 Arjun Barrett, MIT', '@license Unicode 17.0.0 line-break data (c) 1991-2026 Unicode, Inc., Unicode-3.0'];

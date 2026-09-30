@@ -20,8 +20,12 @@ import { PINNED_SNIPPET } from './install-snippet';
 /** The pinned loader with its integrity hash (from public/sri.json). */
 export const SNIPPET = PINNED_SNIPPET;
 
-/** React sites rendered on the server: the loader can set text before hydration. */
-const HYDRATION_WARNING = 'Framer and Wix build pages with React and render them on the server. The script can set text before React takes over in the browser; React then logs a hydration error (#418 or #425) and redraws the page once. The final page is correct, but error monitors such as Sentry will report it.';
+/** React sites rendered on the server. From 4.4 the loader waits for
+ * hydration on pages with a framework marker (Framer has one; Wix does not,
+ * so its page asks for data-typeset-defer="hydration"). Neither has been
+ * checked on a live site yet. */
+const FRAMER_WARNING = 'Framer builds pages with React and renders them on the server. From 4.4 the script finds Framer\u2019s page marker and waits for React to take over in the browser before it sets any text, so React logs no hydration error and does not redraw the page. This has not yet been checked on a live Framer site: if an error monitor such as Sentry reports a hydration error (#418 or #425) after you install it, please report it.';
+const WIX_WARNING = 'Wix builds pages with React and renders them on the server, and its pages carry no marker the script recognises. If the script sets text before React takes over in the browser, React logs a hydration error (#418 or #425) and redraws the page once; the final page is correct, but error monitors such as Sentry report it. With 4.4, add data-typeset-defer="hydration" inside the script tag, before defer, and the script waits for React first (at most 10 seconds). This has not yet been checked on a live Wix site.';
 
 export const PLATFORMS: Record<string, Platform> = {
   ghost: {
@@ -55,14 +59,14 @@ export const PLATFORMS: Record<string, Platform> = {
     name: 'Framer',
     path: ['Site Settings', 'General', 'Custom Code → Start of head — paste, publish'],
     tier: 'Needs any paid site plan.',
-    warning: HYDRATION_WARNING,
+    warning: FRAMER_WARNING,
   },
   wix: {
     key: 'wix',
     name: 'Wix',
     path: ['Settings', 'Custom code', 'Add code to Head — paste, apply'],
     tier: 'Needs a Premium plan with a connected domain.',
-    warning: HYDRATION_WARNING,
+    warning: WIX_WARNING,
   },
   shopify: {
     key: 'shopify',

@@ -5,7 +5,9 @@ import { composeTitle } from './title-layout';
 import { measureLayout } from './layout-metrics';
 import type { LayoutMetrics } from './layout-metrics';
 import type { Options } from './typeset.next';
-import { analyzeBreaks, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
+import { analyzeBreaks, exceedsRunBudget, languageOf, languageWeakEnding, tokenForUnit } from './break-opportunities';
+import { latinTag } from './language';
+import { extendedCoverage } from './coverage';
 import { englishPhraseGroups, keptPhrases, phraseBreakCosts, retainSentenceLayout, strandedOpener } from './phrase-boundaries';
 import { retainParagraphRhythm } from './paragraph-rhythm';
 import { opticalMarkerStyle } from './optical-hanging';
@@ -15,9 +17,14 @@ import { inlineBoxInsets } from './inline-box';
 import { preservesAdvances } from './geometry';
 import type { SpaceAdjustment } from './spacing-finish';
 import { canCompose, ENVIRONMENT_OUTCOME } from './environment';
+import { markerRules } from './lifecycle';
+import { hiddenInline } from './hidden-inline';
 
 export const BREAK_ATTRIBUTE = 'data-ts-break';
 const inlineTags = new Set(['A', 'B', 'STRONG', 'EM', 'I', 'SPAN', 'SMALL', 'U', 'S', 'DEL', 'MARK', 'ABBR', 'CITE', 'CODE']);
+// What extended coverage adds (4.3 left these paragraphs native): elements
+// that lay out inline on the baseline, and sup and sub, which are raised.
+const extendedTags = new Set(['TIME', 'DFN', 'KBD', 'INS', 'SUP', 'SUB']);
 const wordPattern = /[^\s\u00a0\u202f]+(?:[\u00a0\u202f][^\s\u00a0\u202f]+)*/gu;
 interface TextRun { node: Text; start: number; end: number }
 interface Point { node: Node; offset: number }
@@ -37,12 +44,22 @@ export interface RichPlan {
   styleSignature: string;
   constraint?: RichConstraint;
   search?: ParagraphSearchEvidence[];
+  /** Source ranges of visually hidden text (see hiddenInline), which takes
+   * no room on a line: no break falls inside one, and lines are verified by
+   * the text they show. */
+  hidden?: [number, number][];
 }
 
-/** Verify every chosen source span and width, not just the number of lines. */
+/** Verify every chosen source span and width, not just the number of lines.
+ * A line starts at its first shown character and ends after its last one;
+ * white space and visually hidden text (plan.hidden) show nothing. */
 export function richLayoutVerified(plan: RichPlan, after: LayoutMetrics): boolean {
-  const starts = [plan.source.search(/\S/u), ...plan.breaks];
-  const ends = [...plan.breaks.map(at => plan.source.slice(0, at).trimEnd().length), plan.source.trimEnd().length];
+  const { source, hidden = [] } = plan;
+  const shown = (at: number) => /\S/u.test(source[at]) && !hidden.some(([start, end]) => at >= start && at < end);
+  const first = (from: number) => { let at = from; while (at < source.length && !shown(at)) at++; return at; };
+  const last = (to: number) => { let at = to; while (at > 0 && !shown(at - 1)) at--; return at; };
+  const starts = [first(0), ...plan.breaks.map(first)];
+  const ends = [...plan.breaks.map(last), last(source.length)];
   return after.lines.length === plan.widths.length && after.overflow <= .5
     && after.lines.every((line, index) => line.sourceStart === starts[index] && line.sourceEnd === ends[index]
       && line.width <= after.width + .5);
@@ -147,16 +164,29 @@ export function breaksChangeAlignment(style: CSSStyleDeclaration): boolean {
   return last !== 'auto' && side(last) !== align;
 }
 
-function unsupported(element: HTMLElement): string | null {
+/** Raised text measured where it sits (the rendered lines verify the plan):
+ * vertical-align super or sub, and sup or sub that normalize.css and
+ * Tailwind's preflight raise with position: relative and a top offset, which
+ * moves the glyphs but not the line. A horizontal offset would. */
+function raised(el: HTMLElement, cs: CSSStyleDeclaration): boolean {
+  if (cs.verticalAlign === 'super' || cs.verticalAlign === 'sub') return cs.position === 'static';
+  return (el.tagName === 'SUP' || el.tagName === 'SUB') && cs.verticalAlign === 'baseline' && cs.position === 'relative'
+    && ['auto', '0px'].includes(cs.left) && ['auto', '0px'].includes(cs.right);
+}
+
+/** Why a block's markup keeps it native, or null. With extended coverage,
+ * extendedTags and raised text are supported, and visually hidden elements
+ * (`hidden`) are skipped with everything inside them: they take no room. */
+function unsupported(element: HTMLElement, extended = false, hidden: readonly HTMLElement[] = []): string | null {
   for (const el of [element, ...element.querySelectorAll<HTMLElement>('*')]) {
-    if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
-    if (el !== element && !inlineTags.has(el.tagName)) return 'native:rich-element';
+    if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some(atom => atom.contains(el))) continue;
+    if (el !== element && !inlineTags.has(el.tagName) && !(extended && extendedTags.has(el.tagName))) return 'native:rich-element';
     if (el.matches('[hidden], [aria-hidden="true"], [contenteditable]:not([contenteditable="false"]), [data-no-typeset]')) return 'native:rich-excluded';
     const cs = getComputedStyle(el);
     if (cs.direction !== 'ltr' || cs.writingMode !== 'horizontal-tb' || (el !== element && cs.unicodeBidi !== 'normal') || cs.visibility !== 'visible') return 'native:rich-direction';
     if ((cs.whiteSpace !== 'normal' && !(el !== element && cs.whiteSpace === 'nowrap'))
       || !preservesAdvances(cs) || cs.textIndent !== '0px') return 'native:rich-whitespace';
-    if (el !== element && (cs.display !== 'inline' || cs.position !== 'static' || cs.verticalAlign !== 'baseline')) return 'native:rich-layout';
+    if (el !== element && (cs.display !== 'inline' || ((cs.position !== 'static' || cs.verticalAlign !== 'baseline') && !(extended && raised(el, cs))))) return 'native:rich-layout';
     if (el !== element && !inlineBoxInsets(cs).supported) return 'native:rich-box';
     for (const pseudo of ['::before', '::after']) {
       const content = getComputedStyle(el, pseudo).content;
@@ -172,6 +202,11 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   if (!canCompose(element.ownerDocument)) {
     return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: ENVIRONMENT_OUTCOME, breaks: [], widths: [], styleSignature: '' };
   }
+  // An unbreakable run too long to measure safely (see RUN_BUDGET): declined
+  // before any box is read.
+  if (exceedsRunBudget(source)) {
+    return { source, before: { lines: [], width: 0, overflow: 0, firstSingleton: false, lastSingleton: false, rag: 0 }, outcome: 'native:run-budget', breaks: [], widths: [], styleSignature: '' };
+  }
   const markers = Array.from(element.querySelectorAll<HTMLElement>('[' + BREAK_ATTRIBUTE + ']'));
   const restoreMarkers = markers.map(marker => override(marker, { display: 'none' }));
   const tracking = Array.from(element.querySelectorAll<HTMLElement>('[data-ts-track]'));
@@ -179,20 +214,28 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
   try {
     const before = !markers.length && nativeLayout ? nativeLayout : measureLayout(element);
     const search: ParagraphSearchEvidence[] = [];
+    let hiddenRanges: [number, number][] = [];
     const result = (outcome: string, breaks: number[] = [], widths: number[] = [], constraint?: RichConstraint): RichPlan => ({ source, before, outcome, breaks, widths, ...(constraint && { constraint }),
-      styleSignature: outcome === 'composed:rich' ? richFingerprint(element) : '', ...(search.length && { search }) });
+      styleSignature: outcome === 'composed:rich' ? richFingerprint(element) : '', ...(search.length && { search }), ...(hiddenRanges.length && { hidden: hiddenRanges }) });
     const lang = element.closest('[lang]')?.getAttribute('lang');
     if (source.length > 12000) return result('native:budget');
     const unicode = options.lineBreaks === 'unicode';
     // A block that already fits on one line ends at 'native:fits' below, or
     // at an earlier decline; it needs the analysis outcome, not its units.
     const fits = before.lines.length === 1 && before.overflow <= .5;
-    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits }) : null;
+    // Extended coverage (the Unicode path only; legacy stays as it was).
+    const extended = unicode && extendedCoverage(options.coverage);
+    const hidden = extended ? hiddenInline(element) : [];
+    const analysis = unicode ? analyzeBreaks(source, { language: lang, hyphens: getComputedStyle(element).hyphens, outcomeOnly: fits, coverage: options.coverage }) : null;
     if (analysis && analysis.outcome !== 'supported') return result(analysis.outcome);
     if (!unicode && ((lang && !/^en(?:-|$)/i.test(lang)) || /[\u0400-\u052f\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]/u.test(source))) return result('native:language');
     if (unicode) for (const el of [element, ...element.querySelectorAll<HTMLElement>('*')]) {
-      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
-      if (languageOf(el.closest('[lang]')?.getAttribute('lang')) !== analysis!.language) return result('native:mixed-language');
+      if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some(atom => atom.contains(el))) continue;
+      // A descendant in another language written in Latin script (a Spanish
+      // phrase, an en-GB quotation) is set with the block's preferences under
+      // extended coverage; 4.3 left the whole paragraph native.
+      const tag = el.closest('[lang]')?.getAttribute('lang');
+      if (languageOf(tag) !== analysis!.language && !(extended && latinTag(tag))) return result('native:mixed-language');
       const cs = getComputedStyle(el);
       if (cs.hyphens === 'auto') return result('native:auto-hyphens');
       // break-word adds emergency opportunities only. Normal opportunities
@@ -200,7 +243,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
       if (cs.wordBreak !== 'normal' || !['auto', 'normal'].includes(cs.lineBreak) || !['normal', 'break-word'].includes(cs.overflowWrap)) return result('native:break-policy');
     }
     if (getComputedStyle(element).display === 'inline') return result('native:inline');
-    const reason = unsupported(element);
+    const reason = unsupported(element, extended, hidden);
     if (reason) return result(reason);
     if (!before.width || !before.lines.length) return result('unmeasurable');
     if (before.lines.length === 1 && before.overflow <= .5) return result('native:fits');
@@ -223,6 +266,23 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
       parts.push({ text: word[0].slice(cursor), index: word.index! + cursor, hyphen: false });
       return parts;
     });
+    // Visually hidden text takes no room: it joins the unit before it (or,
+    // at the start, the one after it), so no line breaks inside it and no
+    // line holds nothing else.
+    hiddenRanges = hidden.map(atom => {
+      const inside = runs.filter(run => atom.contains(run.node));
+      return [inside[0]?.start ?? 0, inside.at(-1)?.end ?? 0] as [number, number];
+    }).filter(([start, end]) => end > start);
+    const inHidden = (at: number) => hiddenRanges.some(([start, end]) => at >= start && at < end);
+    if (hiddenRanges.length) {
+      const join = (i: number) => {
+        const next = words[i + 1];
+        words[i].text = source.slice(words[i].index, next.index + next.text.length); words[i].hyphen = next.hyphen;
+        words.splice(i + 1, 1);
+      };
+      for (let i = words.length - 1; i > 0; i--) if (inHidden(words[i].index)) join(i - 1);
+      if (words.length > 1 && inHidden(words[0].index)) join(0);
+    }
     if (words.length > 500 || source.length > 12000) return result('native:budget');
     // A nonwrapping inline phrase removes only its own internal opportunities.
     // It must not prevent composition of the surrounding paragraph or links.
@@ -255,7 +315,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const range = element.ownerDocument.createRange();
     const leadingInsets = new Map<number, number>(), trailingInsets = new Map<number, number>();
     for (const el of element.querySelectorAll<HTMLElement>('*')) {
-      if (el.hasAttribute(BREAK_ATTRIBUTE)) continue;
+      if (el.hasAttribute(BREAK_ATTRIBUTE) || hidden.some(atom => atom.contains(el))) continue;
       const insets = inlineBoxInsets(getComputedStyle(el));
       if (!insets.left && !insets.right) continue;
       const children = runs.filter(run => el.contains(run.node));
@@ -266,6 +326,8 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     }
     const restoreWhiteSpace = [element, ...element.querySelectorAll<HTMLElement>('*')].filter(el => !el.hasAttribute(BREAK_ATTRIBUTE))
       .map(el => override(el, { 'white-space': 'nowrap', 'text-wrap': 'nowrap' }));
+    // Measured without hidden text, whose clipped box is elsewhere.
+    restoreWhiteSpace.push(...hidden.map(atom => override(atom, { display: 'none' })));
     let edges: { left: number; right: number }[];
     try {
       // One write phase, then one read phase. The browser shapes each run in
@@ -316,7 +378,7 @@ export function planRichText(element: HTMLElement, options: Options = {}, native
     const maxLines = Math.min(options.maxLines || Infinity, clamp > 0 ? clamp : Infinity, before.lines.length + allowance);
     const fontSize = parseFloat(getComputedStyle(element).fontSize) || 16;
     const contourWidths = !title && options.contour === 'finished' && ['left', 'start'].includes(getComputedStyle(element).textAlign)
-      ? finishedContour(element, words, before.width, spaceWidths) : undefined;
+      ? finishedContour(element, words, before.width, spaceWidths, inHidden) : undefined;
     const onSearch = (evidence: ParagraphSearchEvidence) => { search.push(evidence); };
     let lines = title
       ? composeTitle(tokens, before.width, () => 0, { ...options, maxLines, measureRange, breakPenalty,
@@ -616,7 +678,7 @@ const wrapOverrides = new WeakMap<Element, { value: string; priority: string }>(
  * there and left empty, or the framework's next write would land on the
  * marker and be lost. Nor between a comment and the node after it (see
  * afterComment): such a marker goes before the comment. */
-export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = []): RichOutput {
+export function renderRichText(element: HTMLElement, breaks: readonly number[], hangs: readonly OpticalHang[] = [], spaces: readonly SpaceAdjustment[] = [], copy = true): RichOutput {
   const restoreSelection = selectionBookmark(element);
   const hadStyle = element.hasAttribute('style');
   const wrapStyle = element.style.getPropertyValue('text-wrap-style');
@@ -628,6 +690,9 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   const source = element.textContent || '';
   const markers: HTMLElement[] = [];
   const splits = new Map<Text, SplitRecord>();
+  // Spacing and hanging markers take their shared declarations from the
+  // engine's stylesheet where it applies (see markerRules).
+  const inline = (hangs.length || spaces.length) && !markerRules(element);
   const insertions = [...breaks.map(offset => ({ offset, px: 0, spacing: false })), ...hangs.map(hang => ({ ...hang, spacing: false })),
     ...spaces.map(space => ({ ...space, spacing: true }))].sort((a, b) => b.offset - a.offset || b.px - a.px);
   for (const { offset, px, spacing } of insertions) {
@@ -647,10 +712,10 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
     if (px || !breakReplacesSpace(source, offset)) marker.setAttribute('aria-hidden', 'true');
     if (spacing) {
       marker.dataset.tsSpace = String(offset);
-      Object.assign(marker.style, spacingMarkerStyle(px));
+      Object.assign(marker.style, spacingMarkerStyle(px, !!inline));
     } else if (px) {
       marker.dataset.tsHang = String(offset);
-      Object.assign(marker.style, opticalMarkerStyle(px));
+      Object.assign(marker.style, opticalMarkerStyle(px, !!inline));
     // !important beats author br{display:none}; the variable lets print CSS,
     // stale mode and authors switch every generated break off at once.
     } else marker.style.setProperty('display', 'var(--ts-break-display, inline)', 'important');
@@ -675,7 +740,8 @@ export function renderRichText(element: HTMLElement, breaks: readonly number[], 
   for (const split of splits.values()) split.expected = split.parts.map(part => part.data);
   if (splits.size) markers.push(...shieldWhitespace(element));
   restoreSelection();
-  const releaseCopy = preserveRichCopy(element);
+  // copy: false leaves this element's copying to the browser.
+  const releaseCopy = copy ? preserveRichCopy(element) : () => {};
   let released = false;
   return {
     nodes: [element, ...element.querySelectorAll('*'), ...textRuns(element).map(r => r.node)],
@@ -790,7 +856,9 @@ function renderedText(source: string, range: Range, root: HTMLElement): string {
 }
 
 const copyRoots = new WeakMap<Document, WeakMap<HTMLElement, number>>();
-/** Source copying is independent of visual line breaks. Respect site handlers. */
+/** Source copying is independent of visual line breaks. Respect site handlers.
+ * The document's handler is added with the first element registered here;
+ * an element composed with copy: false is never registered. */
 export function preserveRichCopy(element: HTMLElement): () => void {
   const doc = element.ownerDocument;
   let roots = copyRoots.get(doc);

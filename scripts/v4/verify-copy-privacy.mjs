@@ -18,6 +18,11 @@
 // a text-wrap-style the engine overrode.
 // A copy inside one paragraph whose source is hard-wrapped and indented
 // pastes the text as it renders, not the source's white space.
+// With copy: false (4.4) the engine leaves a host's copying to the browser:
+// composed with copy: false throughout, no copy is handled, and a copy
+// inside a paragraph has a line break at each composed line end; with one
+// host off and the others on, a copy inside the off host is the browser's
+// and a copy that reaches an enabled host is still serialized.
 // (The fixture has no visible text field: Chromium's native plain text
 // includes a text field's current value, which Selection.toString(), and so
 // the engine's cross-block text, never has. That predates and is outside C11.)
@@ -99,7 +104,8 @@ for (const config of browsers) {
     /** The inline styles as the CSSOM holds them before composition (an engine
      * without text-wrap-style: pretty drops that declaration). */
     let authored = { p2: '', p3: '' };
-    for (const composed of [true, false]) {
+    for (const mode of /** @type {const} */ (['composed', 'control', 'copy-off', 'mixed'])) {
+      const composed = mode !== 'control';
       const context = await browser.newContext({ viewport: { width: 520, height: 1200 }, ...(config.name === 'chromium' ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}) });
       await context.route('http://copy.test/**', route => new URL(route.request().url()).pathname === '/typeset.js'
         ? route.fulfill({ contentType: 'text/javascript', body: bundle })
@@ -108,7 +114,14 @@ for (const config of browsers) {
       tab.setDefaultTimeout(20000);
       tab.on('pageerror', error => errors.push({ browser: config.name, error: error.message }));
       await tab.goto('http://copy.test/page');
-      if (composed) {
+      if (mode === 'copy-off' || mode === 'mixed') {
+        await tab.evaluate(async mode => {
+          const off = window.Typeset.mount(document, mode === 'mixed' ? '#p1' : 'main p', { copy: false });
+          const on = mode === 'mixed' ? window.Typeset.mount(document, '#p2, #p3, #p4') : null;
+          await off.ready; await on?.ready;
+        }, mode);
+        check(`${mode}: the paragraphs compose with generated breaks`, await tab.evaluate(() => ['p1', 'p2', 'p3', 'p4'].every(id => document.getElementById(id)?.dataset.tsOutcome === 'composed:rich')));
+      } else if (composed) {
         authored = await tab.evaluate(() => ({ p2: /** @type {HTMLElement} */ (document.getElementById('p2')).style.cssText, p3: /** @type {HTMLElement} */ (document.getElementById('p3')).style.cssText }));
         await tab.evaluate(async () => { const c = window.Typeset.mount(document, 'main p'); await c.ready; });
         check('the paragraphs compose with generated breaks', await tab.evaluate(() => ['p1', 'p2', 'p3', 'p4'].every(id => document.getElementById(id)?.dataset.tsOutcome === 'composed:rich') && document.querySelectorAll('br[data-ts-break]').length > 3));
@@ -122,7 +135,7 @@ for (const config of browsers) {
         document.addEventListener('copy', e => { w.handled = e.defaultPrevented; });
         /** @type {HTMLElement} */ (document.getElementById('sink')).addEventListener('paste', e => { w.captured = { html: e.clipboardData?.getData('text/html') ?? '', text: e.clipboardData?.getData('text/plain') ?? '' }; e.preventDefault(); });
       });
-      const results = clip[composed ? 'composed' : 'control'] = {};
+      const results = clip[mode] = {};
       for (const [name, points] of Object.entries(SELECTIONS)) {
         await tab.evaluate(() => { /** @type {any} */ (window).captured = null; /** @type {any} */ (window).handled = null; });
         await tab.evaluate(select, points);
@@ -148,6 +161,15 @@ for (const config of browsers) {
     check('select all: the author\'s inline styles survive, including a text-wrap-style the engine overrode', clip.composed['select all'].html.includes(tag('p2', authored.p2)) && clip.composed['select all'].html.includes(tag('p3', authored.p3)), { authored, tags: clip.composed['select all'].html.match(/<p [^>]*>/g) });
     check('the link is still absolute and emphasis survives in the HTML', /href="http:\/\/copy\.test\/guide"/.test(clip.composed['p1 to p2'].html) || /href="http:\/\/copy\.test\/guide"/.test(clip.composed['select all'].html), clip.composed['select all'].html.slice(0, 400));
     check('the uncomposed control proves the page hides these marks from native copy', MARKS.filter(mark => clip.control['select all'].text.includes(mark)).length === 0, MARKS.filter(mark => clip.control['select all'].text.includes(mark)));
+    // copy: false.
+    const words = (/** @type {string} */ text) => text.replace(/\s+/g, ' ').trim();
+    const off = clip['copy-off'], mixed = clip.mixed;
+    check('copy-off: with copy: false on every host no copy is handled by the engine', Object.values(off).every(result => result.handled === false), Object.fromEntries(Object.entries(off).map(([name, result]) => [name, result.handled])));
+    check('copy-off: a copy inside a paragraph is the browser\'s own, with a line break at each composed line end', /\n/.test(off['within p1'].text.replace(/\r\n/g, '\n')) && words(off['within p1'].text) === words(clip.control['within p1'].text),
+      { copied: off['within p1'].text.slice(0, 200) });
+    check('mixed: a copy inside the copy: false host is the browser\'s own', mixed['within p1'].handled === false && /\n/.test(mixed['within p1'].text.replace(/\r\n/g, '\n')), mixed['within p1']);
+    check('mixed: copies that reach an enabled host are still serialized as native copy of the uncomposed page', ['within p4, across the source\'s line wraps', 'p1 to p2'].every(name => mixed[name].handled === true && mixed[name].text.replace(/\r\n/g, '\n').trim() === clip.control[name].text.replace(/\r\n/g, '\n').trim()),
+      { p4: mixed['within p4, across the source\'s line wraps'], p1p2: mixed['p1 to p2'] });
   } catch (error) {
     errors.push({ browser: config.name, error: String(/** @type {Error} */ (error).stack || error) });
   } finally { await browser.close(); }

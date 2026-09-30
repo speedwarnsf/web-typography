@@ -9,7 +9,8 @@
  * not bundled. scripts/v4/verify-docs.mjs fails when a code appears in the
  * engine but not here, or here but not in the engine. 4.3 added
  * native:justify, native:live-region, native:translated and
- * native:environment, and the tracking status native:tracking-comment.
+ * native:environment, and the tracking status native:tracking-comment; 4.4
+ * added native:run-budget.
  */
 export const OUTCOMES = [
   // Composed: Typeset chose the breaks.
@@ -23,7 +24,7 @@ export const OUTCOMES = [
   'native:rich-element', 'native:rich-excluded', 'native:rich-direction', 'native:rich-whitespace',
   'native:rich-layout', 'native:rich-box', 'native:rich-decorated', 'native:rich-tokens', 'native:react-component',
   // Left as the browser set it: Typeset could not improve it safely.
-  'native:budget', 'native:no-candidate', 'native:line-budget', 'native:quality', 'native:render-failed', 'native:verification',
+  'native:budget', 'native:run-budget', 'native:no-candidate', 'native:line-budget', 'native:quality', 'native:render-failed', 'native:verification',
   // Not processed.
   'skipped:excluded', 'skipped:framework', 'unmeasurable', 'native:translated', 'native:environment',
 ] as const;
