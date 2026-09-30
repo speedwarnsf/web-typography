@@ -393,6 +393,8 @@ I need it?" list has a languages row.
 
 ## 4.3.2 - 2026-09-29
 
+**Withdrawn before publication.** 4.3.2 was cut and tagged (v4.3.2, fc7f84e) but never published to npm: its release verification failed in 4 of 5 hosted runs on `verify-react`'s "a real ancestor style change still recomposes every block", because the idle-starvation change below let one off-screen React block recompose after the check's 300 ms quiet window on a loaded runner. 4.4.0 carries the corrected change. `scripts/v4/withdrawn.json` records the withdrawal, and `verify-ledger --network` skips 4.3.2's registry check.
+
 4.3.2 is a patch release of 4.3.1: no API, option, outcome code or default
 changed. It fixes how slowly the React adapters caught up with off-screen
 text on a page the browser gives no idle time.

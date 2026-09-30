@@ -1,0 +1,10 @@
+{
+  "note": "Versions that release-cut recorded in public/releases/published.json but that were never published to npm. The ledger stays append-only; verify-ledger --network skips these versions' registry cross-check instead of failing on them, and still checks every archived file. A withdrawn version's tag stays where it is.",
+  "versions": {
+    "4.3.2": {
+      "date": "2026-09-29",
+      "supersededBy": "4.4.0",
+      "reason": "Its release verification failed in 4 of 5 hosted runs on verify-react's 'a real ancestor style change still recomposes every block': the idle-starvation change let one off-screen React block recompose after the check's 300 ms quiet window on a loaded runner. 4.4.0 carries the corrected change. Tag v4.3.2 names the cut commit fc7f84e; no npm version and no GitHub Release exist for it."
+    }
+  }
+}
